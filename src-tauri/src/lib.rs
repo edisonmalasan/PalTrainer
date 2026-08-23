@@ -40,6 +40,14 @@ pub fn run() {
             commands::inspect::run_save_diagnostics,
             commands::inspect::lookup_breeding,
             commands::inspect::get_game_catalog,
+            commands::player::preview_update_player,
+            commands::player::commit_update_player,
+            commands::player::preview_delete_player,
+            commands::player::commit_delete_player,
+            commands::player::preview_bulk_max_players,
+            commands::player::commit_bulk_max_players,
+            commands::player::preview_unlock_player_features,
+            commands::player::commit_unlock_player_features,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PalTrainer");

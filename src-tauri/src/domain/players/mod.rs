@@ -1,4 +1,6 @@
-//! Player read-only projections.
+//! Player projections, mutation types, and helpers.
+
+pub mod mutation;
 
 use serde::{Deserialize, Serialize};
 

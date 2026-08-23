@@ -32,7 +32,34 @@ export interface CommandError {
   readonly details?: string;
 }
 
-// ── Phase 4 Domain DTOs ──────────────────────────────────────────────────────
+export interface EntityDiffSummary {
+  readonly entityType: string;
+  readonly entityId: string;
+  readonly label: string;
+  readonly changeDescription: string;
+}
+
+export interface MutationPreview {
+  readonly operation: string;
+  readonly targetSaveRoot: string;
+  readonly entitiesToModify: readonly EntityDiffSummary[];
+  readonly entitiesToDelete: readonly EntityDiffSummary[];
+  readonly filesToModify: readonly string[];
+  readonly filesToDelete: readonly string[];
+  readonly backupTarget: string | null;
+  readonly warnings: readonly string[];
+  readonly isSafe: boolean;
+}
+
+export interface UpdatePlayerDto {
+  readonly uid: string;
+  readonly nickname?: string;
+  readonly level?: number;
+  readonly exp?: number;
+  readonly hp?: number;
+  readonly maxHp?: number;
+  readonly status?: string;
+}
 
 export interface PlayerProjection {
   readonly uid: string;
