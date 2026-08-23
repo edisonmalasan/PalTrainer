@@ -8,3 +8,4 @@ pub mod pals;
 pub mod players;
 pub mod save_session;
 pub mod tools;
+pub mod world;
