@@ -17,9 +17,9 @@ use crate::resources::loader::GameCatalog;
 
 #[tauri::command]
 pub fn get_players(state: State<'_, SessionState>) -> Result<Vec<PlayerProjection>, AppError> {
-    let lock = state.lock().map_err(|e| {
-        AppError::new("lock_error", format!("Failed to lock session state: {}", e))
-    })?;
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
 
     let session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
     let save_root = session.save_root();
@@ -31,7 +31,10 @@ pub fn get_players(state: State<'_, SessionState>) -> Result<Vec<PlayerProjectio
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().and_then(|e| e.to_str()) == Some("sav") {
-                    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown");
+                    let stem = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("unknown");
                     let clean_uid = stem.to_lowercase().replace('-', "");
                     players.push(PlayerProjection {
                         uid: clean_uid.clone(),
@@ -71,9 +74,9 @@ pub fn get_players(state: State<'_, SessionState>) -> Result<Vec<PlayerProjectio
 
 #[tauri::command]
 pub fn get_guilds(state: State<'_, SessionState>) -> Result<Vec<GuildProjection>, AppError> {
-    let lock = state.lock().map_err(|e| {
-        AppError::new("lock_error", format!("Failed to lock session state: {}", e))
-    })?;
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
 
     let _session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
 
@@ -84,21 +87,19 @@ pub fn get_guilds(state: State<'_, SessionState>) -> Result<Vec<GuildProjection>
         admin_player_name: "Host Player".into(),
         level: 20,
         base_count: 3,
-        members: vec![
-            GuildMemberProjection {
-                player_uid: "00000000000000000000000000000001".into(),
-                player_name: "Host Player".into(),
-                is_admin: true,
-            },
-        ],
+        members: vec![GuildMemberProjection {
+            player_uid: "00000000000000000000000000000001".into(),
+            player_name: "Host Player".into(),
+            is_admin: true,
+        }],
     }])
 }
 
 #[tauri::command]
 pub fn get_bases(state: State<'_, SessionState>) -> Result<Vec<BaseProjection>, AppError> {
-    let lock = state.lock().map_err(|e| {
-        AppError::new("lock_error", format!("Failed to lock session state: {}", e))
-    })?;
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
 
     let _session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
 
@@ -123,9 +124,9 @@ pub fn get_pals(
     player_uid: Option<String>,
     state: State<'_, SessionState>,
 ) -> Result<Vec<PalProjection>, AppError> {
-    let lock = state.lock().map_err(|e| {
-        AppError::new("lock_error", format!("Failed to lock session state: {}", e))
-    })?;
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
 
     let _session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
     let owner = player_uid.unwrap_or_else(|| "00000000000000000000000000000001".into());
@@ -151,7 +152,12 @@ pub fn get_pals(
             souls: 30,
             is_lucky: false,
             is_boss: true,
-            passive_skills: vec!["Legend".into(), "Musclehead".into(), "Ferocious".into(), "BurlyBody".into()],
+            passive_skills: vec![
+                "Legend".into(),
+                "Musclehead".into(),
+                "Ferocious".into(),
+                "BurlyBody".into(),
+            ],
             active_skills: vec!["DragonMeteor".into(), "FireBall".into(), "SolarBeam".into()],
             location: "Party".into(),
         },
@@ -187,9 +193,9 @@ pub fn get_inventory(
     _container_id: Option<String>,
     state: State<'_, SessionState>,
 ) -> Result<InventoryProjection, AppError> {
-    let lock = state.lock().map_err(|e| {
-        AppError::new("lock_error", format!("Failed to lock session state: {}", e))
-    })?;
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
 
     let _session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
 
@@ -226,9 +232,9 @@ pub fn get_inventory(
 
 #[tauri::command]
 pub fn get_map_markers(state: State<'_, SessionState>) -> Result<MapDataProjection, AppError> {
-    let lock = state.lock().map_err(|e| {
-        AppError::new("lock_error", format!("Failed to lock session state: {}", e))
-    })?;
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
 
     let _session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
 
@@ -263,10 +269,12 @@ pub fn get_map_markers(state: State<'_, SessionState>) -> Result<MapDataProjecti
 }
 
 #[tauri::command]
-pub fn run_save_diagnostics(state: State<'_, SessionState>) -> Result<DiagnosticReportDto, AppError> {
-    let lock = state.lock().map_err(|e| {
-        AppError::new("lock_error", format!("Failed to lock session state: {}", e))
-    })?;
+pub fn run_save_diagnostics(
+    state: State<'_, SessionState>,
+) -> Result<DiagnosticReportDto, AppError> {
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
 
     let session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
     let mut issues = Vec::new();
@@ -278,7 +286,10 @@ pub fn run_save_diagnostics(state: State<'_, SessionState>) -> Result<Diagnostic
                 severity: "Warning".into(),
                 category: "StaleFile".into(),
                 target_id: "save_files".into(),
-                description: format!("{} file(s) have been modified externally since load.", stale.len()),
+                description: format!(
+                    "{} file(s) have been modified externally since load.",
+                    stale.len()
+                ),
                 can_auto_repair: false,
             });
         }

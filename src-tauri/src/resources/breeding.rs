@@ -50,7 +50,13 @@ impl BreedingCalculator {
         calc
     }
 
-    pub fn register_pal(&mut self, name: impl Into<String>, combi_rank: i32, rarity: i32, ignore_combi: bool) {
+    pub fn register_pal(
+        &mut self,
+        name: impl Into<String>,
+        combi_rank: i32,
+        rarity: i32,
+        ignore_combi: bool,
+    ) {
         let n = name.into();
         self.pals.insert(
             n.clone(),
@@ -63,11 +69,17 @@ impl BreedingCalculator {
         );
     }
 
-    pub fn register_unique_combo(&mut self, p1: impl Into<String>, p2: impl Into<String>, child: impl Into<String>) {
+    pub fn register_unique_combo(
+        &mut self,
+        p1: impl Into<String>,
+        p2: impl Into<String>,
+        child: impl Into<String>,
+    ) {
         let name1 = p1.into();
         let name2 = p2.into();
         let res = child.into();
-        self.unique_combos.insert((name1.clone(), name2.clone()), res.clone());
+        self.unique_combos
+            .insert((name1.clone(), name2.clone()), res.clone());
         self.unique_combos.insert((name2, name1), res);
     }
 
@@ -76,7 +88,10 @@ impl BreedingCalculator {
     /// Tiebreakers: closest rarity to parent average rarity, then lower rarity.
     pub fn calculate_child(&self, parent1: &str, parent2: &str) -> Option<String> {
         // 1. Check unique combination override
-        if let Some(child) = self.unique_combos.get(&(parent1.to_string(), parent2.to_string())) {
+        if let Some(child) = self
+            .unique_combos
+            .get(&(parent1.to_string(), parent2.to_string()))
+        {
             return Some(child.clone());
         }
 
@@ -187,7 +202,10 @@ mod tests {
     #[test]
     fn test_same_parent_breeding() {
         let calc = BreedingCalculator::new();
-        assert_eq!(calc.calculate_child("Anubis", "Anubis"), Some("Anubis".to_string()));
+        assert_eq!(
+            calc.calculate_child("Anubis", "Anubis"),
+            Some("Anubis".to_string())
+        );
     }
 
     #[test]

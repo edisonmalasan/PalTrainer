@@ -44,6 +44,9 @@ mod tests {
     fn test_world_to_map_coordinates() {
         let (mx, my) = world_to_map_coordinates(0.0, 0.0);
         assert_eq!(mx, 0);
-        assert_eq!(my, (POST_SAKURAJIMA_TRANSL_X / POST_SAKURAJIMA_SCALE).round() as i32);
+        assert_eq!(
+            my,
+            (POST_SAKURAJIMA_TRANSL_X / POST_SAKURAJIMA_SCALE).round() as i32
+        );
     }
 }

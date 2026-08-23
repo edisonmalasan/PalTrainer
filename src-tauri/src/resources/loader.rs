@@ -88,9 +88,18 @@ fn default_pals() -> Vec<PalSpeciesInfo> {
             attack_scaling: 130.0,
             defense_scaling: 100.0,
             work_suitabilities: vec![
-                WorkSuitabilityInfo { work_type: "Handiwork".into(), level: 4 },
-                WorkSuitabilityInfo { work_type: "Mining".into(), level: 3 },
-                WorkSuitabilityInfo { work_type: "Transport".into(), level: 2 },
+                WorkSuitabilityInfo {
+                    work_type: "Handiwork".into(),
+                    level: 4,
+                },
+                WorkSuitabilityInfo {
+                    work_type: "Mining".into(),
+                    level: 3,
+                },
+                WorkSuitabilityInfo {
+                    work_type: "Transport".into(),
+                    level: 2,
+                },
             ],
         },
         PalSpeciesInfo {
@@ -101,9 +110,10 @@ fn default_pals() -> Vec<PalSpeciesInfo> {
             hp_scaling: 140.0,
             attack_scaling: 140.0,
             defense_scaling: 135.0,
-            work_suitabilities: vec![
-                WorkSuitabilityInfo { work_type: "Cooling".into(), level: 4 },
-            ],
+            work_suitabilities: vec![WorkSuitabilityInfo {
+                work_type: "Cooling".into(),
+                level: 4,
+            }],
         },
         PalSpeciesInfo {
             id: "Jormuntide".into(),
@@ -113,9 +123,10 @@ fn default_pals() -> Vec<PalSpeciesInfo> {
             hp_scaling: 130.0,
             attack_scaling: 150.0,
             defense_scaling: 100.0,
-            work_suitabilities: vec![
-                WorkSuitabilityInfo { work_type: "Watering".into(), level: 4 },
-            ],
+            work_suitabilities: vec![WorkSuitabilityInfo {
+                work_type: "Watering".into(),
+                level: 4,
+            }],
         },
         PalSpeciesInfo {
             id: "Lamball".into(),
@@ -126,9 +137,18 @@ fn default_pals() -> Vec<PalSpeciesInfo> {
             attack_scaling: 70.0,
             defense_scaling: 70.0,
             work_suitabilities: vec![
-                WorkSuitabilityInfo { work_type: "Handiwork".into(), level: 1 },
-                WorkSuitabilityInfo { work_type: "Transport".into(), level: 1 },
-                WorkSuitabilityInfo { work_type: "Farming".into(), level: 1 },
+                WorkSuitabilityInfo {
+                    work_type: "Handiwork".into(),
+                    level: 1,
+                },
+                WorkSuitabilityInfo {
+                    work_type: "Transport".into(),
+                    level: 1,
+                },
+                WorkSuitabilityInfo {
+                    work_type: "Farming".into(),
+                    level: 1,
+                },
             ],
         },
     ]
@@ -136,38 +156,168 @@ fn default_pals() -> Vec<PalSpeciesInfo> {
 
 fn default_items() -> Vec<ItemInfo> {
     vec![
-        ItemInfo { id: "PalSphere".into(), name: "Pal Sphere".into(), category: "Sphere".into(), max_stack: 9999, rarity: 1 },
-        ItemInfo { id: "MegaSphere".into(), name: "Mega Sphere".into(), category: "Sphere".into(), max_stack: 9999, rarity: 2 },
-        ItemInfo { id: "GigaSphere".into(), name: "Giga Sphere".into(), category: "Sphere".into(), max_stack: 9999, rarity: 3 },
-        ItemInfo { id: "HyperSphere".into(), name: "Hyper Sphere".into(), category: "Sphere".into(), max_stack: 9999, rarity: 4 },
-        ItemInfo { id: "UltraSphere".into(), name: "Ultra Sphere".into(), category: "Sphere".into(), max_stack: 9999, rarity: 5 },
-        ItemInfo { id: "LegendarySphere".into(), name: "Legendary Sphere".into(), category: "Sphere".into(), max_stack: 9999, rarity: 6 },
-        ItemInfo { id: "Cake".into(), name: "Cake".into(), category: "Food".into(), max_stack: 9999, rarity: 3 },
-        ItemInfo { id: "Wood".into(), name: "Wood".into(), category: "Material".into(), max_stack: 9999, rarity: 1 },
-        ItemInfo { id: "Stone".into(), name: "Stone".into(), category: "Material".into(), max_stack: 9999, rarity: 1 },
-        ItemInfo { id: "Pal_crystal_and_metal".into(), name: "Pal Metal Ingot".into(), category: "Material".into(), max_stack: 9999, rarity: 4 },
+        ItemInfo {
+            id: "PalSphere".into(),
+            name: "Pal Sphere".into(),
+            category: "Sphere".into(),
+            max_stack: 9999,
+            rarity: 1,
+        },
+        ItemInfo {
+            id: "MegaSphere".into(),
+            name: "Mega Sphere".into(),
+            category: "Sphere".into(),
+            max_stack: 9999,
+            rarity: 2,
+        },
+        ItemInfo {
+            id: "GigaSphere".into(),
+            name: "Giga Sphere".into(),
+            category: "Sphere".into(),
+            max_stack: 9999,
+            rarity: 3,
+        },
+        ItemInfo {
+            id: "HyperSphere".into(),
+            name: "Hyper Sphere".into(),
+            category: "Sphere".into(),
+            max_stack: 9999,
+            rarity: 4,
+        },
+        ItemInfo {
+            id: "UltraSphere".into(),
+            name: "Ultra Sphere".into(),
+            category: "Sphere".into(),
+            max_stack: 9999,
+            rarity: 5,
+        },
+        ItemInfo {
+            id: "LegendarySphere".into(),
+            name: "Legendary Sphere".into(),
+            category: "Sphere".into(),
+            max_stack: 9999,
+            rarity: 6,
+        },
+        ItemInfo {
+            id: "Cake".into(),
+            name: "Cake".into(),
+            category: "Food".into(),
+            max_stack: 9999,
+            rarity: 3,
+        },
+        ItemInfo {
+            id: "Wood".into(),
+            name: "Wood".into(),
+            category: "Material".into(),
+            max_stack: 9999,
+            rarity: 1,
+        },
+        ItemInfo {
+            id: "Stone".into(),
+            name: "Stone".into(),
+            category: "Material".into(),
+            max_stack: 9999,
+            rarity: 1,
+        },
+        ItemInfo {
+            id: "Pal_crystal_and_metal".into(),
+            name: "Pal Metal Ingot".into(),
+            category: "Material".into(),
+            max_stack: 9999,
+            rarity: 4,
+        },
     ]
 }
 
 fn default_passives() -> Vec<PassiveSkillInfo> {
     vec![
-        PassiveSkillInfo { id: "Legend".into(), name: "Legend".into(), tier: 3, description: "Attack +20%, Defense +20%, Movement Speed +15%".into() },
-        PassiveSkillInfo { id: "Musclehead".into(), name: "Musclehead".into(), tier: 3, description: "Attack +30%, Work Speed -50%".into() },
-        PassiveSkillInfo { id: "Ferocious".into(), name: "Ferocious".into(), tier: 3, description: "Attack +20%".into() },
-        PassiveSkillInfo { id: "BurlyBody".into(), name: "Burly Body".into(), tier: 3, description: "Defense +20%".into() },
-        PassiveSkillInfo { id: "Runner".into(), name: "Runner".into(), tier: 2, description: "Movement Speed +20%".into() },
-        PassiveSkillInfo { id: "Swift".into(), name: "Swift".into(), tier: 3, description: "Movement Speed +30%".into() },
-        PassiveSkillInfo { id: "Artisan".into(), name: "Artisan".into(), tier: 3, description: "Work Speed +50%".into() },
-        PassiveSkillInfo { id: "WorkSlave".into(), name: "Work Slave".into(), tier: 1, description: "Work Speed +30%, Attack -30%".into() },
+        PassiveSkillInfo {
+            id: "Legend".into(),
+            name: "Legend".into(),
+            tier: 3,
+            description: "Attack +20%, Defense +20%, Movement Speed +15%".into(),
+        },
+        PassiveSkillInfo {
+            id: "Musclehead".into(),
+            name: "Musclehead".into(),
+            tier: 3,
+            description: "Attack +30%, Work Speed -50%".into(),
+        },
+        PassiveSkillInfo {
+            id: "Ferocious".into(),
+            name: "Ferocious".into(),
+            tier: 3,
+            description: "Attack +20%".into(),
+        },
+        PassiveSkillInfo {
+            id: "BurlyBody".into(),
+            name: "Burly Body".into(),
+            tier: 3,
+            description: "Defense +20%".into(),
+        },
+        PassiveSkillInfo {
+            id: "Runner".into(),
+            name: "Runner".into(),
+            tier: 2,
+            description: "Movement Speed +20%".into(),
+        },
+        PassiveSkillInfo {
+            id: "Swift".into(),
+            name: "Swift".into(),
+            tier: 3,
+            description: "Movement Speed +30%".into(),
+        },
+        PassiveSkillInfo {
+            id: "Artisan".into(),
+            name: "Artisan".into(),
+            tier: 3,
+            description: "Work Speed +50%".into(),
+        },
+        PassiveSkillInfo {
+            id: "WorkSlave".into(),
+            name: "Work Slave".into(),
+            tier: 1,
+            description: "Work Speed +30%, Attack -30%".into(),
+        },
     ]
 }
 
 fn default_active_skills() -> Vec<ActiveSkillInfo> {
     vec![
-        ActiveSkillInfo { id: "DragonMeteor".into(), name: "Dragon Meteor".into(), element: "Dragon".into(), power: 150, cooldown_seconds: 55 },
-        ActiveSkillInfo { id: "FireBall".into(), name: "Fire Ball".into(), element: "Fire".into(), power: 150, cooldown_seconds: 55 },
-        ActiveSkillInfo { id: "HydroStream".into(), name: "Hydro Stream".into(), element: "Water".into(), power: 150, cooldown_seconds: 55 },
-        ActiveSkillInfo { id: "SolarBeam".into(), name: "Solar Beam".into(), element: "Grass".into(), power: 150, cooldown_seconds: 55 },
-        ActiveSkillInfo { id: "BlizzardSpike".into(), name: "Blizzard Spike".into(), element: "Ice".into(), power: 130, cooldown_seconds: 45 },
+        ActiveSkillInfo {
+            id: "DragonMeteor".into(),
+            name: "Dragon Meteor".into(),
+            element: "Dragon".into(),
+            power: 150,
+            cooldown_seconds: 55,
+        },
+        ActiveSkillInfo {
+            id: "FireBall".into(),
+            name: "Fire Ball".into(),
+            element: "Fire".into(),
+            power: 150,
+            cooldown_seconds: 55,
+        },
+        ActiveSkillInfo {
+            id: "HydroStream".into(),
+            name: "Hydro Stream".into(),
+            element: "Water".into(),
+            power: 150,
+            cooldown_seconds: 55,
+        },
+        ActiveSkillInfo {
+            id: "SolarBeam".into(),
+            name: "Solar Beam".into(),
+            element: "Grass".into(),
+            power: 150,
+            cooldown_seconds: 55,
+        },
+        ActiveSkillInfo {
+            id: "BlizzardSpike".into(),
+            name: "Blizzard Spike".into(),
+            element: "Ice".into(),
+            power: 130,
+            cooldown_seconds: 45,
+        },
     ]
 }
