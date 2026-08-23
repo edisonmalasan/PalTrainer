@@ -170,11 +170,22 @@ Do not modify these without an explicit reason:
 
 ## Git Rules
 
-- Use branches prefixed with `codex/` unless the user asks for another branch name.
-- Check `git status --short` before and after edits.
+- Do not work directly on `main` for implementation, documentation, or configuration changes unless the user explicitly asks for a direct `main` edit.
+- Use a separate branch for each feature, fix, documentation change, configuration change, or repository-maintenance task.
+- Branch names must follow `{type}/{short-description}` in kebab-case, using valid prefixes such as `feat/`, `fix/`, `docs/`, `chore/`, `refactor/`, `test/`, `ci/`, `hotfix/`, or `release/`.
+- Do not use `codex/`, `phase1/`, or other non-standard branch prefixes unless the user explicitly requests one.
+- Before starting each feature, inspect `git status --short --branch` and `git branch --all --verbose --no-abbrev`.
+- Implement and commit one feature or process step at a time. Do not combine unrelated Phase work into one bulk commit.
+- For each feature branch: create or switch to the correct branch, implement only that feature, run the relevant verification, commit only the files for that feature, then push the branch.
+- Use Conventional Commit messages such as `feat(scope): add thing`, `fix(scope): correct thing`, `docs(scope): clarify thing`, or `chore(scope): update thing`.
+- Inspect staged diffs before committing with `git diff --staged`.
+- Do not commit ignored files unless the user explicitly asks for that ignored file to be tracked. In particular, `docs/` is ignored and should stay untracked unless the user changes that rule.
+- Check `git status --short --branch` before and after edits.
 - Do not revert user changes.
 - Keep commits focused on one logical change.
 - Do not commit generated dependency folders or build outputs.
+- Push feature branches to the remote after successful verification and commit.
+- Merge to `main` only after the branch satisfies the relevant plan/AGENTS requirements and verification has been run or a blocker has been clearly recorded.
 - Do not rewrite history unless explicitly requested.
 
 ## Definition of Done
