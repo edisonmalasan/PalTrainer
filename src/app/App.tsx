@@ -16,6 +16,7 @@ import { MapView } from "../features/map/MapView";
 import { PalsView } from "../features/pals/PalsView";
 import { PlayersView } from "../features/players/PlayersView";
 import { SaveSessionView } from "../features/save-session/SaveSessionView";
+import { WorldOptionsView } from "../features/world/WorldOptionsView";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { appRoutes } from "./routes";
 
@@ -60,7 +61,7 @@ function Workbench() {
           setLogs([
             {
               level: "info",
-              message: "Phase 4 workbench ready. Load a save to inspect.",
+              message: "PalTrainer workbench ready. Load a save to inspect and edit.",
               timestamp: new Date().toISOString(),
             },
           ]);
@@ -200,6 +201,7 @@ function RouteContent({
 }) {
   switch (route) {
     case "save-session":  return <SaveSessionView />;
+    case "world-options": return <WorldOptionsView />;
     case "players":       return <PlayersView />;
     case "guilds":        return <GuildsView />;
     case "bases":         return <BasesView />;

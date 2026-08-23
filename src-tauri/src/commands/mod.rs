@@ -7,3 +7,4 @@ pub mod inspect;
 pub mod player;
 pub mod save_session;
 pub mod settings;
+pub mod world;

@@ -158,6 +158,37 @@ export interface InventoryProjection {
   readonly slots: readonly InventorySlotProjection[];
 }
 
+export interface WorldOptionsDto {
+  readonly expRate: number;
+  readonly palCaptureRate: number;
+  readonly palSpawnNumRate: number;
+  readonly palDamageRateAttack: number;
+  readonly palDamageRateDefense: number;
+  readonly playerDamageRateAttack: number;
+  readonly playerDamageRateDefense: number;
+  readonly playerStaminaDecreaceRate: number;
+  readonly playerStomachDecreaceRate: number;
+  readonly playerAutoHpRegenRate: number;
+  readonly buildObjectDamageRate: number;
+  readonly buildObjectDeteriorationDamageRate: number;
+  readonly collectionDropRate: number;
+  readonly collectionObjectHpRate: number;
+  readonly collectionObjectRespawnSpeedRate: number;
+  readonly enemyDropItemRate: number;
+  readonly deathPenalty: string;
+  readonly guildPlayerMaxNum: number;
+  readonly palEggDefaultHatchingTime: number;
+  readonly enableAimAssistPad: boolean;
+  readonly enableAimAssistKeyboard: boolean;
+}
+
+export interface WorldMetadataDto {
+  readonly worldName: string;
+  readonly gameDays: number;
+  readonly inGameTimeSeconds: number;
+  readonly isMultiplayer: boolean;
+}
+
 export interface Point2D {
   readonly x: number;
   readonly y: number;
