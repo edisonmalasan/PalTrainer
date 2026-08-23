@@ -48,6 +48,14 @@ pub fn run() {
             commands::player::commit_bulk_max_players,
             commands::player::preview_unlock_player_features,
             commands::player::commit_unlock_player_features,
+            commands::guild::preview_update_guild,
+            commands::guild::commit_update_guild,
+            commands::guild::preview_transfer_guild_admin,
+            commands::guild::commit_transfer_guild_admin,
+            commands::guild::preview_delete_guild,
+            commands::guild::commit_delete_guild,
+            commands::guild::preview_disband_empty_guilds,
+            commands::guild::commit_disband_empty_guilds,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PalTrainer");

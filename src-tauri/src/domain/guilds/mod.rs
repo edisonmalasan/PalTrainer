@@ -1,4 +1,6 @@
-//! Guild read-only projections.
+//! Guild projections and mutation types.
+
+pub mod mutation;
 
 use serde::{Deserialize, Serialize};
 
