@@ -118,10 +118,7 @@ mod tests {
     fn fstring_ascii_matches_reference_layout() {
         let mut w = FArchiveWriter::new();
         w.fstring("Pal");
-        assert_eq!(
-            w.into_bytes(),
-            vec![4, 0, 0, 0, b'P', b'a', b'l', 0]
-        );
+        assert_eq!(w.into_bytes(), vec![4, 0, 0, 0, b'P', b'a', b'l', 0]);
     }
 
     #[test]

@@ -85,7 +85,11 @@ impl FArchiveReader<'_> {
                 let enum_type = self.fstring()?;
                 let id = self.optional_guid()?;
                 let value = self.fstring()?;
-                Ok(PropertyValue::Enum { id, enum_type, value })
+                Ok(PropertyValue::Enum {
+                    id,
+                    enum_type,
+                    value,
+                })
             }
             // Bool stores its value BEFORE the optional id, unlike the rest.
             "BoolProperty" => {
@@ -238,7 +242,11 @@ impl FArchiveReader<'_> {
             "BoolProperty" => ArrayValue::Bools(bools),
             _ => ArrayValue::Strings(strings),
         };
-        Ok(PropertyValue::Array { id, array_type, value })
+        Ok(PropertyValue::Array {
+            id,
+            array_type,
+            value,
+        })
     }
 
     fn map_property(&mut self, path: &str) -> Result<PropertyValue, SaveError> {
@@ -261,8 +269,11 @@ impl FArchiveReader<'_> {
 
         let mut entries = Vec::with_capacity(count.min(4096) as usize);
         for _ in 0..count {
-            let key =
-                self.map_prop_value(&key_type, key_struct_type.as_deref(), &format!("{path}.Key"))?;
+            let key = self.map_prop_value(
+                &key_type,
+                key_struct_type.as_deref(),
+                &format!("{path}.Key"),
+            )?;
             let value = self.map_prop_value(
                 &value_type,
                 value_struct_type.as_deref(),
@@ -326,9 +337,7 @@ impl FArchiveReader<'_> {
         match type_name {
             "StructProperty" => {
                 let st = struct_type.unwrap_or("StructProperty");
-                Ok(MapPropValue::Struct(Box::new(
-                    self.struct_value(st, path)?,
-                )))
+                Ok(MapPropValue::Struct(Box::new(self.struct_value(st, path)?)))
             }
             "EnumProperty" => Ok(MapPropValue::Enum(self.fstring()?)),
             "NameProperty" => Ok(MapPropValue::Name(self.fstring()?)),

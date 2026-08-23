@@ -35,12 +35,31 @@ impl Property {
 /// A nested struct payload; the variant selects the fixed binary layout.
 #[derive(Clone, Debug, PartialEq)]
 pub enum StructValue {
-    Vector { x: f64, y: f64, z: f64 },
+    Vector {
+        x: f64,
+        y: f64,
+        z: f64,
+    },
     DateTime(u64),
     Guid(PalUuid),
-    Quat { x: f64, y: f64, z: f64, w: f64 },
-    LinearColor { r: f32, g: f32, b: f32, a: f32 },
-    Color { b: u8, g: u8, r: u8, a: u8 },
+    Quat {
+        x: f64,
+        y: f64,
+        z: f64,
+        w: f64,
+    },
+    LinearColor {
+        r: f32,
+        g: f32,
+        b: f32,
+        a: f32,
+    },
+    Color {
+        b: u8,
+        g: u8,
+        r: u8,
+        a: u8,
+    },
     /// Generic struct: a full nested properties block ending with `None`.
     Properties(Vec<PropertyEntry>),
 }

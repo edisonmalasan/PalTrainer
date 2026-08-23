@@ -1,8 +1,8 @@
 //! Property-tree writing for GVAS payloads.
 
 use super::model::{
-    ArrayValue, BytePropertyValue, MapPropValue, PropertyEntry, PropertyValue, SetValue,
-    SetValues, StructValue,
+    ArrayValue, BytePropertyValue, MapPropValue, PropertyEntry, PropertyValue, SetValue, SetValues,
+    StructValue,
 };
 use super::writer::FArchiveWriter;
 
@@ -77,7 +77,11 @@ impl FArchiveWriter {
                 self.optional_guid(id.as_ref());
                 self.fstring(value);
             }
-            PropertyValue::Enum { id, enum_type, value } => {
+            PropertyValue::Enum {
+                id,
+                enum_type,
+                value,
+            } => {
                 self.fstring(enum_type);
                 self.optional_guid(id.as_ref());
                 self.fstring(value);
@@ -87,7 +91,11 @@ impl FArchiveWriter {
                 self.bool(*value);
                 self.optional_guid(id.as_ref());
             }
-            PropertyValue::Byte { id, enum_type, value } => {
+            PropertyValue::Byte {
+                id,
+                enum_type,
+                value,
+            } => {
                 self.fstring(enum_type);
                 self.optional_guid(id.as_ref());
                 match value {
@@ -95,7 +103,11 @@ impl FArchiveWriter {
                     BytePropertyValue::String(s) => self.fstring(s),
                 }
             }
-            PropertyValue::Array { id, array_type, value } => {
+            PropertyValue::Array {
+                id,
+                array_type,
+                value,
+            } => {
                 self.write_array_property(id.as_ref(), array_type, value);
             }
             PropertyValue::Map(map) => {

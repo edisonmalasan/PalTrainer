@@ -32,8 +32,8 @@ pub fn get_feature_flags() -> Vec<FeatureFlag> {
         FeatureFlag {
             id: "save_session",
             label: "Save sessions",
-            enabled: false,
-            description: "Locked until the Rust parser, backups, and path policy exist.",
+            enabled: true,
+            description: "Save session loading, tracking, and safety infrastructure.",
         },
         FeatureFlag {
             id: "advanced_tools",
