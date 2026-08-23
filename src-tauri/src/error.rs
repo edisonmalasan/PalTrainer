@@ -93,6 +93,33 @@ pub enum SaveError {
          uncompressed length {expected}."
     )]
     UncompressedLengthMismatch { expected: u32, actual: usize },
+
+    #[error("Unexpected end of save data at byte {offset} (needed {needed} more bytes).")]
+    UnexpectedEof { offset: usize, needed: usize },
+
+    #[error("Invalid GVAS header magic 0x{magic:08X}. This is not a GVAS payload.")]
+    InvalidGvasMagic { magic: u32 },
+
+    #[error(
+        "Unsupported save game version {found}; PalTrainer currently reads \
+         version 3 saves."
+    )]
+    UnsupportedSaveGameVersion { found: i32 },
+
+    #[error(
+        "Unsupported custom version format {found}; PalTrainer currently reads \
+         format 3."
+    )]
+    UnsupportedCustomVersionFormat { found: i32 },
+
+    #[error("Unknown property type \"{type_name}\" at {path}. The save may use a newer format.")]
+    UnknownPropertyType { type_name: String, path: String },
+
+    #[error("Unknown array element type \"{array_type}\" at {path}.")]
+    UnknownArrayType { array_type: String, path: String },
+
+    #[error("Malformed string data in save at offset {offset}.")]
+    InvalidFString { offset: usize },
 }
 
 #[cfg(test)]
