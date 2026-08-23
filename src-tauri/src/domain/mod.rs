@@ -1,5 +1,6 @@
 pub mod bases;
 pub mod diagnostics;
+pub mod exclusions;
 pub mod guilds;
 pub mod inventory;
 pub mod map;

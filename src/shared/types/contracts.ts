@@ -158,6 +158,28 @@ export interface InventoryProjection {
   readonly slots: readonly InventorySlotProjection[];
 }
 
+export interface Point2D {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface ZoneExclusion {
+  readonly id: string;
+  readonly name: string;
+  readonly zoneType: string;
+  readonly points: readonly Point2D[];
+  readonly protectBases: boolean;
+  readonly protectPlayers: boolean;
+  readonly protectStructures: boolean;
+}
+
+export interface ExclusionConfig {
+  readonly excludedPlayerUids: readonly string[];
+  readonly excludedGuildIds: readonly string[];
+  readonly excludedBaseIds: readonly string[];
+  readonly zones: readonly ZoneExclusion[];
+}
+
 export interface MapMarkerProjection {
   readonly label: string;
   readonly worldX: number;

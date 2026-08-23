@@ -18,6 +18,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(Mutex::new(None::<domain::save_session::SaveSession>))
         .manage(Mutex::new(storage::BackupManager::new(default_backup_root)))
+        .manage(Mutex::new(domain::exclusions::ExclusionConfig::default()))
         .manage(tasks::TaskTracker::new())
         .invoke_handler(tauri::generate_handler![
             commands::app::get_app_info,
@@ -65,6 +66,11 @@ pub fn run() {
             commands::base::export_base_bundle,
             commands::base::preview_import_base_bundle,
             commands::base::commit_import_base_bundle,
+            commands::exclusions::get_exclusion_config,
+            commands::exclusions::save_exclusion_config,
+            commands::exclusions::add_zone_exclusion,
+            commands::exclusions::remove_zone_exclusion,
+            commands::exclusions::check_coordinate_excluded,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PalTrainer");
