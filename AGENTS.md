@@ -119,23 +119,126 @@ If one of these commands does not exist yet, add the project config before relyi
 
 ## Skills
 
-Project skills are located under `.agents/skills/<name>/SKILL.md`.
+Project skills are located under `.agents/skills/<name>/SKILL.md`. Private
+domain skills are under `.agents/skills/private/<name>/SKILL.md`. They are
+local project context and must be available to agents before implementing the
+related work.
 
-### Required skill usage
+### Skill loading rules
 
-- Use `tauri-development` for work involving Tauri, Rust commands, IPC,
-  filesystem access, capabilities, plugins, application configuration,
-  and Tauri-specific architecture.
-- Use `design-taste-frontend-v1` for frontend UI/UX work, including
-  layout, visual design, typography, spacing, components, interactions,
-  animations, and overall visual polish.
-- When a task involves both frontend UI and Tauri functionality, use both
-  relevant skills.
-- Load the relevant skill before beginning implementation of work covered
-  by that skill.
-- Do not ignore project skills when their scope applies to the task.
-- Follow the project's architecture and security rules in this file even
-  when a skill provides different or more general recommendations.
+- Read the complete `SKILL.md` before implementation, review, or planning work
+  covered by that skill.
+- Use `tauri-development` for any Tauri, Rust command, IPC, capability,
+  filesystem, storage, plugin, configuration, packaging, or desktop lifecycle
+  work.
+- Use `design-taste-frontend-v1` for any frontend UI/UX work. This includes
+  layout, visual hierarchy, typography, spacing, responsive behavior,
+  components, interaction states, animation, accessibility, and polish.
+- When a task crosses frontend and Tauri boundaries, load both skills before
+  editing code.
+- Load the applicable private domain skill before implementing or reviewing its
+  subject area. If a task spans multiple domains, load all applicable skills.
+- Project rules in this file and the authoritative `docs/PLAN.md` take
+  precedence over generic recommendations in a skill.
+- Do not invent a replacement rule when a private skill defines a save-format,
+  data-model, formula, or roundtrip invariant. If the rule is uncertain or
+  contradicted by fixtures, stop and document the uncertainty before changing
+  behavior.
+
+### Project skill registry
+
+#### `tauri-development`
+
+Path: `.agents/skills/tauri-development/SKILL.md`
+
+Use for the TypeScript + React + Tauri + Rust application boundary. It covers
+typed frontend-to-Rust commands and events, thin command handlers, Rust error
+handling, least-privilege capabilities, filesystem validation, state
+synchronization, performance, testing, and packaging. PalTrainer-specific
+security and ownership rules in this file refine its generic examples.
+
+#### `design-taste-frontend-v1`
+
+Path: `.agents/skills/design-taste-frontend-v1/SKILL.md`
+
+Use for all PalTrainer interface work. It defines the project's visual and
+interaction baseline, including neutral palettes with one restrained accent,
+dashboard-appropriate sans typography, responsive grid layouts, accessible
+loading/empty/error states, restrained card use, icon requirements, and
+transform/opacity-focused animation. Verify dependencies in `package.json`
+before importing any UI, icon, motion, or styling library. Treat its highly
+decorative examples as optional; PalTrainer remains a focused save editor and
+must preserve usability, scanability, and performance.
+
+#### `private/pal-trainer-save-pipeline`
+
+Path: `.agents/skills/private/pal-trainer-save-pipeline/SKILL.md`
+
+This is the core save-format contract. Use it for Rust parsing, writing,
+compression, GVAS handling, property dispatch, save-version detection, and
+roundtrip tests. It covers PLZ (`0x32`), PLM/Oodle (`0x31`), and CNK (`0x30`)
+containers, GVAS headers, path-specific raw-data dispatch, and the sacred
+roundtrip rule: unknown bytes must be retained and written back byte-for-byte.
+
+#### `private/pal-trainer-binary-schemas`
+
+Path: `.agents/skills/private/pal-trainer-binary-schemas/SKILL.md`
+
+Use for Booth and Guild raw-data decoders/encoders and byte-drift debugging.
+Preserve bytes before and after dynamic Guild `V1_MARKER` detection, support
+Guild v1 and v2 role/permission layouts, and determine Booth lock state from
+the documented lock flag rather than the private-lock player UID. Unlocking
+must preserve the non-zero Booth UID and only clear the lock flag.
+
+#### `private/pal-trainer-pal-editor`
+
+Path: `.agents/skills/private/pal-trainer-pal-editor/SKILL.md`
+
+Use for Pal entity projections, editor forms, Rust validation, mutation
+commands, and Palbox/party placement. It defines wrapped save property types,
+level/IV/soul/condenser bounds, maximum passive and equipped-skill counts,
+sanitization requirements, and the Palbox model of 32 boxes with 30 slots
+each. The backend remains the authority for all mutation limits.
+
+#### `private/pal-trainer-stat-formula`
+
+Path: `.agents/skills/private/pal-trainer-stat-formula/SKILL.md`
+
+Use for HP, ATK, DEF, and Work Speed calculations, previews, tooltips, and
+regression tests. Keep formula inputs and rounding in sync with the skill,
+recalculate display values from source data, and avoid presenting derived
+values as persisted save fields unless the backend confirms them.
+
+#### `private/pal-trainer-breeding`
+
+Path: `.agents/skills/private/pal-trainer-breeding/SKILL.md`
+
+Use for the breeding calculator, breeding projections, game-data ingestion,
+and breeding tests. It defines CombiRank averaging, rarity tiebreakers,
+IgnoreCombi handling, exclusion of non-breedable entries, standard pair
+permutations, and unique-combination overrides.
+
+#### `private/pal-trainer-cli-tools`
+
+Path: `.agents/skills/private/pal-trainer-cli-tools/SKILL.md`
+
+Use for coordinate translation, map overlays, UUID normalization, and Xbox
+GamePass import/export. It defines the pre- and post-Sakurajima transforms,
+the Z-threshold map switch, normalized UUID comparison, and the XGP UWP
+container/manifests/index version 14 workflow. Steam `.sav` content and XGP
+wrapper data must be treated as separate layers.
+
+### Domain-to-layer ownership
+
+- Rust owns the save pipeline, binary schemas, Pal validation/mutation, stat
+  calculations that affect saved data, backups, filesystem operations,
+  coordinate conversion for imported data, XGP packing/unpacking, and all
+  roundtrip guarantees.
+- TypeScript may calculate presentation-only previews such as stat displays or
+  breeding results, but must use shared typed inputs and matching regression
+  vectors. It must not become the authority for save validity or byte layout.
+- UI code consumes typed projections and user-safe errors through Tauri; it
+  must not parse raw save bytes or access save paths directly.
 
 ### Skill precedence
 
