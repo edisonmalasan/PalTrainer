@@ -1,1 +1,26 @@
 docs
+/.agents/skills/private/
+
+# Dependencies and build outputs
+node_modules/
+dist/
+src-tauri/target/
+
+# Local environment and editor state
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+
+# Palworld save data and generated artifacts
+*.sav
+*.savc
+*.zip
+*.7z
+*.rar
+*.log
+*.dmp
+backups/
+exports/
+temp/
