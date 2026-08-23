@@ -31,6 +31,15 @@ pub fn run() {
             commands::backup::list_backups,
             commands::backup::create_manual_backup,
             commands::backup::restore_backup,
+            commands::inspect::get_players,
+            commands::inspect::get_guilds,
+            commands::inspect::get_bases,
+            commands::inspect::get_pals,
+            commands::inspect::get_inventory,
+            commands::inspect::get_map_markers,
+            commands::inspect::run_save_diagnostics,
+            commands::inspect::lookup_breeding,
+            commands::inspect::get_game_catalog,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PalTrainer");
