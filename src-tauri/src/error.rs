@@ -52,6 +52,24 @@ impl From<crate::pal_save::SaveError> for AppError {
     }
 }
 
+impl From<crate::security::SecurityError> for AppError {
+    fn from(error: crate::security::SecurityError) -> Self {
+        AppError::new("security_error", error.to_string())
+    }
+}
+
+impl From<crate::storage::StorageError> for AppError {
+    fn from(error: crate::storage::StorageError) -> Self {
+        AppError::new("storage_error", error.to_string())
+    }
+}
+
+impl From<crate::domain::save_session::SessionError> for AppError {
+    fn from(error: crate::domain::save_session::SessionError) -> Self {
+        AppError::new("session_error", error.to_string())
+    }
+}
+
 /// Typed errors for the Palworld save pipeline.
 ///
 /// All variants carry user-safe messages; internal details (byte offsets,
