@@ -96,6 +96,27 @@ export interface GuildProjection {
   readonly members: readonly GuildMemberProjection[];
 }
 
+export interface UpdateBaseDto {
+  readonly baseId: string;
+  readonly level?: number;
+  readonly radius?: number;
+}
+
+export interface NudgeBaseCoordinatesDto {
+  readonly baseId: string;
+  readonly deltaX: number;
+  readonly deltaY: number;
+  readonly deltaZ: number;
+}
+
+export interface ImportBaseBundleDto {
+  readonly bundlePath: string;
+  readonly targetGuildId: string;
+  readonly offsetX?: number;
+  readonly offsetY?: number;
+  readonly offsetZ?: number;
+}
+
 export interface BaseProjection {
   readonly baseId: string;
   readonly ownerGuildId: string;

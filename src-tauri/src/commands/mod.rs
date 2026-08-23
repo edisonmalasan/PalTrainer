@@ -1,5 +1,6 @@
 pub mod app;
 pub mod backup;
+pub mod base;
 pub mod guild;
 pub mod inspect;
 pub mod player;

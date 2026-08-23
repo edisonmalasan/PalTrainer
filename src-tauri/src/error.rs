@@ -70,6 +70,12 @@ impl From<crate::domain::save_session::SessionError> for AppError {
     }
 }
 
+impl From<std::io::Error> for AppError {
+    fn from(error: std::io::Error) -> Self {
+        AppError::new("io_error", error.to_string())
+    }
+}
+
 /// Typed errors for the Palworld save pipeline.
 ///
 /// All variants carry user-safe messages; internal details (byte offsets,
