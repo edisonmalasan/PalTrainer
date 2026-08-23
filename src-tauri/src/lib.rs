@@ -56,6 +56,15 @@ pub fn run() {
             commands::guild::commit_delete_guild,
             commands::guild::preview_disband_empty_guilds,
             commands::guild::commit_disband_empty_guilds,
+            commands::base::preview_update_base,
+            commands::base::commit_update_base,
+            commands::base::preview_nudge_base_coordinates,
+            commands::base::commit_nudge_base_coordinates,
+            commands::base::preview_delete_base,
+            commands::base::commit_delete_base,
+            commands::base::export_base_bundle,
+            commands::base::preview_import_base_bundle,
+            commands::base::commit_import_base_bundle,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PalTrainer");

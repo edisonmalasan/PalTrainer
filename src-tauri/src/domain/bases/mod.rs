@@ -1,4 +1,6 @@
-//! Base camp read-only projections.
+//! Base camp projections and mutation models.
+
+pub mod mutation;
 
 use serde::{Deserialize, Serialize};
 
