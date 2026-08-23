@@ -72,6 +72,17 @@ export interface PlayerProjection {
   readonly isHost: boolean;
 }
 
+export interface UpdateGuildDto {
+  readonly guildId: string;
+  readonly name?: string;
+  readonly level?: number;
+}
+
+export interface TransferGuildAdminDto {
+  readonly guildId: string;
+  readonly newAdminUid: string;
+}
+
 export interface GuildMemberProjection {
   readonly uid: string;
   readonly displayName: string;
