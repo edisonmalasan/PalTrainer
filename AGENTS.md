@@ -117,6 +117,34 @@ If one of these commands does not exist yet, add the project config before relyi
 - Keep backend command handlers thin; delegate logic to domain modules.
 - Add comments only for non-obvious save-format, security, or data-integrity behavior.
 
+## Skills
+
+Project skills are located under `.agents/skills/<name>/SKILL.md`.
+
+### Required skill usage
+
+- Use `tauri-development` for work involving Tauri, Rust commands, IPC,
+  filesystem access, capabilities, plugins, application configuration,
+  and Tauri-specific architecture.
+- Use `design-taste-frontend-v1` for frontend UI/UX work, including
+  layout, visual design, typography, spacing, components, interactions,
+  animations, and overall visual polish.
+- When a task involves both frontend UI and Tauri functionality, use both
+  relevant skills.
+- Load the relevant skill before beginning implementation of work covered
+  by that skill.
+- Do not ignore project skills when their scope applies to the task.
+- Follow the project's architecture and security rules in this file even
+  when a skill provides different or more general recommendations.
+
+### Skill precedence
+
+Project-specific rules in `AGENTS.md` take precedence over generic
+recommendations from skills.
+
+Skills provide specialized implementation guidance; they do not replace
+the project's architecture, security, testing, or Git rules.
+
 ## Files Not To Modify
 
 Do not modify these without an explicit reason:
