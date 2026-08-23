@@ -182,7 +182,10 @@ mod tests {
         let mut r = FArchiveReader::new(&[0u8; 3]);
         assert!(matches!(
             r.i32().unwrap_err(),
-            SaveError::UnexpectedEof { offset: 0, needed: 4 }
+            SaveError::UnexpectedEof {
+                offset: 0,
+                needed: 4
+            }
         ));
     }
 

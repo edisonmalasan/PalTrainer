@@ -67,7 +67,10 @@ impl PalUuid {
 
     /// Lowercase hex without dashes, for consistent UID comparison.
     pub fn normalized(&self) -> String {
-        self.raw_bytes.iter().map(|b| format!("{:02x}", b)).collect()
+        self.raw_bytes
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect()
     }
 }
 

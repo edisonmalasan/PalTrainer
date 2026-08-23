@@ -11,7 +11,7 @@ pub fn get_skipped_properties() -> &'static HashSet<&'static str> {
         // Foliage is heavy and currently unused by the UI
         set.insert(".worldSaveData.FoliageGridSaveDataMap");
         set.insert(".worldSaveData.MapObjectSpawnerInStageSaveData");
-        
+
         // Detailed map object transformations can be skipped for performance
         set.insert(".worldSaveData.MapObjectSaveData.MapObjectSaveData.WorldLocation");
         set.insert(".worldSaveData.MapObjectSaveData.MapObjectSaveData.WorldRotation");

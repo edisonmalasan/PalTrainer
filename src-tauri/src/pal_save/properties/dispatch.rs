@@ -45,8 +45,14 @@ pub fn get_type_hints() -> &'static HashMap<String, String> {
             ".worldSaveData.WorkSaveData.Value.RawData".to_string(),
             "ArrayProperty".to_string(),
         );
-        m.insert(".SaveData.Local_MaxFriendshipPalIds.Key".to_string(), "StructProperty".to_string());
-        m.insert(".SaveData.Local_MaxFriendshipPalIds.Value".to_string(), "IntProperty".to_string());
+        m.insert(
+            ".SaveData.Local_MaxFriendshipPalIds.Key".to_string(),
+            "StructProperty".to_string(),
+        );
+        m.insert(
+            ".SaveData.Local_MaxFriendshipPalIds.Value".to_string(),
+            "IntProperty".to_string(),
+        );
         m
     })
 }
