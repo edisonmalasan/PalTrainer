@@ -278,8 +278,13 @@ Do not modify these without an explicit reason:
 - Branch names must follow `{type}/{short-description}` in kebab-case, using valid prefixes such as `feat/`, `fix/`, `docs/`, `chore/`, `refactor/`, `test/`, `ci/`, `hotfix/`, or `release/`.
 - Do not use `codex/`, `phase1/`, or other non-standard branch prefixes unless the user explicitly requests one.
 - Before starting each feature, inspect `git status --short --branch` and `git branch --all --verbose --no-abbrev`.
-- Implement and commit one feature or process step at a time. Do not combine unrelated Phase work into one bulk commit.
+- Treat every phase in `docs/PLAN.md` as a planning group, not as one implementation task or one commit.
+- Before implementation, break the current phase into independently reviewable features or process steps. Each feature must have a clear scope and its own verification criteria.
+- Use one feature branch per feature or process step. Do not complete an entire phase in one branch when it contains multiple independently testable features.
+- Implement and commit one feature or process step at a time. Do not combine unrelated phase work into one bulk commit.
 - For each feature branch: create or switch to the correct branch, implement only that feature, run the relevant verification, commit only the files for that feature, then push the branch.
+- Start the next feature from the intended integration base after the previous feature has been reviewed or merged; do not stack unrelated unfinished feature work in one branch.
+- Keep commits process-by-process when a feature contains multiple meaningful steps, while keeping each commit buildable and logically focused.
 - Use Conventional Commit messages such as `feat(scope): add thing`, `fix(scope): correct thing`, `docs(scope): clarify thing`, or `chore(scope): update thing`.
 - Inspect staged diffs before committing with `git diff --staged`.
 - Do not commit ignored files unless the user explicitly asks for that ignored file to be tracked. In particular, `docs/` is ignored and should stay untracked unless the user changes that rule.
