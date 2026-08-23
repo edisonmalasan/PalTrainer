@@ -160,6 +160,9 @@ mod tests {
 
         write_settings_to_path(&path, &settings).expect("write settings");
 
-        assert_eq!(read_settings_from_path(&path).expect("read settings"), settings);
+        assert_eq!(
+            read_settings_from_path(&path).expect("read settings"),
+            settings
+        );
     }
 }
