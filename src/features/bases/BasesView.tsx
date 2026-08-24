@@ -44,6 +44,10 @@ export function BasesView() {
   const [importPath, setImportPath] = useState("");
   const [importGuildId, setImportGuildId] = useState("");
 
+  // Clone base dialog
+  const [cloneBase, setCloneBase] = useState<BaseProjection | null>(null);
+  const [cloneTargetGuild, setCloneTargetGuild] = useState("");
+
   // Preview & mutation state
   const [activePreview, setActivePreview] = useState<MutationPreview | null>(null);
   const [pendingCommit, setPendingCommit] = useState<(() => Promise<void>) | null>(null);
@@ -58,6 +62,49 @@ export function BasesView() {
   function startNudge(base: BaseProjection) {
     setNudgeBase(base);
     setNudgeOffsets({ dx: 0, dy: 0, dz: 0 });
+  }
+
+  function startClone(base: BaseProjection) {
+    setCloneBase(base);
+    setCloneTargetGuild("");
+  }
+
+  async function handleRequestClonePreview() {
+    if (!cloneBase || !cloneTargetGuild.trim()) return;
+    const dto = {
+      baseId: cloneBase.baseId,
+      targetGuildId: cloneTargetGuild.trim(),
+    };
+
+    try {
+      const preview = await invokeCommand<MutationPreview>("preview_clone_base", { dto });
+      setActivePreview(preview);
+      setPendingCommit(() => async () => {
+        await invokeCommand("commit_clone_base", { dto });
+        setActionMessage(`Cloned base ${cloneBase.baseId} into guild ${cloneTargetGuild}`);
+        setCloneBase(null);
+        setCloneTargetGuild("");
+        setReloadKey((k) => k + 1);
+      });
+    } catch (err: unknown) {
+      setActionMessage(String(err));
+    }
+  }
+
+  async function handleRequestRepairPreview(base: BaseProjection) {
+    try {
+      const preview = await invokeCommand<MutationPreview>("preview_repair_base_structures", {
+        baseId: base.baseId,
+      });
+      setActivePreview(preview);
+      setPendingCommit(() => async () => {
+        await invokeCommand("commit_repair_base_structures", { baseId: base.baseId });
+        setActionMessage(`Repaired all structures for base ${base.baseName || base.baseId}`);
+        setReloadKey((k) => k + 1);
+      });
+    } catch (err: unknown) {
+      setActionMessage(String(err));
+    }
   }
 
   async function handleRequestEditPreview() {
@@ -173,7 +220,7 @@ export function BasesView() {
   return (
     <ViewShell
       title="Bases"
-      subtitle="Base camp coordinates, levels, and structure bundles with position nudging and import/export."
+      subtitle="Base camp coordinates, levels, and structure bundles with position nudging, cloning, and repair."
       status={state.status}
       errorMessage={state.status === "error" ? state.message : undefined}
     >
@@ -200,6 +247,47 @@ export function BasesView() {
         {actionMessage && (
           <div className="border border-shell-accent bg-[#edf5f2] px-4 py-2 text-xs font-mono text-shell-accent">
             {actionMessage}
+          </div>
+        )}
+
+        {/* Clone Base Drawer */}
+        {cloneBase && (
+          <div className="border border-shell-line bg-white p-5 shadow-sm">
+            <h3 className="text-base font-semibold">Clone Base — {cloneBase.baseName || cloneBase.baseId}</h3>
+            <p className="mt-1 text-xs text-shell-muted">
+              Duplicate base structures and worker configuration into a target guild.
+            </p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="grid gap-1.5 text-xs font-medium">
+                <span>Target Guild ID</span>
+                <input
+                  type="text"
+                  placeholder="e.g. 00000000000000000000000000000001"
+                  value={cloneTargetGuild}
+                  onChange={(e) => setCloneTargetGuild(e.target.value)}
+                  className="border border-shell-line px-3 py-1.5 font-mono text-xs"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2 border-t border-shell-line pt-3">
+              <button
+                type="button"
+                onClick={() => setCloneBase(null)}
+                className="border border-shell-line px-3 py-1.5 text-xs text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!cloneTargetGuild.trim()}
+                onClick={() => void handleRequestClonePreview()}
+                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px] disabled:opacity-50"
+              >
+                Preview Clone
+              </button>
+            </div>
           </div>
         )}
 
@@ -280,7 +368,7 @@ export function BasesView() {
               key: "actions",
               header: "Actions",
               render: (r) => (
-                <div className="flex gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                   <button
                     type="button"
                     onClick={() => startEdit(r)}
@@ -294,6 +382,22 @@ export function BasesView() {
                     className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Nudge
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startClone(r)}
+                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    title="Clone base to another guild"
+                  >
+                    Clone
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleRequestRepairPreview(r)}
+                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    title="Repair all damaged structures to full HP"
+                  >
+                    Repair
                   </button>
                   <button
                     type="button"
@@ -311,7 +415,7 @@ export function BasesView() {
                   </button>
                 </div>
               ),
-              width: "220px",
+              width: "280px",
             },
           ]}
           rows={filtered}

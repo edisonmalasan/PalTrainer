@@ -123,6 +123,11 @@ export interface ImportBaseBundleDto {
   readonly offsetZ?: number;
 }
 
+export interface CloneBaseDto {
+  readonly baseId: string;
+  readonly targetGuildId: string;
+}
+
 export interface BaseProjection {
   readonly baseId: string;
   readonly ownerGuildId: string;

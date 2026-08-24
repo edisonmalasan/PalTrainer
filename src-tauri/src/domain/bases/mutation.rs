@@ -28,3 +28,10 @@ pub struct ImportBaseBundleDto {
     pub offset_y: Option<f32>,
     pub offset_z: Option<f32>,
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CloneBaseDto {
+    pub base_id: String,
+    pub target_guild_id: String,
+}
