@@ -185,7 +185,11 @@ Do not modify these without an explicit reason:
 - Keep commits focused on one logical change.
 - Do not commit generated dependency folders or build outputs.
 - Push feature branches to the remote after successful verification and commit.
-- Merge to `main` only after the branch satisfies the relevant plan/AGENTS requirements and verification has been run or a blocker has been clearly recorded.
+- Every completed feature branch must have a pull request opened against `main` before it is integrated. The PR must identify the relevant phase/feature from `docs/PLAN.md`, summarize verification, and call out any blocked checks.
+- Integrate feature branches through the pull request. Do not locally merge directly into `main` or bypass the PR workflow unless the user explicitly requests an exception.
+- Use a merge commit for feature pull requests so the repository history records the branch integration. Do not squash or rebase away the feature-branch history when the purpose is to preserve process-by-process commits.
+- Use the merge commit subject `Merge pull request for <branch> into main` (for example, `Merge pull request for feat/player-editor into main`); platform-generated PR numbers or repository metadata may be appended by GitHub.
+- Merge to `main` only after the PR branch satisfies the relevant plan/AGENTS requirements, required review/CI checks have passed, and verification has been run or a blocker has been clearly recorded.
 - Do not rewrite history unless explicitly requested.
 
 ## Definition of Done
