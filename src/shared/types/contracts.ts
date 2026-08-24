@@ -83,6 +83,12 @@ export interface TransferGuildAdminDto {
   readonly newAdminUid: string;
 }
 
+export interface MoveGuildMemberDto {
+  readonly playerUid: string;
+  readonly sourceGuildId: string;
+  readonly targetGuildId: string;
+}
+
 export interface GuildMemberProjection {
   readonly uid: string;
   readonly displayName: string;
