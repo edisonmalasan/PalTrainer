@@ -88,6 +88,22 @@ export function GuildsView() {
     }
   }
 
+  async function handleUnlockLabResearchPreview(guild: GuildProjection) {
+    try {
+      const preview = await invokeCommand<MutationPreview>("preview_unlock_all_lab_research", {
+        guildId: guild.guildId,
+      });
+      setActivePreview(preview);
+      setPendingCommit(() => async () => {
+        await invokeCommand("commit_unlock_all_lab_research", { guildId: guild.guildId });
+        setActionMessage(`Unlocked all lab research for guild ${guild.guildName || guild.guildId}`);
+        setReloadKey((k) => k + 1);
+      });
+    } catch (err: unknown) {
+      setActionMessage(String(err));
+    }
+  }
+
   async function handleRequestDeletePreview(guild: GuildProjection) {
     try {
       const preview = await invokeCommand<MutationPreview>("preview_delete_guild", {
@@ -195,13 +211,21 @@ export function GuildsView() {
               key: "actions",
               header: "Actions",
               render: (r) => (
-                <div className="flex gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                   <button
                     type="button"
                     onClick={() => startEdit(r)}
                     className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleUnlockLabResearchPreview(r)}
+                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    title="Unlock All Lab Research"
+                  >
+                    Lab
                   </button>
                   <button
                     type="button"
@@ -219,7 +243,7 @@ export function GuildsView() {
                   </button>
                 </div>
               ),
-              width: "180px",
+              width: "220px",
             },
           ]}
           rows={filtered}
