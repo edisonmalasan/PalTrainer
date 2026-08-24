@@ -291,3 +291,122 @@ pub fn commit_import_base_bundle(
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn preview_clone_base(
+    dto: crate::domain::bases::mutation::CloneBaseDto,
+    state: State<'_, SessionState>,
+) -> Result<MutationPreview, AppError> {
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+
+    let session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
+    let mut preview = MutationPreview::new("clone_base", session.save_root());
+
+    preview.add_modify_entity(
+        "Base",
+        &dto.base_id,
+        format!("Clone Base {}", dto.base_id),
+        format!(
+            "Duplicate base camp and child structures into guild {}",
+            dto.target_guild_id
+        ),
+    );
+    preview
+        .files_to_modify
+        .push(session.save_root().join("Level.sav"));
+
+    Ok(preview)
+}
+
+#[tauri::command]
+pub fn commit_clone_base(
+    dto: crate::domain::bases::mutation::CloneBaseDto,
+    session_state: State<'_, SessionState>,
+    backup_state: State<'_, BackupState>,
+) -> Result<(), AppError> {
+    let mut sess_lock = session_state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+    let session = sess_lock.as_mut().ok_or(SessionError::NoActiveSession)?;
+
+    let stale = session.check_stale()?;
+    if !stale.is_empty() {
+        return Err(SessionError::StaleSaveFile(stale).into());
+    }
+
+    {
+        let backup_mgr = backup_state.lock().map_err(|e| {
+            AppError::new("lock_error", format!("Failed to lock backup state: {}", e))
+        })?;
+        backup_mgr.create_backup(
+            session.save_root(),
+            Some("pre-clone-base"),
+            Some(&format!(
+                "Backup before cloning base {} into guild {}",
+                dto.base_id, dto.target_guild_id
+            )),
+        )?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn preview_repair_base_structures(
+    base_id: String,
+    state: State<'_, SessionState>,
+) -> Result<MutationPreview, AppError> {
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+
+    let session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
+    let mut preview = MutationPreview::new("repair_base_structures", session.save_root());
+
+    preview.add_modify_entity(
+        "Base",
+        &base_id,
+        format!("Base {}", base_id),
+        "Restore all damaged map objects and structures within base radius to full HP",
+    );
+    preview
+        .files_to_modify
+        .push(session.save_root().join("Level.sav"));
+
+    Ok(preview)
+}
+
+#[tauri::command]
+pub fn commit_repair_base_structures(
+    base_id: String,
+    session_state: State<'_, SessionState>,
+    backup_state: State<'_, BackupState>,
+) -> Result<(), AppError> {
+    let mut sess_lock = session_state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+    let session = sess_lock.as_mut().ok_or(SessionError::NoActiveSession)?;
+
+    let stale = session.check_stale()?;
+    if !stale.is_empty() {
+        return Err(SessionError::StaleSaveFile(stale).into());
+    }
+
+    {
+        let backup_mgr = backup_state.lock().map_err(|e| {
+            AppError::new("lock_error", format!("Failed to lock backup state: {}", e))
+        })?;
+        backup_mgr.create_backup(
+            session.save_root(),
+            Some("pre-repair-base"),
+            Some(&format!(
+                "Backup before repairing structures for base {}",
+                base_id
+            )),
+        )?;
+    }
+
+    Ok(())
+}
