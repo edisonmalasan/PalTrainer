@@ -107,7 +107,10 @@ export function PlayersView() {
     }
   }
 
-  async function handleUnlockPreview(player: PlayerProjection, feature: "effigies" | "fast_travel") {
+  async function handleUnlockPreview(
+    player: PlayerProjection,
+    feature: "effigies" | "fast_travel" | "technologies" | "viewing_cage" | "stat_points",
+  ) {
     try {
       const preview = await invokeCommand<MutationPreview>("preview_unlock_player_features", {
         uid: player.uid,
@@ -116,7 +119,7 @@ export function PlayersView() {
       setActivePreview(preview);
       setPendingCommit(() => async () => {
         await invokeCommand("commit_unlock_player_features", { uid: player.uid, feature });
-        setActionMessage(`Unlocked ${feature} for player ${player.uid}`);
+        setActionMessage(`Unlocked ${feature.replace("_", " ")} for player ${player.uid}`);
         setReloadKey((k) => k + 1);
       });
     } catch (err: unknown) {
@@ -198,13 +201,29 @@ export function PlayersView() {
               key: "actions",
               header: "Actions",
               render: (r) => (
-                <div className="flex gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                   <button
                     type="button"
                     onClick={() => startEdit(r)}
                     className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleUnlockPreview(r, "technologies")}
+                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    title="Unlock all Technologies and Tech Points"
+                  >
+                    Tech
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleUnlockPreview(r, "stat_points")}
+                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    title="Max Unused Player Stat Points"
+                  >
+                    Stats
                   </button>
                   <button
                     type="button"
@@ -231,7 +250,7 @@ export function PlayersView() {
                   </button>
                 </div>
               ),
-              width: "220px",
+              width: "280px",
             },
           ]}
           rows={filtered}
