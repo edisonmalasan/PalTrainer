@@ -243,4 +243,28 @@ mod tests {
         let (decoded, _) = decompress_sav(&sav).unwrap();
         assert!(decoded.is_empty());
     }
+
+    #[test]
+    fn corrupt_zlib_stream_returns_zlib_error() {
+        let mut corrupted_sav = Vec::new();
+        // Valid header
+        corrupted_sav.extend_from_slice(&100u32.to_le_bytes());
+        corrupted_sav.extend_from_slice(&50u32.to_le_bytes());
+        corrupted_sav.extend_from_slice(&MAGIC_PLZ);
+        corrupted_sav.push(0x32);
+        // Garbage payload that is not valid zlib
+        corrupted_sav.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04]);
+
+        let err = decompress_sav(&corrupted_sav).unwrap_err();
+        assert!(matches!(err, SaveError::ZlibDecompress { .. }));
+    }
+
+    #[test]
+    fn large_payload_roundtrip_plz() {
+        let payload: Vec<u8> = (0..100_000).map(|i| (i ^ (i >> 3)) as u8).collect();
+        let sav = compress_gvas_to_sav(&payload, SaveType::Plz).unwrap();
+        let (decoded, st) = decompress_sav(&sav).unwrap();
+        assert_eq!(st, SaveType::Plz);
+        assert_eq!(decoded, payload);
+    }
 }

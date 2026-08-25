@@ -253,4 +253,40 @@ mod tests {
         );
         assert_eq!(&sav[12..], &[1, 2, 3]);
     }
+
+    #[test]
+    fn parse_plm_header() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&500u32.to_le_bytes());
+        data.extend_from_slice(&250u32.to_le_bytes());
+        data.extend_from_slice(&MAGIC_PLM);
+        data.push(0x31);
+        data.extend_from_slice(&[0u8; 10]);
+
+        let header = SavHeader::parse(&data).unwrap();
+        assert_eq!(header.save_type, SaveType::Plm);
+        assert_eq!(header.uncompressed_len, 500);
+        assert_eq!(header.compressed_len, 250);
+        assert_eq!(header.data_offset, 12);
+    }
+
+    #[test]
+    fn parse_unknown_outer_magic_fails() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&100u32.to_le_bytes());
+        data.extend_from_slice(&50u32.to_le_bytes());
+        data.extend_from_slice(b"BAD");
+        data.push(0x32);
+        data.extend_from_slice(&[0u8; 10]);
+
+        let err = SavHeader::parse(&data).unwrap_err();
+        assert!(matches!(
+            err,
+            SaveError::UnknownMagic {
+                magic,
+                offset: 8
+            }
+            if magic == *b"BAD"
+        ));
+    }
 }
