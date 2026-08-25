@@ -355,15 +355,71 @@ export interface MapMarkerProjection {
 
 export type DiagnosticSeverity = "info" | "warning" | "error";
 
+export type DiagnosticCategory =
+  | "stale_file"
+  | "integrity"
+  | "orphaned_player"
+  | "duplicate_player"
+  | "broken_guild"
+  | "empty_guild"
+  | "illegal_pal"
+  | "invalid_pal_species"
+  | "invalid_passives"
+  | "invalid_active_skills"
+  | "unassigned_pal"
+  | "overfilled_container"
+  | "invalid_item"
+  | "unreferenced_data"
+  | "invalid_structure"
+  | "stale_timestamp"
+  | "dynamic_container_link"
+  | "private_chest_lock"
+  | "death_bag"
+  | "imported_dna_pal"
+  | "non_base_map_object"
+  | "skin";
+
+export interface RepairActionDescriptor {
+  readonly label: string;
+  readonly description: string;
+  readonly affectedEntityCount: number;
+}
+
+export interface CleanupActionDescriptor {
+  readonly label: string;
+  readonly description: string;
+  readonly entitiesToRemove: number;
+}
+
 export interface DiagnosticIssue {
-  readonly code: string;
   readonly severity: DiagnosticSeverity;
+  readonly category: DiagnosticCategory;
+  readonly code: string;
   readonly message: string;
+  readonly targetId: string;
   readonly context: string | null;
+  readonly canAutoRepair: boolean;
+  readonly repairAction: RepairActionDescriptor | null;
+  readonly cleanupAction: CleanupActionDescriptor | null;
+}
+
+export interface DiagnosticScanMeta {
+  readonly scanDurationMs: number;
+  readonly playerCount: number;
+  readonly guildCount: number;
+  readonly baseCount: number;
+  readonly palCount: number;
+  readonly containerCount: number;
+  readonly saveRoot: string;
 }
 
 export interface DiagnosticReportDto {
+  readonly totalIssues: number;
+  readonly errors: number;
+  readonly warnings: number;
+  readonly infos: number;
   readonly issues: readonly DiagnosticIssue[];
+  readonly scanMeta: DiagnosticScanMeta;
   readonly scannedAt: string;
 }
 

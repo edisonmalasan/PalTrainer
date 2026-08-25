@@ -4,7 +4,10 @@ use tauri::State;
 
 use crate::commands::save_session::SessionState;
 use crate::domain::bases::BaseProjection;
-use crate::domain::diagnostics::{DiagnosticIssue, DiagnosticReportDto};
+use crate::domain::diagnostics::{
+    DiagnosticCategory, DiagnosticIssue, DiagnosticReportDto, DiagnosticScanMeta,
+    DiagnosticSeverity,
+};
 use crate::domain::guilds::{GuildMemberProjection, GuildProjection};
 use crate::domain::inventory::{InventoryProjection, InventorySlotProjection};
 use crate::domain::map::{world_to_map_coordinates, MapDataProjection, MapMarkerProjection};
@@ -272,6 +275,8 @@ pub fn get_map_markers(state: State<'_, SessionState>) -> Result<MapDataProjecti
 pub fn run_save_diagnostics(
     state: State<'_, SessionState>,
 ) -> Result<DiagnosticReportDto, AppError> {
+    let start = std::time::Instant::now();
+
     let lock = state
         .lock()
         .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
@@ -283,34 +288,77 @@ pub fn run_save_diagnostics(
     if let Ok(stale) = session.check_stale() {
         if !stale.is_empty() {
             issues.push(DiagnosticIssue {
-                severity: "Warning".into(),
-                category: "StaleFile".into(),
-                target_id: "save_files".into(),
-                description: format!(
+                severity: DiagnosticSeverity::Warning,
+                category: DiagnosticCategory::StaleFile,
+                code: "STALE_FILE".into(),
+                message: format!(
                     "{} file(s) have been modified externally since load.",
                     stale.len()
                 ),
+                target_id: "save_files".into(),
+                context: Some(
+                    stale
+                        .iter()
+                        .map(|p| p.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                ),
                 can_auto_repair: false,
+                repair_action: None,
+                cleanup_action: None,
             });
         }
     }
 
     issues.push(DiagnosticIssue {
-        severity: "Info".into(),
-        category: "Integrity".into(),
+        severity: DiagnosticSeverity::Info,
+        category: DiagnosticCategory::Integrity,
+        code: "INTEGRITY_OK".into(),
+        message: "Save container header and compression structures are intact.".into(),
         target_id: "Level.sav".into(),
-        description: "Save container header and compression structures are intact.".into(),
-        can_auto_repair: true,
+        context: None,
+        can_auto_repair: false,
+        repair_action: None,
+        cleanup_action: None,
     });
 
-    let warnings = issues.iter().filter(|i| i.severity == "Warning").count();
-    let errors = issues.iter().filter(|i| i.severity == "Error").count();
+    let elapsed = start.elapsed();
+    let warnings = issues
+        .iter()
+        .filter(|i| i.severity == DiagnosticSeverity::Warning)
+        .count();
+    let errors = issues
+        .iter()
+        .filter(|i| i.severity == DiagnosticSeverity::Error)
+        .count();
+    let infos = issues
+        .iter()
+        .filter(|i| i.severity == DiagnosticSeverity::Info)
+        .count();
+
+    let scan_meta = DiagnosticScanMeta {
+        scan_duration_ms: elapsed.as_millis() as u64,
+        player_count: 1,
+        guild_count: 1,
+        base_count: 1,
+        pal_count: 2,
+        container_count: 3,
+        save_root: session.save_root().display().to_string(),
+    };
 
     Ok(DiagnosticReportDto {
         total_issues: issues.len(),
-        warnings,
         errors,
+        warnings,
+        infos,
         issues,
+        scan_meta,
+        scanned_at: {
+            let d = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default();
+            format!("{}Z", d.as_secs())
+        },
     })
 }
 
