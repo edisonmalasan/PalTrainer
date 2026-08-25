@@ -142,6 +142,7 @@ impl BreedingCalculator {
                 .partial_cmp(&diff_b)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| a.rarity.cmp(&b.rarity))
+                .then_with(|| a.name.cmp(&b.name))
         });
 
         tied.first().map(|p| p.name.clone())
@@ -163,6 +164,7 @@ impl BreedingCalculator {
                 }
             }
         }
+        results.sort();
         results
     }
 
@@ -214,6 +216,37 @@ mod tests {
         assert_eq!(
             calc.calculate_child("Frostallion", "Helzephyr"),
             Some("Frostallion Noct".to_string())
+        );
+    }
+
+    #[test]
+    fn unique_combinations_are_symmetric() {
+        let calc = BreedingCalculator::new();
+        assert_eq!(
+            calc.calculate_child("Helzephyr", "Frostallion"),
+            calc.calculate_child("Frostallion", "Helzephyr")
+        );
+    }
+
+    #[test]
+    fn parent_lookup_is_sorted_and_contains_unique_pair() {
+        let calc = BreedingCalculator::new();
+        let parents = calc.find_parents("Frostallion Noct");
+        assert!(parents.contains(&("Frostallion".into(), "Helzephyr".into())));
+        let mut sorted = parents.clone();
+        sorted.sort();
+        assert_eq!(parents, sorted);
+    }
+
+    #[test]
+    fn ignore_combi_entries_do_not_enter_standard_candidate_pool() {
+        let mut calc = BreedingCalculator::new();
+        calc.register_pal("TestParentA", 100, 1, false);
+        calc.register_pal("TestParentB", 100, 1, false);
+        calc.register_pal("IgnoredCandidate", 100, 1, true);
+        assert_ne!(
+            calc.calculate_child("TestParentA", "TestParentB"),
+            Some("IgnoredCandidate".into())
         );
     }
 }
