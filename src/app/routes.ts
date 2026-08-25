@@ -16,6 +16,6 @@ export const appRoutes: readonly AppRoute[] = [
   { id: "map",           label: "Map",            phase: "Phase 4", enabled: true },
   { id: "breeding",      label: "Breeding",       phase: "Phase 4", enabled: true },
   { id: "diagnostics",   label: "Diagnostics",    phase: "Phase 4", enabled: true },
-  { id: "tools",         label: "Tools",          phase: "Phase 8", enabled: false },
+  { id: "tools",         label: "Tools",          phase: "Phase 8", enabled: true },
   { id: "settings",      label: "Settings",       phase: "Phase 1", enabled: true },
 ];

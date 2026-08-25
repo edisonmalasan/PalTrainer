@@ -538,3 +538,171 @@ export interface GameCatalog {
   readonly activeSkills: readonly ActiveSkillInfo[];
 }
 
+// ── Phase 8: Conversion, Transfer, and Platform Tool Contracts ──────────────────
+
+export interface IdConversionResult {
+  readonly steamId: string;
+  readonly palworldUid: string;
+  readonly nosteamUid: string;
+  readonly inputType: string;
+}
+
+export interface ConvertSavToJsonDto {
+  readonly inputPath: string;
+  readonly outputPath?: string;
+  readonly minify: boolean;
+}
+
+export interface ConvertJsonToSavDto {
+  readonly inputPath: string;
+  readonly outputPath?: string;
+  readonly saveType?: string;
+}
+
+export interface ConversionResult {
+  readonly sourcePath: string;
+  readonly targetPath: string;
+  readonly bytesWritten: number;
+  readonly message: string;
+}
+
+export interface RawJsonSummary {
+  readonly savePath: string;
+  readonly propertyCount: number;
+  readonly topLevelKeys: readonly string[];
+  readonly saveType: string;
+  readonly isReadOnly: boolean;
+}
+
+export interface RestoreMapOptions {
+  readonly customLocalDataPath?: string;
+  readonly clearUiFog: boolean;
+  readonly clearHiddenLocations: boolean;
+  readonly disableSkyCloudOverlay: boolean;
+}
+
+export interface RestoreMapReport {
+  readonly filesUpdated: readonly string[];
+  readonly backupPath?: string;
+  readonly masksCleared: number;
+  readonly hiddenLocationsReset: number;
+  readonly message: string;
+}
+
+export interface PalboxCapacityDto {
+  readonly playerUid: string;
+  readonly containerId: string;
+  readonly currentSlotCount: number;
+  readonly currentPageCount: number;
+  readonly occupiedSlotCount: number;
+  readonly maxRecommendedPages: number;
+}
+
+export interface SlotInjectionParams {
+  readonly playerUid: string;
+  readonly targetPageCount: number;
+}
+
+export interface SlotInjectionAuditResult {
+  readonly playerUid: string;
+  readonly containerId: string;
+  readonly previousSlotCount: number;
+  readonly newSlotCount: number;
+  readonly newPageCount: number;
+  readonly backupPath?: string;
+  readonly message: string;
+}
+
+export interface TransferPlayerSummaryDto {
+  readonly uid: string;
+  readonly nickname: string;
+  readonly level: number;
+  readonly palCount: number;
+  readonly itemCount: number;
+  readonly hasDpsFile: boolean;
+}
+
+export interface CharacterTransferOptions {
+  readonly sourceSavePath: string;
+  readonly targetSavePath: string;
+  readonly playerUid: string;
+  readonly transferPals: boolean;
+  readonly transferInventory: boolean;
+  readonly transferTech: boolean;
+  readonly transferAllPlayers: boolean;
+  readonly targetGuildId?: string;
+}
+
+export interface CharacterTransferAuditResult {
+  readonly transferredPlayers: readonly string[];
+  readonly sourceSave: string;
+  readonly targetSave: string;
+  readonly palsTransferred: number;
+  readonly itemsTransferred: number;
+  readonly backupPath?: string;
+  readonly message: string;
+}
+
+export interface HostSwapOptions {
+  readonly sourceUid: string;
+  readonly targetUid: string;
+  readonly swapMode: boolean;
+}
+
+export interface HostSwapInspectionDto {
+  readonly sourceUid: string;
+  readonly targetUid: string;
+  readonly sourcePlayerFound: boolean;
+  readonly targetPlayerFound: boolean;
+  readonly sourceNickname: string;
+  readonly targetNickname: string;
+  readonly sourcePalCount: number;
+  readonly targetPalCount: number;
+  readonly affectedGuilds: readonly string[];
+  readonly affectedBases: readonly string[];
+}
+
+export interface HostSwapAuditResult {
+  readonly sourceUid: string;
+  readonly targetUid: string;
+  readonly mode: string;
+  readonly filesRenamed: readonly string[];
+  readonly backupPath?: string;
+  readonly message: string;
+}
+
+export interface XgpSaveEntry {
+  readonly wgsDir: string;
+  readonly userId: string;
+  readonly packageName: string;
+  readonly lastModified: number;
+  readonly containerCount: number;
+  readonly hasLevelSav: boolean;
+  readonly hasPlayers: boolean;
+}
+
+export interface XgpExtractOptions {
+  readonly wgsUserDir: string;
+  readonly destinationPath: string;
+}
+
+export interface XgpImportOptions {
+  readonly sourceSteamPath: string;
+  readonly targetWgsUserDir: string;
+  readonly packageName?: string;
+}
+
+export interface XgpExtractResult {
+  readonly destinationPath: string;
+  readonly filesExtracted: readonly string[];
+  readonly message: string;
+}
+
+export interface XgpImportAuditResult {
+  readonly targetWgsUserDir: string;
+  readonly containersCreated: number;
+  readonly backupPath?: string;
+  readonly message: string;
+}
+
+

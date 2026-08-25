@@ -16,6 +16,7 @@ import { MapView } from "../features/map/MapView";
 import { PalsView } from "../features/pals/PalsView";
 import { PlayersView } from "../features/players/PlayersView";
 import { SaveSessionView } from "../features/save-session/SaveSessionView";
+import { ToolsView } from "../features/tools/ToolsView";
 import { WorldOptionsView } from "../features/world/WorldOptionsView";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { appRoutes } from "./routes";
@@ -210,6 +211,7 @@ function RouteContent({
     case "map":           return <MapView />;
     case "breeding":      return <BreedingView />;
     case "diagnostics":   return <DiagnosticsView />;
+    case "tools":          return <ToolsView />;
     case "settings":
       return (
         <SettingsView
