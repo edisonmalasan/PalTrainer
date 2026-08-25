@@ -98,12 +98,12 @@ mod tests {
     #[test]
     fn display_uses_mixed_endian_layout() {
         let uuid = PalUuid::from_raw(SAMPLE_RAW);
-        assert_eq!(uuid.to_string(), "04030201-0605-0807-0c0b-0a09100f0e0d");
+        assert_eq!(uuid.to_string(), "04030201-0807-0605-0c0b-0a09100f0e0d");
     }
 
     #[test]
     fn parse_roundtrips_display() {
-        let text = "04030201-0605-0807-0c0b-0a09100f0e0d";
+        let text = "04030201-0807-0605-0c0b-0a09100f0e0d";
         let uuid = PalUuid::parse(text).unwrap();
         assert_eq!(uuid.raw_bytes, SAMPLE_RAW);
         assert_eq!(uuid.to_string(), text);
@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn normalized_strips_dashes_and_lowercases() {
-        let uuid = PalUuid::parse("04030201-0605-0807-090A-0B0C0D0E0F10").unwrap();
+        let uuid = PalUuid::parse("04030201-0807-0605-0C0B-0A09100F0E0D").unwrap();
         assert_eq!(uuid.normalized(), "0102030405060708090a0b0c0d0e0f10");
     }
 
@@ -133,5 +133,30 @@ mod tests {
     fn rejects_invalid_input() {
         assert!(PalUuid::parse("not-a-uuid").is_none());
         assert!(PalUuid::parse("04030201-0605-0807-090a-0b0c0d0e0f1").is_none());
+        assert!(PalUuid::parse("04030201-0605-0807-090a-0b0c0d0e0f1000").is_none());
+        assert!(PalUuid::parse("04030201-0605-0807-090a-0b0c0d0e0fzz").is_none());
+        assert!(PalUuid::parse("").is_none());
+    }
+
+    #[test]
+    fn parse_undashed_hex_string() {
+        let undashed = "04030201080706050c0b0a09100f0e0d";
+        let uuid = PalUuid::parse(undashed).unwrap();
+        assert_eq!(uuid.raw_bytes, SAMPLE_RAW);
+    }
+
+    #[test]
+    fn raw_bytes_and_canonical_mapping() {
+        let uuid = PalUuid::from_raw(SAMPLE_RAW);
+        let canonical = uuid.to_canonical();
+        let reconstructed = PalUuid::from_canonical(canonical);
+        assert_eq!(reconstructed.raw_bytes, SAMPLE_RAW);
+    }
+
+    #[test]
+    fn debug_representation() {
+        let uuid = PalUuid::from_raw(SAMPLE_RAW);
+        let debug_str = format!("{:?}", uuid);
+        assert!(debug_str.contains("PalUuid(04030201-0807-0605-0c0b-0a09100f0e0d)"));
     }
 }

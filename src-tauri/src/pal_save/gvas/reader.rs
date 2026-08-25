@@ -130,6 +130,9 @@ impl<'a> FArchiveReader<'a> {
             return String::from_utf16(&pairs).map_err(|_| SaveError::InvalidFString { offset });
         }
         let bytes = self.take(size as usize)?;
+        if bytes.is_empty() || bytes[size as usize - 1] != 0 {
+            return Err(SaveError::InvalidFString { offset });
+        }
         let Some(without_nul) = bytes.get(..size as usize - 1) else {
             return Err(SaveError::InvalidFString { offset });
         };
@@ -204,7 +207,7 @@ mod tests {
     #[test]
     fn fstring_utf16_with_surrogate_pair() {
         // "fox emoji" (U+1F98A) as UTF-16-LE surrogate pair + NUL terminator.
-        let text_bytes: [u8; 6] = [0x3E, 0xD8, 0x9A, 0xDE, 0x00, 0x00];
+        let text_bytes: [u8; 6] = [0x3E, 0xD8, 0x8A, 0xDD, 0x00, 0x00];
         let mut data = Vec::new();
         data.extend_from_slice(&(-3i32).to_le_bytes()); // 2 units + NUL
         data.extend_from_slice(&text_bytes);
@@ -248,5 +251,66 @@ mod tests {
         let mut r = FArchiveReader::new(&[9, 8, 7]);
         assert_eq!(r.read_to_end(), vec![9, 8, 7]);
         assert!(r.eof());
+    }
+
+    #[test]
+    fn truncated_fstring_ascii_fails() {
+        // String header says length 10, but only 4 bytes provided
+        let data = [10, 0, 0, 0, b'P', b'a', b'l', 0];
+        let mut r = FArchiveReader::new(&data);
+        assert!(matches!(
+            r.fstring().unwrap_err(),
+            SaveError::UnexpectedEof { .. }
+        ));
+    }
+
+    #[test]
+    fn missing_nul_terminator_fails() {
+        // String declared length 4, but 4th byte is 'x' instead of 0
+        let data = [4, 0, 0, 0, b'P', b'a', b'l', b'x'];
+        let mut r = FArchiveReader::new(&data);
+        assert!(matches!(
+            r.fstring().unwrap_err(),
+            SaveError::InvalidFString { .. }
+        ));
+    }
+
+    #[test]
+    fn truncated_fstring_utf16_fails() {
+        // UTF-16 negative length -5 (5 code units = 10 bytes), only 4 bytes provided
+        let mut data = Vec::new();
+        data.extend_from_slice(&(-5i32).to_le_bytes());
+        data.extend_from_slice(&[0x3E, 0xD8, 0x9A, 0xDE]);
+        let mut r = FArchiveReader::new(&data);
+        assert!(matches!(
+            r.fstring().unwrap_err(),
+            SaveError::UnexpectedEof { .. }
+        ));
+    }
+
+    #[test]
+    fn take_advances_cursor_and_fails_past_end() {
+        let data = [1, 2, 3, 4];
+        let mut r = FArchiveReader::new(&data);
+        assert_eq!(r.take(2).unwrap(), &[1, 2]);
+        assert_eq!(r.position(), 2);
+        assert_eq!(r.take(2).unwrap(), &[3, 4]);
+        assert_eq!(r.position(), 4);
+        assert!(r.eof());
+        assert!(matches!(
+            r.take(1).unwrap_err(),
+            SaveError::UnexpectedEof {
+                offset: 4,
+                needed: 1
+            }
+        ));
+    }
+
+    #[test]
+    fn take_zero_bytes() {
+        let data = [1, 2, 3];
+        let mut r = FArchiveReader::new(&data);
+        assert_eq!(r.take(0).unwrap(), &[] as &[u8]);
+        assert_eq!(r.position(), 0);
     }
 }

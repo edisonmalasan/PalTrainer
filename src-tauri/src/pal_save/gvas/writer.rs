@@ -136,7 +136,7 @@ mod tests {
             w.into_bytes(),
             vec![
                 0xFD, 0xFF, 0xFF, 0xFF, // -3
-                0x3E, 0xD8, 0x9A, 0xDE, // surrogate pair LE
+                0x3E, 0xD8, 0x8A, 0xDD, // surrogate pair LE
                 0x00, 0x00,
             ]
         );
@@ -151,5 +151,109 @@ mod tests {
         w.patch_u64(at, 4);
         let out = w.into_bytes();
         assert_eq!(&out[..8], &4u64.to_le_bytes());
+    }
+
+    #[test]
+    fn primitives_write_expected_little_endian_bytes() {
+        let mut w = FArchiveWriter::new();
+        w.u8(0x12);
+        w.u16(0x3456);
+        w.u32(0x789ABCDE);
+        w.u64(0x1122334455667788);
+        w.i16(-200);
+        w.i32(-50000);
+        w.i64(-999999999);
+        w.f32(3.14);
+        w.f64(2.71828);
+        w.bool(true);
+        w.bool(false);
+
+        let bytes = w.into_bytes();
+        let mut r = crate::pal_save::gvas::reader::FArchiveReader::new(&bytes);
+        assert_eq!(r.u8().unwrap(), 0x12);
+        assert_eq!(r.u16().unwrap(), 0x3456);
+        assert_eq!(r.u32().unwrap(), 0x789ABCDE);
+        assert_eq!(r.u64().unwrap(), 0x1122334455667788);
+        assert_eq!(r.i16().unwrap(), -200);
+        assert_eq!(r.i32().unwrap(), -50000);
+        assert_eq!(r.i64().unwrap(), -999999999);
+        assert!((r.f32().unwrap() - 3.14).abs() < 1e-5);
+        assert!((r.f64().unwrap() - 2.71828).abs() < 1e-9);
+        assert!(r.bool().unwrap());
+        assert!(!r.bool().unwrap());
+        assert!(r.eof());
+    }
+
+    #[test]
+    fn empty_properties_writes_none_terminator() {
+        let mut w = FArchiveWriter::new();
+        w.write_properties(&[]);
+        let bytes = w.into_bytes();
+        let mut r = crate::pal_save::gvas::reader::FArchiveReader::new(&bytes);
+        let entries = r.properties_until_end("root").unwrap();
+        assert!(entries.is_empty());
+        assert!(r.eof());
+    }
+
+    #[test]
+    fn property_tree_roundtrips_cleanly() {
+        use crate::pal_save::gvas::model::{Property, PropertyEntry, PropertyValue, StructValue};
+        use crate::pal_save::gvas::uuid::PalUuid;
+
+        let original_entries = vec![
+            PropertyEntry {
+                name: "PlayerLevel".to_string(),
+                property: Property::new(
+                    "IntProperty",
+                    PropertyValue::Int {
+                        id: None,
+                        value: 55,
+                    },
+                ),
+            },
+            PropertyEntry {
+                name: "PlayerName".to_string(),
+                property: Property::new(
+                    "StrProperty",
+                    PropertyValue::Str {
+                        id: None,
+                        value: "PalMaster".to_string(),
+                    },
+                ),
+            },
+            PropertyEntry {
+                name: "IsAdmin".to_string(),
+                property: Property::new(
+                    "BoolProperty",
+                    PropertyValue::Bool {
+                        id: None,
+                        value: true,
+                    },
+                ),
+            },
+            PropertyEntry {
+                name: "PlayerGuid".to_string(),
+                property: Property::new(
+                    "StructProperty",
+                    PropertyValue::Struct {
+                        struct_type: "Guid".to_string(),
+                        struct_id: PalUuid::from_raw([0u8; 16]),
+                        id: None,
+                        value: Box::new(StructValue::Guid(PalUuid::from_raw([
+                            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                        ]))),
+                    },
+                ),
+            },
+        ];
+
+        let mut w = FArchiveWriter::new();
+        w.write_properties(&original_entries);
+        let bytes = w.into_bytes();
+
+        let mut r = crate::pal_save::gvas::reader::FArchiveReader::new(&bytes);
+        let read_entries = r.properties_until_end("root").unwrap();
+        assert_eq!(read_entries, original_entries);
+        assert!(r.eof());
     }
 }
