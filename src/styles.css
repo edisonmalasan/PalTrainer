@@ -20,6 +20,7 @@
     min-width: 320px;
     min-height: 100dvh;
     margin: 0;
+    font-family: Geist, Satoshi, ui-sans-serif, system-ui, sans-serif;
   }
 
   button,
@@ -31,5 +32,44 @@
 
   button {
     cursor: pointer;
+  }
+
+  /* Accessible keyboard focus ring */
+  :focus-visible {
+    outline: 2px solid #23685a;
+    outline-offset: 2px;
+  }
+
+  /* Subtle technical scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f7f8fa;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #dfe3e8;
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #b5bcc5;
+  }
+}
+
+@layer utilities {
+  .transition-shell {
+    transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .btn-tactile {
+    transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease;
+  }
+
+  .btn-tactile:active:not(:disabled) {
+    transform: translateY(1px);
   }
 }
