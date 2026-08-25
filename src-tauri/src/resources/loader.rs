@@ -75,6 +75,97 @@ impl GameCatalog {
             active_skills: default_active_skills(),
         }
     }
+
+    /// Validates static or imported game data before it is exposed to editors.
+    pub fn validate_integrity(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        validate_ids(
+            "pals",
+            self.pals.iter().map(|entry| entry.id.as_str()),
+            &mut errors,
+        );
+        validate_ids(
+            "items",
+            self.items.iter().map(|entry| entry.id.as_str()),
+            &mut errors,
+        );
+        validate_ids(
+            "passives",
+            self.passives.iter().map(|entry| entry.id.as_str()),
+            &mut errors,
+        );
+        validate_ids(
+            "active_skills",
+            self.active_skills.iter().map(|entry| entry.id.as_str()),
+            &mut errors,
+        );
+
+        for pal in &self.pals {
+            if pal.rarity < 0
+                || pal.hp_scaling < 0.0
+                || pal.attack_scaling < 0.0
+                || pal.defense_scaling < 0.0
+            {
+                errors.push(format!(
+                    "pals contains invalid numeric values for '{}'.",
+                    pal.id
+                ));
+            }
+            for suitability in &pal.work_suitabilities {
+                if !(1..=4).contains(&suitability.level) || suitability.work_type.is_empty() {
+                    errors.push(format!(
+                        "pals contains invalid work suitability for '{}'.",
+                        pal.id
+                    ));
+                }
+            }
+        }
+        for item in &self.items {
+            if item.max_stack <= 0 || item.rarity < 0 {
+                errors.push(format!(
+                    "items contains invalid numeric values for '{}'.",
+                    item.id
+                ));
+            }
+        }
+        for passive in &self.passives {
+            if passive.tier < 0 || passive.name.is_empty() {
+                errors.push(format!(
+                    "passives contains invalid values for '{}'.",
+                    passive.id
+                ));
+            }
+        }
+        for skill in &self.active_skills {
+            if skill.power < 0 || skill.cooldown_seconds < 0 || skill.element.is_empty() {
+                errors.push(format!(
+                    "active_skills contains invalid values for '{}'.",
+                    skill.id
+                ));
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+fn validate_ids<'a>(
+    collection: &str,
+    ids: impl Iterator<Item = &'a str>,
+    errors: &mut Vec<String>,
+) {
+    let mut seen = std::collections::HashSet::new();
+    for id in ids {
+        if id.is_empty() {
+            errors.push(format!("{collection} contains an empty ID."));
+        } else if !seen.insert(id) {
+            errors.push(format!("{collection} contains duplicate ID '{id}'."));
+        }
+    }
 }
 
 fn default_pals() -> Vec<PalSpeciesInfo> {
@@ -320,4 +411,34 @@ fn default_active_skills() -> Vec<ActiveSkillInfo> {
             cooldown_seconds: 45,
         },
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_catalog_passes_integrity_validation() {
+        let catalog = GameCatalog::new();
+        assert!(catalog.validate_integrity().is_ok());
+        assert!(!catalog.pals.is_empty());
+        assert!(!catalog.items.is_empty());
+        assert!(!catalog.passives.is_empty());
+        assert!(!catalog.active_skills.is_empty());
+    }
+
+    #[test]
+    fn integrity_validation_rejects_duplicate_ids_and_schema_drift() {
+        let mut catalog = GameCatalog::new();
+        catalog.items.push(catalog.items[0].clone());
+        catalog.pals[0].work_suitabilities[0].level = 5;
+        catalog.active_skills[0].cooldown_seconds = -1;
+
+        let errors = catalog.validate_integrity().unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("duplicate ID")));
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("work suitability")));
+        assert!(errors.iter().any(|error| error.contains("active_skills")));
+    }
 }
