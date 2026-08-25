@@ -234,7 +234,29 @@ mod tests {
 
     #[test]
     fn test_cityhash_short() {
-        let h = cityhash64(b"hello");
+        assert_eq!(cityhash64(b"hello"), 2_578_220_239_953_316_063);
+        assert_eq!(cityhash64(b"helloworld"), 16_622_738_483_577_116_029);
+    }
+
+    #[test]
+    fn test_cityhash_medium() {
+        let text = b"The quick brown fox jumps over the lazy dog";
+        let h = cityhash64(text);
+        assert_eq!(h, cityhash64(text));
+        assert_ne!(
+            h,
+            cityhash64(b"The quick brown fox jumps over the lazy cog")
+        );
+    }
+
+    #[test]
+    fn test_cityhash_long_exceeding_64_bytes() {
+        let long_bytes = b"PalTrainer high performance save editor and integrity verification tooling for Palworld".repeat(4);
+        assert!(long_bytes.len() > 64);
+        let h = cityhash64(&long_bytes);
         assert_ne!(h, 0);
+
+        // Determinism test
+        assert_eq!(h, cityhash64(&long_bytes));
     }
 }
