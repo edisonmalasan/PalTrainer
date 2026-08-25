@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PreviewModal } from "../../shared/components/PreviewModal";
+import { WarningBanner } from "../../shared/components/WarningBanner";
 import type {
   MutationPreview,
   XgpExtractOptions,
@@ -117,12 +118,12 @@ export function XgpPanel() {
   return (
     <div className="space-y-8">
       {/* ── Section 1: Xbox Cloud Sync Advisory Banner ─────────────────── */}
-      <div className="border-l-4 border-amber-500 bg-amber-50 p-4 text-xs text-amber-900">
-        <p className="font-semibold uppercase tracking-wider">Xbox Cloud Sync Advisory</p>
-        <p className="mt-1 leading-relaxed">
-          Before extracting or importing Xbox GamePass saves, ensure the Palworld game client and Xbox Gaming Services app are completely closed. Writing container blobs while cloud synchronization is active can trigger cloud conflict dialogs upon next launch.
-        </p>
-      </div>
+      <WarningBanner
+        severity="warning"
+        badge="XBOX CLOUD SYNC ADVISORY"
+        title="Game Client & Gaming Services Precaution"
+        description="Before extracting or importing Xbox GamePass saves, ensure the Palworld game client and Xbox Gaming Services app are completely closed. Writing container blobs while cloud synchronization is active can trigger cloud conflict dialogs upon next launch."
+      />
 
       {/* ── Section 2: Discovered Xbox GamePass Saves ───────────────────── */}
       <section className="border border-shell-line bg-white p-5 space-y-4">
