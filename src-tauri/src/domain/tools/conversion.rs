@@ -413,4 +413,25 @@ mod tests {
         let nosteam = player_uid_to_no_steam(0x12345678);
         assert!(nosteam.ends_with("-0000-0000-0000-000000000000"));
     }
+
+    #[test]
+    fn test_calculate_ids_from_hex_uid() {
+        let hex_uid = "00000000-0000-0000-0000-000000000001";
+        let res = calculate_ids(hex_uid).unwrap();
+        assert_eq!(res.input_type, "Palworld UID");
+        assert_eq!(res.palworld_uid, "00000000-0000-0000-0000-000000000001");
+    }
+
+    #[test]
+    fn test_calculate_ids_invalid_input() {
+        assert!(calculate_ids("invalid_steam_id_string").is_err());
+        assert!(calculate_ids("").is_err());
+    }
+
+    #[test]
+    fn test_hex_decode_validation() {
+        assert_eq!(hex_decode("01020304").unwrap(), vec![1, 2, 3, 4]);
+        assert!(hex_decode("01020").is_err()); // odd length
+        assert!(hex_decode("0102zz").is_err()); // invalid hex
+    }
 }
