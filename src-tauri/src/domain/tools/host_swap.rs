@@ -213,7 +213,32 @@ pub fn commit_host_swap(
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use tempfile::tempdir;
+
     use super::*;
+
+    fn make_session(root: &std::path::Path, source_uid: &str, target_uid: &str) -> SaveSession {
+        fs::create_dir_all(root.join("Players")).unwrap();
+        let mut level = Vec::new();
+        level.extend_from_slice(&100u32.to_le_bytes());
+        level.extend_from_slice(&50u32.to_le_bytes());
+        level.extend_from_slice(b"PlZ");
+        level.push(0x32);
+        fs::write(root.join("Level.sav"), level).unwrap();
+        fs::write(
+            root.join("Players").join(format!("{source_uid}.sav")),
+            b"source",
+        )
+        .unwrap();
+        fs::write(
+            root.join("Players").join(format!("{target_uid}.sav")),
+            b"target",
+        )
+        .unwrap();
+        SaveSession::open(root).unwrap()
+    }
 
     #[test]
     fn test_host_swap_options() {
@@ -224,5 +249,114 @@ mod tests {
         };
         assert!(opt.swap_mode);
         assert_ne!(opt.source_uid, opt.target_uid);
+    }
+
+    #[test]
+    fn host_swap_inspection_normalizes_uids_and_reports_files() {
+        let dir = tempdir().unwrap();
+        let source_uid = "abcdefabcdefabcdefabcdefabcdefab";
+        let target_uid = "12345678123456781234567812345678";
+        let session = make_session(&dir.path().join("World"), source_uid, target_uid);
+
+        let inspection = inspect_host_swap(
+            &session,
+            "ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB",
+            "12345678-1234-5678-1234-567812345678",
+        )
+        .unwrap();
+
+        assert_eq!(inspection.source_uid, source_uid);
+        assert_eq!(inspection.target_uid, target_uid);
+        assert!(inspection.source_player_found);
+        assert!(inspection.target_player_found);
+    }
+
+    #[test]
+    fn host_swap_preview_warns_for_same_uid_and_lists_existing_files() {
+        let dir = tempdir().unwrap();
+        let uid = "abcdefabcdefabcdefabcdefabcdefab";
+        let session = make_session(
+            &dir.path().join("World"),
+            uid,
+            "12345678123456781234567812345678",
+        );
+        let preview = preview_host_swap(
+            &session,
+            &HostSwapOptions {
+                source_uid: uid.into(),
+                target_uid: uid.into(),
+                swap_mode: false,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(preview.operation, "fix_host_save");
+        assert_eq!(preview.files_to_modify.len(), 3);
+        assert!(preview
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("identical")));
+        assert!(preview.backup_target.is_some());
+    }
+
+    #[test]
+    fn host_swap_commit_rejects_same_uid_without_touching_files() {
+        let dir = tempdir().unwrap();
+        let uid = "abcdefabcdefabcdefabcdefabcdefab";
+        let world = dir.path().join("World");
+        let mut session = make_session(&world, uid, "12345678123456781234567812345678");
+        let manager = BackupManager::new(dir.path().join("Backups"));
+        let error = commit_host_swap(
+            &mut session,
+            &manager,
+            &HostSwapOptions {
+                source_uid: uid.into(),
+                target_uid: uid.into(),
+                swap_mode: true,
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "validation_error");
+        assert_eq!(
+            fs::read(world.join("Players").join(format!("{uid}.sav"))).unwrap(),
+            b"source"
+        );
+        assert!(!dir.path().join("Backups").exists());
+    }
+
+    #[test]
+    fn host_swap_commit_exchanges_files_and_creates_backup() {
+        let dir = tempdir().unwrap();
+        let source_uid = "abcdefabcdefabcdefabcdefabcdefab";
+        let target_uid = "12345678123456781234567812345678";
+        let world = dir.path().join("World");
+        let mut session = make_session(&world, source_uid, target_uid);
+        let manager = BackupManager::new(dir.path().join("Backups"));
+
+        let result = commit_host_swap(
+            &mut session,
+            &manager,
+            &HostSwapOptions {
+                source_uid: source_uid.into(),
+                target_uid: target_uid.into(),
+                swap_mode: true,
+            },
+        )
+        .unwrap();
+
+        let players = world.join("Players");
+        assert_eq!(
+            fs::read(players.join(format!("{source_uid}.sav"))).unwrap(),
+            b"target"
+        );
+        assert_eq!(
+            fs::read(players.join(format!("{target_uid}.sav"))).unwrap(),
+            b"source"
+        );
+        assert_eq!(result.mode, "swap");
+        assert_eq!(result.files_renamed.len(), 2);
+        assert!(result.backup_path.is_some());
+        assert!(session.is_dirty());
     }
 }
