@@ -175,4 +175,32 @@ mod tests {
         let progress = tracker.get_progress(&task_id).unwrap();
         assert_eq!(progress.status, TaskStatus::Cancelled);
     }
+
+    #[test]
+    fn test_task_failure() {
+        let tracker = TaskTracker::new();
+        let (task_id, _) = tracker.register_task("fail_test", 50, "Working");
+
+        tracker.fail_task(&task_id, "Out of memory");
+        let progress = tracker.get_progress(&task_id).unwrap();
+        assert_eq!(progress.status, TaskStatus::Failed);
+        assert_eq!(progress.message, "Out of memory");
+    }
+
+    #[test]
+    fn test_non_existent_task_operations() {
+        let tracker = TaskTracker::new();
+        assert!(!tracker.cancel_task("does_not_exist"));
+        assert!(tracker.get_progress("does_not_exist").is_none());
+    }
+
+    #[test]
+    fn test_progress_clamped_at_100() {
+        let tracker = TaskTracker::new();
+        let (task_id, _) = tracker.register_task("clamp_test", 100, "Progressing");
+
+        tracker.update_progress(&task_id, 150, None);
+        let progress = tracker.get_progress(&task_id).unwrap();
+        assert_eq!(progress.percentage, 100.0);
+    }
 }
