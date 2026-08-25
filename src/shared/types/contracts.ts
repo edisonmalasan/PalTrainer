@@ -238,9 +238,58 @@ export interface InventorySlotProjection {
 }
 
 export interface InventoryProjection {
-  readonly ownerUid: string;
+  readonly containerId: string;
+  readonly containerType: string;
+  readonly ownerId: string;
+  readonly slotCapacity: number;
   readonly slots: readonly InventorySlotProjection[];
+  /** Optional legacy alias for ownerId */
+  readonly ownerUid?: string;
 }
+
+// --- Inventory Mutation DTOs ---
+
+export interface UpdateInventorySlotDto {
+  readonly ownerUid: string;
+  readonly containerId: string;
+  readonly slotIndex: number;
+  readonly itemId: string;
+  readonly count: number;
+  readonly durability?: number;
+}
+
+export interface AddItemDto {
+  readonly ownerUid: string;
+  readonly containerId: string;
+  readonly itemId: string;
+  readonly count: number;
+  readonly durability?: number;
+  readonly slotIndex?: number;
+}
+
+export interface RemoveItemDto {
+  readonly ownerUid: string;
+  readonly containerId: string;
+  readonly slotIndex: number;
+  readonly count?: number;
+}
+
+export interface ClearContainerDto {
+  readonly ownerUid: string;
+  readonly containerId: string;
+}
+
+export interface ResizeContainerDto {
+  readonly ownerUid: string;
+  readonly containerId: string;
+  readonly newCapacity: number;
+}
+
+export interface BulkAddKeyItemsDto {
+  readonly playerUid: string;
+  readonly keyItemIds: readonly string[];
+}
+
 
 export interface WorldOptionsDto {
   readonly expRate: number;
