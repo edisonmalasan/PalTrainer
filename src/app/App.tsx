@@ -18,6 +18,8 @@ import { PlayersView } from "../features/players/PlayersView";
 import { SaveSessionView } from "../features/save-session/SaveSessionView";
 import { ToolsView } from "../features/tools/ToolsView";
 import { WorldOptionsView } from "../features/world/WorldOptionsView";
+import { KeyboardShortcutOverlay } from "../shared/components/KeyboardShortcutOverlay";
+import { useKeyboardShortcut } from "../shared/hooks/useKeyboardShortcut";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { appRoutes } from "./routes";
 
@@ -43,6 +45,27 @@ function Workbench() {
   const [logs, setLogs] = useState<readonly AppLogEntry[]>([]);
   const [error, setError] = useState<CommandError | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Global shortcut ? to toggle shortcuts overlay
+  useKeyboardShortcut("?", () => setShowShortcuts((prev) => !prev), {
+    allowInInputs: false,
+  });
+
+  // Global Ctrl+1 .. Ctrl+0 route navigation
+  useEffect(() => {
+    function handleNavKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key >= "0" && e.key <= "9") {
+        const index = e.key === "0" ? 9 : parseInt(e.key, 10) - 1;
+        if (index < appRoutes.length && appRoutes[index].enabled) {
+          e.preventDefault();
+          setActiveRoute(appRoutes[index].id);
+        }
+      }
+    }
+    window.addEventListener("keydown", handleNavKey);
+    return () => window.removeEventListener("keydown", handleNavKey);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,7 +163,18 @@ function Workbench() {
                 <span className="font-mono text-[10px] text-shell-muted">{route.phase}</span>
               </button>
             ))}
-          </nav>
+          <div className="mt-auto pt-6 border-t border-shell-line/60">
+            <button
+              type="button"
+              onClick={() => setShowShortcuts(true)}
+              className="flex w-full items-center justify-between border border-shell-line bg-shell-panel px-3 py-2 text-left text-xs text-shell-muted transition hover:bg-shell-surface hover:text-shell-ink active:translate-y-[1px]"
+            >
+              <span>Shortcuts</span>
+              <kbd className="rounded-sm border border-shell-line bg-white px-1.5 py-0.5 font-mono text-[10px] font-semibold text-shell-ink">
+                ?
+              </kbd>
+            </button>
+          </div>
         </aside>
 
         {/* ── Content area ─────────────────────────────────────────────── */}
@@ -179,6 +213,11 @@ function Workbench() {
           </div>
         </section>
       </div>
+
+      <KeyboardShortcutOverlay
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+      />
     </main>
   );
 }
