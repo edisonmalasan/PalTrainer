@@ -1,1 +1,4 @@
-// Conversion and transfer tools are planned for later phases.
+//! External tools, identifier conversion, save transformation, and platform helpers.
+
+pub mod cityhash;
+pub mod conversion;
