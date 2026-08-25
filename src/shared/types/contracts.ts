@@ -443,6 +443,27 @@ export interface CleanupParams {
   readonly scopePlayerUid?: string;
 }
 
+export type RepairTarget =
+  | "structures"
+  | "items"
+  | "pals"
+  | "illegal_pals"
+  | "illegal_players"
+  | "invalid_active_skills"
+  | "overfilled_inventories"
+  | "guilds"
+  | "timestamps"
+  | "unassigned_pals"
+  | "dynamic_containers"
+  | "private_chests";
+
+export interface RepairParams {
+  readonly target: RepairTarget;
+  readonly scopeEntityId?: string;
+  readonly autoHeal: boolean;
+  readonly clampStats: boolean;
+}
+
 export interface BreedingLookupResult {
   readonly parent1: string;
   readonly parent2: string;
