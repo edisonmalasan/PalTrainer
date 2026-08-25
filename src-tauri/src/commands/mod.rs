@@ -9,6 +9,7 @@ pub mod inventory;
 pub mod pal;
 pub mod player;
 pub mod repair;
+pub mod reset;
 pub mod save_session;
 pub mod settings;
 pub mod world;

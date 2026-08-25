@@ -464,6 +464,26 @@ export interface RepairParams {
   readonly clampStats: boolean;
 }
 
+export type ResetTarget =
+  | "missions"
+  | "dungeons"
+  | "oil_rig"
+  | "invaders"
+  | "supply_drops"
+  | "anti_air_turrets"
+  | "lock_gimmicks";
+
+export interface ResetParams {
+  readonly targets: readonly ResetTarget[];
+  readonly scopePlayerUid?: string;
+}
+
+export interface PalDefenderCommand {
+  readonly command: string;
+  readonly description: string;
+  readonly category: string;
+}
+
 export interface BreedingLookupResult {
   readonly parent1: string;
   readonly parent2: string;

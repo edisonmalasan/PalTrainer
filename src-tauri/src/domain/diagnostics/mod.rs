@@ -2,6 +2,7 @@
 
 pub mod cleanup;
 pub mod repair;
+pub mod reset;
 
 use serde::{Deserialize, Serialize};
 

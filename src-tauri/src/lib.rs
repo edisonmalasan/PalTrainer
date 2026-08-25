@@ -117,6 +117,9 @@ pub fn run() {
             commands::cleanup::commit_cleanup,
             commands::repair::preview_repair,
             commands::repair::commit_repair,
+            commands::reset::preview_reset,
+            commands::reset::commit_reset,
+            commands::reset::generate_paldefender_commands,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PalTrainer");
