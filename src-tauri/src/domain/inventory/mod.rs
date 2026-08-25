@@ -1,4 +1,6 @@
-//! Inventory and container read-only projections.
+//! Inventory and container read-only projections and mutations.
+
+pub mod mutation;
 
 use serde::{Deserialize, Serialize};
 
