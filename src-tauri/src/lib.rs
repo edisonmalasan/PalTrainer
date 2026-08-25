@@ -39,6 +39,7 @@ pub fn run() {
             commands::inspect::get_inventory,
             commands::inspect::get_map_markers,
             commands::inspect::run_save_diagnostics,
+            commands::inspect::run_targeted_diagnostic,
             commands::inspect::lookup_breeding,
             commands::inspect::get_game_catalog,
             commands::player::preview_update_player,
