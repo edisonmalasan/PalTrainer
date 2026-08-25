@@ -124,6 +124,11 @@ pub fn run() {
             commands::conversion::convert_sav_to_json,
             commands::conversion::convert_json_to_sav,
             commands::conversion::inspect_raw_json,
+            commands::modifiers::preview_restore_map,
+            commands::modifiers::commit_restore_map,
+            commands::modifiers::get_palbox_capacity,
+            commands::modifiers::preview_inject_palbox_slots,
+            commands::modifiers::commit_inject_palbox_slots,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PalTrainer");

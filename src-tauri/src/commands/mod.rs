@@ -7,6 +7,7 @@ pub mod exclusions;
 pub mod guild;
 pub mod inspect;
 pub mod inventory;
+pub mod modifiers;
 pub mod pal;
 pub mod player;
 pub mod repair;
