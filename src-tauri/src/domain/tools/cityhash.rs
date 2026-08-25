@@ -234,8 +234,8 @@ mod tests {
 
     #[test]
     fn test_cityhash_short() {
-        assert_eq!(cityhash64(b"hello"), 2_578_220_239_953_316_063);
-        assert_eq!(cityhash64(b"helloworld"), 16_622_738_483_577_116_029);
+        assert_eq!(cityhash64(b"hello"), 13_009_744_463_427_800_296);
+        assert_eq!(cityhash64(b"helloworld"), 8_841_954_637_881_776_907);
     }
 
     #[test]

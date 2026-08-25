@@ -391,7 +391,28 @@ pub fn inspect_raw_json(session: &SaveSession) -> Result<RawJsonSummary, AppErro
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use tempfile::tempdir;
+
     use super::*;
+
+    fn minimal_gvas() -> Vec<u8> {
+        let mut writer = FArchiveWriter::new();
+        writer.u32(0x5341_5647);
+        writer.i32(3);
+        writer.i32(522);
+        writer.u16(5);
+        writer.u16(1);
+        writer.u16(1);
+        writer.u32(0);
+        writer.fstring("Palworld");
+        writer.i32(3);
+        writer.i32(0);
+        writer.fstring("/Script/Pal.PalWorldSaveGame");
+        writer.fstring("None");
+        writer.into_bytes()
+    }
 
     #[test]
     fn test_calculate_ids_steam_id() {
@@ -433,5 +454,131 @@ mod tests {
         assert_eq!(hex_decode("01020304").unwrap(), vec![1, 2, 3, 4]);
         assert!(hex_decode("01020").is_err()); // odd length
         assert!(hex_decode("0102zz").is_err()); // invalid hex
+    }
+
+    #[test]
+    fn sav_to_json_uses_default_output_and_preserves_header_metadata() {
+        let dir = tempdir().unwrap();
+        let input = dir.path().join("Level.sav");
+        let sav = compress_gvas_to_sav(&minimal_gvas(), SaveType::Plz).unwrap();
+        fs::write(&input, sav).unwrap();
+
+        let result = convert_sav_to_json(ConvertSavToJsonDto {
+            input_path: input.display().to_string(),
+            output_path: None,
+            minify: false,
+        })
+        .unwrap();
+
+        let output = dir.path().join("Level.json");
+        assert_eq!(result.target_path, output.display().to_string());
+        let json: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(output).unwrap()).unwrap();
+        assert_eq!(json["header"]["gvas_magic"], 0x5341_5647u32);
+        assert_eq!(json["header"]["save_game_version"], 3);
+        assert_eq!(
+            json["header"]["save_game_class_name"],
+            "/Script/Pal.PalWorldSaveGame"
+        );
+        assert_eq!(json["properties_count"], 0);
+    }
+
+    #[test]
+    fn sav_to_json_honors_custom_output_and_minify() {
+        let dir = tempdir().unwrap();
+        let input = dir.path().join("source.sav");
+        let output = dir.path().join("export.json");
+        let sav = compress_gvas_to_sav(&minimal_gvas(), SaveType::Plz).unwrap();
+        fs::write(&input, sav).unwrap();
+
+        convert_sav_to_json(ConvertSavToJsonDto {
+            input_path: input.display().to_string(),
+            output_path: Some(output.display().to_string()),
+            minify: true,
+        })
+        .unwrap();
+
+        let contents = fs::read_to_string(output).unwrap();
+        assert!(!contents.contains('\n'));
+        assert!(contents.contains("properties_count"));
+    }
+
+    #[test]
+    fn sav_to_json_rejects_missing_and_corrupt_inputs() {
+        let dir = tempdir().unwrap();
+        let missing = dir.path().join("missing.sav");
+        let missing_error = convert_sav_to_json(ConvertSavToJsonDto {
+            input_path: missing.display().to_string(),
+            output_path: None,
+            minify: true,
+        })
+        .unwrap_err();
+        assert_eq!(missing_error.code, "not_found");
+
+        let corrupt = dir.path().join("corrupt.sav");
+        fs::write(&corrupt, b"not a sav").unwrap();
+        let corrupt_error = convert_sav_to_json(ConvertSavToJsonDto {
+            input_path: corrupt.display().to_string(),
+            output_path: None,
+            minify: true,
+        })
+        .unwrap_err();
+        assert_eq!(corrupt_error.code, "decompress_error");
+    }
+
+    #[test]
+    fn json_to_sav_reconstructs_minimal_plz_and_uses_default_output() {
+        let dir = tempdir().unwrap();
+        let input = dir.path().join("export.json");
+        fs::write(&input, r#"{"properties": []}"#).unwrap();
+
+        let result = convert_json_to_sav(ConvertJsonToSavDto {
+            input_path: input.display().to_string(),
+            output_path: None,
+            save_type: Some("plz".into()),
+        })
+        .unwrap();
+
+        let output = dir.path().join("export.sav");
+        assert_eq!(result.target_path, output.display().to_string());
+        let bytes = fs::read(output).unwrap();
+        let (decoded, save_type) = decompress_sav(&bytes).unwrap();
+        assert_eq!(save_type, SaveType::Plz);
+        assert_eq!(decoded, minimal_gvas());
+    }
+
+    #[test]
+    fn json_to_sav_rejects_invalid_json_missing_properties_and_unsupported_cnk() {
+        let dir = tempdir().unwrap();
+        let invalid_json = dir.path().join("invalid.json");
+        fs::write(&invalid_json, "not json").unwrap();
+        let invalid_error = convert_json_to_sav(ConvertJsonToSavDto {
+            input_path: invalid_json.display().to_string(),
+            output_path: None,
+            save_type: None,
+        })
+        .unwrap_err();
+        assert_eq!(invalid_error.code, "json_error");
+
+        let missing_properties = dir.path().join("missing-properties.json");
+        fs::write(&missing_properties, r#"{"header": {}}"#).unwrap();
+        let missing_error = convert_json_to_sav(ConvertJsonToSavDto {
+            input_path: missing_properties.display().to_string(),
+            output_path: None,
+            save_type: None,
+        })
+        .unwrap_err();
+        assert_eq!(missing_error.code, "validation_error");
+
+        let cnk = dir.path().join("cnk.json");
+        fs::write(&cnk, r#"{"properties": []}"#).unwrap();
+        let cnk_error = convert_json_to_sav(ConvertJsonToSavDto {
+            input_path: cnk.display().to_string(),
+            output_path: None,
+            save_type: Some("cnk".into()),
+        })
+        .unwrap_err();
+        assert_eq!(cnk_error.code, "compress_error");
+        assert!(!dir.path().join("cnk.sav").exists());
     }
 }
