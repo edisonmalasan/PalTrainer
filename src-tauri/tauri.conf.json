@@ -25,6 +25,25 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all"
+    "targets": ["nsis", "msi"],
+    "icon": ["icons/icon.ico"],
+    "category": "Utility",
+    "shortDescription": "Inspect and edit Palworld save data safely.",
+    "longDescription": "PalTrainer is a safety-first desktop utility for inspecting, backing up, and editing Palworld save data.",
+    "copyright": "Copyright 2026 PalTrainer contributors",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "startMenuFolder": "PalTrainer",
+        "installerIcon": "icons/icon.ico",
+        "languages": ["English"]
+      }
+    }
   }
 }
