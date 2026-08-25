@@ -349,10 +349,26 @@ export function BasesView() {
             {
               key: "name",
               header: "Base Name",
+              sortable: true,
+              sortValue: (r) => r.baseName || r.baseId,
               render: (r) => <span className="font-semibold text-shell-ink">{r.baseName || "—"}</span>,
             },
-            { key: "level", header: "Level", render: (r) => r.currentLevel, width: "70px" },
-            { key: "workers", header: "Workers", render: (r) => r.workerCount, width: "80px" },
+            {
+              key: "level",
+              header: "Level",
+              sortable: true,
+              sortValue: (r) => r.currentLevel,
+              render: (r) => r.currentLevel,
+              width: "70px",
+            },
+            {
+              key: "workers",
+              header: "Workers",
+              sortable: true,
+              sortValue: (r) => r.workerCount,
+              render: (r) => r.workerCount,
+              width: "80px",
+            },
             {
               key: "pos",
               header: "World Coordinates",
@@ -423,7 +439,8 @@ export function BasesView() {
           searchValue={query}
           onSearchChange={setQuery}
           searchPlaceholder="Filter by base name or ID…"
-          emptyMessage="No bases found. Load a save file first."
+          emptyHeadline="No bases found"
+          emptyDescription="Load a Palworld save directory in Save Session to inspect base camps and camp structures."
         />
 
         {/* Edit Base Level Drawer */}

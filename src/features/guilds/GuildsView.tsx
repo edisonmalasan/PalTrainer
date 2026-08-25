@@ -192,20 +192,35 @@ export function GuildsView() {
             },
             {
               key: "name",
-              header: "Name",
+              header: "Guild Name",
+              sortable: true,
+              sortValue: (r) => r.guildName || r.guildId,
               render: (r) => <span className="font-semibold text-shell-ink">{r.guildName || "—"}</span>,
-            },
-            {
-              key: "admin",
-              header: "Admin UID",
-              render: (r) => <span className="text-shell-muted">{r.adminUid.slice(0, 14)}…</span>,
-              width: "160px",
             },
             {
               key: "members",
               header: "Members",
+              sortable: true,
+              sortValue: (r) => r.members.length,
               render: (r) => r.members.length,
-              width: "80px",
+              width: "90px",
+            },
+            {
+              key: "bases",
+              header: "Bases",
+              sortable: true,
+              sortValue: (r) => r.baseCount,
+              render: (r) => r.baseCount,
+              width: "70px",
+            },
+            {
+              key: "admin",
+              header: "Admin Player",
+              render: (r) => (
+                <span className="text-shell-muted">
+                  {r.adminPlayerName || r.adminUid.slice(0, 8)}
+                </span>
+              ),
             },
             {
               key: "actions",
@@ -251,7 +266,8 @@ export function GuildsView() {
           searchValue={query}
           onSearchChange={setQuery}
           searchPlaceholder="Filter by guild name or ID…"
-          emptyMessage="No guilds found. Load a save file first."
+          emptyHeadline="No guilds found"
+          emptyDescription="Load a Palworld save directory in Save Session to view registered guilds and bases."
         />
 
         {/* Edit Guild Drawer */}

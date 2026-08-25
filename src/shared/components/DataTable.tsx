@@ -3,7 +3,7 @@ import { EmptyState } from "./EmptyState";
 
 export interface Column<T> {
   readonly key: string;
-  readonly header: string;
+  readonly header: string | React.ReactNode;
   readonly render: (row: T) => React.ReactNode;
   readonly width?: string;
   readonly sortable?: boolean;

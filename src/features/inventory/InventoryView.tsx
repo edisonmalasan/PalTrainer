@@ -513,12 +513,16 @@ export function InventoryView() {
                 {
                   key: "slot",
                   header: "Slot",
+                  sortable: true,
+                  sortValue: (s) => s.slotIndex,
                   render: (s) => <span className="font-mono text-xs text-shell-muted">#{s.slotIndex}</span>,
                   width: "60px",
                 },
                 {
                   key: "item",
                   header: "Item ID",
+                  sortable: true,
+                  sortValue: (s) => s.itemId,
                   render: (s) => (
                     <div>
                       <span className="font-semibold text-shell-ink">{s.itemId || "—"}</span>
@@ -532,15 +536,21 @@ export function InventoryView() {
                 },
                 {
                   key: "count",
-                  header: "Quantity",
-                  render: (s) => <span className="font-mono font-medium">{s.count}</span>,
+                  header: "Count",
+                  sortable: true,
+                  sortValue: (s) => s.count,
+                  render: (s) => (
+                    <span className="font-mono font-semibold text-shell-ink">
+                      x{s.count.toLocaleString()}
+                    </span>
+                  ),
                   width: "90px",
                 },
                 {
                   key: "actions",
                   header: "Actions",
                   render: (s) => (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex gap-1.5">
                       <button
                         type="button"
                         onClick={() => startEditSlot(s)}
@@ -550,11 +560,10 @@ export function InventoryView() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => void handleRequestQuickMaxStack(s)}
+                        onClick={() => void handleRequestMaxSlotPreview(s)}
                         className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
-                        title="Set quantity to 9,999"
                       >
-                        Max (9999)
+                        Max (x9999)
                       </button>
                       <button
                         type="button"
@@ -565,7 +574,6 @@ export function InventoryView() {
                       </button>
                     </div>
                   ),
-                  width: "220px",
                 },
               ]}
               rows={filtered}
@@ -573,12 +581,14 @@ export function InventoryView() {
               searchValue={query}
               onSearchChange={setQuery}
               searchPlaceholder="Filter items by ID or slot index…"
-              emptyMessage="This container has no items. Use '+ Add Item' to populate slots."
+              emptyHeadline="Container is empty"
+              emptyDescription="This container currently holds no items. Use '+ Add Item' or 'Add Key Items Pack' to populate slots."
             />
           ) : (
-            <p className="border border-dashed border-shell-line p-6 text-center text-sm text-shell-muted">
-              No inventory data. Load a save file first.
-            </p>
+            <EmptyState
+              headline="No inventory container selected"
+              description="Load a Palworld save directory in Save Session to view player or chest inventories."
+            />
           )}
 
           {/* Edit Slot Drawer */}
