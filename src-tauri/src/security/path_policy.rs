@@ -161,11 +161,47 @@ mod tests {
         fs::write(&valid, b"data").unwrap();
         assert!(validate_import_export_path(&valid, true).is_ok());
 
+        let valid_json = dir.path().join("export.JSON");
+        fs::write(&valid_json, b"data").unwrap();
+        assert!(validate_import_export_path(&valid_json, true).is_ok());
+
+        let valid_zip = dir.path().join("backup.zip");
+        fs::write(&valid_zip, b"data").unwrap();
+        assert!(validate_import_export_path(&valid_zip, true).is_ok());
+
         let invalid_ext = dir.path().join("malicious.exe");
         fs::write(&invalid_ext, b"data").unwrap();
         assert!(matches!(
             validate_import_export_path(&invalid_ext, true),
             Err(SecurityError::DisallowedExtension(_))
         ));
+
+        let script_ext = dir.path().join("hack.bat");
+        fs::write(&script_ext, b"data").unwrap();
+        assert!(matches!(
+            validate_import_export_path(&script_ext, true),
+            Err(SecurityError::DisallowedExtension(_))
+        ));
+
+        let no_ext = dir.path().join("unknown_file");
+        fs::write(&no_ext, b"data").unwrap();
+        assert!(matches!(
+            validate_import_export_path(&no_ext, true),
+            Err(SecurityError::DisallowedExtension(_))
+        ));
+    }
+
+    #[test]
+    fn test_path_traversal_detection() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("safe_dir");
+        fs::create_dir_all(&root).unwrap();
+
+        let secret = dir.path().join("secret.txt");
+        fs::write(&secret, b"sensitive").unwrap();
+
+        // Path with traversal attempting to escape root
+        let escape_attempt = root.join("..").join("secret.txt");
+        assert!(ensure_within_root(&escape_attempt, &root).is_err());
     }
 }

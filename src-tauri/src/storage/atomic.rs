@@ -83,4 +83,22 @@ mod tests {
         atomic_write(&target, b"updated payload").unwrap();
         assert_eq!(fs::read(&target).unwrap(), b"updated payload");
     }
+
+    #[test]
+    fn test_atomic_write_creates_parent_directories() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("nested").join("deep").join("save.sav");
+
+        atomic_write(&target, b"deep content").unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"deep content");
+    }
+
+    #[test]
+    fn test_atomic_write_empty_payload() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("empty.sav");
+
+        atomic_write(&target, b"").unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"");
+    }
 }

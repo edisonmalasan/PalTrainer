@@ -165,4 +165,14 @@ mod tests {
             settings
         );
     }
+
+    #[test]
+    fn corrupt_settings_file_returns_parse_error() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let path = temp.path().join("settings.json");
+        fs::write(&path, "{ invalid json ").unwrap();
+
+        let err = read_settings_from_path(&path).unwrap_err();
+        assert_eq!(err.code, "settings_parse_failed");
+    }
 }

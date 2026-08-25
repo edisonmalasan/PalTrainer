@@ -276,4 +276,28 @@ mod tests {
             b"level_data_v1"
         );
     }
+
+    #[test]
+    fn test_restore_invalid_backup_fails() {
+        let temp = tempdir().unwrap();
+        let empty_backup_dir = temp.path().join("FakeBackup");
+        fs::create_dir_all(&empty_backup_dir).unwrap();
+
+        let save_root = temp.path().join("SaveWorld");
+        fs::create_dir_all(&save_root).unwrap();
+
+        let manager = BackupManager::new(temp.path().join("Backups"));
+        let err = manager
+            .restore_backup(&empty_backup_dir, &save_root)
+            .unwrap_err();
+        assert!(matches!(err, StorageError::InvalidBackup(_)));
+    }
+
+    #[test]
+    fn test_list_backups_empty_when_no_directory() {
+        let temp = tempdir().unwrap();
+        let manager = BackupManager::new(temp.path().join("NonExistentBackups"));
+        let list = manager.list_backups(None).unwrap();
+        assert!(list.is_empty());
+    }
 }
