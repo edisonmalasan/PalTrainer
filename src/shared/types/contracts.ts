@@ -141,20 +141,27 @@ export interface BaseProjection {
 
 export interface PalProjection {
   readonly instanceId: string;
-  readonly palId: string;
-  readonly nickname: string;
+  readonly ownerUid: string;
+  readonly speciesId: string;
+  readonly nickname?: string | null;
+  readonly gender: string;
   readonly level: number;
   readonly exp: number;
-  readonly gender: string;
-  readonly rank: number;
-  readonly condenser_rank: number;
   readonly hp: number;
   readonly maxHp: number;
+  readonly attack: number;
+  readonly defense: number;
   readonly workSpeed: number;
-  readonly passive_skills: readonly string[];
-  readonly active_skills: readonly string[];
-  readonly ownerUid: string | null;
-  readonly container: string | null;
+  readonly ivHp: number;
+  readonly ivAttack: number;
+  readonly ivDefense: number;
+  readonly rank: number;
+  readonly souls: number;
+  readonly isLucky: boolean;
+  readonly isBoss: boolean;
+  readonly passiveSkills: readonly string[];
+  readonly activeSkills: readonly string[];
+  readonly location: string;
 }
 
 // --- Pal Mutation DTOs ---
