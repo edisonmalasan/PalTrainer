@@ -135,6 +135,10 @@ pub fn run() {
             commands::transfer::inspect_host_swap,
             commands::transfer::preview_host_swap,
             commands::transfer::commit_host_swap,
+            commands::xgp::discover_xgp_saves,
+            commands::xgp::extract_xgp_save,
+            commands::xgp::preview_import_steam_to_xgp,
+            commands::xgp::commit_import_steam_to_xgp,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PalTrainer");

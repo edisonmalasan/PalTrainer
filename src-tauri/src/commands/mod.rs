@@ -16,3 +16,4 @@ pub mod save_session;
 pub mod settings;
 pub mod transfer;
 pub mod world;
+pub mod xgp;
