@@ -4,6 +4,7 @@ pub mod base;
 pub mod exclusions;
 pub mod guild;
 pub mod inspect;
+pub mod pal;
 pub mod player;
 pub mod save_session;
 pub mod settings;
