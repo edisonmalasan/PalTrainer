@@ -120,6 +120,10 @@ pub fn run() {
             commands::reset::preview_reset,
             commands::reset::commit_reset,
             commands::reset::generate_paldefender_commands,
+            commands::conversion::calculate_identifier_conversion,
+            commands::conversion::convert_sav_to_json,
+            commands::conversion::convert_json_to_sav,
+            commands::conversion::inspect_raw_json,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PalTrainer");
