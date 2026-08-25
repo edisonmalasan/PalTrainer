@@ -204,7 +204,21 @@ pub fn commit_character_transfer(
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use tempfile::tempdir;
+
     use super::*;
+
+    fn make_save_root(root: &std::path::Path) {
+        fs::create_dir_all(root.join("Players")).unwrap();
+        let mut level = Vec::new();
+        level.extend_from_slice(&100u32.to_le_bytes());
+        level.extend_from_slice(&50u32.to_le_bytes());
+        level.extend_from_slice(b"PlZ");
+        level.push(0x32);
+        fs::write(root.join("Level.sav"), level).unwrap();
+    }
 
     #[test]
     fn test_character_transfer_options() {
@@ -220,5 +234,115 @@ mod tests {
         };
         assert!(opt.transfer_pals);
         assert_eq!(opt.player_uid.len(), 32);
+    }
+
+    #[test]
+    fn inspect_transfer_source_normalizes_uids_and_pairs_dps_files() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("SourceWorld");
+        make_save_root(&root);
+        fs::write(
+            root.join("Players")
+                .join("ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB.sav"),
+            b"player",
+        )
+        .unwrap();
+        fs::write(
+            root.join("Players")
+                .join("abcdefabcdefabcdefabcdefabcdefab_dps.sav"),
+            b"dps",
+        )
+        .unwrap();
+
+        let players = inspect_transfer_source(root.to_str().unwrap()).unwrap();
+        assert_eq!(players.len(), 1);
+        assert_eq!(players[0].uid, "abcdefabcdefabcdefabcdefabcdefab");
+        assert!(players[0].has_dps_file);
+    }
+
+    #[test]
+    fn transfer_preview_reports_target_collision_and_normalizes_uid() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("SourceWorld");
+        let target = dir.path().join("TargetWorld");
+        make_save_root(&source);
+        make_save_root(&target);
+        let uid = "abcdefabcdefabcdefabcdefabcdefab";
+        fs::write(
+            target.join("Players").join(format!("{uid}.sav")),
+            b"existing",
+        )
+        .unwrap();
+
+        let preview = preview_character_transfer(&CharacterTransferOptions {
+            source_save_path: source.display().to_string(),
+            target_save_path: target.display().to_string(),
+            player_uid: "ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB".into(),
+            transfer_pals: true,
+            transfer_inventory: false,
+            transfer_tech: true,
+            transfer_all_players: false,
+            target_guild_id: None,
+        })
+        .unwrap();
+
+        assert_eq!(preview.operation, "character_transfer");
+        assert_eq!(preview.entities_to_modify[0].entity_id, uid);
+        assert!(preview
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("already contains")));
+        assert!(preview.backup_target.is_some());
+    }
+
+    #[test]
+    fn transfer_commit_copies_player_and_dps_files_after_backup() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("SourceWorld");
+        let target = dir.path().join("TargetWorld");
+        make_save_root(&source);
+        make_save_root(&target);
+        let uid = "abcdefabcdefabcdefabcdefabcdefab";
+        fs::write(source.join("Players").join(format!("{uid}.sav")), b"player").unwrap();
+        fs::write(
+            source.join("Players").join(format!("{uid}_dps.sav")),
+            b"dps",
+        )
+        .unwrap();
+
+        let backup_manager = BackupManager::new(dir.path().join("Backups"));
+        let result = commit_character_transfer(
+            &CharacterTransferOptions {
+                source_save_path: source.display().to_string(),
+                target_save_path: target.display().to_string(),
+                player_uid: "ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB".into(),
+                transfer_pals: true,
+                transfer_inventory: true,
+                transfer_tech: false,
+                transfer_all_players: false,
+                target_guild_id: None,
+            },
+            &backup_manager,
+        )
+        .unwrap();
+
+        assert_eq!(result.transferred_players, vec![uid]);
+        assert_eq!(
+            fs::read(target.join("Players").join(format!("{uid}.sav"))).unwrap(),
+            b"player"
+        );
+        assert_eq!(
+            fs::read(target.join("Players").join(format!("{uid}_dps.sav"))).unwrap(),
+            b"dps"
+        );
+        assert!(result.backup_path.is_some());
+    }
+
+    #[test]
+    fn transfer_rejects_missing_source_root() {
+        let dir = tempdir().unwrap();
+        let error =
+            inspect_transfer_source(dir.path().join("missing").to_str().unwrap()).unwrap_err();
+        assert_eq!(error.code, "security_error");
     }
 }
