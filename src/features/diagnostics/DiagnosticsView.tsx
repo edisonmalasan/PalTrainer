@@ -50,10 +50,18 @@ export function DiagnosticsView() {
             })}
             <div className="border border-shell-line bg-white px-4 py-3">
               <p className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">
-                Scanned at
+                Scan Duration
               </p>
               <p className="mt-1 font-mono text-xs text-shell-ink">
-                {new Date(report.scannedAt).toLocaleTimeString()}
+                {report.scanMeta.scanDurationMs}ms
+              </p>
+            </div>
+            <div className="border border-shell-line bg-white px-4 py-3">
+              <p className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">
+                Entities Scanned
+              </p>
+              <p className="mt-1 font-mono text-xs text-shell-ink">
+                {report.scanMeta.playerCount}P / {report.scanMeta.guildCount}G / {report.scanMeta.baseCount}B / {report.scanMeta.palCount}Pal / {report.scanMeta.containerCount}C
               </p>
             </div>
           </div>
@@ -81,11 +89,19 @@ export function DiagnosticsView() {
                     <span className="font-mono text-xs font-semibold">
                       {issue.code}
                     </span>
+                    <span className="font-mono text-[10px] text-shell-muted">
+                      {issue.category}
+                    </span>
                   </div>
                   <p className="mt-1 text-sm leading-6">{issue.message}</p>
                   {issue.context && (
                     <p className="mt-1 font-mono text-[11px] opacity-60">
                       {issue.context}
+                    </p>
+                  )}
+                  {issue.canAutoRepair && issue.repairAction && (
+                    <p className="mt-1 font-mono text-[11px] text-emerald-700">
+                      Auto-repair: {issue.repairAction.label} ({issue.repairAction.affectedEntityCount} entities)
                     </p>
                   )}
                 </li>
