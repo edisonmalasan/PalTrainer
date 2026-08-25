@@ -21,7 +21,7 @@ import { WorldOptionsView } from "../features/world/WorldOptionsView";
 import { KeyboardShortcutOverlay } from "../shared/components/KeyboardShortcutOverlay";
 import { useKeyboardShortcut } from "../shared/hooks/useKeyboardShortcut";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { appRoutes } from "./routes";
+import { appRoutes, routeGroups } from "./routes";
 
 const defaultSettings: AppSettings = {
   theme: "system",
@@ -141,36 +141,66 @@ function Workbench() {
             </p>
           </div>
 
-          <nav className="mt-8 grid gap-1" aria-label="PalTrainer sections">
-            {appRoutes.map((route) => (
-              <button
-                key={route.id}
-                type="button"
-                id={`nav-${route.id}`}
-                disabled={!route.enabled}
-                onClick={() => setActiveRoute(route.id)}
-                className={[
-                  "flex items-center justify-between border px-3 py-2 text-left text-sm transition",
-                  route.id === activeRoute
-                    ? "border-shell-accent bg-[#edf5f2] text-shell-ink"
-                    : "border-transparent text-shell-muted hover:border-shell-line hover:bg-shell-panel",
-                  route.enabled
-                    ? "active:translate-y-[1px]"
-                    : "cursor-not-allowed opacity-40",
-                ].join(" ")}
-              >
-                <span>{route.label}</span>
-                <span className="font-mono text-[10px] text-shell-muted">{route.phase}</span>
-              </button>
-            ))}
-          <div className="mt-auto pt-6 border-t border-shell-line/60">
+          <nav className="mt-6 flex flex-col gap-5 overflow-y-auto" aria-label="PalTrainer sections">
+            {routeGroups.map((group) => {
+              const groupRoutes = appRoutes.filter((r) => r.group === group.id);
+              if (groupRoutes.length === 0) return null;
+
+              return (
+                <div key={group.id} className="space-y-1">
+                  <p className="px-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-shell-muted/80">
+                    {group.title}
+                  </p>
+                  <div className="grid gap-0.5">
+                    {groupRoutes.map((route) => {
+                      const isActive = route.id === activeRoute;
+                      return (
+                        <button
+                          key={route.id}
+                          type="button"
+                          id={`nav-${route.id}`}
+                          disabled={!route.enabled}
+                          onClick={() => setActiveRoute(route.id)}
+                          className={[
+                            "group flex items-center justify-between border-l-2 px-3 py-1.5 text-left text-xs transition-all btn-tactile",
+                            isActive
+                              ? "border-shell-accent bg-[#edf5f2] font-semibold text-shell-ink"
+                              : "border-transparent text-shell-muted hover:border-shell-line hover:bg-shell-panel hover:text-shell-ink",
+                            route.enabled
+                              ? ""
+                              : "cursor-not-allowed opacity-40",
+                          ].join(" ")}
+                        >
+                          <span className="truncate">{route.label}</span>
+                          <div className="flex items-center gap-1">
+                            {route.shortcutIndex !== undefined && (
+                              <span
+                                className={[
+                                  "font-mono text-[10px] opacity-0 transition-opacity group-hover:opacity-100",
+                                  isActive ? "opacity-100 text-shell-accent" : "text-shell-muted",
+                                ].join(" ")}
+                              >
+                                ^{route.shortcutIndex}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </nav>
+
+          <div className="mt-auto pt-4 border-t border-shell-line/60">
             <button
               type="button"
               onClick={() => setShowShortcuts(true)}
-              className="flex w-full items-center justify-between border border-shell-line bg-shell-panel px-3 py-2 text-left text-xs text-shell-muted transition hover:bg-shell-surface hover:text-shell-ink active:translate-y-[1px]"
+              className="flex w-full items-center justify-between border border-shell-line bg-shell-panel px-3 py-1.5 text-left text-xs text-shell-muted transition hover:bg-shell-surface hover:text-shell-ink active:translate-y-[1px]"
             >
               <span>Shortcuts</span>
-              <kbd className="rounded-sm border border-shell-line bg-white px-1.5 py-0.5 font-mono text-[10px] font-semibold text-shell-ink">
+              <kbd className="rounded-sm border border-shell-line bg-white px-1.5 py-0.2 font-mono text-[10px] font-semibold text-shell-ink">
                 ?
               </kbd>
             </button>
