@@ -5,7 +5,7 @@
 //! Steam saves back into XGP container formats.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -65,16 +65,18 @@ pub struct XgpImportAuditResult {
 
 /// Discovers all local Xbox / GamePass Palworld save roots on the system.
 pub fn discover_xgp_saves() -> Result<Vec<XgpSaveEntry>, AppError> {
-    let mut results = Vec::new();
-
     let local_app_data = match dirs::data_local_dir() {
         Some(d) => d,
-        None => return Ok(results),
+        None => return Ok(Vec::new()),
     };
 
-    let packages_dir = local_app_data.join("Packages");
+    Ok(discover_xgp_saves_under(&local_app_data.join("Packages")))
+}
+
+fn discover_xgp_saves_under(packages_dir: &Path) -> Vec<XgpSaveEntry> {
+    let mut results = Vec::new();
     if !packages_dir.is_dir() {
-        return Ok(results);
+        return results;
     }
 
     if let Ok(entries) = fs::read_dir(&packages_dir) {
@@ -131,7 +133,7 @@ pub fn discover_xgp_saves() -> Result<Vec<XgpSaveEntry>, AppError> {
         }
     }
 
-    Ok(results)
+    results
 }
 
 /// Extracts an XGP save folder to a standard Steam save folder.
@@ -206,16 +208,10 @@ pub fn extract_xgp_save(options: &XgpExtractOptions) -> Result<XgpExtractResult,
     }
 
     if extracted_files.is_empty() {
-        // Fallback: create standard placeholder files if directory was empty
-        let dummy_level = dest.join("Level.sav");
-        let dummy_meta = dest.join("LevelMeta.sav");
-        let dummy_player = players_dir.join("00000000000000000000000000000001.sav");
-        let _ = fs::write(&dummy_level, b"GVAS_DUMMY_LEVEL_DATA");
-        let _ = fs::write(&dummy_meta, b"GVAS_DUMMY_META_DATA");
-        let _ = fs::write(&dummy_player, b"GVAS_DUMMY_PLAYER_DATA");
-        extracted_files.push(dummy_level.display().to_string());
-        extracted_files.push(dummy_meta.display().to_string());
-        extracted_files.push(dummy_player.display().to_string());
+        return Err(AppError::new(
+            "invalid_xgp_save",
+            "No recognized save blobs were found in the XGP container.",
+        ));
     }
 
     Ok(XgpExtractResult {
@@ -276,7 +272,7 @@ pub fn commit_import_steam_to_xgp(
     })?;
 
     // Create safety backup of the XGP folder
-    let backup_info = backup_mgr.create_backup(
+    let backup_info = backup_mgr.create_folder_backup(
         &target_wgs,
         Some("xgp_import"),
         Some("Auto-backup before packaging Steam save to XGP"),
@@ -330,6 +326,10 @@ pub fn commit_import_steam_to_xgp(
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use tempfile::tempdir;
+
     use super::*;
 
     #[test]
@@ -339,5 +339,117 @@ mod tests {
             destination_path: "C:/Steam/Save".into(),
         };
         assert!(!opt.wgs_user_dir.is_empty());
+    }
+
+    #[test]
+    fn discovery_reads_palworld_packages_and_container_counts() {
+        let dir = tempdir().unwrap();
+        let packages = dir.path().join("Packages");
+        let wgs = packages
+            .join("PocketpairInc.Palworld_8wekyb3d8bbwe")
+            .join("SystemAppData")
+            .join("wgs");
+        let user = wgs.join("1234_5678");
+        fs::create_dir_all(user.join("container.1")).unwrap();
+        fs::create_dir_all(user.join("container.2")).unwrap();
+        fs::write(user.join("containers.index"), b"index").unwrap();
+
+        let saves = discover_xgp_saves_under(&packages);
+        assert_eq!(saves.len(), 1);
+        assert_eq!(saves[0].user_id, "1234_5678");
+        assert_eq!(
+            saves[0].package_name,
+            "PocketpairInc.Palworld_8wekyb3d8bbwe"
+        );
+        assert_eq!(saves[0].container_count, 2);
+        assert!(saves[0].has_level_sav);
+        assert!(saves[0].has_players);
+    }
+
+    #[test]
+    fn extraction_writes_recognized_blob_and_rejects_empty_container() {
+        let dir = tempdir().unwrap();
+        let wgs = dir.path().join("WgsUser");
+        let container = wgs.join("container.1");
+        fs::create_dir_all(&container).unwrap();
+        let mut level_blob = vec![0x32u8; 100_001];
+        level_blob[1] = 0x01;
+        fs::write(container.join("level_blob"), level_blob).unwrap();
+
+        let destination = dir.path().join("SteamSave");
+        let result = extract_xgp_save(&XgpExtractOptions {
+            wgs_user_dir: wgs.display().to_string(),
+            destination_path: destination.display().to_string(),
+        })
+        .unwrap();
+        assert_eq!(result.files_extracted.len(), 1);
+        assert!(destination.join("Level.sav").is_file());
+        assert!(destination.join("Players").is_dir());
+
+        let empty_wgs = dir.path().join("EmptyWgs");
+        fs::create_dir_all(&empty_wgs).unwrap();
+        let error = extract_xgp_save(&XgpExtractOptions {
+            wgs_user_dir: empty_wgs.display().to_string(),
+            destination_path: dir.path().join("EmptyOutput").display().to_string(),
+        })
+        .unwrap_err();
+        assert_eq!(error.code, "invalid_xgp_save");
+    }
+
+    #[test]
+    fn import_preview_warns_about_cloud_sync_and_validates_source() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("SteamSave");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("Level.sav"), b"level").unwrap();
+        let target = dir.path().join("WgsUser");
+
+        let preview = preview_import_steam_to_xgp(&XgpImportOptions {
+            source_steam_path: source.display().to_string(),
+            target_wgs_user_dir: target.display().to_string(),
+            package_name: Some("PocketpairInc.Palworld_Test".into()),
+        })
+        .unwrap();
+        assert_eq!(preview.operation, "import_steam_to_xgp");
+        assert!(preview
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("CLOUD SYNC")));
+        assert!(preview.backup_target.is_some());
+        assert!(preview.files_to_modify[0].ends_with("containers.index"));
+    }
+
+    #[test]
+    fn import_commit_creates_wgs_backup_index_and_blobs() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("SteamSave");
+        fs::create_dir_all(source.join("Players")).unwrap();
+        fs::write(source.join("Level.sav"), b"level").unwrap();
+        fs::write(source.join("LevelMeta.sav"), b"meta").unwrap();
+        let target = dir.path().join("WgsUser");
+        let manager = BackupManager::new(dir.path().join("Backups"));
+
+        let result = commit_import_steam_to_xgp(
+            &XgpImportOptions {
+                source_steam_path: source.display().to_string(),
+                target_wgs_user_dir: target.display().to_string(),
+                package_name: Some("PocketpairInc.Palworld_Test".into()),
+            },
+            &manager,
+        )
+        .unwrap();
+
+        assert_eq!(result.containers_created, 1);
+        assert!(result.backup_path.is_some());
+        assert_eq!(
+            fs::read(&target.join("containers.index")).unwrap()[..4],
+            14u32.to_le_bytes()
+        );
+        let container = target.join("00000000000000000000000000000001");
+        assert_eq!(
+            fs::read(container.join("LEVEL_BLOB_DATA")).unwrap(),
+            b"level"
+        );
+        assert_eq!(fs::read(container.join("META_BLOB_DATA")).unwrap(), b"meta");
     }
 }
