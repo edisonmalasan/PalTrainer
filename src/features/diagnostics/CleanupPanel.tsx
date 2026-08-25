@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PreviewModal } from "../../shared/components/PreviewModal";
+import { WarningBanner } from "../../shared/components/WarningBanner";
 import type { CleanupParams, CleanupTarget, MutationPreview } from "../../shared/types/contracts";
 import { invokeCommand } from "../../shared/utils/command";
 
@@ -138,14 +139,12 @@ export function CleanupPanel() {
   return (
     <div className="flex flex-col gap-6">
       {/* Alert banner */}
-      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs leading-relaxed text-amber-300">
-        <p className="font-semibold uppercase tracking-wider text-amber-400">
-          Safe Server & World Maintenance
-        </p>
-        <p className="mt-1 text-shell-muted">
-          All cleanup actions automatically generate a full compressed backup before touching save data. Destructive operations require confirmation in the preview diff modal.
-        </p>
-      </div>
+      <WarningBanner
+        severity="warning"
+        badge="SAFE SERVER & WORLD MAINTENANCE"
+        title="Automated Pre-Mutation Backups"
+        description="All cleanup actions automatically generate a full compressed backup before touching save data. Destructive operations require confirmation in the preview diff modal."
+      />
 
       {error && (
         <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-xs text-red-400">
