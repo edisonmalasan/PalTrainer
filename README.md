@@ -38,3 +38,15 @@ cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 ```
+
+## Release and recovery documentation
+
+- [Supported save versions](SUPPORTED_VERSIONS.md)
+- [Backup and restore](BACKUP_AND_RESTORE.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
+- [Release notes template](.github/RELEASE_NOTES_TEMPLATE.md)
+- [Release signing policy](.github/RELEASE_SIGNING.md)
+
+Windows release bundles are configured for NSIS and MSI. A real installer
+build also requires the Tauri Windows prerequisites, including Visual Studio
+Build Tools with the MSVC and Windows SDK components.
