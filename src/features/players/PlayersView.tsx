@@ -185,15 +185,33 @@ export function PlayersView() {
               width: "180px",
             },
             {
-              key: "name",
-              header: "Name",
+              key: "displayName",
+              header: "Player Name",
+              sortable: true,
+              sortValue: (r) => r.displayName || r.uid,
               render: (r) => <span className="font-semibold text-shell-ink">{r.displayName || "—"}</span>,
             },
-            { key: "level", header: "Lv", render: (r) => r.level, width: "60px" },
-            { key: "hp", header: "HP", render: (r) => `${r.hp} / ${r.maxHp}`, width: "110px" },
+            {
+              key: "level",
+              header: "Lv",
+              sortable: true,
+              sortValue: (r) => r.level,
+              render: (r) => r.level,
+              width: "60px",
+            },
+            {
+              key: "hp",
+              header: "HP",
+              sortable: true,
+              sortValue: (r) => r.hp,
+              render: (r) => `${r.hp} / ${r.maxHp}`,
+              width: "110px",
+            },
             {
               key: "host",
               header: "Host",
+              sortable: true,
+              sortValue: (r) => (r.isHost ? 1 : 0),
               render: (r) => (r.isHost ? <Badge color="accent">Host</Badge> : null),
               width: "70px",
             },
@@ -239,7 +257,7 @@ export function PlayersView() {
                     className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                     title="Unlock all Fast Travel points"
                   >
-                    Map
+                    Fast Travel
                   </button>
                   <button
                     type="button"
@@ -258,7 +276,8 @@ export function PlayersView() {
           searchValue={query}
           onSearchChange={setQuery}
           searchPlaceholder="Filter by name or UID…"
-          emptyMessage="No players found. Load a save file first."
+          emptyHeadline="No players loaded"
+          emptyDescription="Load a Palworld save directory in Save Session to view and edit character records."
         />
 
         {/* Edit Player Drawer / Form */}
