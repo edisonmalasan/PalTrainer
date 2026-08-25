@@ -36,6 +36,16 @@ export function PalsView() {
       r.instanceId.toLowerCase().includes(q),
   );
 
+  // Bulk Selection & Operations state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncSourceId, setSyncSourceId] = useState("");
+  const [syncPassives, setSyncPassives] = useState(true);
+  const [syncActives, setSyncActives] = useState(true);
+
+  const [showDeleteSpeciesModal, setShowDeleteSpeciesModal] = useState(false);
+  const [deleteSpeciesTarget, setDeleteSpeciesTarget] = useState("");
+
   // Edit Drawer state
   const [selectedPal, setSelectedPal] = useState<PalProjection | null>(null);
   const [editNickname, setEditNickname] = useState("");
@@ -70,6 +80,119 @@ export function PalsView() {
   const [pendingCommit, setPendingCommit] = useState<(() => Promise<void>) | null>(null);
   const [committing, setCommitting] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((r) => r.instanceId)));
+    }
+  }
+
+  async function handleBulkMaxPreview(cheatMode: boolean) {
+    const ids = Array.from(selectedIds);
+    const dto = { instanceIds: ids, cheatMode };
+
+    try {
+      const preview = await invokeCommand<MutationPreview>("preview_bulk_max_pals", { dto });
+      setActivePreview(preview);
+      setPendingCommit(() => async () => {
+        const count = await invokeCommand<number>("commit_bulk_max_pals", { dto });
+        setActionMessage(`Maxed stats for ${count} Pals (${cheatMode ? "Cheat Mode" : "Normal Caps"})`);
+        setSelectedIds(new Set());
+        setReloadKey((k) => k + 1);
+      });
+    } catch (err: unknown) {
+      setActionMessage(String(err));
+    }
+  }
+
+  async function handleBulkSyncSkillsPreview() {
+    if (!syncSourceId || selectedIds.size === 0) return;
+    const targetIds = Array.from(selectedIds).filter((id) => id !== syncSourceId);
+    const dto = {
+      sourceInstanceId: syncSourceId,
+      targetInstanceIds: targetIds,
+      syncPassives,
+      syncActiveSkills: syncActives,
+    };
+
+    try {
+      const preview = await invokeCommand<MutationPreview>("preview_bulk_sync_pal_skills", { dto });
+      setActivePreview(preview);
+      setPendingCommit(() => async () => {
+        const count = await invokeCommand<number>("commit_bulk_sync_pal_skills", { dto });
+        setActionMessage(`Synced skills to ${count} target Pals`);
+        setShowSyncModal(false);
+        setSyncSourceId("");
+        setSelectedIds(new Set());
+        setReloadKey((k) => k + 1);
+      });
+    } catch (err: unknown) {
+      setActionMessage(String(err));
+    }
+  }
+
+  async function handleBulkDeleteSelectedPreview() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      const preview = await invokeCommand<MutationPreview>("preview_delete_pal", {
+        dto: { instanceIds: ids },
+      });
+      setActivePreview(preview);
+      setPendingCommit(() => async () => {
+        const count = await invokeCommand<number>("commit_delete_pal", {
+          dto: { instanceIds: ids },
+        });
+        setActionMessage(`Deleted ${count} selected Pals`);
+        setSelectedIds(new Set());
+        setReloadKey((k) => k + 1);
+      });
+    } catch (err: unknown) {
+      setActionMessage(String(err));
+    }
+  }
+
+  async function handleBulkDeleteBySpeciesPreview() {
+    if (!deleteSpeciesTarget.trim()) return;
+    const matched = rows.filter(
+      (r) => r.speciesId.toLowerCase() === deleteSpeciesTarget.trim().toLowerCase(),
+    );
+    if (matched.length === 0) {
+      setActionMessage(`No Pals found with species "${deleteSpeciesTarget}"`);
+      return;
+    }
+    const ids = matched.map((r) => r.instanceId);
+
+    try {
+      const preview = await invokeCommand<MutationPreview>("preview_delete_pal", {
+        dto: { instanceIds: ids },
+      });
+      setActivePreview(preview);
+      setPendingCommit(() => async () => {
+        const count = await invokeCommand<number>("commit_delete_pal", {
+          dto: { instanceIds: ids },
+        });
+        setActionMessage(`Deleted all ${count} instances of ${deleteSpeciesTarget}`);
+        setShowDeleteSpeciesModal(false);
+        setDeleteSpeciesTarget("");
+        setReloadKey((k) => k + 1);
+      });
+    } catch (err: unknown) {
+      setActionMessage(String(err));
+    }
+  }
 
   function startEdit(pal: PalProjection) {
     setSelectedPal(pal);
@@ -242,6 +365,13 @@ export function PalsView() {
           <div className="flex gap-2">
             <button
               type="button"
+              onClick={() => setShowDeleteSpeciesModal(true)}
+              className="border border-shell-line bg-white px-3 py-1.5 font-mono text-xs text-shell-muted transition hover:bg-shell-panel active:translate-y-[1px]"
+            >
+              Delete by Species
+            </button>
+            <button
+              type="button"
               onClick={() => setShowCreateModal(true)}
               className="border border-shell-accent bg-[#edf5f2] px-3 py-1.5 font-mono text-xs font-semibold text-shell-accent transition hover:bg-[#d9ede7] active:translate-y-[1px]"
             >
@@ -250,9 +380,168 @@ export function PalsView() {
           </div>
         </div>
 
+        {/* Bulk Actions Bar (Shown when Pals are selected) */}
+        {selectedIds.size > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border border-shell-accent bg-[#edf5f2] p-3">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-xs font-semibold text-shell-accent">
+                {selectedIds.size} Pal{selectedIds.size !== 1 ? "s" : ""} selected
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-xs text-shell-muted underline hover:text-shell-ink"
+              >
+                Clear Selection
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void handleBulkMaxPreview(false)}
+                className="border border-shell-line bg-white px-3 py-1 text-xs font-medium text-shell-ink hover:bg-shell-panel active:translate-y-[1px]"
+              >
+                Max Selected (Lv 55)
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBulkMaxPreview(true)}
+                className="border border-shell-line bg-white px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-50 active:translate-y-[1px]"
+              >
+                Max Selected (Lv 60 Cheat)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSyncSourceId(Array.from(selectedIds)[0]);
+                  setShowSyncModal(true);
+                }}
+                className="border border-shell-line bg-white px-3 py-1 text-xs font-medium text-shell-ink hover:bg-shell-panel active:translate-y-[1px]"
+              >
+                Sync Skills…
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBulkDeleteSelectedPreview()}
+                className="border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 active:translate-y-[1px]"
+              >
+                Delete Selected
+              </button>
+            </div>
+          </div>
+        )}
+
         {actionMessage && (
           <div className="border border-shell-accent bg-[#edf5f2] px-4 py-2 font-mono text-xs text-shell-accent">
             {actionMessage}
+          </div>
+        )}
+
+        {/* Sync Skills Modal */}
+        {showSyncModal && (
+          <div className="border border-shell-line bg-white p-5 shadow-sm">
+            <h3 className="text-base font-semibold">Sync Skills Across Selected Pals</h3>
+            <p className="mt-1 text-xs text-shell-muted">
+              Copy passives and/or active skills from a source Pal to {selectedIds.size} target Pals.
+            </p>
+
+            <div className="mt-4 grid max-w-md gap-4">
+              <label className="grid gap-1 text-xs font-medium">
+                <span>Source Pal Instance ID</span>
+                <select
+                  value={syncSourceId}
+                  onChange={(e) => setSyncSourceId(e.target.value)}
+                  className="border border-shell-line px-3 py-1.5 font-mono text-xs"
+                >
+                  {Array.from(selectedIds).map((id) => {
+                    const pal = rows.find((r) => r.instanceId === id);
+                    return (
+                      <option key={id} value={id}>
+                        {pal ? `${pal.nickname || pal.speciesId} (${id.slice(0, 8)})` : id}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+
+              <div className="flex gap-4 text-xs font-medium">
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={syncPassives}
+                    onChange={(e) => setSyncPassives(e.target.checked)}
+                  />
+                  <span>Sync Passive Skills</span>
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={syncActives}
+                    onChange={(e) => setSyncActives(e.target.checked)}
+                  />
+                  <span>Sync Active Skills</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2 border-t border-shell-line pt-3">
+              <button
+                type="button"
+                onClick={() => setShowSyncModal(false)}
+                className="border border-shell-line px-3 py-1.5 text-xs text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBulkSyncSkillsPreview()}
+                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+              >
+                Preview Sync
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Delete by Species Modal */}
+        {showDeleteSpeciesModal && (
+          <div className="border border-shell-line bg-white p-5 shadow-sm">
+            <h3 className="text-base font-semibold">Bulk Delete by Species</h3>
+            <p className="mt-1 text-xs text-shell-muted">
+              Permanently remove all instances of a species (e.g. Lamball, Chikipi) across all storage.
+            </p>
+
+            <div className="mt-4 max-w-sm">
+              <label className="grid gap-1 text-xs font-medium">
+                <span>Species Name / ID</span>
+                <input
+                  type="text"
+                  placeholder="e.g. Lamball, Chikipi"
+                  value={deleteSpeciesTarget}
+                  onChange={(e) => setDeleteSpeciesTarget(e.target.value)}
+                  className="border border-shell-line px-3 py-1.5 text-xs"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2 border-t border-shell-line pt-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteSpeciesModal(false)}
+                className="border border-shell-line px-3 py-1.5 text-xs text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!deleteSpeciesTarget.trim()}
+                onClick={() => void handleBulkDeleteBySpeciesPreview()}
+                className="border border-red-300 bg-white px-4 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 active:translate-y-[1px] disabled:opacity-50"
+              >
+                Preview Deletion
+              </button>
+            </div>
           </div>
         )}
 
@@ -403,6 +692,26 @@ export function PalsView() {
         {/* Pals Table */}
         <DataTable
           columns={[
+            {
+              key: "select",
+              header: (
+                <input
+                  type="checkbox"
+                  checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all Pals"
+                />
+              ),
+              render: (r) => (
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(r.instanceId)}
+                  onChange={() => toggleSelect(r.instanceId)}
+                  aria-label={`Select ${r.nickname || r.speciesId}`}
+                />
+              ),
+              width: "40px",
+            },
             {
               key: "species",
               header: "Species / Nickname",
