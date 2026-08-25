@@ -6,3 +6,4 @@ pub mod host_swap;
 pub mod restore_map;
 pub mod slot_injector;
 pub mod transfer;
+pub mod xgp;
