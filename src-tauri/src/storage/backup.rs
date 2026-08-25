@@ -52,6 +52,32 @@ impl BackupManager {
         note: Option<&str>,
     ) -> Result<BackupInfo, StorageError> {
         let canon_save_root = validate_save_root(save_root)?;
+        self.create_backup_from_directory(&canon_save_root, tag, note)
+    }
+
+    /// Creates a snapshot of an arbitrary approved directory, including XGP
+    /// WGS folders that do not contain a Steam-style `Level.sav` root.
+    pub fn create_folder_backup(
+        &self,
+        folder: impl AsRef<Path>,
+        tag: Option<&str>,
+        note: Option<&str>,
+    ) -> Result<BackupInfo, StorageError> {
+        let canon_folder = canonicalize_safe(folder)?;
+        if !canon_folder.is_dir() {
+            return Err(StorageError::Security(
+                crate::security::SecurityError::NotADirectory(canon_folder),
+            ));
+        }
+        self.create_backup_from_directory(&canon_folder, tag, note)
+    }
+
+    fn create_backup_from_directory(
+        &self,
+        canon_save_root: &Path,
+        tag: Option<&str>,
+        note: Option<&str>,
+    ) -> Result<BackupInfo, StorageError> {
         fs::create_dir_all(&self.backup_root)?;
 
         let world_name = canon_save_root
@@ -82,7 +108,7 @@ impl BackupManager {
 
         let meta = BackupMeta {
             id: backup_id,
-            original_save_path: canon_save_root,
+            original_save_path: canon_save_root.to_path_buf(),
             world_name,
             created_at: now,
             note: note.map(str::to_string),
