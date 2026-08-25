@@ -3,6 +3,12 @@ name = "paltrainer"
 version = "0.1.0"
 description = "A Tauri desktop app for Palworld save inspection and editing."
 authors = ["PalTrainer contributors"]
+license = "MIT"
+homepage = "https://github.com/edisonmalasan/PalTrainer"
+repository = "https://github.com/edisonmalasan/PalTrainer"
+readme = "../README.md"
+keywords = ["palworld", "save-editor", "tauri", "desktop"]
+categories = ["games", "utilities"]
 edition = "2021"
 rust-version = "1.80"
 
