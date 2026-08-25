@@ -157,6 +157,72 @@ export interface PalProjection {
   readonly container: string | null;
 }
 
+// --- Pal Mutation DTOs ---
+
+export interface UpdatePalDto {
+  readonly instanceId: string;
+  readonly nickname?: string;
+  readonly level?: number;
+  readonly exp?: number;
+  readonly gender?: string;
+  readonly ivHp?: number;
+  readonly ivAttack?: number;
+  readonly ivDefense?: number;
+  readonly souls?: number;
+  readonly condenserRank?: number;
+  readonly passiveSkills?: readonly string[];
+  readonly activeSkills?: readonly string[];
+  readonly isBoss?: boolean;
+  readonly isLucky?: boolean;
+  readonly cheatMode: boolean;
+}
+
+export interface CreatePalDto {
+  readonly speciesId: string;
+  readonly nickname?: string;
+  readonly level: number;
+  readonly gender: string;
+  /** "palbox" | "party" | "base" | "dps" | "gps" */
+  readonly containerType: string;
+  readonly ownerUid?: string;
+  readonly cheatMode: boolean;
+}
+
+export interface ImportPalDto {
+  readonly bundlePath: string;
+  readonly targetContainerType: string;
+  readonly targetOwnerUid?: string;
+  readonly cheatMode: boolean;
+}
+
+export interface ClonePalDto {
+  readonly instanceId: string;
+  readonly targetContainerType: string;
+  readonly targetOwnerUid?: string;
+}
+
+export interface DeletePalDto {
+  readonly instanceIds: readonly string[];
+}
+
+export interface BulkMaxPalsDto {
+  /** Empty = all Pals in the loaded save. */
+  readonly instanceIds: readonly string[];
+  readonly cheatMode: boolean;
+}
+
+export interface BulkSyncPalSkillsDto {
+  readonly sourceInstanceId: string;
+  readonly targetInstanceIds: readonly string[];
+  readonly syncPassives: boolean;
+  readonly syncActiveSkills: boolean;
+}
+
+export interface ExportPalBundleDto {
+  readonly instanceId: string;
+  readonly exportPath: string;
+}
+
 export interface InventorySlotProjection {
   readonly slotIndex: number;
   readonly itemId: string;
