@@ -249,7 +249,19 @@ pub fn commit_restore_map(
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use tempfile::tempdir;
+
     use super::*;
+
+    fn local_data_fixture(root: &std::path::Path) -> PathBuf {
+        let gvas = b"MaskTextureData\0payload\0Local_HiddenLocationFlagMap\0trailer";
+        let sav = compress_gvas_to_sav(gvas, crate::pal_save::archive::SaveType::Plz).unwrap();
+        let path = root.join("LocalData.sav");
+        fs::write(&path, sav).unwrap();
+        path
+    }
 
     #[test]
     fn test_restore_map_options_default() {
@@ -257,5 +269,90 @@ mod tests {
         assert!(opt.clear_ui_fog);
         assert!(opt.clear_hidden_locations);
         assert!(opt.disable_sky_cloud_overlay);
+    }
+
+    #[test]
+    fn custom_file_target_takes_precedence_over_session_discovery() {
+        let dir = tempdir().unwrap();
+        let session_root = dir.path().join("World");
+        fs::create_dir_all(&session_root).unwrap();
+        let session_target = local_data_fixture(&session_root);
+        let custom = dir.path().join("CustomLocalData.sav");
+        fs::write(&custom, b"custom").unwrap();
+
+        let targets = resolve_local_data_targets(
+            &RestoreMapOptions {
+                custom_local_data_path: Some(custom.display().to_string()),
+                ..Default::default()
+            },
+            Some(&session_root),
+        );
+
+        assert_eq!(targets, vec![custom]);
+        assert_ne!(targets[0], session_target);
+    }
+
+    #[test]
+    fn preview_warns_when_no_local_data_is_found() {
+        let dir = tempdir().unwrap();
+        let preview = preview_restore_map(&RestoreMapOptions::default(), Some(dir.path())).unwrap();
+        assert!(preview.files_to_modify.is_empty());
+        assert!(preview
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("No LocalData.sav")));
+    }
+
+    #[test]
+    fn process_counts_map_tags_and_respects_hidden_location_option() {
+        let dir = tempdir().unwrap();
+        let path = local_data_fixture(dir.path());
+
+        let (masks, hidden) = process_local_data_file(
+            &path,
+            &RestoreMapOptions {
+                clear_hidden_locations: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(masks, 1);
+        assert_eq!(hidden, 1);
+
+        let second = dir.path().join("LocalData2.sav");
+        fs::copy(&path, &second).unwrap();
+        let (masks, hidden) = process_local_data_file(
+            &second,
+            &RestoreMapOptions {
+                clear_hidden_locations: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(masks, 1);
+        assert_eq!(hidden, 0);
+    }
+
+    #[test]
+    fn commit_restoration_creates_backup_and_reports_updated_file() {
+        let dir = tempdir().unwrap();
+        let world = dir.path().join("World");
+        fs::create_dir_all(&world).unwrap();
+        let mut level = Vec::new();
+        level.extend_from_slice(&100u32.to_le_bytes());
+        level.extend_from_slice(&50u32.to_le_bytes());
+        level.extend_from_slice(b"PlZ");
+        level.push(0x32);
+        fs::write(world.join("Level.sav"), level).unwrap();
+        let local_data = local_data_fixture(&world);
+        let manager = BackupManager::new(dir.path().join("Backups"));
+
+        let report =
+            commit_restore_map(&RestoreMapOptions::default(), Some(&world), &manager).unwrap();
+
+        assert_eq!(report.files_updated, vec![local_data.display().to_string()]);
+        assert_eq!(report.masks_cleared, 1);
+        assert_eq!(report.hidden_locations_reset, 1);
+        assert!(report.backup_path.is_some());
     }
 }
