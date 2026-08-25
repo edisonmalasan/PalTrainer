@@ -1,6 +1,7 @@
 pub mod app;
 pub mod backup;
 pub mod base;
+pub mod cleanup;
 pub mod exclusions;
 pub mod guild;
 pub mod inspect;

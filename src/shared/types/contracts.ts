@@ -423,6 +423,26 @@ export interface DiagnosticReportDto {
   readonly scannedAt: string;
 }
 
+export type CleanupTarget =
+  | "empty_guilds"
+  | "inactive_players"
+  | "duplicate_players"
+  | "unreferenced_data"
+  | "non_base_map_objects"
+  | "invalid_structure_objects"
+  | "all_skins"
+  | "imported_dna_pals"
+  | "invalid_items"
+  | "invalid_pals"
+  | "invalid_passives";
+
+export interface CleanupParams {
+  readonly target: CleanupTarget;
+  readonly inactivityDaysThreshold?: number;
+  readonly protectDeathBags: boolean;
+  readonly scopePlayerUid?: string;
+}
+
 export interface BreedingLookupResult {
   readonly parent1: string;
   readonly parent2: string;

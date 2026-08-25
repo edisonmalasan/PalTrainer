@@ -1,5 +1,7 @@
 //! Save file diagnostic reporting, cleanup, and repair models.
 
+pub mod cleanup;
+
 use serde::{Deserialize, Serialize};
 
 /// Severity level for a diagnostic issue.
