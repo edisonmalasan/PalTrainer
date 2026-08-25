@@ -14,4 +14,5 @@ pub mod repair;
 pub mod reset;
 pub mod save_session;
 pub mod settings;
+pub mod transfer;
 pub mod world;

@@ -129,6 +129,12 @@ pub fn run() {
             commands::modifiers::get_palbox_capacity,
             commands::modifiers::preview_inject_palbox_slots,
             commands::modifiers::commit_inject_palbox_slots,
+            commands::transfer::inspect_transfer_source,
+            commands::transfer::preview_character_transfer,
+            commands::transfer::commit_character_transfer,
+            commands::transfer::inspect_host_swap,
+            commands::transfer::preview_host_swap,
+            commands::transfer::commit_host_swap,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PalTrainer");
