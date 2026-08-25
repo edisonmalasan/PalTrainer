@@ -4,31 +4,40 @@ import type { ReactNode } from "react";
 export function ViewShell({
   title,
   subtitle,
-  status,
+  description,
+  status = "ok",
   errorMessage,
+  actionSlot,
   children,
 }: {
   readonly title: string;
   readonly subtitle?: string;
-  readonly status: "idle" | "loading" | "ok" | "error";
+  readonly description?: string;
+  readonly status?: "idle" | "loading" | "ok" | "error";
   readonly errorMessage?: string;
+  readonly actionSlot?: ReactNode;
   readonly children: ReactNode;
 }) {
+  const displaySubtitle = description ?? subtitle;
+
   return (
-    <section className="flex flex-col gap-5">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-        {subtitle && (
-          <p className="mt-1 text-sm text-shell-muted">{subtitle}</p>
-        )}
+    <section className="flex flex-col gap-5 animate-fade-in">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight text-shell-ink">{title}</h2>
+          {displaySubtitle && (
+            <p className="mt-1 text-sm text-shell-muted">{displaySubtitle}</p>
+          )}
+        </div>
+        {actionSlot && <div className="flex items-center gap-2">{actionSlot}</div>}
       </div>
 
       {status === "loading" || status === "idle" ? (
         <ViewSkeleton />
       ) : status === "error" ? (
-        <ErrorBanner message={errorMessage ?? "Unexpected error."} />
+        <ErrorBanner message={errorMessage ?? "Unexpected error occurred."} />
       ) : (
-        children
+        <div className="animate-slide-up">{children}</div>
       )}
     </section>
   );
@@ -36,15 +45,15 @@ export function ViewShell({
 
 function ViewSkeleton() {
   return (
-    <div className="flex flex-col gap-3">
-      <div className="h-8 w-48 animate-pulse bg-shell-line" />
-      <div className="h-[2px] w-full animate-pulse bg-shell-line" />
+    <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading content">
+      <div className="h-8 w-48 animate-pulse bg-shell-line/80" />
+      <div className="h-[1px] w-full bg-shell-line" />
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           // eslint-disable-next-line react/no-array-index-key
           key={i}
-          className="h-9 w-full animate-pulse bg-shell-panel"
-          style={{ opacity: 1 - i * 0.12 }}
+          className="h-10 w-full animate-pulse bg-shell-panel"
+          style={{ opacity: 1 - i * 0.14 }}
         />
       ))}
     </div>
@@ -53,9 +62,31 @@ function ViewSkeleton() {
 
 function ErrorBanner({ message }: { readonly message: string }) {
   return (
-    <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-      <span className="font-mono font-semibold uppercase tracking-wide">Error — </span>
-      {message}
+    <div
+      role="alert"
+      className="flex items-center gap-3 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
+        fill="none"
+        className="shrink-0 text-red-600"
+        aria-hidden="true"
+      >
+        <path
+          d="M8 1.5L14.5 13H1.5L8 1.5Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <line x1="8" y1="6" x2="8" y2="9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="8" cy="11.5" r="0.75" fill="currentColor" />
+      </svg>
+      <div>
+        <span className="font-mono font-semibold uppercase tracking-wide text-xs">Error — </span>
+        <span>{message}</span>
+      </div>
     </div>
   );
 }
