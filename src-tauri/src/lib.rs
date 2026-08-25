@@ -113,6 +113,8 @@ pub fn run() {
             commands::world::get_world_meta,
             commands::world::preview_save_world_meta,
             commands::world::commit_save_world_meta,
+            commands::cleanup::preview_cleanup,
+            commands::cleanup::commit_cleanup,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run PalTrainer");
