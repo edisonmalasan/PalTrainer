@@ -43,6 +43,12 @@ export interface SaveSummary {
   readonly loadedAt: number;
 }
 
+export interface GpsSummary {
+  readonly path: string;
+  readonly fileSize: number;
+  readonly loadedAt: number;
+}
+
 export interface EntityDiffSummary {
   readonly entityType: string;
   readonly entityId: string;
