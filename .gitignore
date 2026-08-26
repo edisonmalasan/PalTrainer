@@ -1,4 +1,9 @@
-docs
+docs/PalworldSaveTools
+docs/AGENTS.md
+docs/*.log
+!docs/plan/
+!docs/plan/**
+!docs/PLAN.md
 /.agents/skills/private/
 
 # Dependencies and build outputs
