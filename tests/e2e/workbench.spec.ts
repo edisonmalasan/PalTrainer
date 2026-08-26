@@ -13,9 +13,20 @@ test.beforeEach(async ({ page }) => {
           case "get_feature_flags":
             return [];
           case "load_save_session":
-            return { loaded: true };
+            return {
+              saveRoot: "C:\\fixtures\\World",
+              worldName: "Test World",
+              saveType: "PLZ",
+              playerCount: 1,
+              levelSavSize: 1024,
+              isDirty: false,
+              loadedAt: 1756160000,
+            };
           case "close_save_session":
-            return { closed: true };
+            return null;
+          // Tauri dialog plugin mocked to hand back a Level.sav path
+          case "plugin:dialog|open":
+            return "C:\\fixtures\\World\\Level.sav";
           case "get_players":
             return [];
           default:
@@ -46,12 +57,12 @@ test("launches the workbench and navigates to the session view", async ({ page }
 
 test("opens and closes a save session through the IPC boundary", async ({ page }) => {
   await page.goto("/");
-  const pathInput = page.getByLabel("Save path");
 
-  await pathInput.fill("C:\\fixtures\\World");
-  await page.getByRole("button", { name: "Load save" }).click();
+  // Single-step flow: picking Level.sav in the dialog loads the session
+  await page.getByRole("button", { name: "Load Save…" }).click();
   await expect(page.getByText("Save loaded successfully.")).toBeVisible();
+  await expect(page.getByLabel("Loaded save summary")).toContainText("Test World");
 
-  await page.getByRole("button", { name: "Close session" }).click();
+  await page.getByRole("button", { name: "Close Session" }).click();
   await expect(page.getByText("Save session closed.")).toBeVisible();
 });

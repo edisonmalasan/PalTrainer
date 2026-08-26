@@ -1,87 +1,63 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ViewShell } from "../../shared/components/ViewShell";
-import { useAsync } from "../../shared/hooks/useAsync";
-import type { AppSettings, CommandError } from "../../shared/types/contracts";
+import type { CommandError, SaveSummary } from "../../shared/types/contracts";
 import { invokeCommand } from "../../shared/utils/command";
 
 const LEVEL_SAV_FILE_NAME = "level.sav";
 
-async function pickSaveFolder(): Promise<string | null> {
-  const selection = await open({
-    directory: true,
-    multiple: false,
-    title: "Select the Palworld world save folder (contains Level.sav)",
-  });
-  return typeof selection === "string" ? selection : null;
-}
-
+// Mirrors PalworldSaveTools: a single file picker filtered to *.sav, titled
+// "Select Level.sav". The *.sav filter is what makes Level.sav visible in the
+// world folder — a directory-only picker hides every file.
 async function pickLevelSavFile(): Promise<string | null> {
   const selection = await open({
     directory: false,
     multiple: false,
     title: "Select Level.sav",
-    filters: [{ name: "Palworld save (Level.sav)", extensions: ["sav"] }],
+    filters: [{ name: "Palworld save files (*.sav)", extensions: ["sav"] }],
   });
   return typeof selection === "string" ? selection : null;
 }
 
-function toSaveRootFromLevelSav(selectedPath: string): string {
+// The backend session expects the world save root directory; derive it from the
+// picked Level.sav so users only ever interact with one file.
+function toSaveRootFromLevelSav(selectedPath: string): string | null {
   const segments = selectedPath.split(/[\\/]/);
   const fileName = segments[segments.length - 1] ?? "";
-  if (fileName.toLowerCase() !== LEVEL_SAV_FILE_NAME) return selectedPath;
-  return segments.slice(0, -1).join("\\");
+  if (fileName.toLowerCase() !== LEVEL_SAV_FILE_NAME) return null;
+  segments.pop();
+  return segments.join("\\");
 }
 
+type SessionMessage = { kind: "ok" | "error"; text: string } | null;
+
 export function SaveSessionView() {
-  const state = useAsync(
-    useCallback(() => invokeCommand<AppSettings>("get_settings"), []),
-    [],
-  );
-
-  const [savePath, setSavePath] = useState("");
+  const [summary, setSummary] = useState<SaveSummary | null>(null);
   const [loading, setLoading] = useState(false);
-  const [browsing, setBrowsing] = useState(false);
-  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<SessionMessage>(null);
 
-  async function handleBrowseFolder() {
+  // Single-step flow like PalworldSaveTools: pick Level.sav and the session
+  // loads immediately with no intermediate confirm button.
+  async function handleLoadSave() {
     setMessage(null);
-    setBrowsing(true);
-    try {
-      const selection = await pickSaveFolder();
-      if (selection) {
-        setSavePath(selection);
-      }
-    } catch (err: unknown) {
-      const e = err as CommandError;
-      setMessage({ kind: "error", text: e.message ?? "Could not open the folder picker." });
-    } finally {
-      setBrowsing(false);
-    }
-  }
-
-  async function handleBrowseLevelSav() {
-    setMessage(null);
-    setBrowsing(true);
+    setLoading(true);
     try {
       const selection = await pickLevelSavFile();
-      if (selection) {
-        setSavePath(toSaveRootFromLevelSav(selection));
+      if (!selection) {
+        return;
       }
-    } catch (err: unknown) {
-      const e = err as CommandError;
-      setMessage({ kind: "error", text: e.message ?? "Could not open the file picker." });
-    } finally {
-      setBrowsing(false);
-    }
-  }
-
-  async function handleLoad() {
-    if (!savePath.trim()) return;
-    setLoading(true);
-    setMessage(null);
-    try {
-      await invokeCommand("load_save_session", { path: savePath.trim() });
+      const saveRoot = toSaveRootFromLevelSav(selection);
+      if (!saveRoot) {
+        setMessage({
+          kind: "error",
+          text: `Please select ${LEVEL_SAV_FILE_NAME} from your world save folder.`,
+        });
+        return;
+      }
+      const loadedSummary = await invokeCommand<SaveSummary>("load_save_session", {
+        path: saveRoot,
+      });
+      setSummary(loadedSummary);
       setMessage({ kind: "ok", text: "Save loaded successfully." });
     } catch (err: unknown) {
       const e = err as CommandError;
@@ -91,11 +67,12 @@ export function SaveSessionView() {
     }
   }
 
-  async function handleClose() {
+  async function handleCloseSession() {
     setLoading(true);
     setMessage(null);
     try {
       await invokeCommand("close_save_session");
+      setSummary(null);
       setMessage({ kind: "ok", text: "Save session closed." });
     } catch (err: unknown) {
       const e = err as CommandError;
@@ -105,102 +82,104 @@ export function SaveSessionView() {
     }
   }
 
+  // ── Loaded-save projection straight from the backend session ────────────────
+  function summaryItems(summary: SaveSummary) {
+    return [
+      { label: "World", value: summary.worldName || "Unknown" },
+      { label: "Save type", value: summary.saveType },
+      { label: "Players", value: String(summary.playerCount) },
+      { label: "Level.sav size", value: `${summary.levelSavSize.toLocaleString()} bytes` },
+      { label: "Save root", value: summary.saveRoot },
+      {
+        label: "Loaded at",
+        value: new Date(summary.loadedAt * 1000).toLocaleString(),
+      },
+    ];
+  }
+
   return (
     <ViewShell
       title="Save Session"
-      subtitle="Load a Palworld save directory to inspect players, Pals, guilds, and more."
-      status={state.status}
-      errorMessage={state.status === "error" ? state.message : undefined}
+      subtitle="Select your world's Level.sav to inspect players, Pals, guilds, and more."
     >
       <div className="flex flex-col gap-6">
-        {/* Load form */}
-        <div className="border border-shell-line bg-white p-5">
-          <h3 className="text-base font-semibold">Load Save Directory</h3>
+        {/* Load control */}
+        <div className="border border-shell-line bg-shell-surface p-5">
+          <h3 className="text-base font-semibold">Load Save</h3>
           <p className="mt-2 max-w-[65ch] text-sm leading-6 text-shell-muted">
-            Browse to the folder containing your{" "}
-            <code className="font-mono text-xs">Level.sav</code> and player save
-            files. The path is validated and never modified without a backup.
+            Pick the <code className="font-mono text-xs">Level.sav</code> file inside your
+            world folder (for example{" "}
+            <span className="font-mono text-xs">
+              …\Pal\Saved\SaveGames\&lt;SteamID&gt;\&lt;WorldID&gt;\Level.sav
+            </span>
+            ). The whole directory is validated and never modified without a backup.
           </p>
 
-          <div className="mt-5 grid gap-2" id="save-path-field">
-            <label className="grid gap-2 text-sm" htmlFor="save-path-input">
-              <span className="font-medium">Save path</span>
-              <input
-                id="save-path-input"
-                type="text"
-                value={savePath}
-                onChange={(e) => setSavePath(e.target.value)}
-                placeholder="C:\Users\…\Pal\Saved\SaveGames\…"
-                className="border border-shell-line bg-white px-3 py-2 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-shell-accent"
-              />
-              <span className="text-xs leading-5 text-shell-muted">
-                Use Browse to pick the world folder, or select Level.sav directly.
-                You can also paste a path manually.
-              </span>
-            </label>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <button
+              id="btn-load-save"
+              type="button"
+              disabled={loading}
+              onClick={() => void handleLoadSave()}
+              className={[
+                "border px-4 py-2 text-sm font-medium transition active:translate-y-[1px]",
+                loading
+                  ? "cursor-not-allowed border-shell-line text-shell-muted opacity-60"
+                  : "border-shell-accent bg-shell-accent-subtle text-shell-accent hover:bg-shell-accent-subtle-hover",
+              ].join(" ")}
+            >
+              {loading && !summary ? "Loading…" : summary ? "Load another save…" : "Load Save…"}
+            </button>
 
-            <div className="flex flex-wrap items-center gap-3 pt-1">
+            {summary && (
               <button
-                id="btn-browse-folder"
+                id="btn-close-session"
                 type="button"
-                disabled={browsing || loading}
-                onClick={() => void handleBrowseFolder()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-2 text-sm font-medium text-shell-accent transition hover:bg-[#d9ede7] active:translate-y-[1px] disabled:opacity-60"
+                disabled={loading}
+                onClick={() => void handleCloseSession()}
+                className="border border-shell-line px-4 py-2 text-sm text-shell-muted transition hover:bg-shell-panel active:translate-y-[1px] disabled:opacity-60"
               >
-                {browsing ? "Opening…" : "Browse…"}
+                {loading ? "Closing…" : "Close Session"}
               </button>
-              <button
-                id="btn-browse-level-sav"
-                type="button"
-                disabled={browsing || loading}
-                onClick={() => void handleBrowseLevelSav()}
-                className="border border-shell-line bg-white px-4 py-2 text-sm text-shell-muted transition hover:bg-shell-panel active:translate-y-[1px] disabled:opacity-60"
-              >
-                Select Level.sav…
-              </button>
-            </div>
+            )}
           </div>
 
           {message && (
             <p
               role="status"
               className={[
-                "mt-4 px-3 py-2 text-sm",
+                "mt-4 border px-3 py-2 text-sm",
                 message.kind === "ok"
-                  ? "border border-shell-accent bg-[#edf5f2] text-shell-accent"
-                  : "border border-red-200 bg-red-50 text-red-800",
+                  ? "border-shell-accent/40 bg-shell-accent-subtle text-shell-accent"
+                  : "border-shell-destructive/40 bg-shell-destructive-subtle text-shell-destructive",
               ].join(" ")}
             >
               {message.text}
             </p>
           )}
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              id="btn-load-save"
-              type="button"
-              disabled={loading || browsing || !savePath.trim()}
-              onClick={() => void handleLoad()}
-              className={[
-                "border px-4 py-2 text-sm font-medium transition active:translate-y-[1px]",
-                loading || browsing || !savePath.trim()
-                  ? "cursor-not-allowed border-shell-line text-shell-muted opacity-60"
-                  : "border-shell-accent bg-[#edf5f2] text-shell-accent hover:bg-[#d9ede7]",
-              ].join(" ")}
+          {summary && (
+            <dl
+              className="mt-5 grid grid-cols-1 gap-3 border-t border-shell-line pt-5 sm:grid-cols-2 lg:grid-cols-3"
+              aria-label="Loaded save summary"
             >
-              {loading ? "Loading…" : "Load save"}
-            </button>
-
-            <button
-              id="btn-close-session"
-              type="button"
-              disabled={loading}
-              onClick={() => void handleClose()}
-              className="border border-shell-line px-4 py-2 text-sm text-shell-muted transition hover:bg-shell-panel active:translate-y-[1px] disabled:opacity-60"
-            >
-              Close session
-            </button>
-          </div>
+              {summaryItems(summary).map((item) => (
+                <div key={item.label} className="bg-shell-panel px-3 py-2">
+                  <dt className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">
+                    {item.label}
+                  </dt>
+                  <dd
+                    className={[
+                      "mt-1 break-all text-sm text-shell-ink",
+                      item.label === "Save root" ? "font-mono text-xs" : "",
+                    ].join(" ")}
+                  >
+                    {item.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
 
         {/* Safety notes */}
@@ -211,8 +190,8 @@ export function SaveSessionView() {
           <ul className="mt-3 flex flex-col gap-2 text-sm text-shell-muted">
             {[
               "Path is canonicalized and validated before any read operation.",
-              "All data is read-only in Phase 4 — no write operations are exposed.",
-              "A backup is created automatically before any future write operations.",
+              "Loaded data stays read-only until an explicit write command is used.",
+              "A backup is created automatically before any write operations.",
               "Stale save detection prevents overwriting files modified externally.",
             ].map((note) => (
               <li key={note} className="flex gap-2">
