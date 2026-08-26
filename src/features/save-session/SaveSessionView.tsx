@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ViewShell } from "../../shared/components/ViewShell";
 import type { CommandError, SaveSummary } from "../../shared/types/contracts";
@@ -34,7 +34,72 @@ type SessionMessage = { kind: "ok" | "error"; text: string } | null;
 export function SaveSessionView() {
   const [summary, setSummary] = useState<SaveSummary | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [message, setMessage] = useState<SessionMessage>(null);
+
+  async function loadFromSaveRoot(saveRoot: string) {
+    const loadedSummary = await invokeCommand<SaveSummary>("load_save_session", {
+      path: saveRoot,
+    });
+    setSummary(loadedSummary);
+    setMessage({ kind: "ok", text: "Save loaded successfully." });
+  }
+
+  function handleDroppedPath(droppedPath: string) {
+    const saveRoot = toSaveRootFromLevelSav(droppedPath);
+    if (!saveRoot) {
+      setMessage({
+        kind: "error",
+        text: `Please drop ${LEVEL_SAV_FILE_NAME} — got “${droppedPath.split(/[\\/]/).pop()}”.`,
+      });
+      return;
+    }
+    void (async () => {
+      setMessage(null);
+      setLoading(true);
+      try {
+        await loadFromSaveRoot(saveRoot);
+      } catch (err: unknown) {
+        const e = err as CommandError;
+        setMessage({ kind: "error", text: e.message ?? "Failed to load save." });
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }
+
+  // Tauri desktop drop — mirrors PalworldSaveTools DropOverlay on Tools tab.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getCurrentWebviewWindow } =
+          await import("@tauri-apps/api/webviewWindow");
+        if (cancelled) return;
+        const win = getCurrentWebviewWindow();
+        unlisten = await win.onDragDropEvent((event) => {
+          if (event.payload.type === "enter" || event.payload.type === "over") {
+            setIsDragOver(true);
+          } else if (event.payload.type === "leave") {
+            setIsDragOver(false);
+          } else if (event.payload.type === "drop") {
+            setIsDragOver(false);
+            const first = (event.payload.paths as string[])[0];
+            if (first) handleDroppedPath(first);
+          }
+        });
+      } catch {
+        // Not in Tauri (browser / vitest jsdom) — fall back to HTML5 handlers below.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+    // handleDroppedPath is stable (only uses setters + pure helper)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Single-step flow like PalworldSaveTools: pick Level.sav and the session
   // loads immediately with no intermediate confirm button.
@@ -54,11 +119,7 @@ export function SaveSessionView() {
         });
         return;
       }
-      const loadedSummary = await invokeCommand<SaveSummary>("load_save_session", {
-        path: saveRoot,
-      });
-      setSummary(loadedSummary);
-      setMessage({ kind: "ok", text: "Save loaded successfully." });
+      await loadFromSaveRoot(saveRoot);
     } catch (err: unknown) {
       const e = err as CommandError;
       setMessage({ kind: "error", text: e.message ?? "Failed to load save." });
@@ -97,14 +158,60 @@ export function SaveSessionView() {
     ];
   }
 
+  // Browser fallback for `pnpm dev` without Tauri — file name check only
+  function handleBrowserDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(true);
+  }
+  function handleBrowserDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (file.name.toLowerCase() !== LEVEL_SAV_FILE_NAME) {
+      setMessage({
+        kind: "error",
+        text: `Please drop ${LEVEL_SAV_FILE_NAME} — got “${file.name}”.`,
+      });
+      return;
+    }
+    setMessage({
+      kind: "error",
+      text: `Browser drop cannot resolve the full Level.sav path. Pick “Load Save…” or drop the file in the desktop app.`,
+    });
+  }
+
   return (
     <ViewShell
       title="Save Session"
       subtitle="Select your world's Level.sav to inspect players, Pals, guilds, and more."
     >
-      <div className="flex flex-col gap-6">
-        {/* Load control */}
-        <div className="border border-shell-line bg-shell-surface p-5">
+      <div
+        className="flex flex-col gap-6"
+        onDragOver={handleBrowserDragOver}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={handleBrowserDrop}
+      >
+        {/* Load control — drop target */}
+        <div
+          className={[
+            "relative border bg-shell-surface p-5 transition-colors",
+            isDragOver ? "border-shell-accent bg-shell-accent-subtle" : "border-shell-line",
+          ].join(" ")}
+        >
+          {isDragOver && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-shell-accent bg-shell-accent-subtle/80 backdrop-blur-[2px]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-shell-accent text-white shadow-sm">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+                  <path d="M12 16V3" />
+                  <path d="M8 7l4-4 4 4" />
+                  <path d="M3 17v3h18v-3" />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-shell-accent">Drop Level.sav here</p>
+              <p className="font-mono text-xs text-shell-muted">…\SaveGames\SteamID\WorldID\Level.sav</p>
+            </div>
+          )}
           <h3 className="text-base font-semibold">Load Save</h3>
           <p className="mt-2 max-w-[65ch] text-sm leading-6 text-shell-muted">
             Pick the <code className="font-mono text-xs">Level.sav</code> file inside your
@@ -112,8 +219,9 @@ export function SaveSessionView() {
             <span className="font-mono text-xs">
               …\Pal\Saved\SaveGames\&lt;SteamID&gt;\&lt;WorldID&gt;\Level.sav
             </span>
-            ). The whole directory is validated and never modified without a backup.
+            ) — or drag & drop it here. The directory is validated and never modified without a backup.
           </p>
+          <p className="mt-1 font-mono text-xs text-shell-muted">or drag & drop a Level.sav file here</p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <button
