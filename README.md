@@ -50,3 +50,9 @@ cargo test
 Windows release bundles are configured for NSIS and MSI. A real installer
 build also requires the Tauri Windows prerequisites, including Visual Studio
 Build Tools with the MSVC and Windows SDK components.
+
+## Game data provenance
+
+`resources/game_data/` is versioned (`VERSION` → `v1/catalog.json`) and derived from
+`docs/PalworldSaveTools/resources/game_data/` (MIT, © PalworldSaveTools). See
+`resources/README.md` and `resources/game_data/README.md` for update procedure and license.

@@ -90,13 +90,24 @@ impl GameCatalog {
     }
 
     pub fn load_from_app(app: &tauri::AppHandle) -> Self {
-        // Try bundled resource dir first
+        // Try bundled resource dir first, preferring versioned catalog
         if let Ok(dir) = app.path().resource_dir() {
-            for candidate in [
-                dir.join("resources").join("game_data").join("catalog.json"),
-                dir.join("game_data").join("catalog.json"),
-                dir.join("catalog.json"),
+            for base in [
+                dir.join("resources").join("game_data"),
+                dir.join("game_data"),
+                dir.clone(),
             ] {
+                // Check VERSION file for versioned path
+                if let Ok(version) = fs::read_to_string(base.join("VERSION")) {
+                    let v = version.trim();
+                    if !v.is_empty() {
+                        let versioned = base.join(v).join("catalog.json");
+                        if let Ok(cat) = Self::try_load_from_file(&versioned) {
+                            return cat;
+                        }
+                    }
+                }
+                let candidate = base.join("catalog.json");
                 if let Ok(cat) = Self::try_load_from_file(&candidate) {
                     return cat;
                 }
@@ -188,7 +199,18 @@ impl GameCatalog {
 }
 
 fn dev_catalog_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../resources/game_data/catalog.json")
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../resources/game_data");
+    // Prefer versioned catalog if VERSION file exists
+    if let Ok(version) = fs::read_to_string(base.join("VERSION")) {
+        let v = version.trim();
+        if !v.is_empty() {
+            let versioned = base.join(v).join("catalog.json");
+            if versioned.exists() {
+                return versioned;
+            }
+        }
+    }
+    base.join("catalog.json")
 }
 
 fn validate_ids<'a>(

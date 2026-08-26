@@ -34,7 +34,15 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["../resources/game_data/catalog.json", "../resources/i18n/en.json"],
+    "resources": [
+      "../resources/game_data/catalog.json",
+      "../resources/game_data/VERSION",
+      "../resources/game_data/v1/catalog.json",
+      "../resources/game_data/v1/VERSION",
+      "../resources/README.md",
+      "../resources/game_data/README.md",
+      "../resources/i18n/en.json"
+    ],
     "category": "Utility",
     "shortDescription": "Inspect and edit Palworld save data safely.",
     "longDescription": "PalTrainer is a safety-first desktop utility for inspecting, backing up, and editing Palworld save data.",
