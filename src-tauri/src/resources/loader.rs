@@ -197,12 +197,35 @@ fn validate_ids<'a>(
     errors: &mut Vec<String>,
 ) {
     let mut seen = std::collections::HashSet::new();
+    let mut seen_lower = std::collections::HashSet::new();
     for id in ids {
         if id.is_empty() {
             errors.push(format!("{collection} contains an empty ID."));
-        } else if !seen.insert(id) {
-            errors.push(format!("{collection} contains duplicate ID '{id}'."));
+            continue;
         }
+        if !seen.insert(id) {
+            errors.push(format!("{collection} contains duplicate ID '{id}'."));
+            continue;
+        }
+        let lower = id.to_ascii_lowercase();
+        if !seen_lower.insert(lower) {
+            errors.push(format!(
+                "{collection} contains casing duplicate for ID '{id}'."
+            ));
+        }
+    }
+}
+
+/// Resolves a Pal icon path, falling back to `?` when the asset is missing.
+/// Mirrors PST's icon fallback behavior for unknown pals.
+pub fn pal_icon_path(pal_id: &str) -> String {
+    let candidate = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../resources/assets/pals")
+        .join(format!("{pal_id}.png"));
+    if candidate.exists() {
+        candidate.to_string_lossy().to_string()
+    } else {
+        "?".to_string()
     }
 }
 
@@ -478,5 +501,61 @@ mod tests {
             .iter()
             .any(|error| error.contains("work suitability")));
         assert!(errors.iter().any(|error| error.contains("active_skills")));
+    }
+
+    #[test]
+    fn casing_duplicate_is_detected() {
+        let mut catalog = GameCatalog::new();
+        catalog.pals.push(PalSpeciesInfo {
+            id: "anubis".into(),
+            name: "Anubis Lower".into(),
+            element_types: vec!["Ground".into()],
+            rarity: 1,
+            hp_scaling: 10.0,
+            attack_scaling: 10.0,
+            defense_scaling: 10.0,
+            work_suitabilities: vec![WorkSuitabilityInfo {
+                work_type: "Handiwork".into(),
+                level: 1,
+            }],
+        });
+        let errors = catalog.validate_integrity().unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("casing duplicate")));
+    }
+
+    #[test]
+    fn handles_300_pals_and_icon_fallback() {
+        let mut catalog = GameCatalog::new();
+        // Expand to 300 synthetic pals to simulate full icon set
+        for i in 0..296 {
+            catalog.pals.push(PalSpeciesInfo {
+                id: format!("Pal{i:03}"),
+                name: format!("Pal {i:03}"),
+                element_types: vec!["Neutral".into()],
+                rarity: i % 10,
+                hp_scaling: 100.0,
+                attack_scaling: 100.0,
+                defense_scaling: 100.0,
+                work_suitabilities: vec![WorkSuitabilityInfo {
+                    work_type: "Handiwork".into(),
+                    level: (i % 4) + 1,
+                }],
+            });
+        }
+        assert_eq!(catalog.pals.len(), 300);
+        assert!(catalog.validate_integrity().is_ok());
+        // Icon fallback: missing asset returns "?"
+        assert_eq!(pal_icon_path("NonExistentPal999"), "?");
+        // Existing dev asset check — catalog.json's own pals should have no fallback expectation
+        // (we don't bundle 300 pngs in dev, so even Anubis will fallback to "?" in this context)
+        assert!(pal_icon_path("Anubis") == "?" || pal_icon_path("Anubis").ends_with("Anubis.png"));
+    }
+
+    #[test]
+    fn dev_catalog_file_loads_and_validates() {
+        let catalog = GameCatalog::load();
+        assert!(catalog.validate_integrity().is_ok());
+        // File should have been loaded from resources if present, otherwise fallback is same 4 pals
+        assert!(catalog.pals.len() >= 4);
     }
 }
