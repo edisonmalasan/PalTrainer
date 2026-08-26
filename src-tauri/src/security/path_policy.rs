@@ -180,8 +180,10 @@ mod tests {
         // Direct Level.sav file selection resolves to its parent
         assert_eq!(resolve_save_root(&level_sav).unwrap(), canon_dir);
 
-        // Case-insensitive Level.sav matching
+        // Case-insensitive Level.sav matching (create explicitly so the test
+        // also covers case-sensitive filesystems)
         let lower = save_root.join("level.sav");
+        fs::write(&lower, b"mock").unwrap();
         assert_eq!(resolve_save_root(&lower).unwrap(), canon_dir);
 
         // A non-Level.sav file is rejected
