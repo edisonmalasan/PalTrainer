@@ -50,7 +50,6 @@ function ViewSkeleton() {
       <div className="h-[1px] w-full bg-shell-line" />
       {Array.from({ length: 6 }).map((_, i) => (
         <div
-          // eslint-disable-next-line react/no-array-index-key
           key={i}
           className="h-10 w-full animate-pulse bg-shell-panel"
           style={{ opacity: 1 - i * 0.14 }}

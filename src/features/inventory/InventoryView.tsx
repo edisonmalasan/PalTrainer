@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { DataTable, useSearchFilter } from "../../shared/components/DataTable";
+import { EmptyState } from "../../shared/components/EmptyState";
 import { PreviewModal } from "../../shared/components/PreviewModal";
 import { ViewShell } from "../../shared/components/ViewShell";
 import { useAsync } from "../../shared/hooks/useAsync";
@@ -560,7 +561,7 @@ export function InventoryView() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => void handleRequestMaxSlotPreview(s)}
+                        onClick={() => void handleRequestQuickMaxStack(s)}
                         className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                       >
                         Max (x9999)

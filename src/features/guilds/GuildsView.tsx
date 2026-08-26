@@ -23,7 +23,7 @@ export function GuildsView() {
   const { query, setQuery, filtered } = useSearchFilter(
     rows,
     (r, q) =>
-      r.guildName.toLowerCase().includes(q) || r.guildId.toLowerCase().includes(q),
+      r.name.toLowerCase().includes(q) || r.guildId.toLowerCase().includes(q),
   );
 
   // Edit drawer state
@@ -42,7 +42,7 @@ export function GuildsView() {
 
   function startEdit(guild: GuildProjection) {
     setSelectedGuild(guild);
-    setEditName(guild.guildName || "");
+    setEditName(guild.name || "");
   }
 
   async function handleRequestEditPreview() {
@@ -96,7 +96,7 @@ export function GuildsView() {
       setActivePreview(preview);
       setPendingCommit(() => async () => {
         await invokeCommand("commit_unlock_all_lab_research", { guildId: guild.guildId });
-        setActionMessage(`Unlocked all lab research for guild ${guild.guildName || guild.guildId}`);
+        setActionMessage(`Unlocked all lab research for guild ${guild.name || guild.guildId}`);
         setReloadKey((k) => k + 1);
       });
     } catch (err: unknown) {
@@ -194,8 +194,8 @@ export function GuildsView() {
               key: "name",
               header: "Guild Name",
               sortable: true,
-              sortValue: (r) => r.guildName || r.guildId,
-              render: (r) => <span className="font-semibold text-shell-ink">{r.guildName || "—"}</span>,
+              sortValue: (r) => r.name || r.guildId,
+              render: (r) => <span className="font-semibold text-shell-ink">{r.name || "—"}</span>,
             },
             {
               key: "members",
@@ -218,7 +218,7 @@ export function GuildsView() {
               header: "Admin Player",
               render: (r) => (
                 <span className="text-shell-muted">
-                  {r.adminPlayerName || r.adminUid.slice(0, 8)}
+                  {r.adminPlayerName || r.adminPlayerUid.slice(0, 8)}
                 </span>
               ),
             },
@@ -276,7 +276,7 @@ export function GuildsView() {
             <div className="flex items-center justify-between border-b border-shell-line pb-3">
               <div>
                 <h3 className="text-base font-semibold">
-                  Edit Guild — {selectedGuild.guildName || selectedGuild.guildId}
+                  Edit Guild — {selectedGuild.name || selectedGuild.guildId}
                 </h3>
                 <p className="font-mono text-xs text-shell-muted">ID: {selectedGuild.guildId}</p>
               </div>
@@ -326,9 +326,9 @@ export function GuildsView() {
             <div className="flex items-center justify-between border-b border-shell-line pb-3">
               <div>
                 <h3 className="text-base font-semibold">
-                  Transfer Leadership — {transferTargetGuild.guildName || transferTargetGuild.guildId}
+                  Transfer Leadership — {transferTargetGuild.name || transferTargetGuild.guildId}
                 </h3>
-                <p className="font-mono text-xs text-shell-muted">Current Admin: {transferTargetGuild.adminUid}</p>
+                <p className="font-mono text-xs text-shell-muted">Current Admin: {transferTargetGuild.adminPlayerUid}</p>
               </div>
               <button
                 type="button"

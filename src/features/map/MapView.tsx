@@ -311,7 +311,8 @@ export function MapView() {
           searchValue={query}
           onSearchChange={setQuery}
           searchPlaceholder="Filter by label or marker type…"
-          emptyMessage="No map markers found. Load a save file first."
+          emptyHeadline="No map markers found"
+          emptyDescription="Load a save file first to view map markers."
         />
       </div>
     </ViewShell>
