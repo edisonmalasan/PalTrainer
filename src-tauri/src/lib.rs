@@ -16,6 +16,7 @@ pub fn run() {
         .unwrap_or_else(|| PathBuf::from("Backups"));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(None::<domain::save_session::SaveSession>))
         .manage(Mutex::new(storage::BackupManager::new(default_backup_root)))
         .manage(Mutex::new(domain::exclusions::ExclusionConfig::default()))

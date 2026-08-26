@@ -86,6 +86,31 @@ pub fn validate_save_root(dir: impl AsRef<Path>) -> Result<PathBuf, SecurityErro
     Ok(canon_dir)
 }
 
+/// Resolves a user-selected path into a valid save root directory.
+///
+/// Users may select either the world save directory itself or the
+/// `Level.sav` file inside it; both must resolve to the same root so
+/// downstream commands can rely on `<root>/Level.sav` layout.
+pub fn resolve_save_root(path: impl AsRef<Path>) -> Result<PathBuf, SecurityError> {
+    let p = canonicalize_safe(path.as_ref())?;
+
+    if p.is_file() {
+        let is_level_sav = p
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.eq_ignore_ascii_case("Level.sav"));
+        if !is_level_sav {
+            return Err(SecurityError::NotADirectory(p));
+        }
+        let parent = p
+            .parent()
+            .ok_or_else(|| SecurityError::NotFound(p.clone()))?;
+        return validate_save_root(parent);
+    }
+
+    validate_save_root(p)
+}
+
 /// Validates an export/import file target path.
 pub fn validate_import_export_path(
     path: impl AsRef<Path>,
@@ -137,6 +162,32 @@ mod tests {
         // Passes when Level.sav exists
         fs::write(save_root.join("Level.sav"), b"mock").unwrap();
         assert!(validate_save_root(&save_root).is_ok());
+    }
+
+    #[test]
+    fn test_resolve_save_root_accepts_directory_or_level_sav_file() {
+        let dir = tempdir().unwrap();
+        let save_root = dir.path().join("world_save");
+        fs::create_dir_all(&save_root).unwrap();
+        let level_sav = save_root.join("Level.sav");
+        fs::write(&level_sav, b"mock").unwrap();
+
+        let canon_dir = dunce::canonicalize(&save_root).unwrap();
+
+        // Directory selection resolves to itself
+        assert_eq!(resolve_save_root(&save_root).unwrap(), canon_dir);
+
+        // Direct Level.sav file selection resolves to its parent
+        assert_eq!(resolve_save_root(&level_sav).unwrap(), canon_dir);
+
+        // Case-insensitive Level.sav matching
+        let lower = save_root.join("level.sav");
+        assert_eq!(resolve_save_root(&lower).unwrap(), canon_dir);
+
+        // A non-Level.sav file is rejected
+        let other = dir.path().join("other.sav");
+        fs::write(&other, b"mock").unwrap();
+        assert!(resolve_save_root(&other).is_err());
     }
 
     #[test]

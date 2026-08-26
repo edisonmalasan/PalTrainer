@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default PalTrainer desktop capability. Phase 1 exposes core Tauri behavior and app commands only.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:allow-open"]
 }
