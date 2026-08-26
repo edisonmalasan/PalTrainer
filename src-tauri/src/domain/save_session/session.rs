@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use crate::pal_save::archive::{SavHeader, SaveType};
-use crate::security::path_policy::{validate_save_root, SecurityError};
+use crate::security::path_policy::{resolve_save_root, SecurityError};
 use crate::storage::atomic::StorageError;
 
 #[derive(Debug, Error)]
@@ -98,7 +98,7 @@ pub struct SaveSession {
 impl SaveSession {
     /// Opens and indexes a Palworld save directory.
     pub fn open(save_root: impl AsRef<Path>) -> Result<Self, SessionError> {
-        let canon_root = validate_save_root(save_root)?;
+        let canon_root = resolve_save_root(save_root)?;
         let level_sav_path = canon_root.join("Level.sav");
 
         let level_bytes = fs::read(&level_sav_path)?;
