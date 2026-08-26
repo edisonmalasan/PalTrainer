@@ -74,7 +74,7 @@ export function DataTable<T>({
   return (
     <div className="flex flex-col gap-3">
       {onSearchChange !== undefined && (
-        <div className="flex items-center gap-2 border border-shell-line bg-white px-3 py-2">
+        <div className="flex items-center gap-2 border border-shell-line bg-shell-surface px-3 py-2">
           <svg
             width="14"
             height="14"
@@ -121,7 +121,7 @@ export function DataTable<T>({
           action={emptyAction}
         />
       ) : (
-        <div className="overflow-x-auto border border-shell-line bg-white">
+        <div className="overflow-x-auto border border-shell-line bg-shell-surface">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-shell-line bg-shell-panel">
@@ -168,9 +168,9 @@ export function DataTable<T>({
                   }}
                   className={[
                     "border-b border-shell-line transition-colors",
-                    idx % 2 === 0 ? "bg-white" : "bg-shell-panel/30",
+                    idx % 2 === 0 ? "bg-shell-surface" : "bg-shell-panel/30",
                     onRowClick
-                      ? "cursor-pointer hover:bg-[#edf5f2] focus-visible:bg-[#edf5f2] focus-visible:outline-none"
+                      ? "cursor-pointer hover:bg-shell-accent-subtle focus-visible:bg-shell-accent-subtle focus-visible:outline-none"
                       : "hover:bg-shell-panel/60",
                   ].join(" ")}
                 >

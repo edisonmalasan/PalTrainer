@@ -343,7 +343,7 @@ export function PalsView() {
     >
       <div className="flex flex-col gap-4">
         {/* Action Header & Location Filter Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border border-shell-line bg-white p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border border-shell-line bg-shell-surface p-3">
           <div className="flex items-center gap-1">
             {["All", "Party", "Palbox", "Base", "DPS", "GPS"].map((tab) => (
               <button
@@ -353,7 +353,7 @@ export function PalsView() {
                 className={[
                   "px-3 py-1 text-xs font-medium transition active:translate-y-[1px]",
                   locationFilter.toLowerCase() === tab.toLowerCase()
-                    ? "border border-shell-accent bg-[#edf5f2] font-semibold text-shell-accent"
+                    ? "border border-shell-accent-solid bg-shell-accent-solid-subtle font-semibold text-shell-accent"
                     : "border border-transparent text-shell-muted hover:border-shell-line hover:text-shell-ink",
                 ].join(" ")}
               >
@@ -366,14 +366,14 @@ export function PalsView() {
             <button
               type="button"
               onClick={() => setShowDeleteSpeciesModal(true)}
-              className="border border-shell-line bg-white px-3 py-1.5 font-mono text-xs text-shell-muted transition hover:bg-shell-panel active:translate-y-[1px]"
+              className="border border-shell-line bg-shell-surface px-3 py-1.5 font-mono text-xs text-shell-muted transition hover:bg-shell-panel active:translate-y-[1px]"
             >
               Delete by Species
             </button>
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="border border-shell-accent bg-[#edf5f2] px-3 py-1.5 font-mono text-xs font-semibold text-shell-accent transition hover:bg-[#d9ede7] active:translate-y-[1px]"
+              className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-3 py-1.5 font-mono text-xs font-semibold text-shell-accent transition hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
             >
               + Create Pal
             </button>
@@ -382,7 +382,7 @@ export function PalsView() {
 
         {/* Bulk Actions Bar (Shown when Pals are selected) */}
         {selectedIds.size > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border border-shell-accent bg-[#edf5f2] p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border border-shell-accent-solid bg-shell-accent-solid-subtle p-3">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs font-semibold text-shell-accent">
                 {selectedIds.size} Pal{selectedIds.size !== 1 ? "s" : ""} selected
@@ -400,14 +400,14 @@ export function PalsView() {
               <button
                 type="button"
                 onClick={() => void handleBulkMaxPreview(false)}
-                className="border border-shell-line bg-white px-3 py-1 text-xs font-medium text-shell-ink hover:bg-shell-panel active:translate-y-[1px]"
+                className="border border-shell-line bg-shell-surface px-3 py-1 text-xs font-medium text-shell-ink hover:bg-shell-panel active:translate-y-[1px]"
               >
                 Max Selected (Lv 55)
               </button>
               <button
                 type="button"
                 onClick={() => void handleBulkMaxPreview(true)}
-                className="border border-shell-line bg-white px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-50 active:translate-y-[1px]"
+                className="border border-shell-line bg-shell-surface px-3 py-1 text-xs font-medium text-shell-warning hover:bg-shell-warning-subtle active:translate-y-[1px]"
               >
                 Max Selected (Lv 60 Cheat)
               </button>
@@ -417,14 +417,14 @@ export function PalsView() {
                   setSyncSourceId(Array.from(selectedIds)[0]);
                   setShowSyncModal(true);
                 }}
-                className="border border-shell-line bg-white px-3 py-1 text-xs font-medium text-shell-ink hover:bg-shell-panel active:translate-y-[1px]"
+                className="border border-shell-line bg-shell-surface px-3 py-1 text-xs font-medium text-shell-ink hover:bg-shell-panel active:translate-y-[1px]"
               >
                 Sync Skills…
               </button>
               <button
                 type="button"
                 onClick={() => void handleBulkDeleteSelectedPreview()}
-                className="border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 active:translate-y-[1px]"
+                className="border border-shell-destructive/40 bg-shell-surface px-3 py-1 text-xs font-medium text-shell-destructive hover:bg-shell-destructive-subtle active:translate-y-[1px]"
               >
                 Delete Selected
               </button>
@@ -433,14 +433,14 @@ export function PalsView() {
         )}
 
         {actionMessage && (
-          <div className="border border-shell-accent bg-[#edf5f2] px-4 py-2 font-mono text-xs text-shell-accent">
+          <div className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-2 font-mono text-xs text-shell-accent">
             {actionMessage}
           </div>
         )}
 
         {/* Sync Skills Modal */}
         {showSyncModal && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <h3 className="text-base font-semibold">Sync Skills Across Selected Pals</h3>
             <p className="mt-1 text-xs text-shell-muted">
               Copy passives and/or active skills from a source Pal to {selectedIds.size} target Pals.
@@ -496,7 +496,7 @@ export function PalsView() {
               <button
                 type="button"
                 onClick={() => void handleBulkSyncSkillsPreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
               >
                 Preview Sync
               </button>
@@ -506,7 +506,7 @@ export function PalsView() {
 
         {/* Delete by Species Modal */}
         {showDeleteSpeciesModal && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <h3 className="text-base font-semibold">Bulk Delete by Species</h3>
             <p className="mt-1 text-xs text-shell-muted">
               Permanently remove all instances of a species (e.g. Lamball, Chikipi) across all storage.
@@ -537,7 +537,7 @@ export function PalsView() {
                 type="button"
                 disabled={!deleteSpeciesTarget.trim()}
                 onClick={() => void handleBulkDeleteBySpeciesPreview()}
-                className="border border-red-300 bg-white px-4 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 active:translate-y-[1px] disabled:opacity-50"
+                className="border border-shell-destructive/40 bg-shell-surface px-4 py-1.5 text-xs font-semibold text-shell-destructive hover:bg-shell-destructive-subtle active:translate-y-[1px] disabled:opacity-50"
               >
                 Preview Deletion
               </button>
@@ -547,7 +547,7 @@ export function PalsView() {
 
         {/* Create Pal Modal Drawer */}
         {showCreateModal && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <h3 className="text-base font-semibold">Create New Pal</h3>
             <p className="mt-1 text-xs text-shell-muted">
               Spawn a Pal directly into a chosen party, palbox, or storage slot.
@@ -637,7 +637,7 @@ export function PalsView() {
                 type="button"
                 disabled={!newSpecies.trim()}
                 onClick={() => void handleRequestCreatePreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px] disabled:opacity-50"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px] disabled:opacity-50"
               >
                 Preview Create
               </button>
@@ -647,7 +647,7 @@ export function PalsView() {
 
         {/* Clone Pal Modal */}
         {clonePal && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <h3 className="text-base font-semibold">
               Clone Pal — {clonePal.nickname || clonePal.speciesId}
             </h3>
@@ -681,7 +681,7 @@ export function PalsView() {
               <button
                 type="button"
                 onClick={() => void handleRequestClonePreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
               >
                 Preview Clone
               </button>
@@ -787,7 +787,7 @@ export function PalsView() {
               key: "location",
               header: "Location",
               render: (r) => (
-                <span className="border border-shell-line bg-white px-2 py-0.5 font-mono text-[11px] text-shell-muted">
+                <span className="border border-shell-line bg-shell-surface px-2 py-0.5 font-mono text-[11px] text-shell-muted">
                   {r.location}
                 </span>
               ),
@@ -801,28 +801,28 @@ export function PalsView() {
                   <button
                     type="button"
                     onClick={() => startEdit(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => setClonePal(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Clone
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleExportPal(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Export
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleRequestDeletePreview(r)}
-                    className="border border-red-200 bg-white px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 active:translate-y-[1px]"
+                    className="border border-shell-destructive/40 bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-destructive hover:bg-shell-destructive-subtle active:translate-y-[1px]"
                   >
                     Delete
                   </button>
@@ -842,7 +842,7 @@ export function PalsView() {
 
         {/* Edit Pal Drawer */}
         {selectedPal && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <div className="flex items-center justify-between border-b border-shell-line pb-3">
               <div>
                 <h3 className="text-base font-semibold">
@@ -1012,7 +1012,7 @@ export function PalsView() {
                 />
                 <span>Lucky / Shiny Pal</span>
               </label>
-              <label className="flex items-center gap-1.5 text-amber-800">
+              <label className="flex items-center gap-1.5 text-shell-warning">
                 <input
                   type="checkbox"
                   checked={editCheatMode}
@@ -1033,7 +1033,7 @@ export function PalsView() {
               <button
                 type="button"
                 onClick={() => void handleRequestEditPreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
               >
                 Preview Changes
               </button>

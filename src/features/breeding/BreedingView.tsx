@@ -80,7 +80,7 @@ export function BreedingView() {
               "border px-4 py-2 text-sm font-medium transition active:translate-y-[1px]",
               looking || !parent1 || !parent2
                 ? "cursor-not-allowed border-shell-line text-shell-muted opacity-60"
-                : "border-shell-accent bg-[#edf5f2] text-shell-accent hover:bg-[#d9ede7]",
+                : "border-shell-accent-solid bg-shell-accent-solid-subtle text-shell-accent hover:bg-shell-accent-subtle-hover",
             ].join(" ")}
           >
             {looking ? "Looking up…" : "Look up child"}
@@ -89,14 +89,14 @@ export function BreedingView() {
 
         {/* Error */}
         {lookupError && (
-          <p className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <p className="border border-shell-destructive/40 bg-shell-destructive-subtle px-3 py-2 text-sm text-shell-destructive">
             {lookupError}
           </p>
         )}
 
         {/* Result */}
         {result && (
-          <div className="border border-shell-line bg-white p-5">
+          <div className="border border-shell-line bg-shell-surface p-5">
             <p className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">
               Result
             </p>
@@ -107,7 +107,7 @@ export function BreedingView() {
               {result.childPalId}
             </p>
             {result.isUniqueCombo && (
-              <span className="mt-3 inline-block rounded-sm bg-amber-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-700">
+              <span className="mt-3 inline-block rounded-sm bg-shell-warning-subtle px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-shell-warning">
                 Unique Combo
               </span>
             )}
@@ -139,7 +139,7 @@ export function BreedingView() {
               ].map((entry) => (
                 <div
                   key={entry.label}
-                  className="border border-shell-line bg-white px-3 py-3"
+                  className="border border-shell-line bg-shell-surface px-3 py-3"
                 >
                   <p className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">
                     {entry.label}
@@ -178,7 +178,7 @@ function PalSelect({
           id={id}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="border border-shell-line bg-white px-3 py-2 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-shell-accent"
+          className="border border-shell-line bg-shell-surface px-3 py-2 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-shell-accent"
         >
           <option value="">— Select a Pal —</option>
           {catalog.pals.map((p) => (
@@ -194,7 +194,7 @@ function PalSelect({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Pal ID (e.g. Lamball)"
-          className="border border-shell-line bg-white px-3 py-2 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-shell-accent"
+          className="border border-shell-line bg-shell-surface px-3 py-2 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-shell-accent"
         />
       )}
     </label>

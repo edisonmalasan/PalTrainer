@@ -226,7 +226,7 @@ export function BasesView() {
     >
       <div className="flex flex-col gap-4">
         {/* Action Bar */}
-        <div className="flex items-center justify-between border border-shell-line bg-white px-4 py-3">
+        <div className="flex items-center justify-between border border-shell-line bg-shell-surface px-4 py-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-shell-muted">
               Base Management
@@ -238,21 +238,21 @@ export function BasesView() {
           <button
             type="button"
             onClick={() => setShowImport(!showImport)}
-            className="border border-shell-line bg-white px-3 py-1.5 font-mono text-xs text-shell-ink transition hover:bg-shell-panel active:translate-y-[1px]"
+            className="border border-shell-line bg-shell-surface px-3 py-1.5 font-mono text-xs text-shell-ink transition hover:bg-shell-panel active:translate-y-[1px]"
           >
             {showImport ? "Cancel Import" : "Import Base Bundle"}
           </button>
         </div>
 
         {actionMessage && (
-          <div className="border border-shell-accent bg-[#edf5f2] px-4 py-2 text-xs font-mono text-shell-accent">
+          <div className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-2 text-xs font-mono text-shell-accent">
             {actionMessage}
           </div>
         )}
 
         {/* Clone Base Drawer */}
         {cloneBase && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <h3 className="text-base font-semibold">Clone Base — {cloneBase.baseName || cloneBase.baseId}</h3>
             <p className="mt-1 text-xs text-shell-muted">
               Duplicate base structures and worker configuration into a target guild.
@@ -283,7 +283,7 @@ export function BasesView() {
                 type="button"
                 disabled={!cloneTargetGuild.trim()}
                 onClick={() => void handleRequestClonePreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px] disabled:opacity-50"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px] disabled:opacity-50"
               >
                 Preview Clone
               </button>
@@ -293,7 +293,7 @@ export function BasesView() {
 
         {/* Import Base Bundle Drawer */}
         {showImport && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <h3 className="text-base font-semibold">Import Base Bundle</h3>
             <p className="mt-1 text-xs text-shell-muted">
               Import a standalone base layout file and assign it to a target guild.
@@ -335,7 +335,7 @@ export function BasesView() {
                 type="button"
                 disabled={!importPath.trim() || !importGuildId.trim()}
                 onClick={() => void handleRequestImportPreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px] disabled:opacity-50"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px] disabled:opacity-50"
               >
                 Preview Import
               </button>
@@ -388,21 +388,21 @@ export function BasesView() {
                   <button
                     type="button"
                     onClick={() => startEdit(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => startNudge(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Nudge
                   </button>
                   <button
                     type="button"
                     onClick={() => startClone(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                     title="Clone base to another guild"
                   >
                     Clone
@@ -410,7 +410,7 @@ export function BasesView() {
                   <button
                     type="button"
                     onClick={() => void handleRequestRepairPreview(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                     title="Repair all damaged structures to full HP"
                   >
                     Repair
@@ -418,14 +418,14 @@ export function BasesView() {
                   <button
                     type="button"
                     onClick={() => void handleExportBase(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Export
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleRequestDeletePreview(r)}
-                    className="border border-red-200 bg-white px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 active:translate-y-[1px]"
+                    className="border border-shell-destructive/40 bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-destructive hover:bg-shell-destructive-subtle active:translate-y-[1px]"
                   >
                     Delete
                   </button>
@@ -445,7 +445,7 @@ export function BasesView() {
 
         {/* Edit Base Level Drawer */}
         {selectedBase && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <div className="flex items-center justify-between border-b border-shell-line pb-3">
               <div>
                 <h3 className="text-base font-semibold">
@@ -487,7 +487,7 @@ export function BasesView() {
               <button
                 type="button"
                 onClick={() => void handleRequestEditPreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
               >
                 Preview & Apply
               </button>
@@ -497,7 +497,7 @@ export function BasesView() {
 
         {/* Nudge Coordinates Drawer */}
         {nudgeBase && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <div className="flex items-center justify-between border-b border-shell-line pb-3">
               <div>
                 <h3 className="text-base font-semibold">
@@ -562,7 +562,7 @@ export function BasesView() {
               <button
                 type="button"
                 onClick={() => void handleRequestNudgePreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
               >
                 Preview & Shift
               </button>

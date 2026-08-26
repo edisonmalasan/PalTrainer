@@ -164,7 +164,7 @@ function Workbench() {
                           className={[
                             "group flex items-center justify-between border-l-2 px-3 py-1.5 text-left text-xs transition-all btn-tactile",
                             isActive
-                              ? "border-shell-accent bg-[#edf5f2] font-semibold text-shell-ink"
+                              ? "border-shell-accent-solid bg-shell-accent-solid-subtle font-semibold text-shell-ink"
                               : "border-transparent text-shell-muted hover:border-shell-line hover:bg-shell-panel hover:text-shell-ink",
                             route.enabled
                               ? ""
@@ -200,7 +200,7 @@ function Workbench() {
               className="flex w-full items-center justify-between border border-shell-line bg-shell-panel px-3 py-1.5 text-left text-xs text-shell-muted transition hover:bg-shell-surface hover:text-shell-ink active:translate-y-[1px]"
             >
               <span>Shortcuts</span>
-              <kbd className="rounded-sm border border-shell-line bg-white px-1.5 py-0.2 font-mono text-[10px] font-semibold text-shell-ink">
+              <kbd className="rounded-sm border border-shell-line bg-shell-surface px-1.5 py-0.2 font-mono text-[10px] font-semibold text-shell-ink">
                 ?
               </kbd>
             </button>
@@ -212,10 +212,7 @@ function Workbench() {
           <header className="border-b border-shell-line bg-shell-surface px-6 py-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-shell-muted">
-                  {appRoutes.find((r) => r.id === activeRoute)?.phase ?? "—"}
-                </p>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight">
+                <h2 className="text-xl font-semibold tracking-tight">
                   {appRoutes.find((r) => r.id === activeRoute)?.label ?? "Workbench"}
                 </h2>
               </div>
@@ -325,14 +322,14 @@ function SettingsView({
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
       <section className="min-w-0">
-        <div className="border border-shell-line bg-white p-5">
+        <div className="border border-shell-line bg-shell-surface p-5">
           <h3 className="text-base font-semibold">Settings Storage</h3>
           <p className="mt-2 max-w-[65ch] text-sm leading-6 text-shell-muted">
             Settings are saved through Rust so filesystem ownership stays in the correct place.
           </p>
 
           {error && (
-            <p className="mt-4 border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            <p className="mt-4 border border-shell-destructive/40 bg-shell-destructive-subtle px-3 py-2 text-sm text-shell-destructive">
               {error.message}
             </p>
           )}
@@ -345,7 +342,7 @@ function SettingsView({
                 onChange={(e) =>
                   void onChange({ ...settings, theme: e.target.value as AppSettings["theme"] })
                 }
-                className="border border-shell-line bg-white px-3 py-2"
+                className="border border-shell-line bg-shell-surface px-3 py-2"
               >
                 <option value="system">System</option>
                 <option value="light">Light</option>
@@ -360,7 +357,7 @@ function SettingsView({
                 onChange={(e) =>
                   void onChange({ ...settings, showAdvancedTools: e.target.value === "true" })
                 }
-                className="border border-shell-line bg-white px-3 py-2"
+                className="border border-shell-line bg-shell-surface px-3 py-2"
               >
                 <option value="false">Hidden</option>
                 <option value="true">Visible</option>
@@ -374,7 +371,7 @@ function SettingsView({
           <h3 className="text-base font-semibold">Planned milestones</h3>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {plannedMilestones.map((m) => (
-              <div key={m} className="border border-shell-line bg-white p-4">
+              <div key={m} className="border border-shell-line bg-shell-surface p-4">
                 <p className="text-sm leading-6 text-shell-muted">{m}</p>
               </div>
             ))}
@@ -407,7 +404,7 @@ function SettingsView({
         <h3 className="mt-8 text-base font-semibold">Feature Flags</h3>
         <div className="mt-4 grid gap-3">
           {featureFlags.map((flag) => (
-            <article key={flag.id} className="border border-shell-line bg-white p-4">
+            <article key={flag.id} className="border border-shell-line bg-shell-surface p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-medium">{flag.label}</p>
                 <span className="font-mono text-[11px] uppercase text-shell-muted">
@@ -427,7 +424,7 @@ function SettingsView({
 
 function Metric({ label, value }: { readonly label: string; readonly value: string }) {
   return (
-    <div className="border border-shell-line bg-white px-3 py-2">
+    <div className="border border-shell-line bg-shell-surface px-3 py-2">
       <p className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">{label}</p>
       <p className="mt-1 font-mono text-xs text-shell-ink">{value}</p>
     </div>
@@ -436,7 +433,7 @@ function Metric({ label, value }: { readonly label: string; readonly value: stri
 
 function ShellSkeleton() {
   return (
-    <section className="border border-shell-line bg-white p-5">
+    <section className="border border-shell-line bg-shell-surface p-5">
       <div className="h-4 w-40 animate-pulse bg-shell-line" />
       <div className="mt-5 grid gap-3">
         <div className="h-10 animate-pulse bg-shell-panel" />

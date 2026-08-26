@@ -126,7 +126,7 @@ export function XgpPanel() {
       />
 
       {/* ── Section 2: Discovered Xbox GamePass Saves ───────────────────── */}
-      <section className="border border-shell-line bg-white p-5 space-y-4">
+      <section className="border border-shell-line bg-shell-surface p-5 space-y-4">
         <div className="flex items-center justify-between border-b border-shell-line pb-3">
           <div>
             <h3 className="text-base font-semibold tracking-tight text-shell-ink">
@@ -147,7 +147,7 @@ export function XgpPanel() {
         </div>
 
         {discoverError && (
-          <div className="border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800">
+          <div className="border-l-2 border-shell-destructive bg-shell-destructive-subtle p-3 text-xs text-shell-destructive">
             {discoverError}
           </div>
         )}
@@ -184,14 +184,14 @@ export function XgpPanel() {
                       setExtractWgsDir(entry.wgsDir);
                       setExtractDestPath("C:/Palworld/Extracted_From_GamePass");
                     }}
-                    className="border border-shell-line bg-white px-2.5 py-1 text-[11px] font-medium hover:bg-shell-surface"
+                    className="border border-shell-line bg-shell-surface px-2.5 py-1 text-[11px] font-medium hover:bg-shell-surface"
                   >
                     Select for Extract
                   </button>
                   <button
                     type="button"
                     onClick={() => setImportWgsTarget(entry.wgsDir)}
-                    className="border border-shell-line bg-white px-2.5 py-1 text-[11px] font-medium hover:bg-shell-surface"
+                    className="border border-shell-line bg-shell-surface px-2.5 py-1 text-[11px] font-medium hover:bg-shell-surface"
                   >
                     Select as Import Target
                   </button>
@@ -203,7 +203,7 @@ export function XgpPanel() {
       </section>
 
       {/* ── Section 3: GamePass to Steam Extraction ────────────────────── */}
-      <section className="border border-shell-line bg-white p-5 space-y-4">
+      <section className="border border-shell-line bg-shell-surface p-5 space-y-4">
         <div className="border-b border-shell-line pb-3">
           <h3 className="text-base font-semibold tracking-tight text-shell-ink">
             Extract GamePass Save to Steam Folder
@@ -246,14 +246,14 @@ export function XgpPanel() {
             type="button"
             onClick={() => void handleExtractXgp()}
             disabled={extractLoading || !extractWgsDir.trim() || !extractDestPath.trim()}
-            className="border border-shell-accent bg-shell-accent px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
+            className="border border-shell-accent-solid bg-shell-accent-solid px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
           >
             {extractLoading ? "Extracting Blobs..." : "Extract Save to Steam Format"}
           </button>
         </div>
 
         {extractError && (
-          <div className="border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800">
+          <div className="border-l-2 border-shell-destructive bg-shell-destructive-subtle p-3 text-xs text-shell-destructive">
             {extractError}
           </div>
         )}
@@ -269,7 +269,7 @@ export function XgpPanel() {
       </section>
 
       {/* ── Section 4: Steam to GamePass Packaging ─────────────────────── */}
-      <section className="border border-shell-line bg-white p-5 space-y-4">
+      <section className="border border-shell-line bg-shell-surface p-5 space-y-4">
         <div className="border-b border-shell-line pb-3">
           <h3 className="text-base font-semibold tracking-tight text-shell-ink">
             Package Steam Save to Xbox GamePass WGS
@@ -312,14 +312,14 @@ export function XgpPanel() {
             type="button"
             onClick={() => void handlePreviewImportSteam()}
             disabled={importLoading || !importSteamPath.trim() || !importWgsTarget.trim()}
-            className="border border-shell-accent bg-shell-accent px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
+            className="border border-shell-accent-solid bg-shell-accent-solid px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
           >
             {importLoading ? "Analyzing..." : "Preview GamePass Import"}
           </button>
         </div>
 
         {importError && (
-          <div className="border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800">
+          <div className="border-l-2 border-shell-destructive bg-shell-destructive-subtle p-3 text-xs text-shell-destructive">
             {importError}
           </div>
         )}

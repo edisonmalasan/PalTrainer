@@ -189,7 +189,7 @@ export function TransferPanel() {
           className={[
             "border-b-2 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider transition",
             subMode === "transfer"
-              ? "border-shell-accent text-shell-accent bg-white"
+              ? "border-shell-accent text-shell-accent bg-shell-surface"
               : "border-transparent text-shell-muted hover:text-shell-ink",
           ].join(" ")}
         >
@@ -201,7 +201,7 @@ export function TransferPanel() {
           className={[
             "border-b-2 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider transition",
             subMode === "host-swap"
-              ? "border-shell-accent text-shell-accent bg-white"
+              ? "border-shell-accent text-shell-accent bg-shell-surface"
               : "border-transparent text-shell-muted hover:text-shell-ink",
           ].join(" ")}
         >
@@ -211,7 +211,7 @@ export function TransferPanel() {
 
       {/* ── Mode 1: Character Transfer ───────────────────────────────────── */}
       {subMode === "transfer" && (
-        <section className="border border-shell-line bg-white p-5 space-y-6">
+        <section className="border border-shell-line bg-shell-surface p-5 space-y-6">
           <div>
             <h3 className="text-base font-semibold tracking-tight text-shell-ink">
               Cross-World Character Transfer
@@ -273,8 +273,8 @@ export function TransferPanel() {
                     className={[
                       "border p-3 text-left transition",
                       selectedPlayerUid === p.uid
-                        ? "border-shell-accent bg-[#edf5f2]"
-                        : "border-shell-line bg-white hover:bg-shell-panel",
+                        ? "border-shell-accent-solid bg-shell-accent-solid-subtle"
+                        : "border-shell-line bg-shell-surface hover:bg-shell-panel",
                     ].join(" ")}
                   >
                     <p className="font-semibold text-xs text-shell-ink">{p.nickname}</p>
@@ -327,7 +327,7 @@ export function TransferPanel() {
                 type="button"
                 onClick={() => void handlePreviewTransfer()}
                 disabled={transferLoading || !sourcePath.trim() || !targetPath.trim() || !selectedPlayerUid}
-                className="border border-shell-accent bg-shell-accent px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
+                className="border border-shell-accent-solid bg-shell-accent-solid px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
               >
                 {transferLoading ? "Analyzing..." : "Preview Transfer"}
               </button>
@@ -335,7 +335,7 @@ export function TransferPanel() {
           </div>
 
           {transferError && (
-            <div className="border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800">
+            <div className="border-l-2 border-shell-destructive bg-shell-destructive-subtle p-3 text-xs text-shell-destructive">
               {transferError}
             </div>
           )}
@@ -353,7 +353,7 @@ export function TransferPanel() {
 
       {/* ── Mode 2: Fix Host Save / UID Swap ─────────────────────────────── */}
       {subMode === "host-swap" && (
-        <section className="border border-shell-line bg-white p-5 space-y-6">
+        <section className="border border-shell-line bg-shell-surface p-5 space-y-6">
           <div>
             <h3 className="text-base font-semibold tracking-tight text-shell-ink">
               Fix Host Save &amp; Player UID Swap
@@ -427,7 +427,7 @@ export function TransferPanel() {
               type="button"
               onClick={() => void handlePreviewHostSwap()}
               disabled={hostLoading || !hostSourceUid.trim() || !hostTargetUid.trim()}
-              className="border border-shell-accent bg-shell-accent px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
+              className="border border-shell-accent-solid bg-shell-accent-solid px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
             >
               {hostLoading ? "Inspecting..." : "Preview Host Swap"}
             </button>
@@ -449,7 +449,7 @@ export function TransferPanel() {
           )}
 
           {hostError && (
-            <div className="border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800">
+            <div className="border-l-2 border-shell-destructive bg-shell-destructive-subtle p-3 text-xs text-shell-destructive">
               {hostError}
             </div>
           )}

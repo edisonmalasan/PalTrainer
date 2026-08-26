@@ -63,14 +63,14 @@ function ErrorBanner({ message }: { readonly message: string }) {
   return (
     <div
       role="alert"
-      className="flex items-center gap-3 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+      className="flex items-center gap-3 border border-shell-destructive/40 bg-shell-destructive-subtle px-4 py-3 text-sm text-shell-destructive"
     >
       <svg
         width="16"
         height="16"
         viewBox="0 0 16 16"
         fill="none"
-        className="shrink-0 text-red-600"
+        className="shrink-0 text-shell-destructive"
         aria-hidden="true"
       >
         <path

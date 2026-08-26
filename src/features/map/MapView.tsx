@@ -98,7 +98,7 @@ export function MapView() {
     >
       <div className="flex flex-col gap-6">
         {/* Exclusion Zone Management Panel */}
-        <div className="border border-shell-line bg-white p-5">
+        <div className="border border-shell-line bg-shell-surface p-5">
           <div className="flex items-center justify-between border-b border-shell-line pb-3">
             <div>
               <h3 className="text-base font-semibold">Exclusion Zones & Protection</h3>
@@ -109,7 +109,7 @@ export function MapView() {
             <button
               type="button"
               onClick={() => setShowAddZone(!showAddZone)}
-              className="border border-shell-line bg-white px-3 py-1.5 font-mono text-xs text-shell-ink transition hover:bg-shell-panel active:translate-y-[1px]"
+              className="border border-shell-line bg-shell-surface px-3 py-1.5 font-mono text-xs text-shell-ink transition hover:bg-shell-panel active:translate-y-[1px]"
             >
               {showAddZone ? "Cancel" : "+ Add Exclusion Zone"}
             </button>
@@ -209,7 +209,7 @@ export function MapView() {
                   type="button"
                   disabled={!newZoneName.trim()}
                   onClick={() => void handleAddZone()}
-                  className="border border-shell-accent bg-[#edf5f2] px-3 py-1 font-mono text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px] disabled:opacity-50"
+                  className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-3 py-1 font-mono text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px] disabled:opacity-50"
                 >
                   Save Zone
                 </button>
@@ -235,7 +235,7 @@ export function MapView() {
                     <button
                       type="button"
                       onClick={() => void handleRemoveZone(z.id)}
-                      className="text-xs text-red-600 hover:text-red-800"
+                      className="text-xs text-shell-destructive hover:text-shell-destructive"
                       title="Delete zone"
                     >
                       ×
@@ -269,7 +269,7 @@ export function MapView() {
               <button
                 type="button"
                 onClick={() => void handleTestCoordinate()}
-                className="border border-shell-line bg-white px-3 py-1 font-mono text-xs hover:bg-shell-panel active:translate-y-[1px]"
+                className="border border-shell-line bg-shell-surface px-3 py-1 font-mono text-xs hover:bg-shell-panel active:translate-y-[1px]"
               >
                 Check
               </button>
@@ -277,7 +277,7 @@ export function MapView() {
                 <span
                   className={[
                     "font-mono text-xs font-semibold uppercase px-2 py-0.5 rounded-sm",
-                    testResult ? "bg-amber-100 text-amber-900" : "bg-[#edf5f2] text-shell-accent",
+                    testResult ? "bg-shell-warning-subtle text-shell-warning" : "bg-shell-accent-subtle text-shell-accent",
                   ].join(" ")}
                 >
                   {testResult ? "Excluded (Protected)" : "Not Excluded"}

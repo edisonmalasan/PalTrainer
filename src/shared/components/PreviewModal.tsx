@@ -44,7 +44,7 @@ export function PreviewModal({
       aria-labelledby="preview-modal-title"
       ref={modalRef}
     >
-      <div className="flex max-h-[90vh] w-full max-w-xl flex-col border border-shell-line bg-white shadow-2xl animate-slide-up">
+      <div className="flex max-h-[90vh] w-full max-w-xl flex-col border border-shell-line bg-shell-surface shadow-2xl animate-slide-up">
         {/* Header */}
         <div className="border-b border-shell-line px-5 py-4">
           <div className="flex items-center justify-between">
@@ -62,7 +62,7 @@ export function PreviewModal({
                 "border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide",
                 preview.isSafe
                   ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
-                  : "border-red-500/20 bg-red-50 text-red-700",
+                  : "border-shell-destructive/20 bg-shell-destructive-subtle text-shell-destructive",
               ].join(" ")}
             >
               {preview.isSafe ? "Safe with backup" : "Requires attention"}
@@ -74,7 +74,7 @@ export function PreviewModal({
         <div className="flex-1 overflow-y-auto px-5 py-4 text-sm">
           {/* Warnings */}
           {preview.warnings.length > 0 && (
-            <div className="mb-4 border-l-4 border-amber-500 bg-amber-50 p-3 text-amber-900">
+            <div className="mb-4 border-l-4 border-shell-warning bg-shell-warning-subtle p-3 text-shell-warning">
               <p className="font-mono text-xs font-semibold uppercase">Warnings</p>
               <ul className="mt-1 list-disc pl-4 text-xs">
                 {preview.warnings.map((w) => (
@@ -109,14 +109,14 @@ export function PreviewModal({
           {/* Entities to delete */}
           {preview.entitiesToDelete.length > 0 && (
             <div className="mb-4">
-              <p className="font-mono text-[10px] uppercase tracking-wide text-red-700">
+              <p className="font-mono text-[10px] uppercase tracking-wide text-shell-destructive">
                 Entities to Delete ({preview.entitiesToDelete.length})
               </p>
               <div className="mt-2 grid gap-2">
                 {preview.entitiesToDelete.map((e) => (
                   <div
                     key={`${e.entityType}-${e.entityId}`}
-                    className="border border-red-200 bg-red-50 p-3 text-red-900"
+                    className="border border-shell-destructive/40 bg-shell-destructive-subtle p-3 text-shell-destructive"
                   >
                     <p className="font-semibold text-xs">{e.label}</p>
                     <p className="mt-1 font-mono text-xs opacity-80">{e.changeDescription}</p>
@@ -134,7 +134,7 @@ export function PreviewModal({
                 <li key={f}>Modify: {f.split(/[\\/]/).pop()}</li>
               ))}
               {preview.filesToDelete.map((f) => (
-                <li key={f} className="text-red-600">
+                <li key={f} className="text-shell-destructive">
                   Delete: {f.split(/[\\/]/).pop()}
                 </li>
               ))}
@@ -150,7 +150,7 @@ export function PreviewModal({
               type="button"
               disabled={committing}
               onClick={onCancel}
-              className="border border-shell-line bg-white px-3.5 py-1.5 text-xs font-medium text-shell-ink transition hover:bg-shell-panel active:translate-y-[1px]"
+              className="border border-shell-line bg-shell-surface px-3.5 py-1.5 text-xs font-medium text-shell-ink transition hover:bg-shell-panel active:translate-y-[1px]"
             >
               Cancel (Esc)
             </button>
@@ -158,7 +158,7 @@ export function PreviewModal({
               type="button"
               disabled={committing}
               onClick={() => void onConfirm()}
-              className="border border-shell-accent bg-shell-accent px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white transition hover:bg-shell-accent-hover active:translate-y-[1px] disabled:opacity-60"
+              className="border border-shell-accent-solid bg-shell-accent-solid px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white transition hover:bg-shell-accent-solid-hover active:translate-y-[1px] disabled:opacity-60"
             >
               {committing ? "Applying..." : "Confirm & Commit (Ctrl+Enter)"}
             </button>

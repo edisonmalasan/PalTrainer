@@ -264,7 +264,7 @@ export function InventoryView() {
     >
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* Owner Selector Side Panel */}
-        <aside className="shrink-0 border border-shell-line bg-white lg:w-56">
+        <aside className="shrink-0 border border-shell-line bg-shell-surface lg:w-56">
           <p className="border-b border-shell-line px-3 py-2 font-mono text-[10px] uppercase tracking-wide text-shell-muted">
             Containers ({inventories.length})
           </p>
@@ -280,7 +280,7 @@ export function InventoryView() {
                     className={[
                       "w-full px-3 py-2 text-left font-mono text-xs transition",
                       isSelected
-                        ? "bg-[#edf5f2] font-semibold text-shell-accent"
+                        ? "bg-shell-accent-subtle font-semibold text-shell-accent"
                         : "text-shell-muted hover:bg-shell-panel hover:text-shell-ink",
                     ].join(" ")}
                   >
@@ -298,7 +298,7 @@ export function InventoryView() {
         {/* Main Content Area */}
         <div className="min-w-0 flex-1 flex flex-col gap-4">
           {/* Action Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border border-shell-line bg-white p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border border-shell-line bg-shell-surface p-3">
             <div>
               <p className="text-xs font-semibold text-shell-ink">
                 {activeInv?.containerType || "Player Inventory"} ({activeOwnerId.slice(0, 16)}…)
@@ -312,28 +312,28 @@ export function InventoryView() {
               <button
                 type="button"
                 onClick={() => setShowAddDrawer(true)}
-                className="border border-shell-accent bg-[#edf5f2] px-3 py-1.5 font-mono text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-3 py-1.5 font-mono text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
               >
                 + Add Item
               </button>
               <button
                 type="button"
                 onClick={() => setShowKeyItemsModal(true)}
-                className="border border-shell-line bg-white px-3 py-1.5 font-mono text-xs text-shell-ink hover:bg-shell-panel active:translate-y-[1px]"
+                className="border border-shell-line bg-shell-surface px-3 py-1.5 font-mono text-xs text-shell-ink hover:bg-shell-panel active:translate-y-[1px]"
               >
                 Bulk Key Items
               </button>
               <button
                 type="button"
                 onClick={() => setShowResizeModal(true)}
-                className="border border-shell-line bg-white px-3 py-1.5 font-mono text-xs text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                className="border border-shell-line bg-shell-surface px-3 py-1.5 font-mono text-xs text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
               >
                 Resize
               </button>
               <button
                 type="button"
                 onClick={() => void handleRequestClearContainerPreview()}
-                className="border border-red-200 bg-white px-3 py-1.5 font-mono text-xs text-red-600 hover:bg-red-50 active:translate-y-[1px]"
+                className="border border-shell-destructive/40 bg-shell-surface px-3 py-1.5 font-mono text-xs text-shell-destructive hover:bg-shell-destructive-subtle active:translate-y-[1px]"
               >
                 Clear
               </button>
@@ -341,14 +341,14 @@ export function InventoryView() {
           </div>
 
           {actionMessage && (
-            <div className="border border-shell-accent bg-[#edf5f2] px-4 py-2 font-mono text-xs text-shell-accent">
+            <div className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-2 font-mono text-xs text-shell-accent">
               {actionMessage}
             </div>
           )}
 
           {/* Add Item Drawer */}
           {showAddDrawer && (
-            <div className="border border-shell-line bg-white p-5 shadow-sm">
+            <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
               <h3 className="text-base font-semibold">Add Item to Inventory</h3>
               <p className="mt-1 text-xs text-shell-muted">
                 Specify item ID, stack quantity, and durability.
@@ -404,7 +404,7 @@ export function InventoryView() {
                   type="button"
                   disabled={!newItemId.trim()}
                   onClick={() => void handleRequestAddItemPreview()}
-                  className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px] disabled:opacity-50"
+                  className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px] disabled:opacity-50"
                 >
                   Preview Add
                 </button>
@@ -414,7 +414,7 @@ export function InventoryView() {
 
           {/* Resize Container Modal */}
           {showResizeModal && (
-            <div className="border border-shell-line bg-white p-5 shadow-sm">
+            <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
               <h3 className="text-base font-semibold">Resize Container Slot Capacity</h3>
               <p className="mt-1 text-xs text-shell-muted">
                 Expand or shrink the maximum number of inventory slots (current: {activeInv?.slotCapacity ?? 64}).
@@ -445,7 +445,7 @@ export function InventoryView() {
                 <button
                   type="button"
                   onClick={() => void handleRequestResizePreview()}
-                  className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                  className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
                 >
                   Preview Resize
                 </button>
@@ -455,7 +455,7 @@ export function InventoryView() {
 
           {/* Bulk Key Items Modal */}
           {showKeyItemsModal && (
-            <div className="border border-shell-line bg-white p-5 shadow-sm">
+            <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
               <h3 className="text-base font-semibold">Bulk Add Key & Tech Items</h3>
               <p className="mt-1 text-xs text-shell-muted">
                 Fast-track progression by adding full sets of progression items directly to inventory.
@@ -499,7 +499,7 @@ export function InventoryView() {
                 <button
                   type="button"
                   onClick={() => void handleRequestBulkKeyItemsPreview()}
-                  className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                  className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
                 >
                   Preview Add Key Items
                 </button>
@@ -555,21 +555,21 @@ export function InventoryView() {
                       <button
                         type="button"
                         onClick={() => startEditSlot(s)}
-                        className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
+                        className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleRequestQuickMaxStack(s)}
-                        className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                        className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                       >
                         Max (x9999)
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleRequestRemoveSlotPreview(s)}
-                        className="border border-red-200 bg-white px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 active:translate-y-[1px]"
+                        className="border border-shell-destructive/40 bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-destructive hover:bg-shell-destructive-subtle active:translate-y-[1px]"
                       >
                         Remove
                       </button>
@@ -594,7 +594,7 @@ export function InventoryView() {
 
           {/* Edit Slot Drawer */}
           {selectedSlot && (
-            <div className="border border-shell-line bg-white p-5 shadow-sm">
+            <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
               <div className="flex items-center justify-between border-b border-shell-line pb-3">
                 <h3 className="text-base font-semibold">
                   Edit Slot #{selectedSlot.slotIndex}
@@ -657,7 +657,7 @@ export function InventoryView() {
                   type="button"
                   disabled={!editItemId.trim()}
                   onClick={() => void handleRequestEditSlotPreview()}
-                  className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px] disabled:opacity-50"
+                  className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px] disabled:opacity-50"
                 >
                   Preview Changes
                 </button>

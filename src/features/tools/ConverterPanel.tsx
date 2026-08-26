@@ -111,7 +111,7 @@ export function ConverterPanel() {
   return (
     <div className="space-y-8">
       {/* ── Section 1: Identifier Calculator ────────────────────────────── */}
-      <section className="border border-shell-line bg-white p-5">
+      <section className="border border-shell-line bg-shell-surface p-5">
         <div className="flex items-center justify-between border-b border-shell-line pb-3">
           <div>
             <h3 className="text-base font-semibold tracking-tight text-shell-ink">
@@ -144,7 +144,7 @@ export function ConverterPanel() {
               type="button"
               onClick={() => void handleConvertIds()}
               disabled={idLoading || !idInput.trim()}
-              className="h-[38px] border border-shell-accent bg-shell-accent px-5 text-xs font-semibold uppercase tracking-wider text-white transition hover:bg-opacity-90 disabled:opacity-50"
+              className="h-[38px] border border-shell-accent-solid bg-shell-accent-solid px-5 text-xs font-semibold uppercase tracking-wider text-white transition hover:bg-opacity-90 disabled:opacity-50"
             >
               {idLoading ? "Calculating..." : "Calculate IDs"}
             </button>
@@ -152,7 +152,7 @@ export function ConverterPanel() {
         </div>
 
         {idError && (
-          <div className="mt-4 border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800">
+          <div className="mt-4 border-l-2 border-shell-destructive bg-shell-destructive-subtle p-3 text-xs text-shell-destructive">
             {idError}
           </div>
         )}
@@ -205,7 +205,7 @@ export function ConverterPanel() {
       </section>
 
       {/* ── Section 2: SAV <-> JSON Format Converter ───────────────────── */}
-      <section className="border border-shell-line bg-white p-5">
+      <section className="border border-shell-line bg-shell-surface p-5">
         <div className="border-b border-shell-line pb-3">
           <h3 className="text-base font-semibold tracking-tight text-shell-ink">
             Format Converter (SAV &lt;-&gt; JSON)
@@ -229,7 +229,7 @@ export function ConverterPanel() {
                   value={savInputPath}
                   onChange={(e) => setSavInputPath(e.target.value)}
                   placeholder="C:/Palworld/Level.sav"
-                  className="mt-1 w-full border border-shell-line bg-white px-2.5 py-1.5 font-mono text-xs"
+                  className="mt-1 w-full border border-shell-line bg-shell-surface px-2.5 py-1.5 font-mono text-xs"
                 />
               </div>
               <div>
@@ -239,7 +239,7 @@ export function ConverterPanel() {
                   value={jsonOutputPath}
                   onChange={(e) => setJsonOutputPath(e.target.value)}
                   placeholder="Defaults to same folder as .json"
-                  className="mt-1 w-full border border-shell-line bg-white px-2.5 py-1.5 font-mono text-xs"
+                  className="mt-1 w-full border border-shell-line bg-shell-surface px-2.5 py-1.5 font-mono text-xs"
                 />
               </div>
               <label className="flex items-center gap-2 text-xs text-shell-ink">
@@ -254,7 +254,7 @@ export function ConverterPanel() {
                 type="button"
                 onClick={() => void handleConvertSavToJson()}
                 disabled={convLoading || !savInputPath.trim()}
-                className="w-full border border-shell-line bg-white py-2 text-xs font-semibold uppercase tracking-wider text-shell-ink hover:bg-shell-surface disabled:opacity-50"
+                className="w-full border border-shell-line bg-shell-surface py-2 text-xs font-semibold uppercase tracking-wider text-shell-ink hover:bg-shell-surface disabled:opacity-50"
               >
                 {convLoading ? "Converting..." : "Convert SAV to JSON"}
               </button>
@@ -274,7 +274,7 @@ export function ConverterPanel() {
                   value={jsonInputPath}
                   onChange={(e) => setJsonInputPath(e.target.value)}
                   placeholder="C:/Palworld/Level.json"
-                  className="mt-1 w-full border border-shell-line bg-white px-2.5 py-1.5 font-mono text-xs"
+                  className="mt-1 w-full border border-shell-line bg-shell-surface px-2.5 py-1.5 font-mono text-xs"
                 />
               </div>
               <div>
@@ -284,7 +284,7 @@ export function ConverterPanel() {
                   value={savOutputPath}
                   onChange={(e) => setSavOutputPath(e.target.value)}
                   placeholder="Defaults to same folder as .sav"
-                  className="mt-1 w-full border border-shell-line bg-white px-2.5 py-1.5 font-mono text-xs"
+                  className="mt-1 w-full border border-shell-line bg-shell-surface px-2.5 py-1.5 font-mono text-xs"
                 />
               </div>
               <div>
@@ -292,7 +292,7 @@ export function ConverterPanel() {
                 <select
                   value={targetSaveType}
                   onChange={(e) => setTargetSaveType(e.target.value)}
-                  className="mt-1 w-full border border-shell-line bg-white px-2.5 py-1.5 font-mono text-xs"
+                  className="mt-1 w-full border border-shell-line bg-shell-surface px-2.5 py-1.5 font-mono text-xs"
                 >
                   <option value="plz">PLZ (Double Zlib - Standard Steam)</option>
                   <option value="cnk">CNK (Chunked Zlib)</option>
@@ -302,7 +302,7 @@ export function ConverterPanel() {
                 type="button"
                 onClick={() => void handleConvertJsonToSav()}
                 disabled={convLoading || !jsonInputPath.trim()}
-                className="w-full border border-shell-line bg-white py-2 text-xs font-semibold uppercase tracking-wider text-shell-ink hover:bg-shell-surface disabled:opacity-50"
+                className="w-full border border-shell-line bg-shell-surface py-2 text-xs font-semibold uppercase tracking-wider text-shell-ink hover:bg-shell-surface disabled:opacity-50"
               >
                 {convLoading ? "Converting..." : "Convert JSON to SAV"}
               </button>
@@ -311,7 +311,7 @@ export function ConverterPanel() {
         </div>
 
         {convError && (
-          <div className="mt-4 border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800">
+          <div className="mt-4 border-l-2 border-shell-destructive bg-shell-destructive-subtle p-3 text-xs text-shell-destructive">
             {convError}
           </div>
         )}
@@ -327,7 +327,7 @@ export function ConverterPanel() {
       </section>
 
       {/* ── Section 3: Gated Raw JSON Inspector ─────────────────────────── */}
-      <section className="border border-shell-line bg-white p-5">
+      <section className="border border-shell-line bg-shell-surface p-5">
         <div className="flex items-center justify-between border-b border-shell-line pb-3">
           <div>
             <h3 className="text-base font-semibold tracking-tight text-shell-ink">
@@ -348,7 +348,7 @@ export function ConverterPanel() {
         </div>
 
         {rawError && (
-          <div className="mt-4 border-l-2 border-amber-500 bg-amber-50 p-3 text-xs text-amber-800">
+          <div className="mt-4 border-l-2 border-shell-warning bg-shell-warning-subtle p-3 text-xs text-shell-warning">
             {rawError} (Load a save session to view raw structure)
           </div>
         )}

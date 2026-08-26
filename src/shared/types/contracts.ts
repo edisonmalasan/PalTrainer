@@ -32,6 +32,16 @@ export interface CommandError {
   readonly details?: string;
 }
 
+export interface SaveSummary {
+  readonly saveRoot: string;
+  readonly worldName: string;
+  readonly saveType: string;
+  readonly playerCount: number;
+  readonly levelSavSize: number;
+  readonly isDirty: boolean;
+  readonly loadedAt: number;
+}
+
 export interface EntityDiffSummary {
   readonly entityType: string;
   readonly entityId: string;

@@ -58,21 +58,21 @@ export function DestructiveConfirmModal({
       aria-labelledby="destructive-modal-title"
       aria-describedby="destructive-modal-desc"
     >
-      <div className="flex max-h-[90vh] w-full max-w-md flex-col border border-red-300 bg-white shadow-2xl animate-slide-up">
+      <div className="flex max-h-[90vh] w-full max-w-md flex-col border border-shell-destructive/40 bg-shell-surface shadow-2xl animate-slide-up">
         {/* Header */}
-        <div className="border-b border-red-200 bg-red-50/70 px-5 py-4">
+        <div className="border-b border-shell-destructive/40 bg-shell-destructive-subtle px-5 py-4">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-600 font-mono text-xs font-bold text-white">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-shell-destructive-solid font-mono text-xs font-bold text-white">
               !
             </span>
             <div>
               <h3
                 id="destructive-modal-title"
-                className="text-base font-semibold tracking-tight text-red-950"
+                className="text-base font-semibold tracking-tight text-shell-destructive"
               >
                 {title}
               </h3>
-              <p className="font-mono text-[11px] text-red-700 truncate">{entityLabel}</p>
+              <p className="font-mono text-[11px] text-shell-destructive truncate">{entityLabel}</p>
             </div>
           </div>
         </div>
@@ -83,7 +83,7 @@ export function DestructiveConfirmModal({
             {warningMessage}
           </p>
 
-          <div className="border-l-2 border-red-500 bg-red-50 p-3 text-red-900 space-y-1">
+          <div className="border-l-2 border-shell-destructive bg-shell-destructive-subtle p-3 text-shell-destructive space-y-1">
             <p className="font-semibold uppercase tracking-wide text-[10px]">
               Safety Guarantee
             </p>
@@ -97,7 +97,7 @@ export function DestructiveConfirmModal({
               htmlFor="destructive-confirm-input"
               className="block font-medium text-shell-muted"
             >
-              Type <strong className="font-mono text-red-700">{expectedConfirmationText}</strong> to confirm:
+              Type <strong className="font-mono text-shell-destructive">{expectedConfirmationText}</strong> to confirm:
             </label>
             <input
               id="destructive-confirm-input"
@@ -106,7 +106,7 @@ export function DestructiveConfirmModal({
               onChange={(e) => setTypedValue(e.target.value)}
               placeholder={expectedConfirmationText}
               autoFocus
-              className="w-full border border-shell-line bg-shell-panel px-3 py-2 font-mono text-sm text-shell-ink focus:border-red-500 focus:outline-none"
+              className="w-full border border-shell-line bg-shell-panel px-3 py-2 font-mono text-sm text-shell-ink focus:border-shell-destructive focus:outline-none"
             />
           </div>
         </div>
@@ -117,7 +117,7 @@ export function DestructiveConfirmModal({
             type="button"
             disabled={committing}
             onClick={onCancel}
-            className="border border-shell-line bg-white px-3.5 py-1.5 text-xs font-medium text-shell-ink hover:bg-shell-panel active:translate-y-[1px]"
+            className="border border-shell-line bg-shell-surface px-3.5 py-1.5 text-xs font-medium text-shell-ink hover:bg-shell-panel active:translate-y-[1px]"
           >
             Cancel (Esc)
           </button>
@@ -125,7 +125,7 @@ export function DestructiveConfirmModal({
             type="button"
             disabled={!isMatch || committing}
             onClick={() => void onConfirm()}
-            className="border border-red-600 bg-red-600 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white transition hover:bg-red-700 active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40"
+            className="border border-shell-destructive-solid bg-shell-destructive-solid px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white transition hover:bg-shell-destructive-solid-hover active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {committing ? "Executing..." : "Confirm & Destroy"}
           </button>

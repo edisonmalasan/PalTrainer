@@ -157,7 +157,7 @@ export function GuildsView() {
     >
       <div className="flex flex-col gap-4">
         {/* Bulk Action Bar */}
-        <div className="flex items-center justify-between border border-shell-line bg-white px-4 py-3">
+        <div className="flex items-center justify-between border border-shell-line bg-shell-surface px-4 py-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-shell-muted">
               Guild Management
@@ -169,14 +169,14 @@ export function GuildsView() {
           <button
             type="button"
             onClick={() => void handleDisbandEmptyPreview()}
-            className="border border-shell-line bg-white px-3 py-1.5 font-mono text-xs text-shell-muted transition hover:bg-shell-panel active:translate-y-[1px]"
+            className="border border-shell-line bg-shell-surface px-3 py-1.5 font-mono text-xs text-shell-muted transition hover:bg-shell-panel active:translate-y-[1px]"
           >
             Clean Empty Guilds (0 Members)
           </button>
         </div>
 
         {actionMessage && (
-          <div className="border border-shell-accent bg-[#edf5f2] px-4 py-2 text-xs font-mono text-shell-accent">
+          <div className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-2 text-xs font-mono text-shell-accent">
             {actionMessage}
           </div>
         )}
@@ -230,14 +230,14 @@ export function GuildsView() {
                   <button
                     type="button"
                     onClick={() => startEdit(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleUnlockLabResearchPreview(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                     title="Unlock All Lab Research"
                   >
                     Lab
@@ -245,14 +245,14 @@ export function GuildsView() {
                   <button
                     type="button"
                     onClick={() => setTransferTargetGuild(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Transfer
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleRequestDeletePreview(r)}
-                    className="border border-red-200 bg-white px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 active:translate-y-[1px]"
+                    className="border border-shell-destructive/40 bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-destructive hover:bg-shell-destructive-subtle active:translate-y-[1px]"
                   >
                     Disband
                   </button>
@@ -272,7 +272,7 @@ export function GuildsView() {
 
         {/* Edit Guild Drawer */}
         {selectedGuild && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <div className="flex items-center justify-between border-b border-shell-line pb-3">
               <div>
                 <h3 className="text-base font-semibold">
@@ -312,7 +312,7 @@ export function GuildsView() {
               <button
                 type="button"
                 onClick={() => void handleRequestEditPreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
               >
                 Preview & Apply
               </button>
@@ -322,7 +322,7 @@ export function GuildsView() {
 
         {/* Transfer Leadership Dialog */}
         {transferTargetGuild && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <div className="flex items-center justify-between border-b border-shell-line pb-3">
               <div>
                 <h3 className="text-base font-semibold">
@@ -364,7 +364,7 @@ export function GuildsView() {
                 type="button"
                 disabled={!newAdminUid.trim()}
                 onClick={() => void handleTransferAdminPreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px] disabled:opacity-50"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px] disabled:opacity-50"
               >
                 Preview & Transfer
               </button>
