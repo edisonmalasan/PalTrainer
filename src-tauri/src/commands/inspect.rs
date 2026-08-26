@@ -572,6 +572,6 @@ pub fn lookup_breeding(
 }
 
 #[tauri::command]
-pub fn get_game_catalog() -> GameCatalog {
-    GameCatalog::new()
+pub fn get_game_catalog(app: tauri::AppHandle) -> GameCatalog {
+    GameCatalog::load_from_app(&app)
 }
