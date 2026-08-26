@@ -1,6 +1,13 @@
 //! Game data models and static resource dictionary for Pals, skills, and items.
+//!
+//! In dev the catalog is read from `../resources/game_data/catalog.json` relative to
+//! `src-tauri/Cargo.toml`; in a bundled app it is resolved via `AppHandle::resource_dir()`.
+
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use tauri::Manager;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -74,6 +81,33 @@ impl GameCatalog {
             passives: default_passives(),
             active_skills: default_active_skills(),
         }
+    }
+
+    /// Load from `resources/game_data/catalog.json` with fallback to hardcoded defaults.
+    /// Tries the dev path (`CARGO_MANIFEST_DIR/../resources`) first, then bundled resource dir if `app` is given.
+    pub fn load() -> Self {
+        Self::try_load_from_file(&dev_catalog_path()).unwrap_or_else(|_| Self::new())
+    }
+
+    pub fn load_from_app(app: &tauri::AppHandle) -> Self {
+        // Try bundled resource dir first
+        if let Ok(dir) = app.path().resource_dir() {
+            for candidate in [
+                dir.join("resources").join("game_data").join("catalog.json"),
+                dir.join("game_data").join("catalog.json"),
+                dir.join("catalog.json"),
+            ] {
+                if let Ok(cat) = Self::try_load_from_file(&candidate) {
+                    return cat;
+                }
+            }
+        }
+        Self::load()
+    }
+
+    fn try_load_from_file(path: &Path) -> Result<Self, String> {
+        let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&text).map_err(|e| e.to_string())
     }
 
     /// Validates static or imported game data before it is exposed to editors.
@@ -151,6 +185,10 @@ impl GameCatalog {
             Err(errors)
         }
     }
+}
+
+fn dev_catalog_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../resources/game_data/catalog.json")
 }
 
 fn validate_ids<'a>(
