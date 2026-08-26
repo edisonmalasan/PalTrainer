@@ -212,10 +212,7 @@ function Workbench() {
           <header className="border-b border-shell-line bg-shell-surface px-6 py-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-shell-muted">
-                  {appRoutes.find((r) => r.id === activeRoute)?.phase ?? "—"}
-                </p>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight">
+                <h2 className="text-xl font-semibold tracking-tight">
                   {appRoutes.find((r) => r.id === activeRoute)?.label ?? "Workbench"}
                 </h2>
               </div>
