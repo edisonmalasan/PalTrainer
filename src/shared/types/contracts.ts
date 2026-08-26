@@ -11,6 +11,7 @@ export interface AppSettings {
   readonly theme: ThemePreference;
   readonly language: LanguagePreference;
   readonly showAdvancedTools: boolean;
+  readonly recentSavePaths: readonly string[];
 }
 
 export interface FeatureFlag {

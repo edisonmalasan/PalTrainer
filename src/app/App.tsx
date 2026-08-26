@@ -27,6 +27,7 @@ const defaultSettings: AppSettings = {
   theme: "system",
   language: "en",
   showAdvancedTools: false,
+  recentSavePaths: [],
 };
 
 export function App() {

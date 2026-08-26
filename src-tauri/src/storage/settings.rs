@@ -15,6 +15,8 @@ pub struct AppSettings {
     pub language: LanguagePreference,
     #[serde(default)]
     pub show_advanced_tools: bool,
+    #[serde(default)]
+    pub recent_save_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,8 +39,39 @@ impl Default for AppSettings {
             theme: default_theme(),
             language: default_language(),
             show_advanced_tools: false,
+            recent_save_paths: Vec::new(),
         }
     }
+}
+
+const MAX_RECENT_SAVE_PATHS: usize = 5;
+
+/// Push `path` to the front of `recent_save_paths`, deduping and capping at 5.
+/// Used after a successful `load_save_session`.
+pub fn push_recent_save_path(settings: &mut AppSettings, path: impl Into<String>) {
+    let p = path.into();
+    settings.recent_save_paths.retain(|existing| existing != &p);
+    settings.recent_save_paths.insert(0, p);
+    settings.recent_save_paths.truncate(MAX_RECENT_SAVE_PATHS);
+}
+
+/// Preferred initial directory for the `Level.sav` picker.
+/// Most recent save if available, otherwise OS Palworld default.
+pub fn preferred_save_dir(settings: &AppSettings) -> PathBuf {
+    if let Some(first) = settings.recent_save_paths.first() {
+        let pb = PathBuf::from(first);
+        if pb.is_dir() {
+            return pb;
+        }
+        if let Some(parent) = pb.parent() {
+            if parent.is_dir() {
+                return parent.to_path_buf();
+            }
+        }
+    }
+    dirs::data_local_dir()
+        .map(|d| d.join("Pal").join("Saved").join("SaveGames"))
+        .unwrap_or_else(|| PathBuf::from("."))
 }
 
 pub fn read_settings(app: &AppHandle) -> Result<AppSettings, AppError> {
@@ -133,6 +166,7 @@ mod tests {
                 theme: ThemePreference::System,
                 language: LanguagePreference::En,
                 show_advanced_tools: false,
+                recent_save_paths: Vec::new(),
             },
         );
     }
@@ -156,6 +190,7 @@ mod tests {
             theme: ThemePreference::Dark,
             language: LanguagePreference::En,
             show_advanced_tools: true,
+            recent_save_paths: vec!["C:\\Saves\\World".to_string()],
         };
 
         write_settings_to_path(&path, &settings).expect("write settings");
@@ -174,5 +209,33 @@ mod tests {
 
         let err = read_settings_from_path(&path).unwrap_err();
         assert_eq!(err.code, "settings_parse_failed");
+    }
+
+    #[test]
+    fn recent_save_paths_dedup_and_cap() {
+        let mut settings = AppSettings::default();
+        for i in 0..7 {
+            push_recent_save_path(&mut settings, format!("C:\\Saves\\World{i}"));
+        }
+        assert_eq!(settings.recent_save_paths.len(), 5);
+        assert_eq!(settings.recent_save_paths[0], "C:\\Saves\\World6");
+        // Dedup: pushing existing moves to front
+        push_recent_save_path(&mut settings, "C:\\Saves\\World4".to_string());
+        assert_eq!(settings.recent_save_paths[0], "C:\\Saves\\World4");
+        assert_eq!(settings.recent_save_paths.len(), 5);
+    }
+
+    #[test]
+    fn reads_legacy_settings_without_recent_paths() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let path = temp.path().join("settings.json");
+        fs::write(
+            &path,
+            r#"{"theme":"dark","language":"en","showAdvancedTools":true}"#,
+        )
+        .unwrap();
+        let settings = read_settings_from_path(&path).expect("read legacy");
+        assert_eq!(settings.recent_save_paths, Vec::<String>::new());
+        assert_eq!(settings.theme, ThemePreference::Dark);
     }
 }
