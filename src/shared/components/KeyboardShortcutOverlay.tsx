@@ -74,7 +74,7 @@ export function KeyboardShortcutOverlay({
       aria-modal="true"
       aria-labelledby="shortcuts-dialog-title"
     >
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col border border-shell-line bg-white shadow-2xl animate-slide-up">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col border border-shell-line bg-shell-surface shadow-2xl animate-slide-up">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-shell-line px-5 py-4">
           <div>
@@ -115,7 +115,7 @@ export function KeyboardShortcutOverlay({
                       {sc.keys.map((k) => (
                         <kbd
                           key={k}
-                          className="rounded-sm border border-shell-line bg-white px-1.5 py-0.5 text-[11px] font-semibold text-shell-ink shadow-xs"
+                          className="rounded-sm border border-shell-line bg-shell-surface px-1.5 py-0.5 text-[11px] font-semibold text-shell-ink shadow-xs"
                         >
                           {k}
                         </kbd>
@@ -134,7 +134,7 @@ export function KeyboardShortcutOverlay({
           <button
             type="button"
             onClick={onClose}
-            className="border border-shell-accent bg-shell-accent px-4 py-1 text-xs font-semibold uppercase tracking-wider text-white hover:bg-shell-accent-hover active:translate-y-[1px]"
+            className="border border-shell-accent-solid bg-shell-accent-solid px-4 py-1 text-xs font-semibold uppercase tracking-wider text-white hover:bg-shell-accent-solid-hover active:translate-y-[1px]"
           >
             Done
           </button>

@@ -136,7 +136,7 @@ export function ModifiersPanel() {
   return (
     <div className="space-y-8">
       {/* ── Section 1: Map Fog & Exploration Restorer ───────────────────── */}
-      <section className="border border-shell-line bg-white p-5">
+      <section className="border border-shell-line bg-shell-surface p-5">
         <div className="flex items-center justify-between border-b border-shell-line pb-3">
           <div>
             <h3 className="text-base font-semibold tracking-tight text-shell-ink">
@@ -207,7 +207,7 @@ export function ModifiersPanel() {
               type="button"
               onClick={() => void handlePreviewRestoreMap()}
               disabled={mapLoading}
-              className="border border-shell-accent bg-shell-accent px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
+              className="border border-shell-accent-solid bg-shell-accent-solid px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
             >
               {mapLoading ? "Scanning Targets..." : "Preview Map Restore"}
             </button>
@@ -215,7 +215,7 @@ export function ModifiersPanel() {
         </div>
 
         {mapError && (
-          <div className="mt-4 border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800">
+          <div className="mt-4 border-l-2 border-shell-destructive bg-shell-destructive-subtle p-3 text-xs text-shell-destructive">
             {mapError}
           </div>
         )}
@@ -231,7 +231,7 @@ export function ModifiersPanel() {
       </section>
 
       {/* ── Section 2: Palbox Storage Slot Injector ────────────────────── */}
-      <section className="border border-shell-line bg-white p-5">
+      <section className="border border-shell-line bg-shell-surface p-5">
         <div className="flex items-center justify-between border-b border-shell-line pb-3">
           <div>
             <h3 className="text-base font-semibold tracking-tight text-shell-ink">
@@ -241,7 +241,7 @@ export function ModifiersPanel() {
               Expand player Palbox storage capacity beyond standard 32 pages (960 slots) safely.
             </p>
           </div>
-          <span className="border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 font-mono text-[11px] font-medium text-amber-700">
+          <span className="border border-shell-warning/20 bg-shell-warning-subtle0/10 px-2 py-0.5 font-mono text-[11px] font-medium text-shell-warning">
             Container Mutation
           </span>
         </div>
@@ -314,8 +314,8 @@ export function ModifiersPanel() {
                   className={[
                     "border py-2 text-center text-xs font-medium transition",
                     targetPages === pages
-                      ? "border-shell-accent bg-[#edf5f2] text-shell-ink"
-                      : "border-shell-line bg-white text-shell-muted hover:bg-shell-panel",
+                      ? "border-shell-accent-solid bg-shell-accent-solid-subtle text-shell-ink"
+                      : "border-shell-line bg-shell-surface text-shell-muted hover:bg-shell-panel",
                   ].join(" ")}
                 >
                   <p className="font-semibold">{pages} Pages</p>
@@ -329,7 +329,7 @@ export function ModifiersPanel() {
                 type="button"
                 onClick={() => void handlePreviewInjectSlots()}
                 disabled={slotLoading || !playerUid.trim()}
-                className="border border-shell-accent bg-shell-accent px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
+                className="border border-shell-accent-solid bg-shell-accent-solid px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
               >
                 {slotLoading ? "Analyzing Container..." : "Preview Slot Injection"}
               </button>
@@ -338,7 +338,7 @@ export function ModifiersPanel() {
         </div>
 
         {slotError && (
-          <div className="mt-4 border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800">
+          <div className="mt-4 border-l-2 border-shell-destructive bg-shell-destructive-subtle p-3 text-xs text-shell-destructive">
             {slotError}
           </div>
         )}

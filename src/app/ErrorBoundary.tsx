@@ -23,8 +23,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (this.state.error) {
       return (
         <main className="min-h-[100dvh] bg-shell-panel p-8 text-shell-ink">
-          <section className="mx-auto max-w-3xl border border-red-200 bg-white p-6">
-            <p className="text-sm font-semibold uppercase tracking-wide text-red-700">
+          <section className="mx-auto max-w-3xl border border-shell-destructive/40 bg-shell-surface p-6">
+            <p className="text-sm font-semibold uppercase tracking-wide text-shell-destructive">
               Interface Error
             </p>
             <h1 className="mt-3 text-2xl font-semibold">

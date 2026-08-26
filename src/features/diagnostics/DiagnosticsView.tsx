@@ -17,14 +17,14 @@ type DiagnosticTab = "scanner" | "cleanup" | "repair" | "reset" | "paldefender";
 
 const SEVERITY_BADGES: Record<DiagnosticSeverity, { bg: string; text: string; border: string }> = {
   error: {
-    bg: "bg-red-500/10",
-    text: "text-red-400",
-    border: "border-red-500/20",
+    bg: "bg-shell-destructive-subtle0/10",
+    text: "text-shell-destructive",
+    border: "border-shell-destructive/20",
   },
   warning: {
-    bg: "bg-amber-500/10",
-    text: "text-amber-400",
-    border: "border-amber-500/20",
+    bg: "bg-shell-warning-subtle0/10",
+    text: "text-shell-warning",
+    border: "border-shell-warning/20",
   },
   info: {
     bg: "bg-emerald-500/10",
@@ -152,7 +152,7 @@ export function DiagnosticsView() {
                     setTargetedCategory("");
                     setRefreshKey((k) => k + 1);
                   }}
-                  className="flex items-center gap-2 rounded-lg bg-shell-accent px-4 py-2 text-xs font-semibold text-shell-ink shadow-sm transition hover:bg-shell-accent/90 active:scale-[0.98]"
+                  className="flex items-center gap-2 rounded-lg bg-shell-accent-solid px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-shell-accent-solid-hover active:scale-[0.98]"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -232,20 +232,20 @@ export function DiagnosticsView() {
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-                    <p className="font-mono text-[10px] uppercase tracking-wider text-red-400">
+                  <div className="rounded-xl border border-shell-destructive/20 bg-shell-destructive-subtle0/5 p-4">
+                    <p className="font-mono text-[10px] uppercase tracking-wider text-shell-destructive">
                       Critical Errors
                     </p>
-                    <p className="mt-1 font-mono text-2xl font-bold text-red-400">
+                    <p className="mt-1 font-mono text-2xl font-bold text-shell-destructive">
                       {report.errors}
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-                    <p className="font-mono text-[10px] uppercase tracking-wider text-amber-400">
+                  <div className="rounded-xl border border-shell-warning/20 bg-shell-warning-subtle0/5 p-4">
+                    <p className="font-mono text-[10px] uppercase tracking-wider text-shell-warning">
                       Warnings
                     </p>
-                    <p className="mt-1 font-mono text-2xl font-bold text-amber-400">
+                    <p className="mt-1 font-mono text-2xl font-bold text-shell-warning">
                       {report.warnings}
                     </p>
                   </div>

@@ -97,14 +97,14 @@ export function WorldOptionsView() {
     >
       <div className="flex flex-col gap-6">
         {actionMessage && (
-          <div className="border border-shell-accent bg-[#edf5f2] px-4 py-2 font-mono text-xs text-shell-accent">
+          <div className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-2 font-mono text-xs text-shell-accent">
             {actionMessage}
           </div>
         )}
 
         {/* World Metadata Section */}
         {formMeta && (
-          <div className="border border-shell-line bg-white p-5">
+          <div className="border border-shell-line bg-shell-surface p-5">
             <div className="flex items-center justify-between border-b border-shell-line pb-3">
               <div>
                 <h3 className="text-base font-semibold">World Metadata (LevelMeta.sav)</h3>
@@ -113,7 +113,7 @@ export function WorldOptionsView() {
               <button
                 type="button"
                 onClick={() => void handleRequestMetaPreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 font-mono text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 font-mono text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
               >
                 Save Metadata
               </button>
@@ -160,7 +160,7 @@ export function WorldOptionsView() {
 
         {/* World Option Multipliers Section */}
         {formOptions && (
-          <div className="border border-shell-line bg-white p-5">
+          <div className="border border-shell-line bg-shell-surface p-5">
             <div className="flex items-center justify-between border-b border-shell-line pb-3">
               <div>
                 <h3 className="text-base font-semibold">Gameplay Multipliers (WorldOption.sav)</h3>
@@ -171,7 +171,7 @@ export function WorldOptionsView() {
               <button
                 type="button"
                 onClick={() => void handleRequestOptionsPreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 font-mono text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 font-mono text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
               >
                 Save World Options
               </button>

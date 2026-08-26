@@ -131,7 +131,7 @@ export function ResetPanel() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-xs text-red-400">
+        <div className="rounded-xl border border-shell-destructive/20 bg-shell-destructive-subtle0/10 p-4 text-xs text-shell-destructive">
           {error}
         </div>
       )}
@@ -175,7 +175,7 @@ export function ResetPanel() {
                 key={opt.id}
                 className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
                   isChecked
-                    ? "border-shell-accent bg-shell-accent/10"
+                    ? "border-shell-accent-solid bg-shell-accent-solid/10"
                     : "border-shell-line bg-shell-bg/40 hover:bg-shell-bg/70"
                 }`}
               >
@@ -213,7 +213,7 @@ export function ResetPanel() {
             type="button"
             disabled={loading || selectedTargets.size === 0}
             onClick={handlePreview}
-            className="flex items-center gap-2 rounded-lg bg-shell-accent px-5 py-2.5 text-xs font-semibold text-shell-ink shadow-sm transition hover:bg-shell-accent/90 disabled:opacity-50 active:scale-[0.98]"
+            className="flex items-center gap-2 rounded-lg bg-shell-accent-solid px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-shell-accent-solid-hover disabled:opacity-50 active:scale-[0.98]"
           >
             {loading ? "Preparing Preview..." : `Preview Reset (${selectedTargets.size} Targets)`}
           </button>

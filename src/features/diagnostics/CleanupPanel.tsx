@@ -148,7 +148,7 @@ export function CleanupPanel() {
       />
 
       {error && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-xs text-red-400">
+        <div className="rounded-xl border border-shell-destructive/20 bg-shell-destructive-subtle0/10 p-4 text-xs text-shell-destructive">
           {error}
         </div>
       )}
@@ -174,7 +174,7 @@ export function CleanupPanel() {
                 onClick={() => setSelectedTarget(t.id)}
                 className={`flex flex-col rounded-xl border p-4 text-left transition ${
                   isSelected
-                    ? "border-shell-accent bg-shell-accent/10 shadow-sm"
+                    ? "border-shell-accent-solid bg-shell-accent-solid/10 shadow-sm"
                     : "border-shell-line bg-shell-card hover:border-shell-line/80 hover:bg-shell-bg/40"
                 }`}
               >
@@ -183,9 +183,9 @@ export function CleanupPanel() {
                   <span
                     className={`rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide font-bold ${
                       t.danger === "high"
-                        ? "bg-red-500/20 text-red-400"
+                        ? "bg-shell-destructive-subtle0/20 text-shell-destructive"
                         : t.danger === "medium"
-                          ? "bg-amber-500/20 text-amber-400"
+                          ? "bg-shell-warning-subtle0/20 text-shell-warning"
                           : "bg-emerald-500/20 text-emerald-400"
                     }`}
                   >
@@ -256,7 +256,7 @@ export function CleanupPanel() {
             type="button"
             disabled={loading}
             onClick={handlePreview}
-            className="flex items-center gap-2 rounded-lg bg-shell-accent px-5 py-2.5 text-xs font-semibold text-shell-ink shadow-sm transition hover:bg-shell-accent/90 disabled:opacity-50 active:scale-[0.98]"
+            className="flex items-center gap-2 rounded-lg bg-shell-accent-solid px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-shell-accent-solid-hover disabled:opacity-50 active:scale-[0.98]"
           >
             {loading ? "Preparing Preview..." : `Preview ${CLEANUP_TARGETS.find((t) => t.id === selectedTarget)?.label} Cleanup`}
           </button>

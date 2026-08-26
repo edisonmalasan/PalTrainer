@@ -49,7 +49,7 @@ export function ToolsView() {
             className={[
               "group border-b-2 px-4 py-3 text-left transition",
               activeTab === tab.id
-                ? "border-shell-accent bg-white"
+                ? "border-shell-accent bg-shell-surface"
                 : "border-transparent hover:border-shell-line hover:bg-shell-panel",
             ].join(" ")}
           >

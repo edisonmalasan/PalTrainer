@@ -125,7 +125,7 @@ export function SaveSessionView() {
                 "border px-4 py-2 text-sm font-medium transition active:translate-y-[1px]",
                 loading
                   ? "cursor-not-allowed border-shell-line text-shell-muted opacity-60"
-                  : "border-shell-accent bg-shell-accent-subtle text-shell-accent hover:bg-shell-accent-subtle-hover",
+                  : "border-shell-accent-solid bg-shell-accent-solid-subtle text-shell-accent hover:bg-shell-accent-subtle-hover",
               ].join(" ")}
             >
               {loading && !summary ? "Loading…" : summary ? "Load another save…" : "Load Save…"}

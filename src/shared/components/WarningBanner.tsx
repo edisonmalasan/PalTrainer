@@ -35,20 +35,20 @@ const SEVERITY_STYLES: Record<
     iconColor: "text-sky-600",
   },
   warning: {
-    border: "border-amber-500",
-    bg: "bg-amber-50/90",
-    text: "text-amber-950",
-    badgeBg: "bg-amber-100 text-amber-900 border-amber-300",
-    badgeText: "text-amber-900",
-    iconColor: "text-amber-600",
+    border: "border-shell-warning",
+    bg: "bg-shell-warning-subtle",
+    text: "text-shell-warning",
+    badgeBg: "bg-shell-warning-subtle text-shell-warning border-shell-warning/40",
+    badgeText: "text-shell-warning",
+    iconColor: "text-shell-warning",
   },
   destructive: {
-    border: "border-red-500",
-    bg: "bg-red-50/90",
-    text: "text-red-950",
-    badgeBg: "bg-red-100 text-red-900 border-red-300",
-    badgeText: "text-red-900",
-    iconColor: "text-red-600",
+    border: "border-shell-destructive",
+    bg: "bg-shell-destructive-subtle",
+    text: "text-shell-destructive",
+    badgeBg: "bg-shell-destructive-subtle text-shell-destructive border-shell-destructive/40",
+    badgeText: "text-shell-destructive",
+    iconColor: "text-shell-destructive",
   },
 };
 
@@ -141,7 +141,7 @@ export function WarningBanner({
           <button
             type="button"
             onClick={action.onClick}
-            className="shrink-0 border border-current bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition hover:bg-opacity-90 active:translate-y-[1px]"
+            className="shrink-0 border border-current bg-shell-surface px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition hover:bg-opacity-90 active:translate-y-[1px]"
           >
             {action.label}
           </button>

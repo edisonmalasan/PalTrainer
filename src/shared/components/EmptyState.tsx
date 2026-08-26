@@ -31,7 +31,7 @@ export function EmptyState({
       ].join(" ")}
     >
       {/* Technical geometric empty glyph */}
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-sm border border-shell-line bg-white shadow-sm">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-sm border border-shell-line bg-shell-surface shadow-sm">
         <svg
           width="20"
           height="20"
@@ -65,7 +65,7 @@ export function EmptyState({
             <button
               type="button"
               onClick={action.onClick}
-              className="border border-shell-accent bg-shell-accent px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-white transition hover:bg-shell-accent-hover active:translate-y-[1px]"
+              className="border border-shell-accent-solid bg-shell-accent-solid px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-white transition hover:bg-shell-accent-solid-hover active:translate-y-[1px]"
             >
               {action.label}
             </button>
@@ -74,7 +74,7 @@ export function EmptyState({
             <button
               type="button"
               onClick={secondaryAction.onClick}
-              className="border border-shell-line bg-white px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-shell-ink transition hover:bg-shell-panel active:translate-y-[1px]"
+              className="border border-shell-line bg-shell-surface px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-shell-ink transition hover:bg-shell-panel active:translate-y-[1px]"
             >
               {secondaryAction.label}
             </button>

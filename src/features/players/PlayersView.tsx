@@ -150,7 +150,7 @@ export function PlayersView() {
     >
       <div className="flex flex-col gap-4">
         {/* Bulk Action Bar */}
-        <div className="flex items-center justify-between border border-shell-line bg-white px-4 py-3">
+        <div className="flex items-center justify-between border border-shell-line bg-shell-surface px-4 py-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-shell-muted">
               Bulk Management
@@ -163,14 +163,14 @@ export function PlayersView() {
             type="button"
             disabled={rows.length === 0}
             onClick={() => void handleBulkMaxPreview()}
-            className="border border-shell-accent bg-[#edf5f2] px-3 py-1.5 font-mono text-xs font-semibold text-shell-accent transition hover:bg-[#d9ede7] active:translate-y-[1px] disabled:opacity-50"
+            className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-3 py-1.5 font-mono text-xs font-semibold text-shell-accent transition hover:bg-shell-accent-subtle-hover active:translate-y-[1px] disabled:opacity-50"
           >
             Max All Players (Lv 60)
           </button>
         </div>
 
         {actionMessage && (
-          <div className="border border-shell-accent bg-[#edf5f2] px-4 py-2 text-xs font-mono text-shell-accent">
+          <div className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-2 text-xs font-mono text-shell-accent">
             {actionMessage}
           </div>
         )}
@@ -223,14 +223,14 @@ export function PlayersView() {
                   <button
                     type="button"
                     onClick={() => startEdit(r)}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium hover:bg-shell-panel active:translate-y-[1px]"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleUnlockPreview(r, "technologies")}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                     title="Unlock all Technologies and Tech Points"
                   >
                     Tech
@@ -238,7 +238,7 @@ export function PlayersView() {
                   <button
                     type="button"
                     onClick={() => void handleUnlockPreview(r, "stat_points")}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                     title="Max Unused Player Stat Points"
                   >
                     Stats
@@ -246,7 +246,7 @@ export function PlayersView() {
                   <button
                     type="button"
                     onClick={() => void handleUnlockPreview(r, "effigies")}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                     title="Unlock all Lifmunk Effigies"
                   >
                     Effigies
@@ -254,7 +254,7 @@ export function PlayersView() {
                   <button
                     type="button"
                     onClick={() => void handleUnlockPreview(r, "fast_travel")}
-                    className="border border-shell-line bg-white px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
+                    className="border border-shell-line bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-muted hover:bg-shell-panel active:translate-y-[1px]"
                     title="Unlock all Fast Travel points"
                   >
                     Fast Travel
@@ -262,7 +262,7 @@ export function PlayersView() {
                   <button
                     type="button"
                     onClick={() => void handleRequestDeletePreview(r)}
-                    className="border border-red-200 bg-white px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 active:translate-y-[1px]"
+                    className="border border-shell-destructive/40 bg-shell-surface px-2 py-1 text-[11px] font-medium text-shell-destructive hover:bg-shell-destructive-subtle active:translate-y-[1px]"
                   >
                     Delete
                   </button>
@@ -282,7 +282,7 @@ export function PlayersView() {
 
         {/* Edit Player Drawer / Form */}
         {selectedPlayer && (
-          <div className="border border-shell-line bg-white p-5 shadow-sm">
+          <div className="border border-shell-line bg-shell-surface p-5 shadow-sm">
             <div className="flex items-center justify-between border-b border-shell-line pb-3">
               <div>
                 <h3 className="text-base font-semibold">
@@ -354,7 +354,7 @@ export function PlayersView() {
               <button
                 type="button"
                 onClick={() => void handleRequestEditPreview()}
-                className="border border-shell-accent bg-[#edf5f2] px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-[#d9ede7] active:translate-y-[1px]"
+                className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-4 py-1.5 text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px]"
               >
                 Preview & Apply
               </button>
@@ -383,7 +383,7 @@ function Badge({ color, children }: { color: "accent" | "muted"; children: React
       className={[
         "rounded-sm px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide",
         color === "accent"
-          ? "bg-[#edf5f2] text-shell-accent"
+          ? "bg-shell-accent-subtle text-shell-accent"
           : "bg-shell-panel text-shell-muted",
       ].join(" ")}
     >
