@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ViewShell } from "../../shared/components/ViewShell";
-import type { CommandError, SaveSummary } from "../../shared/types/contracts";
+import type { AppSettings, CommandError, SaveSummary } from "../../shared/types/contracts";
 import { invokeCommand } from "../../shared/utils/command";
 
 const LEVEL_SAV_FILE_NAME = "level.sav";
@@ -9,12 +9,13 @@ const LEVEL_SAV_FILE_NAME = "level.sav";
 // Mirrors PalworldSaveTools: a single file picker filtered to *.sav, titled
 // "Select Level.sav". The *.sav filter is what makes Level.sav visible in the
 // world folder — a directory-only picker hides every file.
-async function pickLevelSavFile(): Promise<string | null> {
+async function pickLevelSavFile(defaultPath?: string | null): Promise<string | null> {
   const selection = await open({
     directory: false,
     multiple: false,
     title: "Select Level.sav",
     filters: [{ name: "Palworld save files (*.sav)", extensions: ["sav"] }],
+    defaultPath: defaultPath ?? undefined,
   });
   return typeof selection === "string" ? selection : null;
 }
@@ -36,6 +37,25 @@ export function SaveSessionView() {
   const [loading, setLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [message, setMessage] = useState<SessionMessage>(null);
+  const [recentPaths, setRecentPaths] = useState<readonly string[]>([]);
+
+  async function refreshRecentPaths() {
+    try {
+      const settings = await invokeCommand<AppSettings>("get_settings");
+      setRecentPaths(settings.recentSavePaths ?? []);
+    } catch {
+      // settings unavailable in tests / browser preview
+    }
+  }
+
+  useEffect(() => {
+    void refreshRecentPaths();
+  }, []);
+
+  // Keep recent list in sync after a successful load (backend also pushes).
+  useEffect(() => {
+    if (summary) void refreshRecentPaths();
+  }, [summary]);
 
   async function loadFromSaveRoot(saveRoot: string) {
     const loadedSummary = await invokeCommand<SaveSummary>("load_save_session", {
@@ -43,6 +63,24 @@ export function SaveSessionView() {
     });
     setSummary(loadedSummary);
     setMessage({ kind: "ok", text: "Save loaded successfully." });
+    // Optimistic recent update for instant feedback; backend is source of truth.
+    setRecentPaths((prev) => {
+      const next = [saveRoot, ...prev.filter((p) => p !== saveRoot)];
+      return next.slice(0, 5);
+    });
+  }
+
+  async function handleLoadRecent(path: string) {
+    setMessage(null);
+    setLoading(true);
+    try {
+      await loadFromSaveRoot(path);
+    } catch (err: unknown) {
+      const e = err as CommandError;
+      setMessage({ kind: "error", text: e.message ?? "Failed to load save." });
+    } finally {
+      setLoading(false);
+    }
   }
 
   function handleDroppedPath(droppedPath: string) {
@@ -103,11 +141,14 @@ export function SaveSessionView() {
 
   // Single-step flow like PalworldSaveTools: pick Level.sav and the session
   // loads immediately with no intermediate confirm button.
+  // Uses the most recent save as `defaultPath` so the dialog opens where the
+  // user last loaded (mirrors common.get_preferred_save_path).
   async function handleLoadSave() {
     setMessage(null);
     setLoading(true);
     try {
-      const selection = await pickLevelSavFile();
+      const defaultPath = recentPaths[0] ?? undefined;
+      const selection = await pickLevelSavFile(defaultPath ?? null);
       if (!selection) {
         return;
       }
@@ -251,6 +292,28 @@ export function SaveSessionView() {
               </button>
             )}
           </div>
+
+          {recentPaths.length > 0 && (
+            <div className="mt-4 border-t border-shell-line pt-3">
+              <p className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">Recent saves</p>
+              <ul className="mt-2 grid gap-1.5">
+                {recentPaths.map((p) => (
+                  <li key={p}>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => void handleLoadRecent(p)}
+                      className="flex w-full items-center gap-2 truncate text-left font-mono text-xs text-shell-muted transition hover:text-shell-ink disabled:opacity-50"
+                      title={p}
+                    >
+                      <span className="h-1 w-1 shrink-0 rounded-full bg-shell-accent" aria-hidden="true" />
+                      <span className="truncate">{p}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {message && (
             <p
