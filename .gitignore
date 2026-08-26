@@ -1,5 +1,5 @@
-docs
 /.agents/skills/private/
+ib
 
 # Dependencies and build outputs
 node_modules/
