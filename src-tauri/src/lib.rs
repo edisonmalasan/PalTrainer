@@ -18,6 +18,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(None::<domain::save_session::SaveSession>))
+        .manage(Mutex::new(None::<domain::gps::GpsSession>))
         .manage(Mutex::new(storage::BackupManager::new(default_backup_root)))
         .manage(Mutex::new(domain::exclusions::ExclusionConfig::default()))
         .manage(tasks::TaskTracker::new())
@@ -30,6 +31,9 @@ pub fn run() {
             commands::save_session::get_save_summary,
             commands::save_session::check_stale_save,
             commands::save_session::close_save_session,
+            commands::gps::load_gps_storage,
+            commands::gps::get_gps_summary,
+            commands::gps::close_gps_storage,
             commands::backup::list_backups,
             commands::backup::create_manual_backup,
             commands::backup::restore_backup,

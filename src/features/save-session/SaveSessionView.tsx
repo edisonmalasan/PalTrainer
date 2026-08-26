@@ -1,10 +1,26 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ViewShell } from "../../shared/components/ViewShell";
-import type { AppSettings, CommandError, SaveSummary } from "../../shared/types/contracts";
+import type { AppSettings, CommandError, GpsSummary, SaveSummary } from "../../shared/types/contracts";
 import { invokeCommand } from "../../shared/utils/command";
 
 const LEVEL_SAV_FILE_NAME = "level.sav";
+const GPS_FILE_NAME = "globalpalstorage.sav";
+
+async function pickGpsFile(): Promise<string | null> {
+  const selection = await open({
+    directory: false,
+    multiple: false,
+    title: "Select GlobalPalStorage.sav",
+    filters: [{ name: "Palworld save files (*.sav)", extensions: ["sav"] }],
+  });
+  return typeof selection === "string" ? selection : null;
+}
+
+function isGpsFileName(path: string): boolean {
+  const name = path.split(/[\\/]/).pop() ?? "";
+  return name.toLowerCase() === GPS_FILE_NAME;
+}
 
 // Mirrors PalworldSaveTools: a single file picker filtered to *.sav, titled
 // "Select Level.sav". The *.sav filter is what makes Level.sav visible in the
@@ -38,6 +54,9 @@ export function SaveSessionView() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [message, setMessage] = useState<SessionMessage>(null);
   const [recentPaths, setRecentPaths] = useState<readonly string[]>([]);
+  const [gpsSummary, setGpsSummary] = useState<GpsSummary | null>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsMessage, setGpsMessage] = useState<SessionMessage>(null);
 
   async function refreshRecentPaths() {
     try {
@@ -56,6 +75,17 @@ export function SaveSessionView() {
   useEffect(() => {
     if (summary) void refreshRecentPaths();
   }, [summary]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const gps = await invokeCommand<GpsSummary | null>("get_gps_summary");
+        if (gps) setGpsSummary(gps);
+      } catch {
+        // no gps loaded
+      }
+    })();
+  }, []);
 
   async function loadFromSaveRoot(saveRoot: string) {
     const loadedSummary = await invokeCommand<SaveSummary>("load_save_session", {
@@ -181,6 +211,45 @@ export function SaveSessionView() {
       setMessage({ kind: "error", text: e.message ?? "Failed to close session." });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleLoadGps() {
+    setGpsMessage(null);
+    setGpsLoading(true);
+    try {
+      const selection = await pickGpsFile();
+      if (!selection) return;
+      if (!isGpsFileName(selection)) {
+        setGpsMessage({
+          kind: "error",
+          text: `Please select GlobalPalStorage.sav — got “${selection.split(/[\\/]/).pop()}”.`,
+        });
+        return;
+      }
+      const gps = await invokeCommand<GpsSummary>("load_gps_storage", { path: selection });
+      setGpsSummary(gps);
+      setGpsMessage({ kind: "ok", text: "GlobalPalStorage loaded." });
+    } catch (err: unknown) {
+      const e = err as CommandError;
+      setGpsMessage({ kind: "error", text: e.message ?? "Failed to load GPS." });
+    } finally {
+      setGpsLoading(false);
+    }
+  }
+
+  async function handleCloseGps() {
+    setGpsLoading(true);
+    setGpsMessage(null);
+    try {
+      await invokeCommand("close_gps_storage");
+      setGpsSummary(null);
+      setGpsMessage({ kind: "ok", text: "GPS session closed." });
+    } catch (err: unknown) {
+      const e = err as CommandError;
+      setGpsMessage({ kind: "error", text: e.message ?? "Failed to close GPS." });
+    } finally {
+      setGpsLoading(false);
     }
   }
 
@@ -349,6 +418,71 @@ export function SaveSessionView() {
                   </dd>
                 </div>
               ))}
+            </dl>
+          )}
+        </div>
+
+        {/* Global Pal Storage — isolated session as in PST File → Load Global Pal Storage */}
+        <div className="border border-shell-line bg-shell-surface p-5">
+          <h3 className="text-base font-semibold">Global Pal Storage</h3>
+          <p className="mt-2 max-w-[65ch] text-sm leading-6 text-shell-muted">
+            Optional isolated store <code className="font-mono text-xs">GlobalPalStorage.sav</code> — loaded separately from the world save, same as in PalworldSaveTools.
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={gpsLoading}
+              onClick={() => void handleLoadGps()}
+              className={[
+                "border px-4 py-2 text-sm font-medium transition active:translate-y-[1px]",
+                gpsLoading
+                  ? "cursor-not-allowed border-shell-line text-shell-muted opacity-60"
+                  : "border-shell-line bg-shell-panel text-shell-muted hover:bg-shell-surface hover:text-shell-ink",
+              ].join(" ")}
+            >
+              {gpsLoading ? "Loading…" : gpsSummary ? "Load another GPS…" : "Load GPS Storage…"}
+            </button>
+            {gpsSummary && (
+              <button
+                type="button"
+                disabled={gpsLoading}
+                onClick={() => void handleCloseGps()}
+                className="border border-shell-line px-4 py-2 text-sm text-shell-muted transition hover:bg-shell-panel active:translate-y-[1px] disabled:opacity-60"
+              >
+                Close GPS
+              </button>
+            )}
+          </div>
+
+          {gpsMessage && (
+            <p
+              role="status"
+              className={[
+                "mt-4 border px-3 py-2 text-sm",
+                gpsMessage.kind === "ok"
+                  ? "border-shell-accent/40 bg-shell-accent-subtle text-shell-accent"
+                  : "border-shell-destructive/40 bg-shell-destructive-subtle text-shell-destructive",
+              ].join(" ")}
+            >
+              {gpsMessage.text}
+            </p>
+          )}
+
+          {gpsSummary && (
+            <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-shell-line pt-4 sm:grid-cols-3" aria-label="GPS summary">
+              <div className="bg-shell-panel px-3 py-2">
+                <dt className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">Path</dt>
+                <dd className="mt-1 break-all font-mono text-xs text-shell-ink">{gpsSummary.path}</dd>
+              </div>
+              <div className="bg-shell-panel px-3 py-2">
+                <dt className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">Size</dt>
+                <dd className="mt-1 text-sm text-shell-ink">{gpsSummary.fileSize.toLocaleString()} bytes</dd>
+              </div>
+              <div className="bg-shell-panel px-3 py-2">
+                <dt className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">Loaded at</dt>
+                <dd className="mt-1 text-sm text-shell-ink">{new Date(gpsSummary.loadedAt * 1000).toLocaleString()}</dd>
+              </div>
             </dl>
           )}
         </div>

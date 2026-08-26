@@ -4,6 +4,7 @@ pub mod base;
 pub mod cleanup;
 pub mod conversion;
 pub mod exclusions;
+pub mod gps;
 pub mod guild;
 pub mod inspect;
 pub mod inventory;
