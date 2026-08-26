@@ -836,7 +836,8 @@ export function PalsView() {
           searchValue={query}
           onSearchChange={setQuery}
           searchPlaceholder="Filter by species, nickname, or instance ID…"
-          emptyMessage="No Pals found in this location."
+          emptyHeadline="No Pals found in this location."
+          emptyDescription="Switch locations or clear the search filter to see more Pals."
         />
 
         {/* Edit Pal Drawer */}

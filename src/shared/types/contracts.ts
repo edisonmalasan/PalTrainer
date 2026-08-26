@@ -90,15 +90,18 @@ export interface MoveGuildMemberDto {
 }
 
 export interface GuildMemberProjection {
-  readonly uid: string;
-  readonly displayName: string;
-  readonly rank: number;
+  readonly playerUid: string;
+  readonly playerName: string;
+  readonly isAdmin: boolean;
 }
 
 export interface GuildProjection {
   readonly guildId: string;
-  readonly guildName: string;
-  readonly adminUid: string;
+  readonly name: string;
+  readonly adminPlayerUid: string;
+  readonly adminPlayerName: string;
+  readonly level: number;
+  readonly baseCount: number;
   readonly members: readonly GuildMemberProjection[];
 }
 

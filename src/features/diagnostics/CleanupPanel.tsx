@@ -86,6 +86,7 @@ export function CleanupPanel() {
 
   const [preview, setPreview] = useState<MutationPreview | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [committing, setCommitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [auditResult, setAuditResult] = useState<string | null>(null);
 
@@ -114,7 +115,7 @@ export function CleanupPanel() {
   const handleCommit = async () => {
     if (!preview) return;
     setError(null);
-    setLoading(true);
+    setCommitting(true);
     try {
       const params: CleanupParams = {
         target: selectedTarget,
@@ -132,7 +133,7 @@ export function CleanupPanel() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false);
+      setCommitting(false);
     }
   };
 
@@ -265,6 +266,7 @@ export function CleanupPanel() {
       {preview && (
         <PreviewModal
           preview={preview}
+          committing={committing}
           onConfirm={handleCommit}
           onCancel={() => setPreview(null)}
         />

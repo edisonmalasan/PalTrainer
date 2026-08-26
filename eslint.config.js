@@ -20,7 +20,9 @@ export default tseslint.config(
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: ["playwright.config.ts", "tests/e2e/*.spec.ts"],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
