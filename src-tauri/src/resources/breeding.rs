@@ -149,6 +149,10 @@ impl BreedingCalculator {
     }
 
     /// Finds all parent combinations that produce `target_child`.
+    ///
+    /// Pairs are normalized to sorted name order because the pal catalog is
+    /// stored in a `HashMap`, whose iteration order would otherwise decide
+    /// the orientation of each tuple (and vary between processes).
     pub fn find_parents(&self, target_child: &str) -> Vec<(String, String)> {
         let mut results = Vec::new();
         let pal_names: Vec<&String> = self.pals.keys().collect();
@@ -159,7 +163,11 @@ impl BreedingCalculator {
                 let p2 = pal_names[j];
                 if let Some(child) = self.calculate_child(p1, p2) {
                     if child == target_child {
-                        results.push((p1.clone(), p2.clone()));
+                        let mut pair = (p1.clone(), p2.clone());
+                        if pair.0 > pair.1 {
+                            std::mem::swap(&mut pair.0, &mut pair.1);
+                        }
+                        results.push(pair);
                     }
                 }
             }
