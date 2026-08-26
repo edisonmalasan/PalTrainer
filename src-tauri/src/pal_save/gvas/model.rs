@@ -195,4 +195,10 @@ pub enum PropertyValue {
     },
     Map(Box<MapValue>),
     Set(Box<SetValue>),
+    /// Opaque bytes for skipped heavy properties (foliage, spawners) — preserved verbatim.
+    /// Used by the GUI summary profile to avoid parsing ~MB of unused data while
+    /// keeping byte-perfect roundtrip. CLI full-decode profile does not use this.
+    Opaque {
+        raw: Vec<u8>,
+    },
 }
