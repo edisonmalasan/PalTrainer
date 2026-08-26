@@ -79,7 +79,7 @@ fn discover_xgp_saves_under(packages_dir: &Path) -> Vec<XgpSaveEntry> {
         return results;
     }
 
-    if let Ok(entries) = fs::read_dir(&packages_dir) {
+    if let Ok(entries) = fs::read_dir(packages_dir) {
         for entry in entries.flatten() {
             let pkg_name = entry.file_name().to_string_lossy().to_string();
             if pkg_name.starts_with("PocketpairInc.Palworld") {
@@ -442,7 +442,7 @@ mod tests {
         assert_eq!(result.containers_created, 1);
         assert!(result.backup_path.is_some());
         assert_eq!(
-            fs::read(&target.join("containers.index")).unwrap()[..4],
+            fs::read(target.join("containers.index")).unwrap()[..4],
             14u32.to_le_bytes()
         );
         let container = target.join("00000000000000000000000000000001");

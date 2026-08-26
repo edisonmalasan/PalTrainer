@@ -163,8 +163,8 @@ mod tests {
         w.i16(-200);
         w.i32(-50000);
         w.i64(-999999999);
-        w.f32(3.14);
-        w.f64(2.71828);
+        w.f32(std::f32::consts::PI);
+        w.f64(std::f64::consts::E);
         w.bool(true);
         w.bool(false);
 
@@ -177,8 +177,8 @@ mod tests {
         assert_eq!(r.i16().unwrap(), -200);
         assert_eq!(r.i32().unwrap(), -50000);
         assert_eq!(r.i64().unwrap(), -999999999);
-        assert!((r.f32().unwrap() - 3.14).abs() < 1e-5);
-        assert!((r.f64().unwrap() - 2.71828).abs() < 1e-9);
+        assert!((r.f32().unwrap() - std::f32::consts::PI).abs() < 1e-5);
+        assert!((r.f64().unwrap() - std::f64::consts::E).abs() < 1e-9);
         assert!(r.bool().unwrap());
         assert!(!r.bool().unwrap());
         assert!(r.eof());
