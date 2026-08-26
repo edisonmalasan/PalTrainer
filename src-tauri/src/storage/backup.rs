@@ -100,7 +100,7 @@ impl BackupManager {
         let mut total_bytes = 0;
 
         copy_dir_recursive(
-            &canon_save_root,
+            canon_save_root,
             &dest_dir,
             &mut file_count,
             &mut total_bytes,
