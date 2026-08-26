@@ -24,7 +24,34 @@ pub fn decompress_sav(data: &[u8]) -> Result<(Vec<u8>, SaveType), SaveError> {
     let header = SavHeader::parse(data)?;
 
     match header.save_type {
-        SaveType::Plm => Err(SaveError::OodleUnsupported),
+        SaveType::Plm => {
+            let compressed = data
+                .get(header.data_offset..)
+                .ok_or(SaveError::UnexpectedEof {
+                    offset: header.data_offset,
+                    needed: header.compressed_len as usize,
+                })?;
+            // Header's compressed_len is authoritative; slice exactly that many bytes if available.
+            let compressed = if compressed.len() >= header.compressed_len as usize {
+                &compressed[..header.compressed_len as usize]
+            } else {
+                compressed
+            };
+            let mut output = vec![0u8; header.uncompressed_len as usize];
+            // SAFETY: oozle's decompress is unsafe but operates only on the supplied slices.
+            let n = unsafe { oozle::decompress(compressed, &mut output) }.map_err(|e| {
+                SaveError::ZlibDecompress {
+                    message: format!("Oodle/Kraken decompress failed: {e}"),
+                }
+            })?;
+            if n != header.uncompressed_len as usize {
+                return Err(SaveError::UncompressedLengthMismatch {
+                    expected: header.uncompressed_len,
+                    actual: n,
+                });
+            }
+            Ok((output, SaveType::Plm))
+        }
         SaveType::Plz => {
             let first_pass = inflate(&data[header.data_offset..])?;
             if first_pass.len() != header.compressed_len as usize {
@@ -170,6 +197,8 @@ mod tests {
 
     #[test]
     fn plm_reports_typed_oodle_error_on_decompress() {
+        // Dummy payload is not valid Kraken — oozle should fail with a
+        // ZlibDecompress (Oodle prefix) rather than the legacy OodleUnsupported.
         let mut sav = Vec::new();
         sav.extend_from_slice(&10u32.to_le_bytes());
         sav.extend_from_slice(&10u32.to_le_bytes());
@@ -178,7 +207,7 @@ mod tests {
         sav.extend_from_slice(&[0u8; 16]);
 
         let err = decompress_sav(&sav).unwrap_err();
-        assert!(matches!(err, SaveError::OodleUnsupported));
+        assert!(matches!(err, SaveError::ZlibDecompress { .. }));
         assert!(err.to_string().contains("Oodle"));
     }
 
