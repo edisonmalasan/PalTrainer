@@ -1,10 +1,5 @@
-docs/PalworldSaveTools
-docs/AGENTS.md
-docs/*.log
-!docs/plan/
-!docs/plan/**
-!docs/PLAN.md
 /.agents/skills/private/
+ib
 
 # Dependencies and build outputs
 node_modules/
