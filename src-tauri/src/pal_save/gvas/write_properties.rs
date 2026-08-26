@@ -124,6 +124,9 @@ impl FArchiveWriter {
             PropertyValue::Set(set) => {
                 self.write_set_property(set);
             }
+            PropertyValue::Opaque { raw } => {
+                self.write_bytes(raw);
+            }
         }
     }
 

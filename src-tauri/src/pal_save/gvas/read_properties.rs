@@ -10,6 +10,8 @@ use super::reader::FArchiveReader;
 
 impl FArchiveReader<'_> {
     /// Reads properties until the `None` terminator.
+    /// Skipped heavy paths (foliage, spawners) are read as opaque bytes to
+    /// keep GUI parsing fast while preserving byte-exact roundtrip.
     pub fn properties_until_end(&mut self, path: &str) -> Result<Vec<PropertyEntry>, SaveError> {
         let mut entries = Vec::new();
         loop {
@@ -20,8 +22,21 @@ impl FArchiveReader<'_> {
             let type_name = self.fstring()?;
             // The declared size is not needed for decoding because type
             // dispatch is authoritative; the writer recomputes sizes.
-            let _declared_size = self.u64()?;
-            let property = self.property(&type_name, &format!("{path}.{name}"))?;
+            let declared_size = self.u64()?;
+            let full_path = format!("{path}.{name}");
+            if crate::pal_save::properties::skip_profiles::should_skip(&full_path) {
+                let raw = self.take(declared_size as usize)?.to_vec();
+                entries.push(PropertyEntry {
+                    name,
+                    property: Property {
+                        type_name,
+                        custom_type: None,
+                        value: super::model::PropertyValue::Opaque { raw },
+                    },
+                });
+                continue;
+            }
+            let property = self.property(&type_name, &full_path)?;
             entries.push(PropertyEntry { name, property });
         }
         Ok(entries)
