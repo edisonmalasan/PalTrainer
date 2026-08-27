@@ -43,6 +43,7 @@ pub fn run() {
             commands::inspect::get_pals,
             commands::inspect::get_inventory,
             commands::inspect::get_map_markers,
+            commands::map_assets::get_map_asset,
             commands::inspect::run_save_diagnostics,
             commands::inspect::run_targeted_diagnostic,
             commands::inspect::lookup_breeding,
