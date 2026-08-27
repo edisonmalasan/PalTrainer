@@ -12,9 +12,11 @@ use crate::domain::tools::restore_map::{
 };
 use crate::domain::tools::slot_injector::{
     commit_inject_palbox_slots as domain_commit_inject_palbox_slots,
+    commit_modify_all_player_slots as domain_commit_modify_all,
     get_player_palbox_capacity as domain_get_player_palbox_capacity,
-    preview_inject_palbox_slots as domain_preview_inject_palbox_slots, PalboxCapacityDto,
-    SlotInjectionAuditResult, SlotInjectionParams,
+    preview_inject_palbox_slots as domain_preview_inject_palbox_slots,
+    preview_modify_all_player_slots as domain_preview_modify_all, ModifyAllSlotsAuditResult,
+    PalboxCapacityDto, SlotInjectionAuditResult, SlotInjectionParams,
 };
 use crate::error::AppError;
 use crate::storage::backup::BackupManager;
@@ -96,4 +98,35 @@ pub fn commit_inject_palbox_slots(
     let active = guard.as_mut().ok_or(SessionError::NoActiveSession)?;
 
     domain_commit_inject_palbox_slots(active, &backup_mgr, &params)
+}
+
+#[tauri::command]
+pub fn preview_modify_all_player_slots(
+    target_slot_count: usize,
+    state: State<'_, SessionState>,
+) -> Result<crate::domain::save_session::preview::MutationPreview, AppError> {
+    let guard = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+    let active = guard.as_ref().ok_or(SessionError::NoActiveSession)?;
+    domain_preview_modify_all(active, target_slot_count)
+}
+
+#[tauri::command]
+pub fn commit_modify_all_player_slots(
+    target_slot_count: usize,
+    state: State<'_, SessionState>,
+    backup_state: State<'_, Mutex<BackupManager>>,
+) -> Result<ModifyAllSlotsAuditResult, AppError> {
+    let mut guard = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+    let backup_mgr = backup_state.lock().map_err(|e| {
+        AppError::new(
+            "lock_error",
+            format!("Failed to lock backup manager: {}", e),
+        )
+    })?;
+    let active = guard.as_mut().ok_or(SessionError::NoActiveSession)?;
+    domain_commit_modify_all(active, &backup_mgr, target_slot_count)
 }

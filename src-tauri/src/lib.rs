@@ -134,6 +134,8 @@ pub fn run() {
             commands::modifiers::get_palbox_capacity,
             commands::modifiers::preview_inject_palbox_slots,
             commands::modifiers::commit_inject_palbox_slots,
+            commands::modifiers::preview_modify_all_player_slots,
+            commands::modifiers::commit_modify_all_player_slots,
             commands::transfer::inspect_transfer_source,
             commands::transfer::preview_character_transfer,
             commands::transfer::commit_character_transfer,
