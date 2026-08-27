@@ -16,6 +16,43 @@ import type {
 } from "../../shared/types/contracts";
 import { invokeCommand } from "../../shared/utils/command";
 
+const SINGLETON_TYPE_A = "SingletonA";
+
+const EQUIPMENT_LANES: readonly {
+  readonly id: string;
+  readonly label: string;
+  readonly slotIndex: number;
+  readonly category: string;
+}[] = [
+  { id: "W1", label: "Weapon 1", slotIndex: 0, category: "Weapon" },
+  { id: "W2", label: "Weapon 2", slotIndex: 1, category: "Weapon" },
+  { id: "W3", label: "Weapon 3", slotIndex: 2, category: "Weapon" },
+  { id: "W4", label: "Weapon 4", slotIndex: 3, category: "Weapon" },
+  { id: "W5", label: "Weapon 5", slotIndex: 4, category: "Weapon" },
+  { id: "H1", label: "Head", slotIndex: 5, category: "Armor" },
+  { id: "B1", label: "Body", slotIndex: 6, category: "Armor" },
+  { id: "S1", label: "Shield", slotIndex: 7, category: "Armor" },
+  { id: "A1", label: "Accessory 1", slotIndex: 8, category: "Accessory" },
+  { id: "A2", label: "Accessory 2", slotIndex: 9, category: "Accessory" },
+  { id: "A3", label: "Accessory 3", slotIndex: 10, category: "Accessory" },
+  { id: "A4", label: "Accessory 4", slotIndex: 11, category: "Accessory" },
+  { id: "G1", label: "Glider", slotIndex: 12, category: "Glider" },
+  { id: "F1", label: "Food 1", slotIndex: 13, category: "Food" },
+  { id: "F2", label: "Food 2", slotIndex: 14, category: "Food" },
+  { id: "F3", label: "Food 3", slotIndex: 15, category: "Food" },
+  { id: "F4", label: "Food 4", slotIndex: 16, category: "Food" },
+  { id: "F5", label: "Food 5", slotIndex: 17, category: "Food" },
+  { id: "SM", label: "Shield Module", slotIndex: 18, category: "Module" },
+];
+
+function isEquipmentContainer(containerType: string): boolean {
+  return containerType === SINGLETON_TYPE_A || containerType.toLowerCase().includes("equipment") || containerType.toLowerCase().includes("singleton");
+}
+
+function isSlotLocked(slotIndex: number, containerCapacity: number): boolean {
+  return slotIndex >= containerCapacity;
+}
+
 export function InventoryView() {
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -503,6 +540,76 @@ export function InventoryView() {
                 >
                   Preview Add Key Items
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Equipment Lanes — PST parity for W1-5/H1/B1/S1/A1-4/G1/F1-5/SM */}
+          {activeInv && isEquipmentContainer(activeInv.containerType) && (
+            <div className="border border-shell-line bg-shell-surface p-3">
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">
+                  Equipment — {activeInv.containerType}
+                  <span className="ml-2 font-mono text-[10px] normal-case tracking-normal text-shell-muted">
+                    Singleton: single item per slot with durability
+                  </span>
+                </p>
+                <span className="font-mono text-[10px] text-shell-muted">
+                  {activeInv.slots.length}/{activeInv.slotCapacity} equipped
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                {EQUIPMENT_LANES.map((lane) => {
+                  const slot = activeInv.slots.find((s) => s.slotIndex === lane.slotIndex);
+                  const locked = isSlotLocked(lane.slotIndex, activeInv.slotCapacity);
+                  return (
+                    <div
+                      key={lane.id}
+                      className={[
+                        "relative flex flex-col gap-1 border p-2.5 transition",
+                        locked
+                          ? "border-shell-line bg-shell-panel opacity-40"
+                          : slot
+                            ? "border-shell-accent/40 bg-shell-accent-subtle hover:border-shell-accent"
+                            : "border-shell-line bg-shell-panel hover:border-shell-line hover:bg-shell-surface",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="rounded bg-shell-surface px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-shell-accent">
+                          {lane.id}
+                        </span>
+                        {locked ? (
+                          <span className="font-mono text-[9px] uppercase tracking-wide text-shell-muted">Locked</span>
+                        ) : (
+                          <span className="font-mono text-[9px] text-shell-muted">{lane.category}</span>
+                        )}
+                      </div>
+                      <p className="truncate text-xs font-medium leading-tight">{lane.label}</p>
+                      {locked ? (
+                        <p className="font-mono text-[10px] text-shell-muted">Reach higher level</p>
+                      ) : slot ? (
+                        <div className="mt-1 min-w-0">
+                          <p className="truncate font-mono text-xs font-semibold text-shell-ink">{slot.itemId || "—"}</p>
+                          <p className="font-mono text-[10px] text-shell-muted">
+                            x{slot.count.toLocaleString()}
+                            {slot.durability !== null ? ` · ${slot.durability.toFixed(0)} dur` : ""}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="mt-1 font-mono text-[10px] text-shell-muted">Empty</p>
+                      )}
+                      {!locked && slot && (
+                        <button
+                          type="button"
+                          onClick={() => startEditSlot(slot)}
+                          className="mt-1 border border-shell-line bg-white px-2 py-1 text-center font-mono text-[10px] hover:bg-shell-panel active:translate-y-[1px]"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
