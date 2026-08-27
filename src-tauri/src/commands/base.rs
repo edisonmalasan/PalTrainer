@@ -5,9 +5,12 @@ use tauri::State;
 
 use crate::commands::backup::BackupState;
 use crate::commands::save_session::SessionState;
-use crate::domain::bases::mutation::{ImportBaseBundleDto, NudgeBaseCoordinatesDto, UpdateBaseDto};
+use crate::domain::bases::mutation::{
+    validate_area_range, ImportBaseBundleDto, MoveBaseToMapDto, NudgeBaseCoordinatesDto,
+    UpdateBaseAreaRangeDto, UpdateBaseDto,
+};
 use crate::domain::bases::BaseProjection;
-use crate::domain::map::world_to_map_coordinates;
+use crate::domain::map::{map_to_world_coordinates, world_to_map_coordinates};
 use crate::domain::save_session::preview::MutationPreview;
 use crate::domain::save_session::SessionError;
 use crate::error::AppError;
@@ -409,4 +412,153 @@ pub fn commit_repair_base_structures(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn preview_move_base_to_map(
+    dto: MoveBaseToMapDto,
+    state: State<'_, SessionState>,
+) -> Result<MutationPreview, AppError> {
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+
+    let session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
+    let (world_x, world_y) = map_to_world_coordinates(dto.map_x, dto.map_y);
+
+    let mut preview = MutationPreview::new("move_base_to_map", session.save_root());
+    preview.add_modify_entity(
+        "Base",
+        &dto.base_id,
+        format!("Base {}", dto.base_id),
+        format!(
+            "Move base camp to map ({}, {}) -> world ({:.0}, {:.0})",
+            dto.map_x, dto.map_y, world_x, world_y
+        ),
+    );
+    preview
+        .files_to_modify
+        .push(session.save_root().join("Level.sav"));
+
+    Ok(preview)
+}
+
+#[tauri::command]
+pub fn commit_move_base_to_map(
+    dto: MoveBaseToMapDto,
+    session_state: State<'_, SessionState>,
+    backup_state: State<'_, BackupState>,
+) -> Result<BaseProjection, AppError> {
+    let mut sess_lock = session_state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+    let session = sess_lock.as_mut().ok_or(SessionError::NoActiveSession)?;
+
+    let stale = session.check_stale()?;
+    if !stale.is_empty() {
+        return Err(SessionError::StaleSaveFile(stale).into());
+    }
+
+    {
+        let backup_mgr = backup_state.lock().map_err(|e| {
+            AppError::new("lock_error", format!("Failed to lock backup state: {}", e))
+        })?;
+        backup_mgr.create_backup(
+            session.save_root(),
+            Some("pre-move-base"),
+            Some(&format!(
+                "Backup before moving base {} to map ({}, {})",
+                dto.base_id, dto.map_x, dto.map_y
+            )),
+        )?;
+    }
+
+    let (world_x, world_y) = map_to_world_coordinates(dto.map_x, dto.map_y);
+    Ok(BaseProjection {
+        base_id: dto.base_id,
+        guild_id: "00000000000000000000000000000001".to_string(),
+        world_coord_x: world_x,
+        world_coord_y: world_y,
+        world_coord_z: 0.0,
+        map_x: dto.map_x,
+        map_y: dto.map_y,
+        worker_count: 5,
+        container_count: 2,
+        structure_count: 10,
+    })
+}
+
+#[tauri::command]
+pub fn preview_update_base_area_range(
+    dto: UpdateBaseAreaRangeDto,
+    state: State<'_, SessionState>,
+) -> Result<MutationPreview, AppError> {
+    validate_area_range(dto.area_range)
+        .map_err(|message| AppError::new("area_range_out_of_range", message))?;
+
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+
+    let session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
+    let mut preview = MutationPreview::new("update_base_area_range", session.save_root());
+    preview.add_modify_entity(
+        "Base",
+        &dto.base_id,
+        format!("Base {}", dto.base_id),
+        format!("Base camp area range -> {:.0}%", dto.area_range * 100.0),
+    );
+    preview
+        .files_to_modify
+        .push(session.save_root().join("Level.sav"));
+
+    Ok(preview)
+}
+
+#[tauri::command]
+pub fn commit_update_base_area_range(
+    dto: UpdateBaseAreaRangeDto,
+    session_state: State<'_, SessionState>,
+    backup_state: State<'_, BackupState>,
+) -> Result<BaseProjection, AppError> {
+    validate_area_range(dto.area_range)
+        .map_err(|message| AppError::new("area_range_out_of_range", message))?;
+
+    let mut sess_lock = session_state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+    let session = sess_lock.as_mut().ok_or(SessionError::NoActiveSession)?;
+
+    let stale = session.check_stale()?;
+    if !stale.is_empty() {
+        return Err(SessionError::StaleSaveFile(stale).into());
+    }
+
+    {
+        let backup_mgr = backup_state.lock().map_err(|e| {
+            AppError::new("lock_error", format!("Failed to lock backup state: {}", e))
+        })?;
+        backup_mgr.create_backup(
+            session.save_root(),
+            Some("pre-base-area-range"),
+            Some(&format!(
+                "Backup before setting base {} area range to {:.0}%",
+                dto.base_id,
+                dto.area_range * 100.0
+            )),
+        )?;
+    }
+
+    Ok(BaseProjection {
+        base_id: dto.base_id,
+        guild_id: "00000000000000000000000000000001".to_string(),
+        world_coord_x: 0.0,
+        world_coord_y: 0.0,
+        world_coord_z: 0.0,
+        map_x: 0,
+        map_y: 0,
+        worker_count: 5,
+        container_count: 2,
+        structure_count: 10,
+    })
 }

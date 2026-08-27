@@ -20,6 +20,14 @@ pub struct BulkPlayerOperationDto {
     pub uids: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MovePlayerToMapDto {
+    pub uid: String,
+    pub map_x: i32,
+    pub map_y: i32,
+}
+
 pub fn normalize_player_uid(uid: &str) -> String {
     uid.replace('-', "").to_lowercase()
 }
