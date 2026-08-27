@@ -1,8 +1,12 @@
 //! Inventory and container read-only projections and mutations.
 
+pub mod cross_guild;
 pub mod dynamic;
 pub mod mutation;
 
+pub use cross_guild::{
+    find_item_locations_efficient, get_container_image_path, remove_item_from_players, ItemLocation,
+};
 pub use dynamic::{DynamicContainerReport, DynamicItem, DynamicItemManager};
 
 use serde::{Deserialize, Serialize};
