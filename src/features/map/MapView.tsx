@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
 import { DataTable, useSearchFilter } from "../../shared/components/DataTable";
 import { ViewShell } from "../../shared/components/ViewShell";
+import { MapCanvas } from "./MapCanvas";
 import { useAsync } from "../../shared/hooks/useAsync";
 import type {
   ExclusionConfig,
-  MapMarkerProjection,
+  MapDataProjection,
   ZoneExclusion,
 } from "../../shared/types/contracts";
 import { invokeCommand } from "../../shared/utils/command";
@@ -13,7 +14,7 @@ export function MapView() {
   const [reloadKey, setReloadKey] = useState(0);
 
   const markerState = useAsync(
-    useCallback(() => invokeCommand<readonly MapMarkerProjection[]>("get_map_markers"), []),
+    useCallback(() => invokeCommand<MapDataProjection>("get_map_markers"), []),
     [reloadKey],
   );
 
@@ -22,7 +23,7 @@ export function MapView() {
     [reloadKey],
   );
 
-  const markers = markerState.status === "ok" ? markerState.data : [];
+  const markers = markerState.status === "ok" ? markerState.data.markers : [];
   const exclusions = configState.status === "ok" ? configState.data : null;
 
   const { query, setQuery, filtered } = useSearchFilter(
@@ -35,7 +36,12 @@ export function MapView() {
   const [showAddZone, setShowAddZone] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
   const [newZoneType, setNewZoneType] = useState<"rectangle" | "polygon">("rectangle");
-  const [rectPoints, setRectPoints] = useState({ minX: 0, minY: 0, maxX: 100000, maxY: 100000 });
+  const [rectPoints, setRectPoints] = useState({
+    minX: 0,
+    minY: 0,
+    maxX: 100000,
+    maxY: 100000,
+  });
   const [protectBases, setProtectBases] = useState(true);
   const [protectPlayers, setProtectPlayers] = useState(true);
 
@@ -96,224 +102,283 @@ export function MapView() {
       status={markerState.status}
       errorMessage={markerState.status === "error" ? markerState.message : undefined}
     >
-      <div className="flex flex-col gap-6">
-        {/* Exclusion Zone Management Panel */}
-        <div className="border border-shell-line bg-shell-surface p-5">
-          <div className="flex items-center justify-between border-b border-shell-line pb-3">
-            <div>
-              <h3 className="text-base font-semibold">Exclusion Zones & Protection</h3>
-              <p className="mt-1 text-xs text-shell-muted">
-                Entities inside active exclusion zones will be skipped during automated cleanup and deletion sweeps.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowAddZone(!showAddZone)}
-              className="border border-shell-line bg-shell-surface px-3 py-1.5 font-mono text-xs text-shell-ink transition hover:bg-shell-panel active:translate-y-[1px]"
-            >
-              {showAddZone ? "Cancel" : "+ Add Exclusion Zone"}
-            </button>
-          </div>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[62fr_38fr]">
+        {/* Canvas — 62% left split (phase 16 outcome) */}
+        <section
+          className="border border-shell-line bg-shell-surface lg:sticky lg:top-4 lg:h-[calc(100dvh-190px)]"
+          aria-label="World map canvas"
+        >
+          <MapCanvas markers={markers} />
+        </section>
 
-          {/* Add Zone Drawer */}
-          {showAddZone && (
-            <div className="mt-4 border-b border-shell-line pb-4">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-shell-muted">
-                Define New Exclusion Zone
-              </h4>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-                <label className="grid gap-1 text-xs font-medium">
-                  <span>Zone Name</span>
-                  <input
-                    type="text"
-                    placeholder="e.g. Spawn Sanctuary"
-                    value={newZoneName}
-                    onChange={(e) => setNewZoneName(e.target.value)}
-                    className="border border-shell-line px-2.5 py-1.5 font-mono text-xs"
-                  />
-                </label>
-
-                <label className="grid gap-1 text-xs font-medium">
-                  <span>Zone Geometry</span>
-                  <select
-                    value={newZoneType}
-                    onChange={(e) => setNewZoneType(e.target.value as "rectangle" | "polygon")}
-                    className="border border-shell-line px-2.5 py-1.5 text-xs"
-                  >
-                    <option value="rectangle">Rectangle (2 points)</option>
-                    <option value="polygon">Polygon</option>
-                  </select>
-                </label>
-
-                <label className="grid gap-1 text-xs font-medium">
-                  <span>Min X / Min Y</span>
-                  <div className="flex gap-1">
-                    <input
-                      type="number"
-                      placeholder="Min X"
-                      value={rectPoints.minX}
-                      onChange={(e) => setRectPoints({ ...rectPoints, minX: Number(e.target.value) })}
-                      className="w-1/2 border border-shell-line px-2 py-1 font-mono text-xs"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Min Y"
-                      value={rectPoints.minY}
-                      onChange={(e) => setRectPoints({ ...rectPoints, minY: Number(e.target.value) })}
-                      className="w-1/2 border border-shell-line px-2 py-1 font-mono text-xs"
-                    />
-                  </div>
-                </label>
-
-                <label className="grid gap-1 text-xs font-medium">
-                  <span>Max X / Max Y</span>
-                  <div className="flex gap-1">
-                    <input
-                      type="number"
-                      placeholder="Max X"
-                      value={rectPoints.maxX}
-                      onChange={(e) => setRectPoints({ ...rectPoints, maxX: Number(e.target.value) })}
-                      className="w-1/2 border border-shell-line px-2 py-1 font-mono text-xs"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Max Y"
-                      value={rectPoints.maxY}
-                      onChange={(e) => setRectPoints({ ...rectPoints, maxY: Number(e.target.value) })}
-                      className="w-1/2 border border-shell-line px-2 py-1 font-mono text-xs"
-                    />
-                  </div>
-                </label>
+        {/* Map Browser — 38% right split */}
+        <aside className="flex min-w-0 flex-col gap-6">
+          {/* Exclusion Zone Management Panel */}
+          <div className="border border-shell-line bg-shell-surface p-5">
+            <div className="flex items-center justify-between border-b border-shell-line pb-3">
+              <div>
+                <h3 className="text-base font-semibold">
+                  Exclusion Zones & Protection
+                </h3>
+                <p className="mt-1 text-xs text-shell-muted">
+                  Entities inside active exclusion zones will be skipped during
+                  automated cleanup and deletion sweeps.
+                </p>
               </div>
-
-              <div className="mt-3 flex items-center justify-between">
-                <div className="flex gap-4 text-xs">
-                  <label className="flex items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={protectBases}
-                      onChange={(e) => setProtectBases(e.target.checked)}
-                    />
-                    <span>Protect Bases</span>
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={protectPlayers}
-                      onChange={(e) => setProtectPlayers(e.target.checked)}
-                    />
-                    <span>Protect Players</span>
-                  </label>
-                </div>
-                <button
-                  type="button"
-                  disabled={!newZoneName.trim()}
-                  onClick={() => void handleAddZone()}
-                  className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-3 py-1 font-mono text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px] disabled:opacity-50"
-                >
-                  Save Zone
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Active Zones List */}
-          <div className="mt-4">
-            <p className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">
-              Active Zones ({exclusions?.zones.length ?? 0})
-            </p>
-            {(!exclusions || exclusions.zones.length === 0) ? (
-              <p className="mt-2 text-xs text-shell-muted">No exclusion zones configured.</p>
-            ) : (
-              <div className="mt-2 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-                {exclusions.zones.map((z) => (
-                  <div key={z.id} className="flex items-center justify-between border border-shell-line bg-shell-panel p-2.5">
-                    <div>
-                      <p className="font-semibold text-xs text-shell-ink">{z.name}</p>
-                      <p className="font-mono text-[10px] text-shell-muted">{z.zoneType} · {z.points.length} pts</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void handleRemoveZone(z.id)}
-                      className="text-xs text-shell-destructive hover:text-shell-destructive"
-                      title="Delete zone"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Coordinate Exclusion Tester */}
-          <div className="mt-5 border-t border-shell-line pt-4">
-            <h4 className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">
-              Test Coordinate for Exclusion
-            </h4>
-            <div className="mt-2 flex items-center gap-3">
-              <input
-                type="number"
-                placeholder="World X"
-                value={testCoord.x}
-                onChange={(e) => setTestCoord({ ...testCoord, x: Number(e.target.value) })}
-                className="w-32 border border-shell-line px-2.5 py-1 font-mono text-xs"
-              />
-              <input
-                type="number"
-                placeholder="World Y"
-                value={testCoord.y}
-                onChange={(e) => setTestCoord({ ...testCoord, y: Number(e.target.value) })}
-                className="w-32 border border-shell-line px-2.5 py-1 font-mono text-xs"
-              />
               <button
                 type="button"
-                onClick={() => void handleTestCoordinate()}
-                className="border border-shell-line bg-shell-surface px-3 py-1 font-mono text-xs hover:bg-shell-panel active:translate-y-[1px]"
+                onClick={() => setShowAddZone(!showAddZone)}
+                className="border border-shell-line bg-shell-surface px-3 py-1.5 font-mono text-xs text-shell-ink transition hover:bg-shell-panel active:translate-y-[1px]"
               >
-                Check
+                {showAddZone ? "Cancel" : "+ Add Exclusion Zone"}
               </button>
-              {testResult !== null && (
-                <span
-                  className={[
-                    "font-mono text-xs font-semibold uppercase px-2 py-0.5 rounded-sm",
-                    testResult ? "bg-shell-warning-subtle text-shell-warning" : "bg-shell-accent-subtle text-shell-accent",
-                  ].join(" ")}
-                >
-                  {testResult ? "Excluded (Protected)" : "Not Excluded"}
-                </span>
+            </div>
+
+            {/* Add Zone Drawer */}
+            {showAddZone && (
+              <div className="mt-4 border-b border-shell-line pb-4">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-shell-muted">
+                  Define New Exclusion Zone
+                </h4>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                  <label className="grid gap-1 text-xs font-medium">
+                    <span>Zone Name</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. Spawn Sanctuary"
+                      value={newZoneName}
+                      onChange={(e) => setNewZoneName(e.target.value)}
+                      className="border border-shell-line px-2.5 py-1.5 font-mono text-xs"
+                    />
+                  </label>
+
+                  <label className="grid gap-1 text-xs font-medium">
+                    <span>Zone Geometry</span>
+                    <select
+                      value={newZoneType}
+                      onChange={(e) =>
+                        setNewZoneType(e.target.value as "rectangle" | "polygon")
+                      }
+                      className="border border-shell-line px-2.5 py-1.5 text-xs"
+                    >
+                      <option value="rectangle">Rectangle (2 points)</option>
+                      <option value="polygon">Polygon</option>
+                    </select>
+                  </label>
+
+                  <label className="grid gap-1 text-xs font-medium">
+                    <span>Min X / Min Y</span>
+                    <div className="flex gap-1">
+                      <input
+                        type="number"
+                        placeholder="Min X"
+                        value={rectPoints.minX}
+                        onChange={(e) =>
+                          setRectPoints({ ...rectPoints, minX: Number(e.target.value) })
+                        }
+                        className="w-1/2 border border-shell-line px-2 py-1 font-mono text-xs"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Min Y"
+                        value={rectPoints.minY}
+                        onChange={(e) =>
+                          setRectPoints({ ...rectPoints, minY: Number(e.target.value) })
+                        }
+                        className="w-1/2 border border-shell-line px-2 py-1 font-mono text-xs"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="grid gap-1 text-xs font-medium">
+                    <span>Max X / Max Y</span>
+                    <div className="flex gap-1">
+                      <input
+                        type="number"
+                        placeholder="Max X"
+                        value={rectPoints.maxX}
+                        onChange={(e) =>
+                          setRectPoints({ ...rectPoints, maxX: Number(e.target.value) })
+                        }
+                        className="w-1/2 border border-shell-line px-2 py-1 font-mono text-xs"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Max Y"
+                        value={rectPoints.maxY}
+                        onChange={(e) =>
+                          setRectPoints({ ...rectPoints, maxY: Number(e.target.value) })
+                        }
+                        className="w-1/2 border border-shell-line px-2 py-1 font-mono text-xs"
+                      />
+                    </div>
+                  </label>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="flex gap-4 text-xs">
+                    <label className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={protectBases}
+                        onChange={(e) => setProtectBases(e.target.checked)}
+                      />
+                      <span>Protect Bases</span>
+                    </label>
+                    <label className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={protectPlayers}
+                        onChange={(e) => setProtectPlayers(e.target.checked)}
+                      />
+                      <span>Protect Players</span>
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!newZoneName.trim()}
+                    onClick={() => void handleAddZone()}
+                    className="border border-shell-accent-solid bg-shell-accent-solid-subtle px-3 py-1 font-mono text-xs font-semibold text-shell-accent hover:bg-shell-accent-subtle-hover active:translate-y-[1px] disabled:opacity-50"
+                  >
+                    Save Zone
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Active Zones List */}
+            <div className="mt-4">
+              <p className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">
+                Active Zones ({exclusions?.zones.length ?? 0})
+              </p>
+              {!exclusions || exclusions.zones.length === 0 ? (
+                <p className="mt-2 text-xs text-shell-muted">
+                  No exclusion zones configured.
+                </p>
+              ) : (
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                  {exclusions.zones.map((z) => (
+                    <div
+                      key={z.id}
+                      className="flex items-center justify-between border border-shell-line bg-shell-panel p-2.5"
+                    >
+                      <div>
+                        <p className="font-semibold text-xs text-shell-ink">{z.name}</p>
+                        <p className="font-mono text-[10px] text-shell-muted">
+                          {z.zoneType} · {z.points.length} pts
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleRemoveZone(z.id)}
+                        className="text-xs text-shell-destructive hover:text-shell-destructive"
+                        title="Delete zone"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          </div>
-        </div>
 
-        {/* Map Markers Table */}
-        <DataTable
-          columns={[
-            {
-              key: "label",
-              header: "Label",
-              render: (r) => <span className="font-semibold text-shell-ink">{r.label || "—"}</span>,
-            },
-            {
-              key: "type",
-              header: "Type",
-              render: (r) => <span className="text-shell-muted">{r.markerType}</span>,
-              width: "120px",
-            },
-            { key: "mapX", header: "Map X", render: (r) => r.mapX.toFixed(3), width: "100px" },
-            { key: "mapY", header: "Map Y", render: (r) => r.mapY.toFixed(3), width: "100px" },
-            { key: "worldX", header: "World X", render: (r) => r.worldX.toFixed(0), width: "100px" },
-            { key: "worldY", header: "World Y", render: (r) => r.worldY.toFixed(0), width: "100px" },
-          ]}
-          rows={filtered}
-          rowKey={(r) => `${r.markerType}:${r.label}:${r.worldX}`}
-          searchValue={query}
-          onSearchChange={setQuery}
-          searchPlaceholder="Filter by label or marker type…"
-          emptyHeadline="No map markers found"
-          emptyDescription="Load a save file first to view map markers."
-        />
+            {/* Coordinate Exclusion Tester */}
+            <div className="mt-5 border-t border-shell-line pt-4">
+              <h4 className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">
+                Test Coordinate for Exclusion
+              </h4>
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  type="number"
+                  placeholder="World X"
+                  value={testCoord.x}
+                  onChange={(e) =>
+                    setTestCoord({ ...testCoord, x: Number(e.target.value) })
+                  }
+                  className="w-32 border border-shell-line px-2.5 py-1 font-mono text-xs"
+                />
+                <input
+                  type="number"
+                  placeholder="World Y"
+                  value={testCoord.y}
+                  onChange={(e) =>
+                    setTestCoord({ ...testCoord, y: Number(e.target.value) })
+                  }
+                  className="w-32 border border-shell-line px-2.5 py-1 font-mono text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleTestCoordinate()}
+                  className="border border-shell-line bg-shell-surface px-3 py-1 font-mono text-xs hover:bg-shell-panel active:translate-y-[1px]"
+                >
+                  Check
+                </button>
+                {testResult !== null && (
+                  <span
+                    className={[
+                      "font-mono text-xs font-semibold uppercase px-2 py-0.5 rounded-sm",
+                      testResult
+                        ? "bg-shell-warning-subtle text-shell-warning"
+                        : "bg-shell-accent-subtle text-shell-accent",
+                    ].join(" ")}
+                  >
+                    {testResult ? "Excluded (Protected)" : "Not Excluded"}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Map Markers Table */}
+          <DataTable
+            columns={[
+              {
+                key: "label",
+                header: "Label",
+                render: (r) => (
+                  <span className="font-semibold text-shell-ink">{r.label || "—"}</span>
+                ),
+              },
+              {
+                key: "type",
+                header: "Type",
+                render: (r) => <span className="text-shell-muted">{r.markerType}</span>,
+                width: "120px",
+              },
+              {
+                key: "mapX",
+                header: "Map X",
+                render: (r) => r.mapX.toFixed(3),
+                width: "100px",
+              },
+              {
+                key: "mapY",
+                header: "Map Y",
+                render: (r) => r.mapY.toFixed(3),
+                width: "100px",
+              },
+              {
+                key: "worldX",
+                header: "World X",
+                render: (r) => r.worldX.toFixed(0),
+                width: "100px",
+              },
+              {
+                key: "worldY",
+                header: "World Y",
+                render: (r) => r.worldY.toFixed(0),
+                width: "100px",
+              },
+            ]}
+            rows={filtered}
+            rowKey={(r) => `${r.markerType}:${r.label}:${r.worldX}`}
+            searchValue={query}
+            onSearchChange={setQuery}
+            searchPlaceholder="Filter by label or marker type…"
+            emptyHeadline="No map markers found"
+            emptyDescription="Load a save file first to view map markers."
+          />
+        </aside>
       </div>
     </ViewShell>
   );

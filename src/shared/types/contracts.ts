@@ -310,7 +310,6 @@ export interface BulkAddKeyItemsDto {
   readonly keyItemIds: readonly string[];
 }
 
-
 export interface WorldOptionsDto {
   readonly expRate: number;
   readonly palCaptureRate: number;
@@ -365,12 +364,25 @@ export interface ExclusionConfig {
 }
 
 export interface MapMarkerProjection {
+  readonly id: string;
+  readonly markerType: string;
   readonly label: string;
   readonly worldX: number;
   readonly worldY: number;
+  readonly worldZ: number;
   readonly mapX: number;
   readonly mapY: number;
-  readonly markerType: string;
+}
+
+export interface MapDataProjection {
+  readonly mapVersion: string;
+  readonly markers: readonly MapMarkerProjection[];
+}
+
+export interface MapAssetPayload {
+  readonly name: string;
+  readonly mimeType: string;
+  readonly base64Data: string;
 }
 
 export type DiagnosticSeverity = "info" | "warning" | "error";
@@ -724,5 +736,3 @@ export interface XgpImportAuditResult {
   readonly backupPath?: string;
   readonly message: string;
 }
-
-
