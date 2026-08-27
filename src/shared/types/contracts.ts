@@ -370,8 +370,12 @@ export interface MapMarkerProjection {
   readonly worldX: number;
   readonly worldY: number;
   readonly worldZ: number;
+  /** "PreSakurajima" | "PostSakurajima" */
+  readonly mapVersion: string;
   readonly mapX: number;
   readonly mapY: number;
+  readonly treemapX: number;
+  readonly treemapY: number;
   /** Base camp area multiplier (0.5-10.0); null for non-base markers. */
   readonly areaRange?: number | null;
 }

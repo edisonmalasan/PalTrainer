@@ -10,7 +10,10 @@ use crate::domain::diagnostics::{
 };
 use crate::domain::guilds::{GuildMemberProjection, GuildProjection};
 use crate::domain::inventory::{InventoryProjection, InventorySlotProjection};
-use crate::domain::map::{world_to_map_coordinates, MapDataProjection, MapMarkerProjection};
+use crate::domain::map::{
+    sav_to_map_by_z, treemap_to_pixel, world_to_map_post_sakurajima, MapDataProjection,
+    MapMarkerProjection,
+};
 use crate::domain::pals::PalProjection;
 use crate::domain::players::PlayerProjection;
 use crate::domain::save_session::SessionError;
@@ -106,7 +109,7 @@ pub fn get_bases(state: State<'_, SessionState>) -> Result<Vec<BaseProjection>, 
 
     let _session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
 
-    let (mx, my) = world_to_map_coordinates(12000.0, -85000.0);
+    let (mx, my) = world_to_map_post_sakurajima(12000.0, -85000.0);
 
     Ok(vec![BaseProjection {
         base_id: "base_hq_01".into(),
@@ -241,8 +244,10 @@ pub fn get_map_markers(state: State<'_, SessionState>) -> Result<MapDataProjecti
 
     let _session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
 
-    let (b_mx, b_my) = world_to_map_coordinates(12000.0, -85000.0);
-    let (p_mx, p_my) = world_to_map_coordinates(15000.0, -82000.0);
+    let (b_mx, b_my) = sav_to_map_by_z(12000.0, -85000.0, 3200.0);
+    let (p_mx, p_my) = sav_to_map_by_z(15000.0, -82000.0, 3250.0);
+    let (b_tx, b_ty) = treemap_to_pixel(12000.0, -85000.0);
+    let (p_tx, p_ty) = treemap_to_pixel(15000.0, -82000.0);
 
     Ok(MapDataProjection {
         map_version: "PostSakurajima".into(),
@@ -254,8 +259,11 @@ pub fn get_map_markers(state: State<'_, SessionState>) -> Result<MapDataProjecti
                 world_x: 12000.0,
                 world_y: -85000.0,
                 world_z: 3200.0,
+                map_version: "PostSakurajima".into(),
                 map_x: b_mx,
                 map_y: b_my,
+                treemap_x: b_tx,
+                treemap_y: b_ty,
                 area_range: Some(1.0),
             },
             MapMarkerProjection {
@@ -265,8 +273,11 @@ pub fn get_map_markers(state: State<'_, SessionState>) -> Result<MapDataProjecti
                 world_x: 15000.0,
                 world_y: -82000.0,
                 world_z: 3250.0,
+                map_version: "PostSakurajima".into(),
                 map_x: p_mx,
                 map_y: p_my,
+                treemap_x: p_tx,
+                treemap_y: p_ty,
                 area_range: None,
             },
         ],

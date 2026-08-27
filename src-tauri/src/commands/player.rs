@@ -4,7 +4,7 @@ use tauri::State;
 
 use crate::commands::backup::BackupState;
 use crate::commands::save_session::SessionState;
-use crate::domain::map::map_to_world_coordinates;
+use crate::domain::map::map_to_world_post_sakurajima;
 use crate::domain::players::mutation::{
     normalize_player_uid, BulkPlayerOperationDto, MovePlayerToMapDto, UpdatePlayerDto,
 };
@@ -360,7 +360,7 @@ pub fn preview_move_player_to_map(
     let norm_uid = normalize_player_uid(&dto.uid);
 
     let mut preview = MutationPreview::new("move_player_to_map", session.save_root());
-    let (world_x, world_y) = map_to_world_coordinates(dto.map_x, dto.map_y);
+    let (world_x, world_y) = map_to_world_post_sakurajima(dto.map_x, dto.map_y);
     preview.add_modify_entity(
         "Player",
         &norm_uid,
