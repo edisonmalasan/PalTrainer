@@ -1,6 +1,9 @@
 //! Inventory and container read-only projections and mutations.
 
+pub mod dynamic;
 pub mod mutation;
+
+pub use dynamic::{DynamicContainerReport, DynamicItem, DynamicItemManager};
 
 use serde::{Deserialize, Serialize};
 
