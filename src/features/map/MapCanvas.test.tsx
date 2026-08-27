@@ -28,6 +28,7 @@ const SAMPLE_MARKERS = [
     worldZ: 3200,
     mapX: 10,
     mapY: 20,
+    areaRange: 1.0,
   },
   {
     id: "player_1",
@@ -101,9 +102,87 @@ describe("MapCanvas", () => {
     await waitFor(() => {
       expect(screen.getByTestId("map-markers-layer")).toBeInTheDocument();
     });
-    expect(screen.getByTitle("HQ (10, 20)")).toBeInTheDocument();
-    expect(screen.getByTitle("Host (-30, 40)")).toBeInTheDocument();
+    expect(screen.getByTestId("map-marker-base_1")).toBeInTheDocument();
+    expect(screen.getByTestId("map-marker-player_1")).toBeInTheDocument();
     expect(screen.getByText("2 marker(s)")).toBeInTheDocument();
+  });
+
+  it("drags a base marker and reports the new map grid position", async () => {
+    mockTilesOk();
+    const onMoveMarker = vi.fn();
+    render(<MapCanvas markers={SAMPLE_MARKERS} onMoveMarker={onMoveMarker} />);
+
+    const marker = await screen.findByTestId("map-marker-base_1");
+    // Initial layer position is (mapX + 1024, mapY + 1024) = (1034, 1044).
+    fireEvent.pointerDown(marker, {
+      button: 0,
+      pointerId: 1,
+      clientX: 1034,
+      clientY: 1044,
+    });
+    fireEvent.pointerMove(marker, { pointerId: 1, clientX: 1074, clientY: 1054 });
+    fireEvent.pointerUp(marker, { pointerId: 1, clientX: 1074, clientY: 1054 });
+
+    expect(onMoveMarker).toHaveBeenCalledOnce();
+    const [moved, mapX, mapY] = onMoveMarker.mock.calls[0];
+    expect(moved.id).toBe("base_1");
+    expect(mapX).toBe(50); // 10 + 40px drag
+    expect(mapY).toBe(30); // 20 + 10px drag
+  });
+
+  it("drags the base radius ring and reports a clamped area range", async () => {
+    mockTilesOk();
+    const onAreaRangeChange = vi.fn();
+    const base = { ...SAMPLE_MARKERS[0], areaRange: 1.0 };
+    render(<MapCanvas markers={[base]} onAreaRangeChange={onAreaRangeChange} />);
+
+    const handle = await screen.findByTestId("map-ring-handle-base_1");
+    // Ring radius at 1.0 is 24 grid units; handle starts at layer x 1058.
+    fireEvent.pointerDown(handle, {
+      button: 0,
+      pointerId: 1,
+      clientX: 1058,
+      clientY: 1044,
+    });
+    // Drag 48px from the center -> radius 48 -> 2.0x area range.
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 1082, clientY: 1044 });
+    fireEvent.pointerUp(handle, { pointerId: 1, clientX: 1082, clientY: 1044 });
+
+    expect(onAreaRangeChange).toHaveBeenCalledOnce();
+    expect(onAreaRangeChange.mock.calls[0][0].id).toBe("base_1");
+    expect(onAreaRangeChange.mock.calls[0][1]).toBe(2);
+
+    // Oversized drags clamp to the save-format maximum (10.0).
+    cleanup();
+    const onClamped = vi.fn();
+    render(<MapCanvas markers={[base]} onAreaRangeChange={onClamped} />);
+    const handle2 = screen.getByTestId("map-ring-handle-base_1");
+    fireEvent.pointerDown(handle2, {
+      button: 0,
+      pointerId: 2,
+      clientX: 1058,
+      clientY: 1044,
+    });
+    fireEvent.pointerMove(handle2, { pointerId: 2, clientX: 2058, clientY: 1044 });
+    fireEvent.pointerUp(handle2, { pointerId: 2, clientX: 2058, clientY: 1044 });
+    expect(onClamped.mock.calls[0][1]).toBe(10);
+  });
+
+  it("shows the hover overlay with marker details", async () => {
+    mockTilesOk();
+    render(<MapCanvas markers={SAMPLE_MARKERS} />);
+
+    const marker = await screen.findByTestId("map-marker-base_1");
+    fireEvent.mouseEnter(marker);
+
+    const overlay = screen.getByTestId("map-hover-overlay");
+    expect(overlay).toHaveTextContent("Base");
+    expect(overlay).toHaveTextContent("HQ");
+    expect(overlay).toHaveTextContent("MAP 10 , 20");
+    expect(overlay).toHaveTextContent("AREA 100%");
+
+    fireEvent.mouseLeave(marker);
+    expect(screen.queryByTestId("map-hover-overlay")).not.toBeInTheDocument();
   });
 
   it("flips pressed state on the overlay toggles", () => {

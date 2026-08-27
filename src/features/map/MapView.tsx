@@ -1,17 +1,28 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { DataTable, useSearchFilter } from "../../shared/components/DataTable";
+import { PreviewModal } from "../../shared/components/PreviewModal";
 import { ViewShell } from "../../shared/components/ViewShell";
 import { MapCanvas } from "./MapCanvas";
 import { useAsync } from "../../shared/hooks/useAsync";
 import type {
   ExclusionConfig,
   MapDataProjection,
+  MoveBaseToMapDto,
+  MovePlayerToMapDto,
+  MutationPreview,
+  UpdateBaseAreaRangeDto,
   ZoneExclusion,
 } from "../../shared/types/contracts";
 import { invokeCommand } from "../../shared/utils/command";
 
+type MarkerFilter = "Bases" | "Players";
+
 export function MapView() {
   const [reloadKey, setReloadKey] = useState(0);
+  const [markerFilter, setMarkerFilter] = useState<MarkerFilter>("Bases");
+  const [pendingPreview, setPendingPreview] = useState<MutationPreview | null>(null);
+  const [committing, setCommitting] = useState(false);
+  const pendingCommitRef = useRef<(() => Promise<void>) | null>(null);
 
   const markerState = useAsync(
     useCallback(() => invokeCommand<MapDataProjection>("get_map_markers"), []),
@@ -24,10 +35,85 @@ export function MapView() {
   );
 
   const markers = markerState.status === "ok" ? markerState.data.markers : [];
+  const visibleMarkers = markers.filter((m) =>
+    markerFilter === "Bases" ? m.markerType === "Base" : m.markerType === "Player",
+  );
   const exclusions = configState.status === "ok" ? configState.data : null;
 
+  async function openMovePreview(
+    marker: (typeof markers)[number],
+    mapX: number,
+    mapY: number,
+  ) {
+    try {
+      if (marker.markerType === "Base") {
+        const dto: MoveBaseToMapDto = { baseId: marker.id, mapX, mapY };
+        const preview = await invokeCommand<MutationPreview>(
+          "preview_move_base_to_map",
+          {
+            dto,
+          },
+        );
+        pendingCommitRef.current = async () => {
+          await invokeCommand("commit_move_base_to_map", { dto });
+          setReloadKey((k) => k + 1);
+        };
+        setPendingPreview(preview);
+      } else {
+        const dto: MovePlayerToMapDto = { uid: marker.id, mapX, mapY };
+        const preview = await invokeCommand<MutationPreview>(
+          "preview_move_player_to_map",
+          {
+            dto,
+          },
+        );
+        pendingCommitRef.current = async () => {
+          await invokeCommand("commit_move_player_to_map", { dto });
+          setReloadKey((k) => k + 1);
+        };
+        setPendingPreview(preview);
+      }
+    } catch (err: unknown) {
+      console.error("Failed to preview marker move", err);
+    }
+  }
+
+  async function openAreaRangePreview(
+    marker: (typeof markers)[number],
+    areaRange: number,
+  ) {
+    if (marker.markerType !== "Base") return;
+    try {
+      const dto: UpdateBaseAreaRangeDto = { baseId: marker.id, areaRange };
+      const preview = await invokeCommand<MutationPreview>(
+        "preview_update_base_area_range",
+        {
+          dto,
+        },
+      );
+      pendingCommitRef.current = async () => {
+        await invokeCommand("commit_update_base_area_range", { dto });
+        setReloadKey((k) => k + 1);
+      };
+      setPendingPreview(preview);
+    } catch (err: unknown) {
+      console.error("Failed to preview area range update", err);
+    }
+  }
+
+  async function handleConfirmPending() {
+    setCommitting(true);
+    try {
+      await pendingCommitRef.current?.();
+      setPendingPreview(null);
+      pendingCommitRef.current = null;
+    } finally {
+      setCommitting(false);
+    }
+  }
+
   const { query, setQuery, filtered } = useSearchFilter(
-    markers,
+    visibleMarkers,
     (r, q) =>
       r.label.toLowerCase().includes(q) || r.markerType.toLowerCase().includes(q),
   );
@@ -108,7 +194,15 @@ export function MapView() {
           className="border border-shell-line bg-shell-surface lg:sticky lg:top-4 lg:h-[calc(100dvh-190px)]"
           aria-label="World map canvas"
         >
-          <MapCanvas markers={markers} />
+          <MapCanvas
+            markers={visibleMarkers}
+            onMoveMarker={(marker, mapX, mapY) =>
+              void openMovePreview(marker, mapX, mapY)
+            }
+            onAreaRangeChange={(marker, areaRange) =>
+              void openAreaRangePreview(marker, areaRange)
+            }
+          />
         </section>
 
         {/* Map Browser — 38% right split */}
@@ -329,6 +423,31 @@ export function MapView() {
             </div>
           </div>
 
+          {/* Bases | Players toggle (phase 16 outcome) */}
+          <div
+            className="flex border border-shell-line bg-shell-surface font-mono text-xs"
+            role="tablist"
+            aria-label="Marker filter"
+          >
+            {(["Bases", "Players"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                role="tab"
+                aria-selected={markerFilter === option}
+                onClick={() => setMarkerFilter(option)}
+                className={[
+                  "flex-1 px-3 py-1.5 uppercase tracking-wide transition-colors",
+                  markerFilter === option
+                    ? "bg-shell-accent-subtle text-shell-accent"
+                    : "text-shell-muted hover:bg-shell-panel hover:text-shell-ink",
+                ].join(" ")}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+
           {/* Map Markers Table */}
           <DataTable
             columns={[
@@ -380,6 +499,16 @@ export function MapView() {
           />
         </aside>
       </div>
+
+      <PreviewModal
+        preview={pendingPreview}
+        committing={committing}
+        onCancel={() => {
+          setPendingPreview(null);
+          pendingCommitRef.current = null;
+        }}
+        onConfirm={handleConfirmPending}
+      />
     </ViewShell>
   );
 }

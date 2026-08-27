@@ -15,6 +15,13 @@ const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 8;
 const ZOOM_STEP = 1.25;
 
+// Presentation placeholder until 16.4 calibration: ring radius in map grid
+// units per 1.0 of area_range. The backend stays the authority for saved
+// values; bounds mirror `base_camp::MIN/MAX_AREA_RANGE` for inline feedback.
+const BASE_RING_GRID_UNITS = 24;
+const MIN_AREA_RANGE = 0.5;
+const MAX_AREA_RANGE = 10.0;
+
 interface Vec2 {
   readonly x: number;
   readonly y: number;
@@ -126,6 +133,36 @@ function IconCrosshair() {
   );
 }
 
+// ── Hover overlay ─────────────────────────────────────────────────────────────
+
+function HoverOverlay({ marker }: { readonly marker: MapMarkerProjection | null }) {
+  if (!marker) return null;
+  return (
+    <div
+      className="pointer-events-none absolute right-3 top-3 max-w-[240px] border border-shell-line bg-shell-surface/95 px-3 py-2 shadow-sm"
+      data-testid="map-hover-overlay"
+    >
+      <p className="font-mono text-[10px] uppercase tracking-wide text-shell-muted">
+        {marker.markerType}
+      </p>
+      <p className="mt-0.5 truncate text-sm font-semibold text-shell-ink">
+        {marker.label || marker.id}
+      </p>
+      <p className="mt-0.5 font-mono text-[11px] leading-5 text-shell-muted">
+        MAP {marker.mapX} , {marker.mapY}
+        <br />
+        WORLD {marker.worldX.toFixed(0)} , {marker.worldY.toFixed(0)}
+        {marker.areaRange != null && (
+          <>
+            <br />
+            AREA {Math.round(marker.areaRange * 100)}%
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
 // ── Canvas ────────────────────────────────────────────────────────────────────
 
 function IconPin() {
@@ -144,11 +181,26 @@ function IconPin() {
 
 export function MapCanvas({
   markers = [],
+  onMoveMarker,
+  onAreaRangeChange,
 }: {
   readonly markers?: readonly MapMarkerProjection[];
+  readonly onMoveMarker?: (
+    marker: MapMarkerProjection,
+    mapX: number,
+    mapY: number,
+  ) => void;
+  readonly onAreaRangeChange?: (marker: MapMarkerProjection, areaRange: number) => void;
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const dragRef = useRef<{ pointerId: number; start: Vec2; origin: Vec2 } | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    mode: "pan" | "move" | "ring";
+    start: Vec2;
+    origin: Vec2;
+    marker: MapMarkerProjection | null;
+    originLayer: Vec2;
+  } | null>(null);
   const fittedRef = useRef(false);
 
   const [tiles, setTiles] = useState<{ world: string | null; treemap: string | null }>({
@@ -161,6 +213,10 @@ export function MapCanvas({
   const [showTreemap, setShowTreemap] = useState(false);
   const [showCrosshair, setShowCrosshair] = useState(true);
   const [showMarkers, setShowMarkers] = useState(true);
+  const [dragMarkerId, setDragMarkerId] = useState<string | null>(null);
+  const [dragPos, setDragPos] = useState<Vec2 | null>(null);
+  const [ringRange, setRingRange] = useState<number | null>(null);
+  const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -255,12 +311,50 @@ export function MapCanvas({
     zoomAt(e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, viewportPoint(e));
   }
 
+  function clampAreaRange(range: number): number {
+    const stepped = Math.round(range * 10) / 10;
+    return Math.min(MAX_AREA_RANGE, Math.max(MIN_AREA_RANGE, stepped));
+  }
+
+  function markerLayerPos(marker: MapMarkerProjection): Vec2 {
+    if (dragMarkerId === marker.id && dragPos) return dragPos;
+    return { x: mapGridToCanvas(marker.mapX), y: mapGridToCanvas(marker.mapY) };
+  }
+
+  function beginMarkerDrag(
+    e: React.PointerEvent<HTMLElement>,
+    marker: MapMarkerProjection,
+    mode: "move" | "ring",
+  ) {
+    if (e.button !== 0) return;
+    // Keep the viewport pan handler out of marker drags.
+    e.stopPropagation();
+    const pos = markerLayerPos(marker);
+    dragRef.current = {
+      pointerId: e.pointerId,
+      mode,
+      start: { x: e.clientX, y: e.clientY },
+      origin: view.offset,
+      marker,
+      originLayer: pos,
+    };
+    setDragMarkerId(marker.id);
+    setHoveredMarkerId(null);
+    if (mode === "move") setDragPos(pos);
+    if (mode === "ring") setRingRange(clampAreaRange(marker.areaRange ?? 1.0));
+    // jsdom has no pointer capture; guard so tests can simulate drag events.
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  }
+
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
     dragRef.current = {
       pointerId: e.pointerId,
+      mode: "pan",
       start: { x: e.clientX, y: e.clientY },
       origin: view.offset,
+      marker: null,
+      originLayer: { x: 0, y: 0 },
     };
     // jsdom has no pointer capture; guard so tests can simulate drag events.
     e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -270,17 +364,55 @@ export function MapCanvas({
     setCursor(viewportPoint(e));
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== e.pointerId) return;
-    setView((prev) => ({
-      ...prev,
-      offset: {
-        x: drag.origin.x + (e.clientX - drag.start.x),
-        y: drag.origin.y + (e.clientY - drag.start.y),
-      },
-    }));
+
+    if (drag.mode === "pan") {
+      setView((prev) => ({
+        ...prev,
+        offset: {
+          x: drag.origin.x + (e.clientX - drag.start.x),
+          y: drag.origin.y + (e.clientY - drag.start.y),
+        },
+      }));
+      return;
+    }
+
+    if (!drag.marker) return;
+    // Drag deltas are expressed in world-layer pixels so markers track the
+    // cursor one-to-one at any zoom level.
+    const dx = (e.clientX - drag.start.x) / view.zoom;
+    const dy = (e.clientY - drag.start.y) / view.zoom;
+
+    if (drag.mode === "move") {
+      setDragPos({ x: drag.originLayer.x + dx, y: drag.originLayer.y + dy });
+    } else {
+      const viewport = viewportPoint(e);
+      const pointerLayer = {
+        x: viewport.x - view.offset.x,
+        y: viewport.y - view.offset.y,
+      };
+      const radius = Math.abs(pointerLayer.x - drag.originLayer.x);
+      setRingRange(clampAreaRange(radius / BASE_RING_GRID_UNITS));
+    }
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    if (dragRef.current?.pointerId === e.pointerId) dragRef.current = null;
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+
+    if (drag.mode === "move" && drag.marker && dragPos) {
+      onMoveMarker?.(
+        drag.marker,
+        Math.round(dragPos.x - MAP_PIXEL_SIZE / 2),
+        Math.round(dragPos.y - MAP_PIXEL_SIZE / 2),
+      );
+    } else if (drag.mode === "ring" && drag.marker && ringRange !== null) {
+      onAreaRangeChange?.(drag.marker, ringRange);
+    }
+
+    dragRef.current = null;
+    setDragMarkerId(null);
+    setDragPos(null);
+    setRingRange(null);
   }
 
   const cursorMap: Vec2 | null = cursor
@@ -422,26 +554,86 @@ export function MapCanvas({
           )}
           {showMarkers && (
             <div data-testid="map-markers-layer">
-              {markers.map((marker) => (
-                <div
-                  key={marker.id}
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
-                  style={{
-                    left: mapGridToCanvas(marker.mapX),
-                    top: mapGridToCanvas(marker.mapY),
-                  }}
-                  title={`${marker.label || marker.markerType} (${marker.mapX}, ${marker.mapY})`}
-                >
-                  <span
-                    className={[
-                      "block h-2.5 w-2.5 rounded-full border border-shell-line shadow-sm",
-                      marker.markerType === "Base"
-                        ? "bg-shell-accent"
-                        : "bg-shell-warning",
-                    ].join(" ")}
-                  />
-                </div>
-              ))}
+              {markers.map((marker) => {
+                const pos = markerLayerPos(marker);
+                const isDragging = dragMarkerId === marker.id;
+                const areaRange =
+                  isDragging && ringRange !== null
+                    ? ringRange
+                    : (marker.areaRange ?? null);
+                const ringRadius =
+                  areaRange !== null ? areaRange * BASE_RING_GRID_UNITS : null;
+                return (
+                  <div key={marker.id}>
+                    {ringRadius !== null && (
+                      <svg
+                        className="pointer-events-none absolute text-shell-accent"
+                        style={{
+                          left: pos.x - ringRadius,
+                          top: pos.y - ringRadius,
+                          width: ringRadius * 2,
+                          height: ringRadius * 2,
+                          overflow: "visible",
+                        }}
+                        data-testid={`map-base-ring-${marker.id}`}
+                        aria-hidden="true"
+                      >
+                        <circle
+                          cx={ringRadius}
+                          cy={ringRadius}
+                          r={ringRadius}
+                          fill="currentColor"
+                          fillOpacity={0.08}
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                          strokeDasharray="4 3"
+                        />
+                      </svg>
+                    )}
+                    <div
+                      className={[
+                        "absolute -translate-x-1/2 -translate-y-1/2 touch-none",
+                        marker.markerType === "Base" ? "cursor-move" : "cursor-grab",
+                        isDragging ? "z-10" : "",
+                      ].join(" ")}
+                      style={{ left: pos.x, top: pos.y }}
+                      onPointerDown={(e) => beginMarkerDrag(e, marker, "move")}
+                      onMouseEnter={() => setHoveredMarkerId(marker.id)}
+                      onMouseLeave={() =>
+                        setHoveredMarkerId((id) => (id === marker.id ? null : id))
+                      }
+                      data-testid={`map-marker-${marker.id}`}
+                    >
+                      <span
+                        className={[
+                          "block rounded-full border border-shell-line shadow-sm transition-transform",
+                          marker.markerType === "Base"
+                            ? "bg-shell-accent"
+                            : "bg-shell-warning",
+                          marker.markerType === "Base" ? "h-3 w-3" : "h-2.5 w-2.5",
+                          isDragging ? "scale-125" : "",
+                        ].join(" ")}
+                      />
+                    </div>
+                    {ringRadius !== null && (
+                      <div
+                        className={[
+                          "absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border border-shell-accent bg-shell-surface shadow-sm",
+                          isDragging ? "z-10" : "",
+                        ].join(" ")}
+                        style={{ left: pos.x + ringRadius, top: pos.y }}
+                        onPointerDown={(e) => beginMarkerDrag(e, marker, "ring")}
+                        onMouseEnter={() => setHoveredMarkerId(marker.id)}
+                        onMouseLeave={() =>
+                          setHoveredMarkerId((id) => (id === marker.id ? null : id))
+                        }
+                        title="Drag to resize base area range"
+                        data-testid={`map-ring-handle-${marker.id}`}
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -462,6 +654,13 @@ export function MapCanvas({
               style={{ left: cursor.x }}
             />
           </div>
+        )}
+
+        {/* Hover overlay */}
+        {hoveredMarkerId && !dragMarkerId && (
+          <HoverOverlay
+            marker={markers.find((m) => m.id === hoveredMarkerId) ?? null}
+          />
         )}
 
         {/* Tile loading / error states */}
