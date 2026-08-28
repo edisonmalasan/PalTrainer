@@ -363,6 +363,16 @@ export interface ExclusionConfig {
   readonly zones: readonly ZoneExclusion[];
 }
 
+/** Draft for a zone drawn on the map canvas; points are post-Sakurajima map-grid units. */
+export interface ZoneExclusionFromMapDto {
+  readonly name: string;
+  readonly zoneType: string;
+  readonly points: readonly Point2D[];
+  readonly protectBases: boolean;
+  readonly protectPlayers: boolean;
+  readonly protectStructures: boolean;
+}
+
 export interface MapMarkerProjection {
   readonly id: string;
   readonly markerType: string;

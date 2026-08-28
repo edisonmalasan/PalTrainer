@@ -119,6 +119,8 @@ pub fn run() {
             commands::exclusions::add_zone_exclusion,
             commands::exclusions::remove_zone_exclusion,
             commands::exclusions::check_coordinate_excluded,
+            commands::exclusions::is_point_in_exclusion,
+            commands::exclusions::add_zone_exclusion_from_map,
             commands::world::get_world_options,
             commands::world::preview_save_world_options,
             commands::world::commit_save_world_options,
