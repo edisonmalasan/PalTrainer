@@ -71,29 +71,44 @@ fn build_cleanup_preview(
             );
         }
         CleanupTarget::UnreferencedData => {
-            preview.add_delete_entity(
-                "CharacterSaveParameterMap",
-                "unreferenced_records",
-                "Clean Unreferenced Character Data",
-                "Purge 14 orphaned character map entries not linked to any active player, palbox, base worker, or dungeon spawn."
-                    .to_string(),
-            );
-            preview.add_delete_entity(
-                "ItemContainerSaveDataMap",
-                "orphaned_containers",
-                "Clean Orphaned Item Containers",
-                "Purge 3 orphaned containers not referenced by any player or base structure."
-                    .to_string(),
-            );
+            match crate::domain::diagnostics::world_index::harvest_world_index(session) {
+                Ok(index) => {
+                    let character_sweep =
+                        crate::domain::diagnostics::orphans::sweep_orphaned_characters(&index);
+                    let dynamic_sweep =
+                        crate::domain::diagnostics::orphans::purge_dynamic_items(&index);
+                    for report in [character_sweep, dynamic_sweep] {
+                        crate::domain::diagnostics::orphans::queue_sweep(&report, &mut preview);
+                    }
+                    if !exclusions.excluded_player_uids.is_empty() {
+                        preview.add_warning(format!(
+                            "{} excluded player(s) keep their character records during orphan sweeps.",
+                            exclusions.excluded_player_uids.len()
+                        ));
+                    }
+                }
+                Err(error) => {
+                    preview.add_warning(format!(
+                        "[ORPHAN_SCAN_UNAVAILABLE] Orphan sweep skipped: {}. No deletions queued.",
+                        error.message
+                    ));
+                }
+            }
         }
         CleanupTarget::NonBaseMapObjects => {
-            preview.add_delete_entity(
-                "MapObjectSaveData",
-                "wilderness_placed_structures",
-                "Purge Non-Base Map Objects",
-                "Remove 8 player-placed structures built outside registered base territory radii."
-                    .to_string(),
-            );
+            match crate::domain::diagnostics::world_index::harvest_world_index(session) {
+                Ok(index) => {
+                    let sweep =
+                        crate::domain::diagnostics::orphans::sweep_non_base_map_objects(&index);
+                    crate::domain::diagnostics::orphans::queue_sweep(&sweep, &mut preview);
+                }
+                Err(error) => {
+                    preview.add_warning(format!(
+                        "[MAP_OBJECT_SCAN_UNAVAILABLE] Non-base map object scan skipped: {}.",
+                        error.message
+                    ));
+                }
+            }
             if !exclusions.zones.is_empty() {
                 preview.add_warning(format!(
                     "{} protected exclusion zone(s) will preserve non-base structures inside their boundaries.",
