@@ -3,6 +3,7 @@
 pub mod cleanup;
 pub mod illegal;
 pub mod orphans;
+pub mod overfilled;
 pub mod repair;
 pub mod reset;
 pub mod world_index;
