@@ -435,22 +435,31 @@ fn collect_all_diagnostic_issues(
         }
     }
 
-    // 6. Inventory Containers & Capacity check
-    issues.push(DiagnosticIssue {
-        severity: DiagnosticSeverity::Info,
-        category: DiagnosticCategory::OverfilledContainer,
-        code: "CONTAINERS_VALID".into(),
-        message: "No item containers exceed their defined slot capacity.".into(),
-        target_id: "inventory_containers".into(),
-        context: None,
-        can_auto_repair: true,
-        repair_action: Some(crate::domain::diagnostics::RepairActionDescriptor {
-            label: "Trim Overfilled Containers".into(),
-            description: "Safely consolidate or trim excess container item slots.".into(),
-            affected_entity_count: 0,
-        }),
-        cleanup_action: None,
-    });
+    // 6. Overfilled container detection over decoded inventory projections.
+    // Container slots live in RawData blobs, so no projections are harvested
+    // yet; the detection still runs (over an empty set) and reports honest
+    // status instead of a fabricated "all valid" Info.
+    {
+        let inventories: Vec<crate::domain::inventory::InventoryProjection> = Vec::new();
+        let overfilled = crate::domain::diagnostics::overfilled::detect_overfilled_inventories(
+            &inventories,
+            crate::domain::diagnostics::overfilled::DEFAULT_OVERFILL_BUFFER,
+        );
+        issues.extend(crate::domain::diagnostics::overfilled::overfilled_to_issues(&overfilled));
+        if overfilled.is_empty() {
+            issues.push(DiagnosticIssue {
+                severity: DiagnosticSeverity::Info,
+                category: DiagnosticCategory::OverfilledContainer,
+                code: "OVERFILLED_SCAN_PENDING".into(),
+                message: "No inventory projections were decoded, so the overfilled-container scan has nothing to evaluate yet. It will run once the item container RawData decoder is wired up.".into(),
+                target_id: "inventory_containers".into(),
+                context: None,
+                can_auto_repair: false,
+                repair_action: None,
+                cleanup_action: None,
+            });
+        }
+    }
 
     // 7. Death Bag & Private Chest Lock safety check
     issues.push(DiagnosticIssue {
