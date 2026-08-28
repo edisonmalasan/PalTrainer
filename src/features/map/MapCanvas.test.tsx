@@ -57,7 +57,7 @@ describe("MapCanvas", () => {
     cleanup();
   });
 
-  it("renders the seven-icon toolbar and requests both tiles", async () => {
+  it("renders the toolbar controls and requests both tiles", async () => {
     mockTilesOk();
     render(<MapCanvas />);
 
@@ -72,6 +72,8 @@ describe("MapCanvas", () => {
       "Toggle treemap overlay",
       "Toggle crosshair",
       "Toggle markers",
+      "Draw rectangle exclusion zone",
+      "Draw polygon exclusion zone",
     ]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
@@ -223,5 +225,145 @@ describe("MapCanvas", () => {
     expect(alert).toHaveTextContent(
       "Map asset 'world-map.png' is missing from the app resources.",
     );
+  });
+
+  it("draws a rectangle zone and reports map-grid corners", () => {
+    mockTilesOk();
+    const onZoneDrawn = vi.fn();
+    render(<MapCanvas onZoneDrawn={onZoneDrawn} />);
+
+    const tool = screen.getByRole("button", {
+      name: "Draw rectangle exclusion zone",
+    });
+    expect(tool).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(tool);
+    expect(tool).toHaveAttribute("aria-pressed", "true");
+
+    const viewport = screen.getByTestId("map-viewport");
+    // Layer pixel = grid + 1024 at the default zoom/offset.
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      pointerId: 1,
+      clientX: 1124,
+      clientY: 1124,
+    });
+    fireEvent.pointerMove(viewport, { pointerId: 1, clientX: 1224, clientY: 1224 });
+    expect(screen.getByTestId("map-zone-draft")).toBeInTheDocument();
+    fireEvent.pointerUp(viewport, { pointerId: 1, clientX: 1224, clientY: 1224 });
+
+    expect(onZoneDrawn).toHaveBeenCalledOnce();
+    expect(onZoneDrawn.mock.calls[0][0]).toBe("rectangle");
+    expect(onZoneDrawn.mock.calls[0][1]).toEqual([
+      { x: 100, y: 100 },
+      { x: 200, y: 200 },
+    ]);
+    expect(screen.queryByTestId("map-zone-draft")).not.toBeInTheDocument();
+  });
+
+  it("cancels a zero-area rectangle draft without a callback", () => {
+    mockTilesOk();
+    const onZoneDrawn = vi.fn();
+    render(<MapCanvas onZoneDrawn={onZoneDrawn} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Draw rectangle exclusion zone" }),
+    );
+    const viewport = screen.getByTestId("map-viewport");
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      pointerId: 1,
+      clientX: 1124,
+      clientY: 1124,
+    });
+    fireEvent.pointerUp(viewport, { pointerId: 1, clientX: 1124, clientY: 1124 });
+
+    expect(onZoneDrawn).not.toHaveBeenCalled();
+  });
+
+  it("draws a polygon zone vertex-by-vertex and finishes on double-click", () => {
+    mockTilesOk();
+    const onZoneDrawn = vi.fn();
+    render(<MapCanvas onZoneDrawn={onZoneDrawn} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Draw polygon exclusion zone" }),
+    );
+    const viewport = screen.getByTestId("map-viewport");
+    fireEvent.pointerUp(viewport, { pointerId: 1, clientX: 1124, clientY: 1124 });
+    fireEvent.pointerUp(viewport, { pointerId: 1, clientX: 1224, clientY: 1124 });
+    fireEvent.pointerUp(viewport, { pointerId: 1, clientX: 1174, clientY: 1224 });
+    // The status bar tracks the pending vertex count while drawing.
+    expect(screen.getByTestId("map-status-right")).toHaveTextContent("3 vertex(ies)");
+    fireEvent.doubleClick(viewport);
+
+    expect(onZoneDrawn).toHaveBeenCalledOnce();
+    expect(onZoneDrawn.mock.calls[0][0]).toBe("polygon");
+    expect(onZoneDrawn.mock.calls[0][1]).toEqual([
+      { x: 100, y: 100 },
+      { x: 200, y: 100 },
+      { x: 150, y: 200 },
+    ]);
+  });
+
+  it("does not finish a polygon with fewer than three vertices", () => {
+    mockTilesOk();
+    const onZoneDrawn = vi.fn();
+    render(<MapCanvas onZoneDrawn={onZoneDrawn} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Draw polygon exclusion zone" }),
+    );
+    const viewport = screen.getByTestId("map-viewport");
+    fireEvent.pointerUp(viewport, { pointerId: 1, clientX: 1124, clientY: 1124 });
+    fireEvent.pointerUp(viewport, { pointerId: 1, clientX: 1224, clientY: 1124 });
+    fireEvent.doubleClick(viewport);
+
+    expect(onZoneDrawn).not.toHaveBeenCalled();
+  });
+
+  it("cancels the zone draft with Escape", () => {
+    mockTilesOk();
+    const onZoneDrawn = vi.fn();
+    render(<MapCanvas onZoneDrawn={onZoneDrawn} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Draw rectangle exclusion zone" }),
+    );
+    const viewport = screen.getByTestId("map-viewport");
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      pointerId: 1,
+      clientX: 1124,
+      clientY: 1124,
+    });
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.pointerUp(viewport, { pointerId: 1, clientX: 1224, clientY: 1224 });
+
+    expect(onZoneDrawn).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("map-zone-draft")).not.toBeInTheDocument();
+  });
+
+  it("renders persisted exclusion zone overlays", () => {
+    mockTilesOk();
+    render(
+      <MapCanvas
+        zones={[
+          {
+            id: "z1",
+            name: "Spawn Sanctuary",
+            zoneType: "rectangle",
+            points: [
+              { x: 0, y: 0 },
+              { x: 100, y: 100 },
+            ],
+            protectBases: true,
+            protectPlayers: true,
+            protectStructures: true,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("map-zone-z1")).toBeInTheDocument();
   });
 });

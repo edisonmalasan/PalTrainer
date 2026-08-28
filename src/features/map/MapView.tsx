@@ -10,8 +10,10 @@ import type {
   MoveBaseToMapDto,
   MovePlayerToMapDto,
   MutationPreview,
+  Point2D,
   UpdateBaseAreaRangeDto,
   ZoneExclusion,
+  ZoneExclusionFromMapDto,
 } from "../../shared/types/contracts";
 import { invokeCommand } from "../../shared/utils/command";
 
@@ -169,6 +171,28 @@ export function MapView() {
     }
   }
 
+  // A zone drawn on the canvas arrives in post-Sakurajima map-grid units; the
+  // backend converts the corners to world coordinates before persisting.
+  async function handleZoneDrawn(
+    zoneType: "rectangle" | "polygon",
+    points: readonly Point2D[],
+  ) {
+    try {
+      const draft: ZoneExclusionFromMapDto = {
+        name: `Zone ${(exclusions?.zones.length ?? 0) + 1}`,
+        zoneType,
+        points,
+        protectBases: true,
+        protectPlayers: true,
+        protectStructures: true,
+      };
+      await invokeCommand("add_zone_exclusion_from_map", { zone: draft });
+      setReloadKey((k) => k + 1);
+    } catch (err: unknown) {
+      console.error("Failed to add drawn zone", err);
+    }
+  }
+
   async function handleTestCoordinate() {
     try {
       const isExcluded = await invokeCommand<boolean>("check_coordinate_excluded", {
@@ -196,12 +220,14 @@ export function MapView() {
         >
           <MapCanvas
             markers={visibleMarkers}
+            zones={exclusions?.zones ?? []}
             onMoveMarker={(marker, mapX, mapY) =>
               void openMovePreview(marker, mapX, mapY)
             }
             onAreaRangeChange={(marker, areaRange) =>
               void openAreaRangePreview(marker, areaRange)
             }
+            onZoneDrawn={(zoneType, points) => void handleZoneDrawn(zoneType, points)}
           />
         </section>
 

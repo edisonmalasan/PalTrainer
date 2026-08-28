@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   MapAssetPayload,
   MapMarkerProjection,
+  Point2D,
+  ZoneExclusion,
 } from "../../shared/types/contracts";
 import { invokeCommand } from "../../shared/utils/command";
 
@@ -26,6 +28,10 @@ interface Vec2 {
   readonly x: number;
   readonly y: number;
 }
+
+// Zone drawing modes (task 16.3): rectangle drag + polygon vertex placement.
+type ZoneDrawMode = "none" | "rectangle" | "polygon";
+type ZoneGeometry = "rectangle" | "polygon";
 
 interface ViewState {
   zoom: number;
@@ -182,18 +188,110 @@ function IconPin() {
   );
 }
 
+function IconRect() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect
+        x="2.5"
+        y="4.5"
+        width="11"
+        height="7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeDasharray="3 2"
+      />
+    </svg>
+  );
+}
+
+function IconPolygon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M8 2.5 13.5 6.5 11.5 13h-7L2.5 6.5 8 2.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// ── Zone overlays ────────────────────────────────────────────────────────────
+
+function mapGridToCanvasPoint(p: Vec2): Vec2 {
+  return { x: mapGridToCanvas(p.x), y: mapGridToCanvas(p.y) };
+}
+
+// Renders one exclusion zone (or the in-progress draft) as a world-layer SVG
+// shape. Two corner points render as a rectangle, three or more as a polygon.
+function ZoneShapeSvg({
+  corners,
+  draft,
+  testId,
+}: {
+  readonly corners: readonly Vec2[];
+  readonly draft: boolean;
+  readonly testId: string;
+}) {
+  const canvasPts = corners.map(mapGridToCanvasPoint);
+  const xs = canvasPts.map((p) => p.x);
+  const ys = canvasPts.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  return (
+    <svg
+      className={[
+        "pointer-events-none absolute left-0 top-0 overflow-visible",
+        draft ? "text-shell-accent" : "text-shell-warning",
+      ].join(" ")}
+      width={1}
+      height={1}
+      data-testid={testId}
+    >
+      {canvasPts.length === 2 ? (
+        <rect
+          x={minX}
+          y={minY}
+          width={Math.max(...xs) - minX}
+          height={Math.max(...ys) - minY}
+          fill="currentColor"
+          fillOpacity={0.1}
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeDasharray={draft ? "6 4" : undefined}
+        />
+      ) : (
+        <polygon
+          points={canvasPts.map((p) => `${p.x},${p.y}`).join(" ")}
+          fill="currentColor"
+          fillOpacity={0.1}
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeDasharray={draft ? "6 4" : undefined}
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
+  );
+}
+
 export function MapCanvas({
   markers = [],
+  zones = [],
   onMoveMarker,
   onAreaRangeChange,
+  onZoneDrawn,
 }: {
   readonly markers?: readonly MapMarkerProjection[];
+  readonly zones?: readonly ZoneExclusion[];
   readonly onMoveMarker?: (
     marker: MapMarkerProjection,
     mapX: number,
     mapY: number,
   ) => void;
   readonly onAreaRangeChange?: (marker: MapMarkerProjection, areaRange: number) => void;
+  readonly onZoneDrawn?: (zoneType: ZoneGeometry, points: readonly Point2D[]) => void;
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
@@ -220,6 +318,20 @@ export function MapCanvas({
   const [dragPos, setDragPos] = useState<Vec2 | null>(null);
   const [ringRange, setRingRange] = useState<number | null>(null);
   const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
+  const [drawMode, setDrawMode] = useState<ZoneDrawMode>("none");
+  const [draftPoints, setDraftPoints] = useState<Vec2[] | null>(null);
+  const rectStartRef = useRef<Vec2 | null>(null);
+
+  // Escape cancels an in-progress zone draft (rect corners or polygon vertices).
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      rectStartRef.current = null;
+      setDraftPoints(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -319,6 +431,21 @@ export function MapCanvas({
     return Math.min(MAX_AREA_RANGE, Math.max(MIN_AREA_RANGE, stepped));
   }
 
+  function toggleDraw(mode: Exclude<ZoneDrawMode, "none">) {
+    setDrawMode((prev) => (prev === mode ? "none" : mode));
+    rectStartRef.current = null;
+    setDraftPoints(null);
+  }
+
+  // Viewport pointer position -> map-grid units (inverse of mapGridToCanvas).
+  function eventToGrid(e: React.PointerEvent<HTMLDivElement>): Vec2 {
+    const point = viewportPoint(e);
+    return {
+      x: Math.round((point.x - view.offset.x) / view.zoom - MAP_PIXEL_SIZE / 2),
+      y: Math.round((point.y - view.offset.y) / view.zoom - MAP_PIXEL_SIZE / 2),
+    };
+  }
+
   function markerLayerPos(marker: MapMarkerProjection): Vec2 {
     if (dragMarkerId === marker.id && dragPos) return dragPos;
     return { x: mapGridToCanvas(marker.mapX), y: mapGridToCanvas(marker.mapY) };
@@ -351,6 +478,14 @@ export function MapCanvas({
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
+    if (drawMode === "rectangle") {
+      const grid = eventToGrid(e);
+      rectStartRef.current = grid;
+      setDraftPoints([grid, grid]);
+      return;
+    }
+    // Polygon mode suppresses panning; vertices are placed on pointer-up.
+    if (drawMode === "polygon") return;
     dragRef.current = {
       pointerId: e.pointerId,
       mode: "pan",
@@ -366,6 +501,10 @@ export function MapCanvas({
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
     setCursor(viewportPoint(e));
     const drag = dragRef.current;
+    if (drawMode === "rectangle" && rectStartRef.current) {
+      setDraftPoints([rectStartRef.current, eventToGrid(e)]);
+      return;
+    }
     if (!drag || drag.pointerId !== e.pointerId) return;
 
     if (drag.mode === "pan") {
@@ -399,6 +538,26 @@ export function MapCanvas({
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    // Zone drawing never runs while a marker drag owns the pointer.
+    if (drawMode === "rectangle" && !dragRef.current) {
+      const start = rectStartRef.current;
+      rectStartRef.current = null;
+      setDraftPoints(null);
+      if (start) {
+        const end = eventToGrid(e);
+        if (end.x !== start.x && end.y !== start.y) {
+          onZoneDrawn?.("rectangle", [start, end]);
+        }
+      }
+      return;
+    }
+    if (drawMode === "polygon" && !dragRef.current) {
+      // Compute the grid point outside the updater: React releases the event's
+      // currentTarget before lazy state updater callbacks run.
+      const grid = eventToGrid(e);
+      setDraftPoints((prev) => [...(prev ?? []), grid]);
+      return;
+    }
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== e.pointerId) return;
 
@@ -416,6 +575,13 @@ export function MapCanvas({
     setDragMarkerId(null);
     setDragPos(null);
     setRingRange(null);
+  }
+
+  function handleDoubleClick() {
+    if (drawMode === "polygon" && draftPoints && draftPoints.length >= 3) {
+      onZoneDrawn?.("polygon", draftPoints);
+      setDraftPoints(null);
+    }
   }
 
   const cursorMap: Vec2 | null = cursor
@@ -503,6 +669,27 @@ export function MapCanvas({
         >
           <IconPin />
         </button>
+        <span className="mx-1 h-5 w-px bg-shell-line" aria-hidden="true" />
+        <button
+          type="button"
+          className={toolbarButton}
+          onClick={() => toggleDraw("rectangle")}
+          title="Draw rectangle exclusion zone"
+          aria-label="Draw rectangle exclusion zone"
+          aria-pressed={drawMode === "rectangle"}
+        >
+          <IconRect />
+        </button>
+        <button
+          type="button"
+          className={toolbarButton}
+          onClick={() => toggleDraw("polygon")}
+          title="Draw polygon exclusion zone"
+          aria-label="Draw polygon exclusion zone"
+          aria-pressed={drawMode === "polygon"}
+        >
+          <IconPolygon />
+        </button>
         <span
           className="ml-auto pr-1 font-mono text-[11px] text-shell-muted"
           data-testid="map-zoom-label"
@@ -514,12 +701,18 @@ export function MapCanvas({
       {/* Viewport */}
       <div
         ref={viewportRef}
-        className="relative min-h-0 flex-1 cursor-grab touch-none select-none overflow-hidden bg-shell-panel active:cursor-grabbing"
+        className={[
+          "relative min-h-0 flex-1 touch-none select-none overflow-hidden bg-shell-panel",
+          drawMode === "none"
+            ? "cursor-grab active:cursor-grabbing"
+            : "cursor-crosshair",
+        ].join(" ")}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={() => setCursor(null)}
+        onDoubleClick={handleDoubleClick}
         role="application"
         aria-label="Interactive world map"
         data-testid="map-viewport"
@@ -534,6 +727,28 @@ export function MapCanvas({
           }}
           data-testid="map-world"
         >
+          {/* Persistent exclusion zones + the active drawing draft */}
+          {zones.map((zone) => (
+            <ZoneShapeSvg
+              key={zone.id}
+              corners={zone.points}
+              draft={false}
+              testId={`map-zone-${zone.id}`}
+            />
+          ))}
+          {drawMode !== "none" && draftPoints && draftPoints.length > 0 && (
+            <ZoneShapeSvg
+              corners={
+                drawMode === "rectangle" && draftPoints.length === 2
+                  ? draftPoints
+                  : cursorMap
+                    ? [...draftPoints, cursorMap]
+                    : draftPoints
+              }
+              draft
+              testId="map-zone-draft"
+            />
+          )}
           {tiles.world && (
             <img
               src={tiles.world}
@@ -694,7 +909,11 @@ export function MapCanvas({
         <span data-testid="map-cursor-coords">
           {cursorMap ? `MAP ${cursorMap.x} , ${cursorMap.y}` : "MAP — , —"}
         </span>
-        <span>{markers.length} marker(s)</span>
+        <span data-testid="map-status-right">
+          {drawMode === "polygon" && draftPoints
+            ? `${draftPoints.length} vertex(ies)`
+            : `${markers.length} marker(s)`}
+        </span>
       </div>
     </div>
   );
