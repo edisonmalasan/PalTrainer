@@ -1,7 +1,7 @@
 //! Cleanup and deletion IPC commands with mandatory preview, backup, and audit support.
 
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{Manager, State};
 
 use crate::commands::backup::BackupState;
 use crate::commands::save_session::SessionState;
@@ -23,6 +23,23 @@ fn build_cleanup_preview(
 
     let level_sav = session.save_root().join("Level.sav");
     preview.files_to_modify.push(level_sav);
+
+    // Real death-bag scan: the protection set guards every delete queued
+    // below (see guard_preview_against_death_bags at the end of this fn).
+    let death_bag_protection =
+        match crate::domain::diagnostics::world_index::harvest_world_index(session) {
+            Ok(index) => {
+                crate::domain::diagnostics::death_bag::scan_and_protect_death_bags(&index)
+                    .protection
+            }
+            Err(_) => crate::domain::diagnostics::death_bag::DeathBagProtection::new(),
+        };
+    if params.protect_death_bags && !death_bag_protection.is_empty() {
+        preview.add_warning(format!(
+            "{} death-bag container(s) are protected from this cleanup.",
+            death_bag_protection.len()
+        ));
+    }
 
     match params.target {
         CleanupTarget::EmptyGuilds => {
@@ -172,8 +189,14 @@ fn build_cleanup_preview(
         }
     }
 
+    // The delete-path guard: when protection is enabled, remove every
+    // protected death-bag entity/file from the queue before the user sees
+    // the preview. `is_death_bag_protected` backs this guard.
     if params.protect_death_bags {
-        preview.add_warning("Death penalty containers are protected from cleanup routines.");
+        crate::domain::diagnostics::death_bag::guard_preview_against_death_bags(
+            &mut preview,
+            &death_bag_protection,
+        );
     }
 
     preview
@@ -201,6 +224,7 @@ pub fn preview_cleanup(
 
 #[tauri::command]
 pub fn commit_cleanup(
+    app_handle: tauri::AppHandle,
     params: CleanupParams,
     session_state: State<'_, SessionState>,
     backup_state: State<'_, BackupState>,
@@ -259,12 +283,62 @@ pub fn commit_cleanup(
         std::fs::rename(&temp_file, &level_sav)?;
     }
 
-    // If deleting files (such as inactive player saves)
+    // If deleting files (such as inactive player saves). Defense in depth:
+    // re-run the death-bag guard against the final queue right before any
+    // file is actually removed.
+    if params.protect_death_bags {
+        let protection = match crate::domain::diagnostics::world_index::harvest_world_index(session)
+        {
+            Ok(index) => {
+                crate::domain::diagnostics::death_bag::scan_and_protect_death_bags(&index)
+                    .protection
+            }
+            Err(_) => crate::domain::diagnostics::death_bag::DeathBagProtection::new(),
+        };
+        preview.files_to_delete.retain(|path| {
+            !crate::domain::diagnostics::death_bag::is_path_protected(path, &protection)
+        });
+    }
+
     for file_to_del in &preview.files_to_delete {
         if file_to_del.exists() {
             let _ = std::fs::remove_file(file_to_del);
         }
     }
 
+    // Log the committed cleanup when the Scan Save Logger toggle is on.
+    let scan_logger_enabled = crate::storage::settings::read_settings(&app_handle)
+        .map(|settings| settings.scan_save_logger)
+        .unwrap_or(false);
+    if scan_logger_enabled {
+        if let Ok(log_dir) = app_handle.path().app_log_dir() {
+            let entries = vec![format!(
+                "commit_cleanup target={:?} entities_deleted={} files_deleted={}",
+                params.target,
+                preview.entities_to_delete.len(),
+                preview.files_to_delete.len()
+            )];
+            let _ = crate::storage::scan_log::write_scan_log(&log_dir, true, &entries);
+        }
+    }
+
     Ok(preview)
+}
+
+/// IPC guard backing the delete paths: reports whether a container id is a
+/// protected death bag in the active save session. The frontend can consult
+/// this before queueing any destructive operation.
+#[tauri::command]
+pub fn is_death_bag_protected(
+    container_id: String,
+    state: State<'_, SessionState>,
+) -> Result<bool, AppError> {
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+
+    let session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
+    let index = crate::domain::diagnostics::world_index::harvest_world_index(session)?;
+    let scan = crate::domain::diagnostics::death_bag::scan_and_protect_death_bags(&index);
+    Ok(scan.protection.is_death_bag_protected(&container_id))
 }

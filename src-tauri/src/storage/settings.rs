@@ -17,6 +17,10 @@ pub struct AppSettings {
     pub show_advanced_tools: bool,
     #[serde(default)]
     pub recent_save_paths: Vec<String>,
+    /// `Logs / Scan Save Logger` toggle — writes every diagnostic scan and
+    /// cleanup preview to `Logs/scan-save.log` in the app log directory.
+    #[serde(default)]
+    pub scan_save_logger: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -40,6 +44,7 @@ impl Default for AppSettings {
             language: default_language(),
             show_advanced_tools: false,
             recent_save_paths: Vec::new(),
+            scan_save_logger: false,
         }
     }
 }
@@ -167,6 +172,7 @@ mod tests {
                 language: LanguagePreference::En,
                 show_advanced_tools: false,
                 recent_save_paths: Vec::new(),
+                scan_save_logger: false,
             },
         );
     }
@@ -191,6 +197,7 @@ mod tests {
             language: LanguagePreference::En,
             show_advanced_tools: true,
             recent_save_paths: vec!["C:\\Saves\\World".to_string()],
+            scan_save_logger: true,
         };
 
         write_settings_to_path(&path, &settings).expect("write settings");

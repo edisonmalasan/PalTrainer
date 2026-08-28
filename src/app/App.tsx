@@ -28,6 +28,7 @@ const defaultSettings: AppSettings = {
   language: "en",
   showAdvancedTools: false,
   recentSavePaths: [],
+  scanSaveLogger: false,
 };
 
 export function App() {

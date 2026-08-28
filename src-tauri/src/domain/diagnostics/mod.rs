@@ -1,6 +1,7 @@
 //! Save file diagnostic reporting, cleanup, and repair models.
 
 pub mod cleanup;
+pub mod death_bag;
 pub mod illegal;
 pub mod orphans;
 pub mod overfilled;

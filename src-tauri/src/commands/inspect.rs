@@ -1,6 +1,6 @@
 //! Read-only inspection commands for players, guilds, bases, pals, inventories, and maps.
 
-use tauri::State;
+use tauri::{Manager, State};
 
 use crate::commands::save_session::SessionState;
 use crate::domain::bases::BaseProjection;
@@ -462,19 +462,30 @@ fn collect_all_diagnostic_issues(
     }
 
     // 7. Death Bag & Private Chest Lock safety check
-    issues.push(DiagnosticIssue {
-        severity: DiagnosticSeverity::Info,
-        category: DiagnosticCategory::DeathBag,
-        code: "DEATH_BAGS_PROTECTED".into(),
-        message:
-            "Death penalty drop containers are marked protected from automatic cleanup routines."
-                .into(),
-        target_id: "death_bags".into(),
-        context: None,
-        can_auto_repair: false,
-        repair_action: None,
-        cleanup_action: None,
-    });
+    // Real death-bag scan over the harvested world index; the protection set
+    // is authoritative and guarded on every delete path (see cleanup.rs).
+    match crate::domain::diagnostics::world_index::harvest_world_index(session) {
+        Ok(index) => {
+            let scan = crate::domain::diagnostics::death_bag::scan_and_protect_death_bags(&index);
+            issues.extend(crate::domain::diagnostics::death_bag::death_bag_scan_to_issues(&scan));
+        }
+        Err(error) => {
+            issues.push(DiagnosticIssue {
+                severity: DiagnosticSeverity::Info,
+                category: DiagnosticCategory::DeathBag,
+                code: "DEATH_BAG_SCAN_UNAVAILABLE".into(),
+                message: format!(
+                    "Death-bag scan skipped: {}. Protected ids were not refreshed; the delete guard still applies to any previously protected id.",
+                    error.message
+                ),
+                target_id: "death_bags".into(),
+                context: None,
+                can_auto_repair: false,
+                repair_action: None,
+                cleanup_action: None,
+            });
+        }
+    }
 
     issues.push(DiagnosticIssue {
         severity: DiagnosticSeverity::Info,
@@ -497,6 +508,7 @@ fn collect_all_diagnostic_issues(
 
 #[tauri::command]
 pub fn run_save_diagnostics(
+    app: tauri::AppHandle,
     state: State<'_, SessionState>,
 ) -> Result<DiagnosticReportDto, AppError> {
     let start = std::time::Instant::now();
@@ -507,6 +519,28 @@ pub fn run_save_diagnostics(
 
     let session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
     let issues = collect_all_diagnostic_issues(session);
+
+    // Optional `Logs / Scan Save Logger` output. Logging failures never fail
+    // the scan itself.
+    let scan_logger_enabled = crate::storage::settings::read_settings(&app)
+        .map(|settings| settings.scan_save_logger)
+        .unwrap_or(false);
+    if scan_logger_enabled {
+        if let Ok(log_dir) = app.path().app_log_dir() {
+            let entries: Vec<String> = std::iter::once(format!(
+                "run_save_diagnostics save_root={} issues={}",
+                session.save_root().display(),
+                issues.len()
+            ))
+            .chain(
+                issues
+                    .iter()
+                    .map(|i| format!("  [{:?}] {}: {}", i.severity, i.code, i.message)),
+            )
+            .collect();
+            let _ = crate::storage::scan_log::write_scan_log(&log_dir, true, &entries);
+        }
+    }
 
     let elapsed = start.elapsed();
     let warnings = issues
