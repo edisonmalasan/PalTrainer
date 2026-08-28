@@ -310,7 +310,6 @@ export interface BulkAddKeyItemsDto {
   readonly keyItemIds: readonly string[];
 }
 
-
 export interface WorldOptionsDto {
   readonly expRate: number;
   readonly palCaptureRate: number;
@@ -365,12 +364,45 @@ export interface ExclusionConfig {
 }
 
 export interface MapMarkerProjection {
+  readonly id: string;
+  readonly markerType: string;
   readonly label: string;
   readonly worldX: number;
   readonly worldY: number;
+  readonly worldZ: number;
   readonly mapX: number;
   readonly mapY: number;
-  readonly markerType: string;
+  /** Base camp area multiplier (0.5-10.0); null for non-base markers. */
+  readonly areaRange?: number | null;
+}
+
+export interface MapDataProjection {
+  readonly mapVersion: string;
+  readonly markers: readonly MapMarkerProjection[];
+}
+
+export interface MapAssetPayload {
+  readonly name: string;
+  readonly mimeType: string;
+  readonly base64Data: string;
+}
+
+export interface MoveBaseToMapDto {
+  readonly baseId: string;
+  readonly mapX: number;
+  readonly mapY: number;
+}
+
+export interface MovePlayerToMapDto {
+  readonly uid: string;
+  readonly mapX: number;
+  readonly mapY: number;
+}
+
+export interface UpdateBaseAreaRangeDto {
+  readonly baseId: string;
+  /** Base camp area multiplier; validated in 50-1000% (0.5-10.0). */
+  readonly areaRange: number;
 }
 
 export type DiagnosticSeverity = "info" | "warning" | "error";
@@ -724,5 +756,3 @@ export interface XgpImportAuditResult {
   readonly backupPath?: string;
   readonly message: string;
 }
-
-

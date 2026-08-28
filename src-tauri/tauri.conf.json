@@ -39,6 +39,8 @@
       "../resources/game_data/VERSION",
       "../resources/game_data/v1/catalog.json",
       "../resources/game_data/v1/VERSION",
+      "../resources/assets/map/world-map.png",
+      "../resources/assets/map/treemap-overlay.png",
       "../resources/README.md",
       "../resources/game_data/README.md",
       "../resources/i18n/en.json"

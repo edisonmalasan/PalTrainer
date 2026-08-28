@@ -8,6 +8,7 @@ pub mod gps;
 pub mod guild;
 pub mod inspect;
 pub mod inventory;
+pub mod map_assets;
 pub mod modifiers;
 pub mod pal;
 pub mod player;

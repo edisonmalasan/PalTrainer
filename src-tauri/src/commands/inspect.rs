@@ -256,6 +256,7 @@ pub fn get_map_markers(state: State<'_, SessionState>) -> Result<MapDataProjecti
                 world_z: 3200.0,
                 map_x: b_mx,
                 map_y: b_my,
+                area_range: Some(1.0),
             },
             MapMarkerProjection {
                 id: "player_1".into(),
@@ -266,6 +267,7 @@ pub fn get_map_markers(state: State<'_, SessionState>) -> Result<MapDataProjecti
                 world_z: 3250.0,
                 map_x: p_mx,
                 map_y: p_my,
+                area_range: None,
             },
         ],
     })

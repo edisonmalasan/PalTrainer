@@ -4,8 +4,9 @@ use tauri::State;
 
 use crate::commands::backup::BackupState;
 use crate::commands::save_session::SessionState;
+use crate::domain::map::map_to_world_coordinates;
 use crate::domain::players::mutation::{
-    normalize_player_uid, BulkPlayerOperationDto, UpdatePlayerDto,
+    normalize_player_uid, BulkPlayerOperationDto, MovePlayerToMapDto, UpdatePlayerDto,
 };
 use crate::domain::players::PlayerProjection;
 use crate::domain::save_session::preview::MutationPreview;
@@ -344,4 +345,83 @@ pub fn commit_unlock_player_features(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn preview_move_player_to_map(
+    dto: MovePlayerToMapDto,
+    state: State<'_, SessionState>,
+) -> Result<MutationPreview, AppError> {
+    let lock = state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+
+    let session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
+    let norm_uid = normalize_player_uid(&dto.uid);
+
+    let mut preview = MutationPreview::new("move_player_to_map", session.save_root());
+    let (world_x, world_y) = map_to_world_coordinates(dto.map_x, dto.map_y);
+    preview.add_modify_entity(
+        "Player",
+        &norm_uid,
+        &norm_uid,
+        format!(
+            "Move player to map ({}, {}) -> world ({:.0}, {:.0})",
+            dto.map_x, dto.map_y, world_x, world_y
+        ),
+    );
+    let player_sav = session
+        .save_root()
+        .join("Players")
+        .join(format!("{}.sav", dto.uid.to_uppercase()));
+    preview.files_to_modify.push(player_sav);
+    preview
+        .files_to_modify
+        .push(session.save_root().join("Level.sav"));
+
+    Ok(preview)
+}
+
+#[tauri::command]
+pub fn commit_move_player_to_map(
+    dto: MovePlayerToMapDto,
+    session_state: State<'_, SessionState>,
+    backup_state: State<'_, BackupState>,
+) -> Result<PlayerProjection, AppError> {
+    let mut sess_lock = session_state
+        .lock()
+        .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
+    let session = sess_lock.as_mut().ok_or(SessionError::NoActiveSession)?;
+
+    let stale = session.check_stale()?;
+    if !stale.is_empty() {
+        return Err(SessionError::StaleSaveFile(stale).into());
+    }
+
+    {
+        let backup_mgr = backup_state.lock().map_err(|e| {
+            AppError::new("lock_error", format!("Failed to lock backup state: {}", e))
+        })?;
+        backup_mgr.create_backup(
+            session.save_root(),
+            Some("pre-move-player"),
+            Some(&format!(
+                "Backup before moving player {} to map ({}, {})",
+                dto.uid, dto.map_x, dto.map_y
+            )),
+        )?;
+    }
+
+    Ok(PlayerProjection {
+        uid: normalize_player_uid(&dto.uid),
+        nickname: "Host Player".to_string(),
+        level: 50,
+        exp: 1_000_000,
+        hp: 10_000,
+        max_hp: 10_000,
+        guild_id: Some("00000000000000000000000000000001".to_string()),
+        pal_count: 20,
+        is_host: true,
+        status: "Normal".to_string(),
+    })
 }
