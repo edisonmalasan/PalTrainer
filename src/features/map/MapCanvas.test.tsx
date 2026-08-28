@@ -26,8 +26,11 @@ const SAMPLE_MARKERS = [
     worldX: 12000,
     worldY: -85000,
     worldZ: 3200,
+    mapVersion: "PostSakurajima",
     mapX: 10,
     mapY: 20,
+    treemapX: 200,
+    treemapY: 300,
     areaRange: 1.0,
   },
   {
@@ -37,8 +40,11 @@ const SAMPLE_MARKERS = [
     worldX: 15000,
     worldY: -82000,
     worldZ: 3250,
+    mapVersion: "PostSakurajima",
     mapX: -30,
     mapY: 40,
+    treemapX: 210,
+    treemapY: 310,
   },
 ] as const;
 

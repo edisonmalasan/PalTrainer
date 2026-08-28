@@ -149,9 +149,12 @@ function HoverOverlay({ marker }: { readonly marker: MapMarkerProjection | null 
         {marker.label || marker.id}
       </p>
       <p className="mt-0.5 font-mono text-[11px] leading-5 text-shell-muted">
-        MAP {marker.mapX} , {marker.mapY}
+        {marker.mapVersion} · MAP {marker.mapX} , {marker.mapY}
         <br />
-        WORLD {marker.worldX.toFixed(0)} , {marker.worldY.toFixed(0)}
+        WORLD {marker.worldX.toFixed(0)} , {marker.worldY.toFixed(0)} ,{" "}
+        {marker.worldZ.toFixed(0)}
+        <br />
+        TREE {marker.treemapX} , {marker.treemapY}
         {marker.areaRange != null && (
           <>
             <br />

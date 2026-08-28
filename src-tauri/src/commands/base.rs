@@ -10,7 +10,7 @@ use crate::domain::bases::mutation::{
     UpdateBaseAreaRangeDto, UpdateBaseDto,
 };
 use crate::domain::bases::BaseProjection;
-use crate::domain::map::{map_to_world_coordinates, world_to_map_coordinates};
+use crate::domain::map::{map_to_world_post_sakurajima, world_to_map_post_sakurajima};
 use crate::domain::save_session::preview::MutationPreview;
 use crate::domain::save_session::SessionError;
 use crate::error::AppError;
@@ -82,7 +82,7 @@ pub fn commit_update_base(
         )?;
     }
 
-    let (mx, my) = world_to_map_coordinates(0.0, 0.0);
+    let (mx, my) = world_to_map_post_sakurajima(0.0, 0.0);
     let updated = BaseProjection {
         base_id: dto.base_id,
         guild_id: "00000000000000000000000000000001".to_string(),
@@ -424,7 +424,7 @@ pub fn preview_move_base_to_map(
         .map_err(|e| AppError::new("lock_error", format!("Failed to lock session state: {}", e)))?;
 
     let session = lock.as_ref().ok_or(SessionError::NoActiveSession)?;
-    let (world_x, world_y) = map_to_world_coordinates(dto.map_x, dto.map_y);
+    let (world_x, world_y) = map_to_world_post_sakurajima(dto.map_x, dto.map_y);
 
     let mut preview = MutationPreview::new("move_base_to_map", session.save_root());
     preview.add_modify_entity(
@@ -473,7 +473,7 @@ pub fn commit_move_base_to_map(
         )?;
     }
 
-    let (world_x, world_y) = map_to_world_coordinates(dto.map_x, dto.map_y);
+    let (world_x, world_y) = map_to_world_post_sakurajima(dto.map_x, dto.map_y);
     Ok(BaseProjection {
         base_id: dto.base_id,
         guild_id: "00000000000000000000000000000001".to_string(),
