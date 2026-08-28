@@ -12,6 +12,7 @@ export interface AppSettings {
   readonly language: LanguagePreference;
   readonly showAdvancedTools: boolean;
   readonly recentSavePaths: readonly string[];
+  readonly scanSaveLogger: boolean;
 }
 
 export interface FeatureFlag {

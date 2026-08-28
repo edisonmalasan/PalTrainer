@@ -129,6 +129,7 @@ pub fn run() {
             commands::world::commit_save_world_meta,
             commands::cleanup::preview_cleanup,
             commands::cleanup::commit_cleanup,
+            commands::cleanup::is_death_bag_protected,
             commands::repair::preview_repair,
             commands::repair::commit_repair,
             commands::reset::preview_reset,

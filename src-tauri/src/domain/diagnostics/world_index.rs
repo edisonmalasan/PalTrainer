@@ -41,12 +41,20 @@ pub struct WorldIndex {
     /// ownership — container slots and work assignments live in RawData blobs).
     pub referenced_character_ids: Vec<String>,
     pub referenced_dynamic_ids: Vec<String>,
+    /// Container ids identified as death-bag (death penalty) containers.
+    /// Populated once the container `RawData` decoder is implemented; empty
+    /// while payloads are opaque, so the death-bag scan reports pending
+    /// status instead of fabricating protection claims.
+    pub death_bag_container_ids: Vec<String>,
     /// Number of `RawData` blobs whose decoders are not implemented yet.
     pub opaque_blob_count: usize,
     /// True when every reference source feeding the sweeps has been decoded.
     /// Harvest marks this false while RawData decoders are stubs, so sweeps
     /// suppress deletion candidates instead of guessing.
     pub references_complete: bool,
+    /// True when every `ItemContainerSaveData` payload has been decoded —
+    /// the death-bag scan is only "complete" when this holds.
+    pub containers_decoded: bool,
 }
 
 /// Decompresses and parses `Level.sav` from the session, harvesting the index.
