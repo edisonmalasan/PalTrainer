@@ -354,6 +354,39 @@ fn collect_all_diagnostic_issues(
         }
     }
 
+    // 3b. Real orphan sweep over the parsed Level.sav reference index
+    match crate::domain::diagnostics::world_index::harvest_world_index(session) {
+        Ok(index) => {
+            let sweeps = [
+                crate::domain::diagnostics::orphans::sweep_orphaned_characters(&index),
+                crate::domain::diagnostics::orphans::sweep_orphaned_works(&index),
+                crate::domain::diagnostics::orphans::sweep_orphaned_containers(&index),
+                crate::domain::diagnostics::orphans::purge_dynamic_items(&index),
+                crate::domain::diagnostics::orphans::sweep_orphaned_foliage(&index),
+                crate::domain::diagnostics::orphans::sweep_non_base_map_objects(&index),
+            ];
+            for sweep in sweeps {
+                issues.extend(sweep.issues);
+            }
+        }
+        Err(error) => {
+            issues.push(DiagnosticIssue {
+                severity: DiagnosticSeverity::Warning,
+                category: DiagnosticCategory::UnreferencedData,
+                code: "ORPHAN_SCAN_FAILED".into(),
+                message: format!(
+                    "Orphan sweep could not parse Level.sav: {}. No orphan findings reported.",
+                    error.message
+                ),
+                target_id: "Level.sav".into(),
+                context: None,
+                can_auto_repair: false,
+                repair_action: None,
+                cleanup_action: None,
+            });
+        }
+    }
+
     // 4. Guild integrity check
     issues.push(DiagnosticIssue {
         severity: DiagnosticSeverity::Info,

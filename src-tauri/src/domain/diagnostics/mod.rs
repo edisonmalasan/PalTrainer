@@ -1,8 +1,10 @@
 //! Save file diagnostic reporting, cleanup, and repair models.
 
 pub mod cleanup;
+pub mod orphans;
 pub mod repair;
 pub mod reset;
+pub mod world_index;
 
 use serde::{Deserialize, Serialize};
 
