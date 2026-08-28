@@ -9,6 +9,7 @@ import type {
   SlotInjectionParams,
 } from "../../shared/types/contracts";
 import { invokeCommand } from "../../shared/utils/command";
+import { pickSaveOrJsonFile } from "../../shared/utils/fileDialog";
 
 export function ModifiersPanel() {
   // Map Fog Restorer state
@@ -48,7 +49,9 @@ export function ModifiersPanel() {
       });
       setMapPreview(preview);
     } catch (err: unknown) {
-      setMapError((err as { message?: string }).message ?? "Failed to preview map restore");
+      setMapError(
+        (err as { message?: string }).message ?? "Failed to preview map restore",
+      );
     } finally {
       setMapLoading(false);
     }
@@ -68,7 +71,9 @@ export function ModifiersPanel() {
       setMapReport(report);
       setMapPreview(null);
     } catch (err: unknown) {
-      setMapError((err as { message?: string }).message ?? "Failed to execute map restore");
+      setMapError(
+        (err as { message?: string }).message ?? "Failed to execute map restore",
+      );
     } finally {
       setMapCommitting(false);
     }
@@ -85,7 +90,9 @@ export function ModifiersPanel() {
       });
       setCapacityInfo(cap);
     } catch (err: unknown) {
-      setSlotError((err as { message?: string }).message ?? "Failed to query Palbox capacity");
+      setSlotError(
+        (err as { message?: string }).message ?? "Failed to query Palbox capacity",
+      );
     } finally {
       setSlotLoading(false);
     }
@@ -101,12 +108,17 @@ export function ModifiersPanel() {
         playerUid: playerUid.trim(),
         targetPageCount: targetPages,
       };
-      const preview = await invokeCommand<MutationPreview>("preview_inject_palbox_slots", {
-        params,
-      });
+      const preview = await invokeCommand<MutationPreview>(
+        "preview_inject_palbox_slots",
+        {
+          params,
+        },
+      );
       setSlotPreview(preview);
     } catch (err: unknown) {
-      setSlotError((err as { message?: string }).message ?? "Failed to preview slot injection");
+      setSlotError(
+        (err as { message?: string }).message ?? "Failed to preview slot injection",
+      );
     } finally {
       setSlotLoading(false);
     }
@@ -121,13 +133,18 @@ export function ModifiersPanel() {
         playerUid: playerUid.trim(),
         targetPageCount: targetPages,
       };
-      const report = await invokeCommand<SlotInjectionAuditResult>("commit_inject_palbox_slots", {
-        params,
-      });
+      const report = await invokeCommand<SlotInjectionAuditResult>(
+        "commit_inject_palbox_slots",
+        {
+          params,
+        },
+      );
       setSlotReport(report);
       setSlotPreview(null);
     } catch (err: unknown) {
-      setSlotError((err as { message?: string }).message ?? "Failed to commit slot injection");
+      setSlotError(
+        (err as { message?: string }).message ?? "Failed to commit slot injection",
+      );
     } finally {
       setSlotCommitting(false);
     }
@@ -143,7 +160,8 @@ export function ModifiersPanel() {
               Map Fog &amp; Exploration Restorer
             </h3>
             <p className="text-xs text-shell-muted">
-              Reveal world map exploration fog in LocalData.sav across the active world or standard Steam saves.
+              Reveal world map exploration fog in LocalData.sav across the active world
+              or standard Steam saves.
             </p>
           </div>
           <span className="border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] font-medium text-emerald-700">
@@ -156,15 +174,36 @@ export function ModifiersPanel() {
             <label className="block text-xs font-medium text-shell-muted uppercase tracking-wider">
               Target LocalData.sav or Save Folder (Optional — Defaults to loaded world)
             </label>
-            <input
-              type="text"
-              value={mapOptions.customLocalDataPath}
-              onChange={(e) =>
-                setMapOptions((prev) => ({ ...prev, customLocalDataPath: e.target.value }))
-              }
-              placeholder="Leave blank to scan active session and Steam save folder"
-              className="mt-1 w-full border border-shell-line bg-shell-panel px-3 py-2 font-mono text-sm"
-            />
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                value={mapOptions.customLocalDataPath}
+                onChange={(e) =>
+                  setMapOptions((prev) => ({
+                    ...prev,
+                    customLocalDataPath: e.target.value,
+                  }))
+                }
+                placeholder="Leave blank to scan active session and Steam save folder"
+                className="w-full border border-shell-line bg-shell-panel px-3 py-2 font-mono text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  void pickSaveOrJsonFile("Select LocalData.sav").then((picked) => {
+                    if (picked) {
+                      setMapOptions((prev) => ({
+                        ...prev,
+                        customLocalDataPath: picked,
+                      }));
+                    }
+                  });
+                }}
+                className="shrink-0 rounded-xl border border-shell-line bg-shell-surface px-4 text-xs font-semibold uppercase tracking-wider text-shell-ink hover:bg-shell-panel"
+              >
+                Browse
+              </button>
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
@@ -184,7 +223,10 @@ export function ModifiersPanel() {
                 type="checkbox"
                 checked={mapOptions.clearHiddenLocations}
                 onChange={(e) =>
-                  setMapOptions((prev) => ({ ...prev, clearHiddenLocations: e.target.checked }))
+                  setMapOptions((prev) => ({
+                    ...prev,
+                    clearHiddenLocations: e.target.checked,
+                  }))
                 }
               />
               <span>Reset Hidden Location Flags</span>
@@ -195,7 +237,10 @@ export function ModifiersPanel() {
                 type="checkbox"
                 checked={mapOptions.disableSkyCloudOverlay}
                 onChange={(e) =>
-                  setMapOptions((prev) => ({ ...prev, disableSkyCloudOverlay: e.target.checked }))
+                  setMapOptions((prev) => ({
+                    ...prev,
+                    disableSkyCloudOverlay: e.target.checked,
+                  }))
                 }
               />
               <span>Disable Sky Island Clouds</span>
@@ -224,7 +269,8 @@ export function ModifiersPanel() {
           <div className="mt-4 border-l-2 border-emerald-500 bg-emerald-50 p-3 text-xs text-emerald-800">
             <p className="font-semibold">{mapReport.message}</p>
             <p className="mt-1 font-mono text-[11px] text-emerald-700">
-              Updated files: {mapReport.filesUpdated.length} | Backup: {mapReport.backupPath ?? "Automatic snapshot"}
+              Updated files: {mapReport.filesUpdated.length} | Backup:{" "}
+              {mapReport.backupPath ?? "Automatic snapshot"}
             </p>
           </div>
         )}
@@ -238,7 +284,8 @@ export function ModifiersPanel() {
               Palbox Storage Slot Injector
             </h3>
             <p className="text-xs text-shell-muted">
-              Expand player Palbox storage capacity beyond standard 32 pages (960 slots) safely.
+              Expand player Palbox storage capacity beyond standard 32 pages (960 slots)
+              safely.
             </p>
           </div>
           <span className="border border-shell-warning/20 bg-shell-warning-subtle0/10 px-2 py-0.5 font-mono text-[11px] font-medium text-shell-warning">
@@ -275,19 +322,26 @@ export function ModifiersPanel() {
           {capacityInfo && (
             <div className="grid gap-3 border border-shell-line bg-shell-panel p-3 sm:grid-cols-3">
               <div>
-                <span className="font-mono text-[10px] uppercase text-shell-muted">Current Capacity</span>
+                <span className="font-mono text-[10px] uppercase text-shell-muted">
+                  Current Capacity
+                </span>
                 <p className="mt-1 font-mono text-sm font-semibold text-shell-ink">
-                  {capacityInfo.currentPageCount} Pages ({capacityInfo.currentSlotCount} slots)
+                  {capacityInfo.currentPageCount} Pages ({capacityInfo.currentSlotCount}{" "}
+                  slots)
                 </p>
               </div>
               <div>
-                <span className="font-mono text-[10px] uppercase text-shell-muted">Occupied Slots</span>
+                <span className="font-mono text-[10px] uppercase text-shell-muted">
+                  Occupied Slots
+                </span>
                 <p className="mt-1 font-mono text-sm font-semibold text-shell-ink">
                   {capacityInfo.occupiedSlotCount} Pals Stored
                 </p>
               </div>
               <div>
-                <span className="font-mono text-[10px] uppercase text-shell-muted">Max Recommended</span>
+                <span className="font-mono text-[10px] uppercase text-shell-muted">
+                  Max Recommended
+                </span>
                 <p className="mt-1 font-mono text-sm font-semibold text-emerald-700">
                   {capacityInfo.maxRecommendedPages} Pages (3,840 slots)
                 </p>
@@ -347,7 +401,8 @@ export function ModifiersPanel() {
           <div className="mt-4 border-l-2 border-emerald-500 bg-emerald-50 p-3 text-xs text-emerald-800">
             <p className="font-semibold">{slotReport.message}</p>
             <p className="mt-1 font-mono text-[11px] text-emerald-700">
-              Capacity: {slotReport.newPageCount} pages ({slotReport.newSlotCount} slots) | Backup: {slotReport.backupPath ?? "Automatic snapshot"}
+              Capacity: {slotReport.newPageCount} pages ({slotReport.newSlotCount}{" "}
+              slots) | Backup: {slotReport.backupPath ?? "Automatic snapshot"}
             </p>
           </div>
         )}

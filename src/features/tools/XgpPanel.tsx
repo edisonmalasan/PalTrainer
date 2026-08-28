@@ -10,6 +10,7 @@ import type {
   XgpSaveEntry,
 } from "../../shared/types/contracts";
 import { invokeCommand } from "../../shared/utils/command";
+import { pickDirectory } from "../../shared/utils/fileDialog";
 
 export function XgpPanel() {
   // Discovery state
@@ -48,7 +49,9 @@ export function XgpPanel() {
         setImportWgsTarget(list[0].wgsDir);
       }
     } catch (err: unknown) {
-      setDiscoverError((err as { message?: string }).message ?? "Failed to scan Xbox GamePass saves");
+      setDiscoverError(
+        (err as { message?: string }).message ?? "Failed to scan Xbox GamePass saves",
+      );
     } finally {
       setDiscovering(false);
     }
@@ -64,10 +67,14 @@ export function XgpPanel() {
         wgsUserDir: extractWgsDir.trim(),
         destinationPath: extractDestPath.trim(),
       };
-      const res = await invokeCommand<XgpExtractResult>("extract_xgp_save", { options });
+      const res = await invokeCommand<XgpExtractResult>("extract_xgp_save", {
+        options,
+      });
       setExtractResult(res);
     } catch (err: unknown) {
-      setExtractError((err as { message?: string }).message ?? "Failed to extract XGP save");
+      setExtractError(
+        (err as { message?: string }).message ?? "Failed to extract XGP save",
+      );
     } finally {
       setExtractLoading(false);
     }
@@ -83,12 +90,17 @@ export function XgpPanel() {
         sourceSteamPath: importSteamPath.trim(),
         targetWgsUserDir: importWgsTarget.trim(),
       };
-      const preview = await invokeCommand<MutationPreview>("preview_import_steam_to_xgp", {
-        options,
-      });
+      const preview = await invokeCommand<MutationPreview>(
+        "preview_import_steam_to_xgp",
+        {
+          options,
+        },
+      );
       setImportPreview(preview);
     } catch (err: unknown) {
-      setImportError((err as { message?: string }).message ?? "Failed to preview XGP import");
+      setImportError(
+        (err as { message?: string }).message ?? "Failed to preview XGP import",
+      );
     } finally {
       setImportLoading(false);
     }
@@ -103,13 +115,18 @@ export function XgpPanel() {
         sourceSteamPath: importSteamPath.trim(),
         targetWgsUserDir: importWgsTarget.trim(),
       };
-      const report = await invokeCommand<XgpImportAuditResult>("commit_import_steam_to_xgp", {
-        options,
-      });
+      const report = await invokeCommand<XgpImportAuditResult>(
+        "commit_import_steam_to_xgp",
+        {
+          options,
+        },
+      );
       setImportReport(report);
       setImportPreview(null);
     } catch (err: unknown) {
-      setImportError((err as { message?: string }).message ?? "Failed to package save to XGP");
+      setImportError(
+        (err as { message?: string }).message ?? "Failed to package save to XGP",
+      );
     } finally {
       setImportCommitting(false);
     }
@@ -133,7 +150,8 @@ export function XgpPanel() {
               Xbox GamePass Save Explorer
             </h3>
             <p className="text-xs text-shell-muted">
-              Auto-scans %LOCALAPPDATA%/Packages/PocketpairInc.Palworld_*/SystemAppData/wgs/
+              Auto-scans
+              %LOCALAPPDATA%/Packages/PocketpairInc.Palworld_*/SystemAppData/wgs/
             </p>
           </div>
           <button
@@ -154,7 +172,8 @@ export function XgpPanel() {
 
         {discoveredSaves.length === 0 && !discovering && (
           <p className="border border-dashed border-shell-line p-6 text-center text-xs text-shell-muted">
-            No active Xbox GamePass Palworld saves detected on this system. You can manually specify a WGS folder below.
+            No active Xbox GamePass Palworld saves detected on this system. You can
+            manually specify a WGS folder below.
           </p>
         )}
 
@@ -167,7 +186,9 @@ export function XgpPanel() {
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-semibold text-shell-ink truncate">User ID: {entry.userId}</p>
+                    <p className="font-semibold text-shell-ink truncate">
+                      User ID: {entry.userId}
+                    </p>
                     <p className="mt-0.5 font-mono text-[10px] text-shell-muted truncate">
                       {entry.wgsDir}
                     </p>
@@ -209,7 +230,8 @@ export function XgpPanel() {
             Extract GamePass Save to Steam Folder
           </h3>
           <p className="text-xs text-shell-muted">
-            Unpack container blobs into standard Level.sav, LevelMeta.sav, and Players/*.sav files.
+            Unpack container blobs into standard Level.sav, LevelMeta.sav, and
+            Players/*.sav files.
           </p>
         </div>
 
@@ -218,26 +240,56 @@ export function XgpPanel() {
             <label className="block text-xs font-medium text-shell-muted uppercase tracking-wider">
               Source GamePass WGS User Directory
             </label>
-            <input
-              type="text"
-              value={extractWgsDir}
-              onChange={(e) => setExtractWgsDir(e.target.value)}
-              placeholder=".../SystemAppData/wgs/000900000_..."
-              className="mt-1 w-full border border-shell-line bg-shell-panel px-3 py-1.5 font-mono text-xs"
-            />
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                value={extractWgsDir}
+                onChange={(e) => setExtractWgsDir(e.target.value)}
+                placeholder=".../SystemAppData/wgs/000900000_..."
+                className="w-full border border-shell-line bg-shell-panel px-3 py-1.5 font-mono text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  void pickDirectory("Select GamePass WGS user directory").then(
+                    (picked) => {
+                      if (picked) setExtractWgsDir(picked);
+                    },
+                  );
+                }}
+                className="shrink-0 rounded-xl border border-shell-line bg-shell-surface px-3 text-xs font-semibold uppercase tracking-wider text-shell-ink hover:bg-shell-panel"
+              >
+                Browse
+              </button>
+            </div>
           </div>
 
           <div>
             <label className="block text-xs font-medium text-shell-muted uppercase tracking-wider">
               Destination Steam Save Folder
             </label>
-            <input
-              type="text"
-              value={extractDestPath}
-              onChange={(e) => setExtractDestPath(e.target.value)}
-              placeholder="C:/Palworld/Extracted_Save"
-              className="mt-1 w-full border border-shell-line bg-shell-panel px-3 py-1.5 font-mono text-xs"
-            />
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                value={extractDestPath}
+                onChange={(e) => setExtractDestPath(e.target.value)}
+                placeholder="C:/Palworld/Extracted_Save"
+                className="w-full border border-shell-line bg-shell-panel px-3 py-1.5 font-mono text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  void pickDirectory("Select destination Steam save folder").then(
+                    (picked) => {
+                      if (picked) setExtractDestPath(picked);
+                    },
+                  );
+                }}
+                className="shrink-0 rounded-xl border border-shell-line bg-shell-surface px-3 text-xs font-semibold uppercase tracking-wider text-shell-ink hover:bg-shell-panel"
+              >
+                Browse
+              </button>
+            </div>
           </div>
         </div>
 
@@ -245,7 +297,9 @@ export function XgpPanel() {
           <button
             type="button"
             onClick={() => void handleExtractXgp()}
-            disabled={extractLoading || !extractWgsDir.trim() || !extractDestPath.trim()}
+            disabled={
+              extractLoading || !extractWgsDir.trim() || !extractDestPath.trim()
+            }
             className="border border-shell-accent-solid bg-shell-accent-solid px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
           >
             {extractLoading ? "Extracting Blobs..." : "Extract Save to Steam Format"}
@@ -262,7 +316,8 @@ export function XgpPanel() {
           <div className="border-l-2 border-emerald-500 bg-emerald-50 p-3 text-xs text-emerald-800">
             <p className="font-semibold">{extractResult.message}</p>
             <p className="mt-1 font-mono text-[11px] text-emerald-700 truncate">
-              Extracted to: {extractResult.destinationPath} ({extractResult.filesExtracted.length} files)
+              Extracted to: {extractResult.destinationPath} (
+              {extractResult.filesExtracted.length} files)
             </p>
           </div>
         )}
@@ -275,7 +330,8 @@ export function XgpPanel() {
             Package Steam Save to Xbox GamePass WGS
           </h3>
           <p className="text-xs text-shell-muted">
-            Generate containers.index v14 and package Level and Player save files into WGS format.
+            Generate containers.index v14 and package Level and Player save files into
+            WGS format.
           </p>
         </div>
 
@@ -284,26 +340,56 @@ export function XgpPanel() {
             <label className="block text-xs font-medium text-shell-muted uppercase tracking-wider">
               Source Steam Save Folder
             </label>
-            <input
-              type="text"
-              value={importSteamPath}
-              onChange={(e) => setImportSteamPath(e.target.value)}
-              placeholder="C:/Palworld/SaveGames/.../SaveA"
-              className="mt-1 w-full border border-shell-line bg-shell-panel px-3 py-1.5 font-mono text-xs"
-            />
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                value={importSteamPath}
+                onChange={(e) => setImportSteamPath(e.target.value)}
+                placeholder="C:/Palworld/SaveGames/.../SaveA"
+                className="w-full border border-shell-line bg-shell-panel px-3 py-1.5 font-mono text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  void pickDirectory("Select source Steam save folder").then(
+                    (picked) => {
+                      if (picked) setImportSteamPath(picked);
+                    },
+                  );
+                }}
+                className="shrink-0 rounded-xl border border-shell-line bg-shell-surface px-3 text-xs font-semibold uppercase tracking-wider text-shell-ink hover:bg-shell-panel"
+              >
+                Browse
+              </button>
+            </div>
           </div>
 
           <div>
             <label className="block text-xs font-medium text-shell-muted uppercase tracking-wider">
               Target GamePass WGS User Directory
             </label>
-            <input
-              type="text"
-              value={importWgsTarget}
-              onChange={(e) => setImportWgsTarget(e.target.value)}
-              placeholder=".../SystemAppData/wgs/000900000_..."
-              className="mt-1 w-full border border-shell-line bg-shell-panel px-3 py-1.5 font-mono text-xs"
-            />
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                value={importWgsTarget}
+                onChange={(e) => setImportWgsTarget(e.target.value)}
+                placeholder=".../SystemAppData/wgs/000900000_..."
+                className="w-full border border-shell-line bg-shell-panel px-3 py-1.5 font-mono text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  void pickDirectory("Select target GamePass WGS user directory").then(
+                    (picked) => {
+                      if (picked) setImportWgsTarget(picked);
+                    },
+                  );
+                }}
+                className="shrink-0 rounded-xl border border-shell-line bg-shell-surface px-3 text-xs font-semibold uppercase tracking-wider text-shell-ink hover:bg-shell-panel"
+              >
+                Browse
+              </button>
+            </div>
           </div>
         </div>
 
@@ -311,7 +397,9 @@ export function XgpPanel() {
           <button
             type="button"
             onClick={() => void handlePreviewImportSteam()}
-            disabled={importLoading || !importSteamPath.trim() || !importWgsTarget.trim()}
+            disabled={
+              importLoading || !importSteamPath.trim() || !importWgsTarget.trim()
+            }
             className="border border-shell-accent-solid bg-shell-accent-solid px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-opacity-90 disabled:opacity-50"
           >
             {importLoading ? "Analyzing..." : "Preview GamePass Import"}
@@ -328,7 +416,8 @@ export function XgpPanel() {
           <div className="border-l-2 border-emerald-500 bg-emerald-50 p-3 text-xs text-emerald-800">
             <p className="font-semibold">{importReport.message}</p>
             <p className="mt-1 font-mono text-[11px] text-emerald-700 truncate">
-              Target: {importReport.targetWgsUserDir} | Backup: {importReport.backupPath ?? "Automatic snapshot"}
+              Target: {importReport.targetWgsUserDir} | Backup:{" "}
+              {importReport.backupPath ?? "Automatic snapshot"}
             </p>
           </div>
         )}

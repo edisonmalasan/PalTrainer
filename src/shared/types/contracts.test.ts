@@ -8,6 +8,7 @@ describe("frontend contracts", () => {
       language: "en",
       showAdvancedTools: false,
       recentSavePaths: [],
+      scanSaveLogger: true,
     } satisfies AppSettings;
     const update = {
       instanceId: "pal-001",
