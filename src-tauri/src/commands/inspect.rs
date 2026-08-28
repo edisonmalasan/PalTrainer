@@ -405,24 +405,35 @@ fn collect_all_diagnostic_issues(
         cleanup_action: None,
     });
 
-    // 5. Pal Legality & Passive checks
-    issues.push(DiagnosticIssue {
-        severity: DiagnosticSeverity::Info,
-        category: DiagnosticCategory::IllegalPal,
-        code: "PALS_LEGAL".into(),
-        message:
-            "All Pal IVs, skill slots, levels, and rank limits are within valid game parameters."
-                .into(),
-        target_id: "pals_registry".into(),
-        context: None,
-        can_auto_repair: true,
-        repair_action: Some(crate::domain::diagnostics::RepairActionDescriptor {
-            label: "Clamp Illegal Pal Stats".into(),
-            description: "Normalize out-of-bounds IVs, skill tiers, and rank values.".into(),
-            affected_entity_count: 0,
-        }),
-        cleanup_action: None,
-    });
+    // 5. Pal legality & invalid item/passive checks over decoded projections.
+    // Currently the character RawData decoder is a stub, so no pal projections
+    // can be harvested — the scan still runs (over an empty set) and reports
+    // an honest status instead of a fabricated "all legal" Info.
+    {
+        let catalog = crate::resources::loader::GameCatalog::load();
+        let decoded_pals: Vec<crate::domain::pals::PalProjection> = Vec::new();
+        let illegal = crate::domain::diagnostics::illegal::scan_illegal_pals_by_owner(
+            &decoded_pals,
+            &catalog,
+        );
+        issues.extend(crate::domain::diagnostics::illegal::illegal_findings_to_issues(&illegal));
+        let invalid_items = crate::domain::diagnostics::illegal::scan_invalid_items(&[], &catalog);
+        let invalid_passives =
+            crate::domain::diagnostics::illegal::scan_invalid_passives(&[], &catalog);
+        if illegal.is_empty() && invalid_items.is_empty() && invalid_passives.is_empty() {
+            issues.push(DiagnosticIssue {
+                severity: DiagnosticSeverity::Info,
+                category: DiagnosticCategory::IllegalPal,
+                code: "ILLEGAL_SCAN_PENDING".into(),
+                message: "No pal, item, or passive projections were decoded, so the illegal-pal scan has nothing to evaluate yet. The scan will run as soon as the character RawData decoder is wired up.".into(),
+                target_id: "pals_registry".into(),
+                context: None,
+                can_auto_repair: false,
+                repair_action: None,
+                cleanup_action: None,
+            });
+        }
+    }
 
     // 6. Inventory Containers & Capacity check
     issues.push(DiagnosticIssue {
