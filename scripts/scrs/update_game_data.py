@@ -3,8 +3,6 @@ import sys
 import json
 import re
 import shutil
-import subprocess
-import glob
 from pathlib import Path
 import io
 import itertools
@@ -16,31 +14,16 @@ def _venv_python():
         return VENV_DIR / 'Scripts' / 'python.exe'
     return VENV_DIR / 'bin' / 'python'
 def _ensure_venv():
+    """Verify the project venv exists without installing anything.
+
+    Plan 009: scripts must not auto-install dependencies or delete the
+    lockfile.  If the venv is missing, report setup guidance and stop.
+    """
     vpy = _venv_python()
     if vpy.exists():
         return True
-    print('Creating virtual environment...')
-    if VENV_DIR.exists():
-        shutil.rmtree(VENV_DIR, ignore_errors=True)
-    result = subprocess.run(['uv', 'venv', str(VENV_DIR)])
-    if result.returncode != 0:
-        print('Failed to create venv')
-        return False
-    print('Installing dependencies...')
-    result = subprocess.run(['uv', 'sync'], cwd=str(Path(__file__).resolve().parent.parent.parent))
-    uv_lock = Path(__file__).resolve().parent.parent.parent / 'uv.lock'
-    if uv_lock.exists():
-        uv_lock.unlink()
-    for pattern in ['*egg-info', 'src/*egg-info', 'src/palsav/*egg-info']:
-        for match in glob.glob(pattern):
-            if os.path.isdir(match):
-                shutil.rmtree(match, ignore_errors=True)
-    if result.returncode == 0:
-        print('Environment ready')
-        return True
-    print('Failed to install dependencies')
-    if VENV_DIR.exists():
-        shutil.rmtree(VENV_DIR, ignore_errors=True)
+    print('ERROR: virtual environment not found at', VENV_DIR)
+    print('Run `uv sync` (or start.py) from the project root first, then retry.')
     return False
 def _spinner(label):
     spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']

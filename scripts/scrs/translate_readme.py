@@ -6,14 +6,8 @@ from pathlib import Path
 from typing import List, Tuple, Optional, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
-try:
-    from deep_translator import GoogleTranslator
-except ImportError:
-    print('Installing deep-translator...')
-    import subprocess
-    subprocess.check_call(['uv', 'pip', 'install', 'deep-translator'])
-    from deep_translator import GoogleTranslator
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+from script_common import PROJECT_ROOT, require_deep_translator
+GoogleTranslator = require_deep_translator()
 README_SOURCE = PROJECT_ROOT / 'README.md'
 README_DIR = PROJECT_ROOT / 'resources' / 'readme'
 LANGUAGES = {'zh_CN': {'name': 'Simplified Chinese', 'code': 'zh-CN'}, 'de_DE': {'name': 'German', 'code': 'de'}, 'es_ES': {'name': 'Spanish', 'code': 'es'}, 'fr_FR': {'name': 'French', 'code': 'fr'}, 'ru_RU': {'name': 'Russian', 'code': 'ru'}, 'ja_JP': {'name': 'Japanese', 'code': 'ja'}, 'ko_KR': {'name': 'Korean', 'code': 'ko'}, 'pt_BR': {'name': 'Portuguese (Brazil)', 'code': 'pt'}, 'pt_PT': {'name': 'Portuguese (Portugal)', 'code': 'pt'}}

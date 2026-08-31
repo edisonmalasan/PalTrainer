@@ -1,16 +1,9 @@
 import re
 import time
 from pathlib import Path
+from script_common import PROJECT_ROOT, require_deep_translator
+GoogleTranslator = require_deep_translator()
 
-try:
-    from deep_translator import GoogleTranslator
-except ImportError:
-    print('Installing deep-translator...')
-    import subprocess
-    subprocess.check_call(['uv', 'pip', 'install', 'deep-translator'])
-    from deep_translator import GoogleTranslator
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 CHANGELOG_FILE = PROJECT_ROOT / 'changelogs.md'
 OUTPUT_FILE = PROJECT_ROOT / 'CHANGELOG.multilang.md'
 
