@@ -26,6 +26,7 @@ _TEST_STEM_ALIASES: dict[str, str] = {
     'domain_stats': 'stats',
     'palworld_coord': 'palworld_coord/__init__',
     'xgp_import': 'palworld_xgp_import/__init__',
+    'compatibility_matrix': 'save_engine/__init__',
 }
 
 _INSTALLED_MODULES: dict[str, str] = {
