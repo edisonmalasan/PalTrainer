@@ -1,0 +1,114 @@
+name: Build All & Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      draft_release:
+        description: "Draft a test release? (title: Testing_<version>)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-all-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            build_mode: --onefile
+            system_deps: "patchelf file wget"
+            extra_deps: ""
+            artifact_name: linux-build
+            artifact_glob: "*-linux.AppImage"
+            use_appimage: true
+          - os: macos-latest
+            platform: macos
+            build_mode: --onedir
+            system_deps: ""
+            extra_deps: "imageio"
+            artifact_name: macos-build
+            artifact_glob: "*-macos.dmg"
+            use_appimage: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - name: Bootstrap environment
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - name: Restore cached dist
+        id: cache-dist
+        uses: actions/cache@v4
+        with:
+          path: dist
+          key: ${{ runner.os }}-paltrainer-dist-${{ steps.env.outputs.version }}-${{ hashFiles('build/**', 'src/**', 'resources/**', 'pyproject.toml', 'requirements.txt', 'README.md', 'LICENSE') }}
+      - name: Install system deps
+        if: ${{ matrix.system_deps != '' && steps.cache-dist.outputs.cache-hit != 'true' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.system_deps }}
+      - name: Install dependencies
+        if: steps.cache-dist.outputs.cache-hit != 'true'
+        run: |
+          uv venv --clear
+          uv pip install -r requirements.txt ${{ matrix.extra_deps }}
+      - name: Build AppImage (Linux)
+        if: ${{ matrix.use_appimage && steps.cache-dist.outputs.cache-hit != 'true' }}
+        # GitHub runners lack a usable FUSE mount namespace, so appimagetool
+        # runs in extract-and-run mode inside linux_build.py.
+        run: uv run python build/linux_build.py --appimage-extract-and-run
+      - name: Build macOS DMG
+        if: ${{ matrix.platform == 'macos' && steps.cache-dist.outputs.cache-hit != 'true' }}
+        run: uv run python build/macos_build.py
+
+      - name: Verify build output
+        shell: bash
+        run: |
+          echo "=== Files in dist/ ==="
+          if ! ls -la dist/; then
+            echo "::error::dist/ directory not found — build produced no output"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/${{ steps.env.outputs.app_name }}-${{ matrix.artifact_glob }}
+          if-no-files-found: error
+
+  draft-test-release:
+    needs: build
+    if: ${{ github.event.inputs.draft_release == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - name: Bootstrap environment
+        id: env
+        uses: ./.github/actions/setup-build-env
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+      - name: List all artifacts
+        run: find artifacts -type f -ls
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: Testing_${{ steps.env.outputs.version }}
+          name: Testing_${{ steps.env.outputs.version }}
+          draft: true
+          prerelease: true
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=75.6.0", "wheel"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "paltrainer"
+version = "0.1.0"
+description = "All-in-one tool for fixing/transferring/editing Palworld saves"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "PalTrainer contributors" }]
+requires-python = ">=3.11"
+dependencies = [
+    "PyQt6>=6.8",
+    "Pillow",
+    "cx-freeze>=8.3.0",
+    "nerdfont",
+    "packaging",
+    "palsav-flex",
+    "brotli",
+    "cbor2",
+    "msgpack",
+    "zstandard",
+    "orjson",
+    "nuitka>=4.1.2",
+    "loguru>=0.7.3",
+]
+
+[tool.uv.sources]
+palsav-flex = { workspace = true }
+
+[tool.uv.workspace]
+members = [
+    "src/palsav",
+]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+extraPaths = ["src/palsav"]
+reportAttributeAccessIssue = false
+reportOptionalMemberAccess = false
+reportOptionalSubscript = false
+reportOptionalIterable = false
+reportArgumentType = false
+
+[dependency-groups]
+dev = [
+    "cx-freeze>=8.6.0",
+    "imageio",
+    "pytest",
+    "pyright>=1.1.390",
+]

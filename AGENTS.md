@@ -1,312 +1,143 @@
 # AGENTS.md - PalTrainer
 
-PalTrainer is a desktop app for modifying Palworld save files using TypeScript, Tauri, and Rust.
+## Project identity
 
-## Repository Structure
+PalTrainer is a Python desktop application for inspecting, repairing, converting, and editing Palworld save files. The GUI uses PyQt6. The `palsav` workspace package owns save serialization and compression.
 
-Current repository:
-
-```text
-PalTrainer/
-  AGENTS.md
-  README.md
-  LICENSE
-  docs/
-```
-
-Expected application structure after scaffold:
+## Repository structure
 
 ```text
-PalTrainer/
-  package.json
-  pnpm-lock.yaml
-  index.html
-  vite.config.ts
-  tsconfig.json
-  src/
-    app/
-    features/
-    shared/
-    assets/
-  src-tauri/
-    Cargo.toml
-    tauri.conf.json
-    capabilities/
-    src/
-      commands/
-      domain/
-      pal_save/
-      security/
-      storage/
-      tasks/
-  resources/
-    game_data/
-    assets/
-    i18n/
-  tests/
-    fixtures/
-    e2e/
+src/palsav/               Save serialization, property codecs, compression, and containers
+src/palworld_aio/         PyQt6 application, managers, editors, tabs, dialogs, and widgets
+src/palworld_toolsets/    Conversion, transfer, map restoration, and slot tools
+src/palworld_xgp_import/  Xbox Game Pass discovery, extraction, and packaging
+src/palworld_coord/       Coordinate conversion helpers
+src/                      Launch, paths, resources, localization, and shared imports
+resources/                Game data, translations, guides, maps, themes, and assets
+tests/                    Structural, integration, unit, and fixture tests
+build/                    Nuitka, cx_Freeze, installer, and build verification tools
+scripts/                  Local maintenance and test helpers
 ```
 
-## Setup Commands
+## Setup and development
 
-These commands apply after the Tauri scaffold exists:
+Required tools are Python 3.11+, `uv`, a C/C++ build toolchain for native save dependencies, and the platform Qt prerequisites.
 
 ```bash
-pnpm install
+uv sync
+uv run start.py
+uv run python src/palworld_aio/main.py
 ```
 
-Required tools:
+On Windows, `start.cmd` launches the application and `test.cmd` runs it with fault reporting enabled. Keep `uv.lock` under version control when it exists; launchers must not delete it.
 
-- Node.js LTS.
-- pnpm.
-- Rust stable.
-- Tauri v2 system prerequisites.
-
-## Development Commands
+## Test, lint, typecheck, and format
 
 ```bash
-pnpm tauri dev
-pnpm dev
+uv run pytest -c tests/pytest.ini
+uv run pytest -c tests/pytest.ini -m slow
+uv run python -m compileall -q src tests
+uv run pyright src
 ```
 
-Use `pnpm tauri dev` for desktop behavior because filesystem permissions, dialogs, and Rust commands run through Tauri.
+Pyright is the configured type checker. Do not claim that Ruff, Black, or another formatter is available until its configuration and dependency are added.
 
-## Test Commands
+## Architecture and ownership
 
-```bash
-pnpm test
-cd src-tauri && cargo test
-```
+- `palsav` owns binary parsing, property dispatch, compression, save containers, serialization, and roundtrip behavior.
+- `palworld_aio` owns PyQt6 presentation, dialogs, tabs, navigation, user interaction, and workflow orchestration.
+- `palworld_toolsets` owns conversion, character transfer, host repair, map restoration, and slot injection.
+- `palworld_xgp_import` owns the Game Pass container layer. Keep wrapper bytes separate from inner save payloads.
+- `palworld_coord` owns coordinate transforms and known map-version boundaries.
+- Filesystem code owns path discovery, validation, backups, temporary workspaces, and atomic replacement. UI code must not bypass it.
+- Save mutation belongs in testable save/domain functions, not in widget event handlers.
+- Keep UI state separate from loaded save data and keep long-running work off the Qt GUI thread.
+- Preserve the dynamic test importer; update `tests/test_registry.py` when modules move.
 
-Slow fixture tests should be explicit and opt-in once added.
+## Save-data invariants
 
-## Lint, Typecheck, and Format Commands
+- Treat all save files, imports, archives, JSON, and manifests as untrusted input.
+- Preserve unsupported properties, unknown bytes, trailing bytes, and container metadata when the engine cannot interpret them.
+- Never silently normalize, discard, or reorder data without a format contract and regression coverage.
+- Distinguish Level saves, player saves, global storage, and Game Pass wrappers.
+- Keep legacy export readers. New export formats must be versioned and validated before import.
+- The raw JSON editor is read-only by default. Write access requires a backup, strict diff, schema validation, and explicit confirmation.
+- Destructive actions require a preview and a separate commit step.
 
-```bash
-pnpm lint
-pnpm typecheck
-pnpm format
-cd src-tauri && cargo fmt --check
-cd src-tauri && cargo clippy --all-targets --all-features -- -D warnings
-```
+## PyQt6 rules
 
-If one of these commands does not exist yet, add the project config before relying on it.
+- Use PyQt6 consistently; do not reintroduce another Qt binding.
+- Use `pyqtSignal`, `pyqtSlot`, and `pyqtProperty` for Qt declarations.
+- Follow Qt6 enum APIs and run focused GUI/import tests after widget changes.
+- Never mutate or delete widget trees from a modal dialog signal handler while `exec()` is active. Defer refreshes until the dialog returns.
+- Detach widgets from layouts before scheduling deletion. Avoid monkey-patching C++ virtual methods with closures and avoid QObject signal reference cycles.
+- Keep dialogs, workers, and timers owned by live Qt objects and stop them during shutdown.
 
-## Architecture Rules
+## Coding conventions
 
-- Rust owns save parsing, compression, mutation, backups, path validation, filesystem access, atomic writes, and long-running tasks.
-- TypeScript owns UI, navigation, view state, filters, forms, validation messages, and rendering.
-- Frontend code must call explicit Tauri commands for privileged operations.
-- Keep canonical loaded-save state in a backend save session.
-- Exchange typed command payloads and typed projections between frontend and backend.
-- Prefer user-intent commands such as `load_save`, `get_save_summary`, `preview_delete_player`, and `commit_delete_player`.
-- Destructive operations must support preview before commit.
-- Long-running operations must report progress and avoid blocking the UI.
-
-## Coding Conventions
-
-- Use TypeScript strict mode.
-- Use explicit DTO and projection types.
-- Use Rust `serde` for command payloads and responses.
-- Use typed Rust errors with user-safe messages.
-- Normalize Palworld UIDs consistently by removing dashes and comparing lowercase.
-- Keep feature UI under `src/features/<domain>/`.
-- Keep shared frontend utilities under `src/shared/`.
-- Keep backend domain logic under `src-tauri/src/domain/`.
-- Keep backend command handlers thin; delegate logic to domain modules.
-- Add comments only for non-obvious save-format, security, or data-integrity behavior.
+- Add type annotations to new public Python functions and keep control flow explicit.
+- Keep entry points thin and delegate behavior to testable functions.
+- Use `pathlib.Path` for new filesystem code.
+- Prefer structured parsers and serializers over string replacement for data files.
+- Show user-safe errors in dialogs and retain detailed diagnostics in logs.
+- Normalize UUIDs consistently where the save format requires it.
+- Add comments only for non-obvious format, security, or lifecycle behavior.
+- Keep changes close to their existing domain and avoid unrelated refactors.
 
 ## Skills
 
-Project skills are located under `.agents/skills/<name>/SKILL.md`. Private
-domain skills are under `.agents/skills/private/<name>/SKILL.md`. They are
-local project context and must be available to agents before implementing the
-related work.
+Read the complete applicable skill before planning, reviewing, or implementing its subject area. Project skills live under `.agents/skills/`.
 
-### Skill loading rules
+- `private/codebase-analysis`: evidence-based repository inspection and architecture planning.
+- `design-taste-frontend-v1`: PyQt6 UI hierarchy, accessibility, interaction states, and polish.
+- `private/pal-trainer-save-pipeline`: save containers, compression, GVAS/property handling, and roundtrip preservation.
+- `private/pal-trainer-binary-schemas`: Booth and Guild layouts and byte-drift debugging.
+- `private/pal-trainer-pal-editor`: Pal projections, validation bounds, and Palbox/party placement.
+- `private/pal-trainer-stat-formula`: stat calculations and regression vectors.
+- `private/pal-trainer-breeding`: breeding formulas, exclusions, and deterministic lookups.
+- `private/pal-trainer-cli-tools`: coordinate transforms, UUID handling, and Game Pass workflows.
+- `clean-code`: focused refactoring without behavior changes.
+- `tdd`: test-first implementation for behavior changes.
+- `review`: correctness, security, regression, and test review.
+- `git-branch-naming`: branch naming rules.
+- `git-commit`: focused Conventional Commit workflow.
 
-- Read the complete `SKILL.md` before implementation, review, or planning work
-  covered by that skill.
-- Use `tauri-development` for any Tauri, Rust command, IPC, capability,
-  filesystem, storage, plugin, configuration, packaging, or desktop lifecycle
-  work.
-- Use `design-taste-frontend-v1` for any frontend UI/UX work. This includes
-  layout, visual hierarchy, typography, spacing, responsive behavior,
-  components, interaction states, animation, accessibility, and polish.
-- When a task crosses frontend and Tauri boundaries, load both skills before
-  editing code.
-- Load the applicable private domain skill before implementing or reviewing its
-  subject area. If a task spans multiple domains, load all applicable skills.
-- Project rules in this file and the authoritative `docs/PLAN.md` take
-  precedence over generic recommendations in a skill.
-- Do not invent a replacement rule when a private skill defines a save-format,
-  data-model, formula, or roundtrip invariant. If the rule is uncertain or
-  contradicted by fixtures, stop and document the uncertainty before changing
-  behavior.
+If a private skill conflicts with a fixture or established invariant, document the uncertainty before changing behavior.
 
-### Project skill registry
+## Security and storage
 
-#### `tauri-development`
+- Never access save files directly from widgets.
+- Canonicalize paths and enforce approved roots before access.
+- Back up before every mutation, detect stale inputs, and replace files atomically.
+- Use temporary directories for extraction and remove them on success and failure.
+- Reject archive traversal, symlink escapes, unexpected members, and oversized inputs.
+- Never commit real saves, exports, backups, logs, crash dumps, credentials, or machine-specific configuration.
+- Keep network and release integration opt-in and limited to documented update behavior.
 
-Path: `.agents/skills/tauri-development/SKILL.md`
+## Files not to modify
 
-Use for the TypeScript + React + Tauri + Rust application boundary. It covers
-typed frontend-to-Rust commands and events, thin command handlers, Rust error
-handling, least-privilege capabilities, filesystem validation, state
-synchronization, performance, testing, and packaging. PalTrainer-specific
-security and ownership rules in this file refine its generic examples.
+Do not modify generated or user-owned material without an explicit reason:
 
-#### `design-taste-frontend-v1`
+- `.venv/`, `__pycache__/`, `dist/`, build outputs, standalone bundles, and native dependency build directories.
+- `node_modules/` or old frontend artifacts if present locally; they are not part of this Python project.
+- Real save directories, `*.sav`, `*.savc`, exports, backups, logs, and temporary extraction folders.
+- Lockfiles for package managers not used by this project.
+- Reference material under `ib/` unless explicitly requested.
 
-Path: `.agents/skills/design-taste-frontend-v1/SKILL.md`
+## Git workflow
 
-Use for all PalTrainer interface work. It defines the project's visual and
-interaction baseline, including neutral palettes with one restrained accent,
-dashboard-appropriate sans typography, responsive grid layouts, accessible
-loading/empty/error states, restrained card use, icon requirements, and
-transform/opacity-focused animation. Verify dependencies in `package.json`
-before importing any UI, icon, motion, or styling library. Treat its highly
-decorative examples as optional; PalTrainer remains a focused save editor and
-must preserve usability, scanability, and performance.
-
-#### `private/pal-trainer-save-pipeline`
-
-Path: `.agents/skills/private/pal-trainer-save-pipeline/SKILL.md`
-
-This is the core save-format contract. Use it for Rust parsing, writing,
-compression, GVAS handling, property dispatch, save-version detection, and
-roundtrip tests. It covers PLZ (`0x32`), PLM/Oodle (`0x31`), and CNK (`0x30`)
-containers, GVAS headers, path-specific raw-data dispatch, and the sacred
-roundtrip rule: unknown bytes must be retained and written back byte-for-byte.
-
-#### `private/pal-trainer-binary-schemas`
-
-Path: `.agents/skills/private/pal-trainer-binary-schemas/SKILL.md`
-
-Use for Booth and Guild raw-data decoders/encoders and byte-drift debugging.
-Preserve bytes before and after dynamic Guild `V1_MARKER` detection, support
-Guild v1 and v2 role/permission layouts, and determine Booth lock state from
-the documented lock flag rather than the private-lock player UID. Unlocking
-must preserve the non-zero Booth UID and only clear the lock flag.
-
-#### `private/pal-trainer-pal-editor`
-
-Path: `.agents/skills/private/pal-trainer-pal-editor/SKILL.md`
-
-Use for Pal entity projections, editor forms, Rust validation, mutation
-commands, and Palbox/party placement. It defines wrapped save property types,
-level/IV/soul/condenser bounds, maximum passive and equipped-skill counts,
-sanitization requirements, and the Palbox model of 32 boxes with 30 slots
-each. The backend remains the authority for all mutation limits.
-
-#### `private/pal-trainer-stat-formula`
-
-Path: `.agents/skills/private/pal-trainer-stat-formula/SKILL.md`
-
-Use for HP, ATK, DEF, and Work Speed calculations, previews, tooltips, and
-regression tests. Keep formula inputs and rounding in sync with the skill,
-recalculate display values from source data, and avoid presenting derived
-values as persisted save fields unless the backend confirms them.
-
-#### `private/pal-trainer-breeding`
-
-Path: `.agents/skills/private/pal-trainer-breeding/SKILL.md`
-
-Use for the breeding calculator, breeding projections, game-data ingestion,
-and breeding tests. It defines CombiRank averaging, rarity tiebreakers,
-IgnoreCombi handling, exclusion of non-breedable entries, standard pair
-permutations, and unique-combination overrides.
-
-#### `private/pal-trainer-cli-tools`
-
-Path: `.agents/skills/private/pal-trainer-cli-tools/SKILL.md`
-
-Use for coordinate translation, map overlays, UUID normalization, and Xbox
-GamePass import/export. It defines the pre- and post-Sakurajima transforms,
-the Z-threshold map switch, normalized UUID comparison, and the XGP UWP
-container/manifests/index version 14 workflow. Steam `.sav` content and XGP
-wrapper data must be treated as separate layers.
-
-### Domain-to-layer ownership
-
-- Rust owns the save pipeline, binary schemas, Pal validation/mutation, stat
-  calculations that affect saved data, backups, filesystem operations,
-  coordinate conversion for imported data, XGP packing/unpacking, and all
-  roundtrip guarantees.
-- TypeScript may calculate presentation-only previews such as stat displays or
-  breeding results, but must use shared typed inputs and matching regression
-  vectors. It must not become the authority for save validity or byte layout.
-- UI code consumes typed projections and user-safe errors through Tauri; it
-  must not parse raw save bytes or access save paths directly.
-
-### Skill precedence
-
-Project-specific rules in `AGENTS.md` take precedence over generic
-recommendations from skills.
-
-Skills provide specialized implementation guidance; they do not replace
-the project's architecture, security, testing, or Git rules.
-
-## Files Not To Modify
-
-Do not modify these without an explicit reason:
-
-- Generated build outputs such as `dist/`, `target/`, and Tauri bundle artifacts.
-- Dependency folders such as `node_modules/`.
-- Backup folders, logs, crash dumps, temporary extraction folders, and user save directories.
-- Real user save files.
-- Lockfiles for package managers not used by the project.
-
-## Security Rules
-
-- Never let frontend code directly read, write, copy, delete, or enumerate save files.
-- Use least-privilege Tauri capabilities.
-- Canonicalize paths before reading or writing.
-- Restrict writes to approved roots.
-- Back up before save-modifying operations.
-- Detect stale save files before overwrite.
-- Write to temporary files and atomically replace final files.
-- Queue deletions until the user confirms commit.
-- Treat imported files as untrusted.
-- Never commit `.sav`, `.savc`, archives, backups, logs, crash dumps, or personal game data.
-
-## Git Rules
-
-- Do not work directly on `main` for implementation, documentation, or configuration changes unless the user explicitly asks for a direct `main` edit.
-- Use a separate branch for each feature, fix, documentation change, configuration change, or repository-maintenance task.
-- Branch names must follow `{type}/{short-description}` in kebab-case, using valid prefixes such as `feat/`, `fix/`, `docs/`, `chore/`, `refactor/`, `test/`, `ci/`, `hotfix/`, or `release/`.
-- Do not use `codex/`, `phase1/`, or other non-standard branch prefixes unless the user explicitly requests one.
-- Before starting each feature, inspect `git status --short --branch` and `git branch --all --verbose --no-abbrev`.
-- Treat every phase in `docs/PLAN.md` as a planning group, not as one implementation task or one commit.
-- Before implementation, break the current phase into independently reviewable features or process steps. Each feature must have a clear scope and its own verification criteria.
-- Use one feature branch per feature or process step. Do not complete an entire phase in one branch when it contains multiple independently testable features.
-- Implement and commit one feature or process step at a time. Do not combine unrelated phase work into one bulk commit.
-- For each feature branch: create or switch to the correct branch, implement only that feature, run the relevant verification, commit only the files for that feature, then push the branch.
-- Start the next feature from the intended integration base after the previous feature has been reviewed or merged; do not stack unrelated unfinished feature work in one branch.
-- Keep commits process-by-process when a feature contains multiple meaningful steps, while keeping each commit buildable and logically focused.
-- Use Conventional Commit messages such as `feat(scope): add thing`, `fix(scope): correct thing`, `docs(scope): clarify thing`, or `chore(scope): update thing`.
-- Inspect staged diffs before committing with `git diff --staged`.
-- Do not commit ignored files unless the user explicitly asks for that ignored file to be tracked. In particular, `docs/` is ignored and should stay untracked unless the user changes that rule.
-- Check `git status --short --branch` before and after edits.
-- Do not revert user changes.
-- Keep commits focused on one logical change.
-- Do not commit generated dependency folders or build outputs.
-- Push feature branches to the remote after successful verification and commit.
-- Every completed feature branch must have a pull request opened against `main` before it is integrated. The PR must identify the relevant phase/feature from `docs/PLAN.md`, summarize verification, and call out any blocked checks.
-- Integrate feature branches through the pull request. Do not locally merge directly into `main` or bypass the PR workflow unless the user explicitly requests an exception.
-- Use a merge commit for feature pull requests so the repository history records the branch integration. Do not squash or rebase away the feature-branch history when the purpose is to preserve process-by-process commits.
-- Use the merge commit subject `Merge pull request for <branch> into main` (for example, `Merge pull request for feat/player-editor into main`); platform-generated PR numbers or repository metadata may be appended by GitHub.
-- Merge to `main` only after the PR branch satisfies the relevant plan/AGENTS requirements, required review/CI checks have passed, and verification has been run or a blocker has been clearly recorded.
-- Do not rewrite history unless explicitly requested.
+- Do not work directly on `main` for implementation, documentation, configuration, or maintenance changes.
+- Use one branch per independently reviewable feature, fix, documentation change, configuration change, or process step.
+- Branch names use `{type}/{short-description}` in kebab-case with prefixes such as `feat/`, `fix/`, `docs/`, `chore/`, `refactor/`, `test/`, `ci/`, `hotfix/`, or `release/`.
+- Before each task, inspect `git status --short --branch` and `git branch --all --verbose --no-abbrev`.
+- Treat each plan as a planning group. Break it into independently verifiable features before editing.
+- Keep commits process-by-process and buildable. Do not combine unrelated work into a bulk commit.
+- Stage only the current feature, inspect `git diff --staged`, and use a clear Conventional Commit message.
+- Push the feature branch only after verification. Do not commit or push work merely because a task is in progress.
+- Open a pull request against `main` for each completed feature branch and identify the relevant plan item and verification.
+- Integrate through the pull request with a merge commit titled `Merge pull request for <branch> into main`; do not squash away feature history unless explicitly requested.
+- Never rewrite history or revert user changes without explicit authorization.
 
 ## Definition of Done
 
-A change is done when:
-
-- It follows the architecture and security rules in this file.
-- Tests match the risk of the change.
-- Save-modifying behavior has backup, stale-save, path-validation, preview, and regression coverage.
-- Frontend lint/typecheck/tests pass when available.
-- Rust format/clippy/tests pass when available.
-- Missing scaffold commands are clearly called out rather than assumed.
+A change is complete when it follows this file and the relevant plan, has focused tests at the appropriate risk level, preserves save-data and security invariants, passes available import/test/type checks, and records any blocked verification honestly.
