@@ -1,18 +1,21 @@
-from import_libs import *
-from palsav.gvas import GvasFile
-from palsav.paltypes import PALWORLD_TYPE_HINTS
-from palobject import SKP_PALWORLD_CUSTOM_PROPERTIES
-from loading_manager import show_information, show_critical, run_with_loading
-from palsav.core import decompress_sav_to_gvas, compress_gvas_to_sav
-
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QFileDialog, QApplication, QFrame, QGridLayout, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QSpinBox, QGroupBox, QWidget, QScrollArea, QProgressBar
+import sys, os, shutil, copy, tempfile
+import logging
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QFileDialog, QApplication, QFrame, QGridLayout, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QSpinBox, QGroupBox, QWidget, QScrollArea, QProgressBar, QInputDialog
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from PyQt6.QtGui import QIcon, QFont, QPixmap, QColor, QPalette
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
 from concurrent.futures import ThreadPoolExecutor
-import os
+from i18n import t
+from common import ICON_PATH, get_preferred_save_path
+from palsav.gvas import GvasFile
+from palsav.paltypes import PALWORLD_TYPE_HINTS
+from palobject import SKP_PALWORLD_CUSTOM_PROPERTIES
+from palsav.core import decompress_sav_to_gvas, compress_gvas_to_sav
+from import_libs import backup_whole_directory
+from loading_manager import show_information, show_critical, run_with_loading
 from palworld_aio.ui.chrome.styles import ThemeManager
 from palworld_aio import constants
+logger = logging.getLogger(__name__)
 _SORT_ROLE = Qt.UserRole + 1
 class _SortableTableItem(QTableWidgetItem):
     def __lt__(self, other):

@@ -1,4 +1,11 @@
-from import_libs import *
+import sys
+from PyQt6.QtWidgets import QApplication, QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
+from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtCore import Qt, QTimer
+from i18n import t
+from common import ICON_PATH
+from palobject import toUUID, PlayerUid2NoSteam, steamIdToPlayerUid
+from import_libs import NerdBtn
 from loading_manager import show_warning, show_critical
 from palworld_aio.ui.chrome.styles import ThemeManager
 import nerdfont as nf

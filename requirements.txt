@@ -1,8 +1,10 @@
+# Generated compatibility artifact — source of truth is pyproject.toml.
+# This file is kept for CI/build scripts that use `uv pip install -r requirements.txt`.
+# Update pyproject.toml first, then regenerate this file.
+
 PyQt6>=6.8
-cx-freeze>=8.3.0
 nerdfont
 orjson
-pefile
 packaging
 Pillow
 brotli
@@ -10,5 +12,13 @@ cbor2
 msgpack
 zstandard
 
+# Build/CI tools (mirrored from pyproject.toml [dependency-groups.dev])
+cx-freeze>=8.6.0
+nuitka>=4.1.2
+pefile
+
+# Test tooling
 pytest
+
+# Workspace packages
 ./src/palsav

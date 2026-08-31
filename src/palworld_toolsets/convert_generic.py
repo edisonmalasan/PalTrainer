@@ -1,5 +1,5 @@
 import sys, os, gc, time
-from import_libs import *
+from i18n import t
 from loading_manager import show_information, run_with_loading
 from palworld_aio.ui.chrome.styles import ThemeManager
 from PyQt6.QtWidgets import QApplication, QFileDialog

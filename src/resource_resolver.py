@@ -1,66 +1,38 @@
 import os
-import sys
+
+from boot_paths import (
+    ROOT_DIR,
+    SRC_DIR,
+    RESOURCES_DIR,
+    CONFIG_DIR,
+    is_frozen as _is_frozen,
+    get_user_config_dir as _get_user_config_dir,
+    get_data_base as _get_data_base,
+)
 
 
-def _compute_binary_root() -> str:
-    if hasattr(sys, '_PALTRAINER_BINARY_ROOT'):
-        return sys._PALTRAINER_BINARY_ROOT
-    _found_root = None
-    if os.path.isfile(sys.executable):
-        _exe_dir = os.path.dirname(os.path.realpath(sys.executable))
-        if os.path.isdir(os.path.join(_exe_dir, 'resources')):
-            _found_root = _exe_dir
-        else:
-            _parent = os.path.dirname(_exe_dir)
-            if os.path.isdir(os.path.join(_parent, 'resources')):
-                _found_root = _parent
-    if _found_root is None:
-        _probe = os.path.dirname(os.path.abspath(__file__))
-        for _ in range(5):
-            if os.path.isdir(os.path.join(_probe, 'resources')):
-                _found_root = _probe
-                break
-            _probe = os.path.dirname(_probe)
-        if _found_root is None:
-            _found_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return _found_root
+def get_base_dir() -> str:
+    return str(ROOT_DIR)
 
 
-sys._PALTRAINER_BINARY_ROOT = _compute_binary_root()
+def get_src_dir() -> str:
+    return str(SRC_DIR)
 
 
-def get_base_dir():
-    return sys._PALTRAINER_BINARY_ROOT
+def get_resources_dir() -> str:
+    return str(RESOURCES_DIR)
 
-def _frozen():
-    if getattr(sys, 'frozen', False):
-        return True
-    _exe = getattr(sys, 'executable', '') or ''
-    return not os.path.basename(_exe).lower().startswith('python')
 
-def get_data_base():
-    if _frozen():
-        return os.path.dirname(get_user_config_dir())
-    return get_base_dir()
+def _frozen() -> bool:
+    return _is_frozen()
+
+
+def get_data_base() -> str:
+    return str(_get_data_base())
 
 
 def get_user_config_dir() -> str:
-    if _frozen():
-        if sys.platform == 'win32':
-            base = os.environ.get('APPDATA', os.path.expanduser('~'))
-        elif sys.platform == 'darwin':
-            base = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support')
-        else:
-            base = os.path.join(os.path.expanduser('~'), '.config')
-        return os.path.join(base, 'PalTrainer', 'configs')
-    return os.path.join(get_base_dir(), 'src', 'data', 'configs')
-
-def get_resources_dir():
-    return os.path.join(get_base_dir(), 'resources')
-
-
-def get_src_dir():
-    return os.path.join(get_base_dir(), 'src')
+    return str(_get_user_config_dir())
 
 
 _RESOURCE_MAP = {
@@ -92,7 +64,6 @@ _RESOURCE_MAP = {
     'background.png': 'assets/branding/background.png',
     'logo.png': 'assets/branding/logo.png',
     'PalTrainer.png': 'assets/branding/PalTrainer.png',
-    'PalTrainer.png': 'assets/branding/PalTrainer.png',
     'PalTrainer_Black.png': 'assets/branding/PalTrainer_Black.png',
     'PalTrainer_Blue.png': 'assets/branding/PalTrainer_Blue.png',
     'PalTrainer_readme_divider.png': 'assets/branding/PalTrainer_readme_divider.png',
@@ -117,8 +88,6 @@ _RESOURCE_MAP = {
     'T_TreeMap.webp': 'assets/maps/T_TreeMap.webp',
     'T_WorldMap.webp': 'assets/maps/T_WorldMap.webp',
 }
-
-_FLAT_KEYS = {k for k in _RESOURCE_MAP if '/' not in k}
 
 
 def resource_path(base_dir: str, *parts: str) -> str:
