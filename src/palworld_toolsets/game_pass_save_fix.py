@@ -1,4 +1,6 @@
-from import_libs import *
+import os, sys, shutil, random, string, threading, logging, zipfile, traceback
+from i18n import t
+from common import ICON_PATH, get_preferred_save_path
 from palworld_aio.utils import sav_to_json, json_to_sav, extract_value
 from palworld_toolsets.fix_host_save import ask_string_with_icon
 from resource_resolver import get_data_base

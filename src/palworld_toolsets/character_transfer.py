@@ -1,9 +1,11 @@
-from import_libs import *
-from loading_manager import show_information, show_warning, run_with_loading
-from PyQt6.QtWidgets import QHeaderView, QWidget, QTreeWidget, QTreeWidgetItem, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, QFileDialog, QMessageBox, QApplication, QFrame
+import sys, os, shutil, time, traceback, pickle
+from PyQt6.QtWidgets import QHeaderView, QWidget, QTreeWidget, QTreeWidgetItem, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, QFileDialog, QMessageBox, QApplication, QFrame, QInputDialog
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QFont
-import os
+from i18n import t
+from common import ICON_PATH, get_preferred_save_path
+from import_libs import backup_whole_directory
+from loading_manager import show_information, show_warning, show_critical, run_with_loading
 from palsav.core import decompress_sav_to_gvas, compress_gvas_to_sav
 
 from palworld_aio.ui.chrome.styles import ThemeManager
@@ -15,6 +17,7 @@ from palworld_aio import constants
 from palworld_aio.managers.func_manager import repair_items
 from palobject import SKP_PALWORLD_CUSTOM_PROPERTIES
 from palsav.archive import UUID as PalUUID
+from palsav.archive import UUID
 from palsav.io import load_sav
 _TRANSFER_STEPS = {'character': True, 'tech_data': True, 'inventory': True, 'guild': True, 'pals': True, 'dynamics': True, 'timestamps': True}
 player_list_cache = []

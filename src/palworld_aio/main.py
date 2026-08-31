@@ -104,19 +104,11 @@ def run_aio():
             init_language('en_US')
     except Exception:
         init_language('en_US')
-    if len(sys.argv) > 1 and (not sys.argv[1].startswith('--')):
-        path_arg = sys.argv[1].strip().strip('"')
-        options = {'logs': False, 'fix': False}
-        for arg in sys.argv[2:]:
-            if arg in ('-logs', '--logs', '-log'):
-                options['logs'] = True
-            elif arg in ('-fix', '--fix'):
-                options['fix'] = True
-        if not any(options.values()):
-            options['logs'] = True
-            options['fix'] = True
-        if options['fix']:
-            options['logs'] = True
+    from cli import parse_app_options
+    opts = parse_app_options(sys.argv[1:])
+    if opts.save_path:
+        path_arg = opts.save_path
+        options = {'logs': opts.logs, 'fix': opts.fix}
         print(f'Processing save file: {path_arg}')
         mode_desc = []
         if options['logs']:
@@ -257,7 +249,7 @@ def run_aio():
             else:
                 print('Error: No save file loaded')
         sys.exit(0)
-    if '--test-loading-popup' in sys.argv:
+    if opts.test_loading_popup:
         from palworld_aio.widgets import LoadingPopup
         app = QApplication.instance()
         if app is None:

@@ -4,11 +4,10 @@ import sys
 from typing import Dict, Any
 from palsav import json_tools
 
-from resource_resolver import get_base_dir, get_resources_dir, get_user_config_dir
-base_dir = get_base_dir()
-_CFG: str = os.path.join(get_user_config_dir(), 'config.json')
-_BUNDLED_CFG: str = os.path.join(base_dir, 'src', 'data', 'configs', 'config.json')
-_RESOURCES_BASE: str = get_resources_dir()
+from boot_paths import ROOT_DIR, RESOURCES_DIR, get_user_config_dir as _get_user_config_dir
+_CFG: str = os.path.join(str(_get_user_config_dir()), 'config.json')
+_BUNDLED_CFG: str = os.path.join(str(ROOT_DIR), 'src', 'data', 'configs', 'config.json')
+_RESOURCES_BASE: str = str(RESOURCES_DIR)
 if _RESOURCES_BASE not in sys.path:
     sys.path.insert(0, _RESOURCES_BASE)
 _SUPPORTED_LANGS = ['en_US', 'zh_CN', 'ru_RU', 'fr_FR', 'es_ES', 'de_DE', 'ja_JP', 'ko_KR', 'pt_BR']

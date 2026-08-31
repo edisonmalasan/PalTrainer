@@ -1,7 +1,10 @@
-from import_libs import *
+import os, time, shutil, sys, traceback
+from i18n import t
+from common import ICON_PATH
+from palsav.gvas import GvasFile
+from palobject import SKP_PALWORLD_CUSTOM_PROPERTIES
+from loading_manager import show_critical, show_question, run_with_loading
 from palsav.core import decompress_sav_to_gvas, compress_gvas_to_sav
-
-from loading_manager import show_critical, run_with_loading
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QApplication
 from PyQt6.QtGui import QIcon, QFont
 from PyQt6.QtCore import Qt, QTimer

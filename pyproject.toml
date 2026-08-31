@@ -3,7 +3,8 @@ requires = ["setuptools>=75.6.0", "wheel"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "paltrainer"
-version = "0.1.0"
+# Authoritative version source. Mirror this value in src/common.py (APP_VERSION).
+version = "2.4.0"
 description = "All-in-one tool for fixing/transferring/editing Palworld saves"
 readme = "README.md"
 license = "MIT"
@@ -12,7 +13,6 @@ requires-python = ">=3.11"
 dependencies = [
     "PyQt6>=6.8",
     "Pillow",
-    "cx-freeze>=8.3.0",
     "nerdfont",
     "packaging",
     "palsav-flex",
@@ -21,8 +21,6 @@ dependencies = [
     "msgpack",
     "zstandard",
     "orjson",
-    "nuitka>=4.1.2",
-    "loguru>=0.7.3",
 ]
 
 [tool.uv.sources]
@@ -49,7 +47,9 @@ reportArgumentType = false
 [dependency-groups]
 dev = [
     "cx-freeze>=8.6.0",
+    "nuitka>=4.1.2",
     "imageio",
+    "pefile",
     "pytest",
     "pyright>=1.1.390",
 ]

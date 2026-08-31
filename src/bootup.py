@@ -17,10 +17,11 @@ PROJECT_DIR = ROOT_DIR
 _src = str(PROJECT_DIR / 'src')
 if _src not in sys.path:
     sys.path.insert(0, _src)
+import cli as _cli
 import qt_compat as _qt_compat
 from palsav import json_tools
 
-if os.environ.get('PALTRAINER_NO_GUI', '') in ('1', 'true', 'True'):
+if _cli.env_flag('PALTRAINER_NO_GUI'):
     GUI_AVAILABLE = False
 else:
     try:
@@ -35,7 +36,7 @@ if GUI_AVAILABLE:
         if 'QThreadStorage' in str(message) and 'destroyed before end of thread' in str(message):
             return
     qInstallMessageHandler(qt_message_handler)
-DEBUG = bool(os.environ.get('PALTRAINER_DEBUG', '') in ('1', 'true', 'True'))
+DEBUG = bool(os.environ.get('PALTRAINER_DEBUG', '') in ('1', 'true', 'True')) or _cli.env_flag('PALTRAINER_DEBUG')
 USE_ANSI = True
 if os.name == 'nt':
     try:

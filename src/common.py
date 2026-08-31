@@ -1,26 +1,26 @@
 import os, sys, subprocess, configparser
+from pathlib import Path
 from palsav import json_tools
-from resource_resolver import get_base_dir, get_src_dir, get_resources_dir, resource_path, get_user_config_dir
+from boot_paths import ROOT_DIR, SRC_DIR, RESOURCES_DIR, CONFIG_DIR, get_data_base as _get_data_base, is_frozen as _is_frozen
+from resource_resolver import resource_path
 APP_NAME = 'PalTrainer'
+# Mirror of pyproject.toml [project].version (authoritative source).
 APP_VERSION = '2.4.0'
 TESTING_VER = '2.4.0'
 GAME_VERSION = '1.0.3'
 def get_base_directory():
-    return get_base_dir()
+    return str(ROOT_DIR)
 def get_src_directory():
-    return get_src_dir()
+    return str(SRC_DIR)
 def get_resources_directory():
-    return get_resources_dir()
-ICON_PATH = resource_path(get_base_dir(), 'icon.ico')
-BACKUP_BASE_DIR = os.path.join(get_base_dir(), 'Backups')
+    return str(RESOURCES_DIR)
+ICON_PATH = resource_path(str(ROOT_DIR), 'icon.ico')
+BACKUP_BASE_DIR = str(ROOT_DIR / 'Backups')
 def get_backup_directory(tool_name):
     return os.path.join(BACKUP_BASE_DIR, tool_name)
 BACKUP_DIRS = {'all_in_one_tools': 'AllinOneTools', 'slot_injector': 'Slot Injector', 'character_transfer': 'Character Transfer', 'fix_host_save': 'Fix Host Save', 'restore_map': 'Restore Map'}
 def is_frozen():
-    if getattr(sys, 'frozen', False):
-        return True
-    _exe = getattr(sys, 'executable', '') or ''
-    return not os.path.basename(_exe).lower().startswith('python')
+    return _is_frozen()
 def get_python_executable():
     if is_frozen():
         return sys.executable
@@ -40,8 +40,7 @@ def get_display_version():
 def is_standalone():
     if is_frozen():
         return True
-    from boot_paths import CONFIG_DIR
-    cfg_path = os.path.join(str(CONFIG_DIR), 'runtime.cfg')
+    cfg_path = str(CONFIG_DIR / 'runtime.cfg')
     try:
         cfg = configparser.ConfigParser()
         cfg.read(cfg_path)
@@ -109,4 +108,3 @@ def open_file_with_default_app(file_path):
     except Exception as e:
         print(f'Error opening file {file_path}: {e}')
         return False
-
