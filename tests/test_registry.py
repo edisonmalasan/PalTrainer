@@ -20,6 +20,7 @@ MODULE_MAP: dict[str, dict] = {
     'common':                {'import_as': 'common',                'parent': 'src'},
     'path_setup':            {'import_as': 'path_setup',            'parent': 'src'},
     'cli':                   {'import_as': 'cli',                   'parent': 'src'},
+    'save_engine':           {'import_as': 'save_engine',           'parent': 'src'},
     'resource_resolver':     {'import_as': 'resource_resolver',     'parent': 'src'},
     'qt_imports':            {'import_as': 'qt_imports',            'parent': 'src'},
     'palobject':             {'import_as': 'palobject',             'parent': 'src'},
