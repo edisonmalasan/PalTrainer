@@ -116,86 +116,34 @@ def run_aio():
         if options['fix']:
             mode_desc.append('fix')
         print(f"Mode: {', '.join(mode_desc)}")
+        from palworld_aio.managers.save_session import save_session, SavePathError
         if constants.loaded_level_json is not None:
-            constants.loaded_level_json = None
-            constants.current_save_path = None
-            constants.backup_save_path = None
-            constants.srcGuildMapping = None
-            constants.base_guild_lookup = {}
-            constants.files_to_delete = set()
-            constants.PLAYER_PAL_COUNTS = {}
-            constants.player_levels = {}
-            constants.player_character_cache = {}
-            constants.player_duplicate_bodies = {}
-            constants.PLAYER_DETAILS_CACHE = {}
-            constants.PLAYER_REMAPS = {}
-            constants.death_bag_protected_instance_ids.clear()
-            constants.death_bag_protected_container_ids.clear()
-            constants.selected_source_player = None
-            constants.dps_executor = None
-            constants.dps_futures = []
-            constants.dps_tasks = []
-            constants.original_loaded_level_json = None
-            constants.xgp_container_path = None
-            constants.xgp_save_id = None
-            constants.xgp_container_index = None
-            constants.xgp_loaded = False
-            constants.gps_path = None
-            constants.gps_gvas = None
-            constants.gps_xgp_container_path = None
-            MappingCacheObject._MappingCacheInstances.clear()
+            save_session.reset()
         p = path_arg
-        if not p:
-            print('Error: No path provided')
-            sys.exit(1)
-        if not p.endswith('Level.sav'):
-            print('Error: File must be Level.sav')
+        try:
+            p = save_session.approve_save_path(p)
+        except SavePathError as e:
+            print(f'Error: {e}')
             sys.exit(1)
         d = os.path.dirname(p)
         playerdir = os.path.join(d, 'Players')
-        if not os.path.isdir(playerdir):
-            print('Error: Players folder not found')
-            sys.exit(1)
         print('Loading save...')
-        constants.current_save_path = d
-        constants.backup_save_path = constants.current_save_path
         from common import set_last_save_path
         set_last_save_path(d)
-        from import_libs import backup_whole_directory
-        backup_whole_directory(constants.backup_save_path, 'Backups/AllinOneTools')
-        import time
-        from palworld_aio.utils import sav_to_gvas_wrapper
-        from palobject import MappingCacheObject, toUUID
-        t0 = time.perf_counter()
-        constants.loaded_level_json = sav_to_gvas_wrapper(p)
-        t1 = time.perf_counter()
-        print(f'Save loaded in {t1 - t0:.2f} seconds')
-        from palworld_aio.managers.func_manager import scan_and_protect_death_bags
-        scan_and_protect_death_bags()
-        from palworld_aio.managers.save_manager import build_player_levels
-        build_player_levels()
-        if not constants.loaded_level_json:
+        save_session.current_save_path = d
+        save_session.backup_save_path = d
+        save_session.make_backup('AllinOneTools')
+        if not save_session.load(p):
             print('Error: Failed to load save')
             sys.exit(1)
+        print(f'Save loaded')
         data_source = constants.loaded_level_json['properties']['worldSaveData']['value']
-        try:
-            if hasattr(MappingCacheObject, 'clear_cache'):
-                MappingCacheObject.clear_cache()
-            constants.srcGuildMapping = MappingCacheObject.get(data_source, use_mp=True)
-            if constants.srcGuildMapping._worldSaveData.get('GroupSaveDataMap') is None:
-                constants.srcGuildMapping.GroupSaveDataMap = {}
-        except Exception as e:
-            print(f'Error: {e}')
-            constants.srcGuildMapping = None
-        constants.base_guild_lookup = {}
         guild_name_map = {}
         if constants.srcGuildMapping:
             for gid_uuid, gdata in constants.srcGuildMapping.GroupSaveDataMap.items():
                 gid = str(gid_uuid)
                 guild_name = gdata['value']['RawData']['value'].get('guild_name', 'Unnamed Guild')
                 guild_name_map[gid.lower()] = guild_name
-                for base_id_uuid in gdata['value']['RawData']['value'].get('base_ids', []):
-                    constants.base_guild_lookup[str(base_id_uuid)] = {'GuildName': guild_name, 'GuildID': gid}
         print('Loading done')
         if options['logs']:
             from resource_resolver import get_data_base
@@ -226,26 +174,8 @@ def run_aio():
             fixed_count = fix_illegal_pals_in_save(parent=None)
             print('Saving changes...')
             if constants.current_save_path and constants.loaded_level_json:
-                from palworld_aio.utils import wrapper_to_sav
-                level_sav_path = os.path.join(constants.current_save_path, 'Level.sav')
-                t0 = time.perf_counter()
-                wrapper_to_sav(constants.loaded_level_json, level_sav_path)
-                t1 = time.perf_counter()
-                players_folder = os.path.join(constants.current_save_path, 'Players')
-                for uid in constants.files_to_delete:
-                    f = os.path.join(players_folder, uid.upper() + '.sav')
-                    f_dps = os.path.join(players_folder, f'{uid.upper()}_dps.sav')
-                    try:
-                        os.remove(f)
-                    except FileNotFoundError:
-                        pass
-                    try:
-                        os.remove(f_dps)
-                    except FileNotFoundError:
-                        pass
-                constants.files_to_delete.clear()
-                duration = t1 - t0
-                print(f'Changes saved successfully in {duration:.2f} seconds')
+                save_session.save()
+                print('Changes saved successfully')
             else:
                 print('Error: No save file loaded')
         sys.exit(0)

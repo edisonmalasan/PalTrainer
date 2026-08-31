@@ -21,6 +21,7 @@ from import_libs import backup_whole_directory, run_with_loading
 import palworld_coord
 from i18n import t
 from palworld_aio import constants
+from palworld_aio.managers.save_session import save_session, SavePathError, SaveNoPathError, SaveMissingPlayersError, SaveNotLevelError
 from palworld_aio.utils import sav_to_json, json_to_sav, sav_to_gvas_wrapper, wrapper_to_sav, sav_to_gvasfile, extract_value, sanitize_filename, format_duration_short, resolve_name, canonical_player_entries
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from palworld_aio.managers.func_manager import check_is_illegal_pal
@@ -78,79 +79,23 @@ class SaveManager(QObject):
         self._disabled_adapters: list[str] = []
 
     def _reset_state(self):
-        from palobject import MappingCacheObject
-        constants.loaded_level_json = None
-        constants.loaded_level_mtime = None
-        constants.current_save_path = None
-        constants.backup_save_path = None
-        constants.srcGuildMapping = None
-        constants.base_guild_lookup = {}
-        constants.files_to_delete = set()
-        constants.PLAYER_PAL_COUNTS = {}
-        constants.player_levels = {}
-        constants.player_character_cache = {}
-        constants.player_duplicate_bodies = {}
-        constants.PLAYER_DETAILS_CACHE = {}
-        constants.PLAYER_REMAPS = {}
-        constants.death_bag_protected_instance_ids.clear()
-        constants.death_bag_protected_container_ids.clear()
-        constants.selected_source_player = None
-        constants.dps_executor = None
-        constants.dps_futures = []
-        constants.dps_tasks = []
-        constants.original_loaded_level_json = None
-        constants.xgp_container_path = None
-        constants.xgp_save_id = None
-        constants.xgp_container_index = None
-        constants.xgp_loaded = False
-        constants.gps_path = None
-        constants.gps_gvas = None
-        constants.gps_xgp_container_path = None
-        self.dps_tasks.clear()
-        self.player_sav_cache.clear()
-        if hasattr(MappingCacheObject, '_MappingCacheInstances'):
-            MappingCacheObject._MappingCacheInstances.clear()
-        if self._xgp_temp_dir:
-            shutil.rmtree(self._xgp_temp_dir, ignore_errors=True)
-            self._xgp_temp_dir = None
+        save_session.reset()
     def _load_from_path(self, level_sav_path: str, parent=None) -> bool:
-        t0 = time.perf_counter()
-        constants.loaded_level_json = sav_to_gvas_wrapper(level_sav_path)
-        constants.loaded_level_mtime = os.path.getmtime(level_sav_path)
-        t1 = time.perf_counter()
-        constants.invalidate_container_lookup()
-        from palworld_aio.managers.func_manager import scan_and_protect_death_bags
-        scan_and_protect_death_bags()
-        from palworld_aio.inventory.dynamic_item_manager import get_dynamic_item_manager
-        get_dynamic_item_manager().sync_with_save_data(constants.loaded_level_json)
-        build_player_levels()
-        if not constants.loaded_level_json:
+        ok = save_session.load(level_sav_path)
+        if not ok:
             return False
         data_source = constants.loaded_level_json['properties']['worldSaveData']['value']
-        from palobject import MappingCacheObject
-        try:
-            if hasattr(MappingCacheObject, 'clear_cache'):
-                MappingCacheObject.clear_cache()
-            constants.srcGuildMapping = MappingCacheObject.get(data_source, use_mp=True)
-            if constants.srcGuildMapping._worldSaveData.get('GroupSaveDataMap') is None:
-                constants.srcGuildMapping.GroupSaveDataMap = {}
-        except Exception as e:
-            if parent:
-                show_critical(parent, t('error.title'), t('error.guild_mapping_failed', err=e))
-            constants.srcGuildMapping = None
-        constants.base_guild_lookup = {}
-        guild_name_map = {}
-        if constants.srcGuildMapping:
-            for gid_uuid, gdata in constants.srcGuildMapping.GroupSaveDataMap.items():
-                gid = str(gid_uuid)
-                guild_name = gdata['value']['RawData']['value'].get('guild_name', 'Unnamed Guild')
-                guild_name_map[gid.lower()] = guild_name
-                for base_id_uuid in gdata['value']['RawData']['value'].get('base_ids', []):
-                    constants.base_guild_lookup[str(base_id_uuid)] = {'GuildName': guild_name, 'GuildID': gid}
         from resource_resolver import get_data_base
         base_path = get_data_base()
         log_folder = os.path.join(base_path, 'Logs', 'Scan Save Logger')
         os.makedirs(log_folder, exist_ok=True)
+        guild_name_map = {}
+        if constants.srcGuildMapping:
+            mapping = constants.srcGuildMapping
+            for gid_uuid, gdata in mapping.GroupSaveDataMap.items():
+                gid = str(gid_uuid)
+                guild_name = gdata['value']['RawData']['value'].get('guild_name', 'Unnamed Guild')
+                guild_name_map[gid.lower()] = guild_name
         player_pals_count = {}
         playerdir = os.path.join(constants.current_save_path, 'Players')
         illegal_pals_by_owner, owner_nicknames = self._count_pals_found(data_source, player_pals_count, log_folder, constants.current_save_path, guild_name_map)
@@ -166,21 +111,24 @@ class SaveManager(QObject):
             p = path
         if not p:
             return False
-        if not p.endswith('Level.sav'):
+        try:
+            p = save_session.approve_save_path(p)
+        except SaveNoPathError:
+            return False
+        except SaveMissingPlayersError:
+            show_critical(parent, t('error.title'), t('error.players_folder_missing'))
+            return False
+        except SavePathError:
             show_critical(parent, t('error.title'), t('error.not_level_sav'))
             return False
         d = os.path.dirname(p)
-        playerdir = os.path.join(d, 'Players')
-        if not os.path.isdir(playerdir):
-            show_critical(parent, t('error.title'), t('error.players_folder_missing'))
-            return False
         self._reset_state()
         self.load_started.emit()
         constants.current_save_path = d
         constants.backup_save_path = constants.current_save_path
         from common import set_last_save_path
         set_last_save_path(d)
-        backup_whole_directory(constants.backup_save_path, 'Backups/AllinOneTools')
+        save_session.make_backup('AllinOneTools')
         def load_task():
             try:
                 ok = self._load_from_path(p, parent)
@@ -198,39 +146,18 @@ class SaveManager(QObject):
             raise Exception('No save is currently loaded')
         self.dps_tasks.clear()
         self.player_sav_cache.clear()
-        level_sav_path = os.path.join(constants.current_save_path, 'Level.sav')
-        if not os.path.exists(level_sav_path):
-            raise Exception(f'Level.sav not found at {level_sav_path}')
-        from resource_resolver import get_data_base
-        base_path = get_data_base()
-        t0 = time.perf_counter()
-        constants.loaded_level_json = sav_to_gvas_wrapper(level_sav_path)
-        constants.loaded_level_mtime = os.path.getmtime(level_sav_path)
-        t1 = time.perf_counter()
-        constants.invalidate_container_lookup()
-        from palworld_aio.managers.func_manager import scan_and_protect_death_bags
-        scan_and_protect_death_bags()
-        build_player_levels()
-        if not constants.loaded_level_json:
+        ok = save_session.reload()
+        if not ok:
             raise Exception('Failed to parse Level.sav')
         data_source = constants.loaded_level_json['properties']['worldSaveData']['value']
-        try:
-            if hasattr(MappingCacheObject, 'clear_cache'):
-                MappingCacheObject.clear_cache()
-            constants.srcGuildMapping = MappingCacheObject.get(data_source, use_mp=True)
-            if constants.srcGuildMapping._worldSaveData.get('GroupSaveDataMap') is None:
-                constants.srcGuildMapping.GroupSaveDataMap = {}
-        except Exception as e:
-            constants.srcGuildMapping = None
-        constants.base_guild_lookup = {}
+        from resource_resolver import get_data_base
+        base_path = get_data_base()
         guild_name_map = {}
         if constants.srcGuildMapping:
             for gid_uuid, gdata in constants.srcGuildMapping.GroupSaveDataMap.items():
                 gid = str(gid_uuid)
                 guild_name = gdata['value']['RawData']['value'].get('guild_name', 'Unnamed Guild')
                 guild_name_map[gid.lower()] = guild_name
-                for base_id_uuid in gdata['value']['RawData']['value'].get('base_ids', []):
-                    constants.base_guild_lookup[str(base_id_uuid)] = {'GuildName': guild_name, 'GuildID': gid}
         log_folder = os.path.join(base_path, 'Logs', 'Scan Save Logger')
         os.makedirs(log_folder, exist_ok=True)
         player_pals_count = {}
@@ -240,14 +167,7 @@ class SaveManager(QObject):
         self._process_scan_log(data_source, playerdir, log_folder, guild_name_map, base_path, illegal_pals_by_owner, owner_nicknames)
         return True
     def is_save_stale(self, level_sav_path=None) -> bool:
-        if constants.loaded_level_mtime is None or not constants.current_save_path:
-            return False
-        if level_sav_path is None:
-            level_sav_path = os.path.join(constants.current_save_path, 'Level.sav')
-        try:
-            return os.path.getmtime(level_sav_path) != constants.loaded_level_mtime
-        except OSError:
-            return False
+        return save_session.is_stale()
     def save_changes(self, parent=None):
         if not constants.current_save_path or not constants.loaded_level_json:
             return
@@ -282,21 +202,9 @@ class SaveManager(QObject):
         def save_task():
             t0 = time.perf_counter()
             try:
-                wrapper_to_sav(constants.loaded_level_json, level_sav_path)
-                players_folder = os.path.join(constants.current_save_path, 'Players')
-                for uid in constants.files_to_delete:
-                    f = os.path.join(players_folder, uid.upper() + '.sav')
-                    f_dps = os.path.join(players_folder, f'{uid.upper()}_dps.sav')
-                    try: os.remove(f)
-                    except FileNotFoundError: pass
-                    try: os.remove(f_dps)
-                    except FileNotFoundError: pass
-                constants.files_to_delete.clear()
+                save_session.save()
                 if constants.xgp_loaded:
                     self._save_xgp_container()
-                else:
-                    constants.loaded_level_mtime = os.path.getmtime(level_sav_path)
-                constants.dirty = False
             except Exception:
                 import traceback
                 traceback.print_exc()
