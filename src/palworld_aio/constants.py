@@ -1,6 +1,9 @@
 import os
 import sys
+from typing import TYPE_CHECKING
 from resource_resolver import get_base_dir, get_src_dir, get_user_config_dir, resource_path
+if TYPE_CHECKING:
+    from palobject import MappingCacheObject
 BG = '#0A0B0E'
 GLASS = '#121418'
 ACCENT = '#3B8ED0'
@@ -50,7 +53,7 @@ loaded_level_json = None
 loaded_level_mtime: float | None = None
 original_loaded_level_json = None
 backup_save_path = None
-srcGuildMapping = None
+srcGuildMapping: "MappingCacheObject | None" = None
 player_levels = {}
 player_character_cache = {}
 player_duplicate_bodies = {}
