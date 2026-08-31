@@ -1,69 +1,233 @@
 from __future__ import annotations
-import os, sys, glob, subprocess, shutil, pathlib
-PROJECT_DIR = pathlib.Path(__file__).resolve().parent
-VENV_DIR = PROJECT_DIR / '.venv'
+
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+# ============================================================
+# PALTRAINER
+# ============================================================
+
+PROJECT_DIR = Path(__file__).resolve().parent
+VENV_DIR = PROJECT_DIR / ".venv"
+
+
+# ============================================================
+# COLORS
+# ============================================================
+
 USE_ANSI = True
-if os.name == 'nt':
+
+if os.name == "nt":
     try:
         import ctypes
+
         kernel32 = ctypes.windll.kernel32
-        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+        handle = kernel32.GetStdHandle(-11)
+
+        mode = ctypes.c_uint32()
+        kernel32.GetConsoleMode(handle, ctypes.byref(mode))
+        kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+
     except Exception:
-        pass
+        USE_ANSI = False
+
+
 def ansi(code: str) -> str:
-    return code if USE_ANSI else ''
-RESET = ansi('\x1b[0m')
-BOLD = ansi('\x1b[1m')
-GREEN = ansi('\x1b[32m')
-YELLOW = ansi('\x1b[33m')
-RED = ansi('\x1b[31m')
-CYAN = ansi('\x1b[36m')
-DIM = ansi('\x1b[2m')
-LOGO = "\n  ___      _                _    _ ___              _____         _    \n | _ \\__ _| |_ __ _____ _ _| |__| / __| __ ___ ____|_   _|__  ___| |___\n |  _/ _` | \\ V  V / _ \\ '_| / _` \\__ \\/ _` \\ V / -_)| |/ _ \\/ _ \\(_-<\n |_| \\__,_|_|\\_/\\_/\\___/_| |_\\__,_|___/\\__,_|\\_/\\___||_|\\___/\\___/_/__/\n"
-def log(msg: str, color: str=''):
-    print(f'{color}{msg}{RESET}')
-def venv_python() -> pathlib.Path:
-    if os.name == 'nt':
-        return VENV_DIR / 'Scripts' / 'python.exe'
-    return VENV_DIR / 'bin' / 'python'
-def ensure_venv():
+    return code if USE_ANSI else ""
+
+
+RESET = ansi("\033[0m")
+BOLD = ansi("\033[1m")
+DIM = ansi("\033[2m")
+
+GREEN = ansi("\033[92m")
+CYAN = ansi("\033[96m")
+YELLOW = ansi("\033[93m")
+RED = ansi("\033[91m")
+WHITE = ansi("\033[97m")
+
+
+# ============================================================
+# PALTRAINER LOGO
+# ============================================================
+
+LOGO = f"""
+{CYAN}██████╗  █████╗ ██╗         ████████╗██████╗  █████╗ ██╗███╗   ██╗███████╗██████╗
+██╔══██╗██╔══██╗██║         ╚══██╔══╝██╔══██╗██╔══██╗██║████╗  ██║██╔════╝██╔══██╗
+██████╔╝███████║██║            ██║   ██████╔╝███████║██║██╔██╗ ██║█████╗  ██████╔╝
+██╔═══╝ ██╔══██║██║            ██║   ██╔══██╗██╔══██║██║██║╚██╗██║██╔══╝  ██╔══██╗
+██║     ██║  ██║███████╗       ██║   ██║  ██║██║  ██║██║██║ ╚████║███████╗██║  ██║
+╚═╝     ╚═╝  ╚═╝╚══════╝       ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝{RESET}
+"""
+
+
+# ============================================================
+# UI
+# ============================================================
+
+def clear_screen() -> None:
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def success(message: str) -> None:
+    print(f"  {GREEN}✓{RESET} {message}")
+
+
+def info(message: str) -> None:
+    print(f"  {CYAN}›{RESET} {message}")
+
+
+def warning(message: str) -> None:
+    print(f"  {YELLOW}!{RESET} {message}")
+
+
+def error(message: str) -> None:
+    print(f"  {RED}✗{RESET} {message}")
+
+
+def divider(char: str = "─", width: int = 64) -> None:
+    print(f"{DIM}{char * width}{RESET}")
+
+
+# ============================================================
+# VIRTUAL ENVIRONMENT
+# ============================================================
+
+def venv_python() -> Path:
+    if os.name == "nt":
+        return VENV_DIR / "Scripts" / "python.exe"
+
+    return VENV_DIR / "bin" / "python"
+
+
+def uv_available() -> bool:
+    return shutil.which("uv") is not None
+
+
+def run_command(
+    command: list[str],
+    *,
+    cwd: Path | None = None,
+) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        command,
+        cwd=cwd or PROJECT_DIR,
+        text=True,
+    )
+
+
+def ensure_venv() -> bool:
     vpy = venv_python()
+
+    # Already installed
     if vpy.exists():
         return True
-    log('Creating virtual environment...', CYAN)
-    if VENV_DIR.exists():
-        shutil.rmtree(VENV_DIR, ignore_errors=True)
-    result = subprocess.run(['uv', 'venv', str(VENV_DIR)])
-    if result.returncode != 0:
-        log('Failed to create venv', RED)
+
+    # Check UV
+    if not uv_available():
+        error("UV was not found on your system.")
         return False
-    log('Installing dependencies...', CYAN)
-    result = subprocess.run(['uv', 'sync'])
-    for pattern in ['*egg-info', 'src/*egg-info', 'src/palsav/*egg-info']:
-        for match in glob.glob(pattern):
-            if os.path.isdir(match):
-                shutil.rmtree(match, ignore_errors=True)
-    if result.returncode == 0:
-        log('Environment ready', GREEN)
-        return True
-    else:
-        log('Failed to install dependencies', RED)
+
+    info("Creating virtual environment...")
+
+    result = run_command(
+        ["uv", "venv", str(VENV_DIR)]
+    )
+
+    if result.returncode != 0:
+        error("Failed to create virtual environment.")
+        return False
+
+    info("Installing dependencies...")
+
+    result = run_command(
+        ["uv", "sync"]
+    )
+
+    if result.returncode != 0:
+        error("Failed to install dependencies.")
+
         if VENV_DIR.exists():
             shutil.rmtree(VENV_DIR, ignore_errors=True)
+
         return False
-def main():
-    print(f'{BOLD}{LOGO}{RESET}')
-    if not ensure_venv():
-        log('Setup failed', RED)
-        input('Press Enter to exit...')
-        sys.exit(1)
+
+    return True
+
+
+# ============================================================
+# START PALTRAINER
+# ============================================================
+
+def start_paltrainer() -> int:
+    bootup_py = PROJECT_DIR / "src" / "bootup.py"
     vpy = venv_python()
-    bootup_py = PROJECT_DIR / 'src' / 'bootup.py'
-    log('Starting PalTrainer...', GREEN)
+
+    if not bootup_py.exists():
+        error("Could not find src/bootup.py.")
+        return 1
+
+    if not vpy.exists():
+        error("PALTRAINER environment was not found.")
+        return 1
+
+    print()
+    info("Starting PALTRAINER...")
+    print()
+
     try:
-        result = subprocess.run([str(vpy), str(bootup_py)])
-        sys.exit(result.returncode)
+        result = subprocess.run(
+            [str(vpy), str(bootup_py)],
+            cwd=PROJECT_DIR,
+        )
+
+        return result.returncode
+
     except KeyboardInterrupt:
-        sys.exit(0)
-if __name__ == '__main__':
+        return 0
+
+    except Exception as exc:
+        error(f"Failed to start PALTRAINER: {exc}")
+        return 1
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+def main() -> None:
+    clear_screen()
+
+    print(LOGO)
+
+    # Setup
+    if not ensure_venv():
+        print()
+        error("PALTRAINER setup failed.")
+        print()
+
+        if os.name == "nt":
+            input("Press Enter to exit...")
+
+        sys.exit(1)
+
+    # Start
+    exit_code = start_paltrainer()
+
+    if exit_code != 0:
+        print()
+        error(f"PALTRAINER exited with code {exit_code}.")
+        print()
+
+        if os.name == "nt":
+            input("Press Enter to exit...")
+
+    sys.exit(exit_code)
+
+
+if __name__ == "__main__":
     main()
