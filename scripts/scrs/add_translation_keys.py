@@ -3,14 +3,8 @@ import os
 import sys
 import concurrent.futures
 from pathlib import Path
-try:
-    from deep_translator import GoogleTranslator
-except ImportError:
-    print('Installing deep-translator...')
-    import subprocess
-    subprocess.check_call(['uv', 'pip', 'install', 'deep-translator'])
-    from deep_translator import GoogleTranslator
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+from script_common import PROJECT_ROOT, require_deep_translator
+GoogleTranslator = require_deep_translator()
 LANGUAGES = {'zh_CN': {'name': 'Simplified Chinese', 'code': 'zh-CN'}, 'de_DE': {'name': 'German', 'code': 'de'}, 'es_ES': {'name': 'Spanish', 'code': 'es'}, 'fr_FR': {'name': 'French', 'code': 'fr'}, 'ru_RU': {'name': 'Russian', 'code': 'ru'}, 'ja_JP': {'name': 'Japanese', 'code': 'ja'}, 'ko_KR': {'name': 'Korean', 'code': 'ko'}, 'pt_BR': {'name': 'Portuguese (Brazil)', 'code': 'pt'}, 'pt_PT': {'name': 'Portuguese (Portugal)', 'code': 'pt'}}
 NEW_TRANSLATIONS = {
     'modify_all_guild_chest_slots_prompt': 'Enter new slot count for all guild chests:',
@@ -32,10 +26,6 @@ NEW_TRANSLATIONS = {
     'inventory.palpedia_click_unregister': 'Click to unregister',
 }
 OLD_KEYS = []
-def _clean_uv_locks():
-    for p in [Path.cwd() / 'uv.lock', PROJECT_ROOT / 'uv.lock']:
-        if p.exists():
-            p.unlink()
 def remove_old_keys_from_all():
     for lang_code in list(LANGUAGES.keys()) + ['en_US']:
         lang_file = PROJECT_ROOT / 'resources' / 'i18n' / f'{lang_code}.json'
@@ -91,7 +81,6 @@ def add_keys_to_language(lang_code: str, lang_info: dict) -> bool:
         print(f'  [ERROR] File-level failure: {e}')
         return False
 def main():
-    _clean_uv_locks()
     print('\n' + '=' * 60)
     print('  UPDATING TRANSLATION KEYS')
     print('=' * 60)
@@ -111,7 +100,6 @@ def main():
                 print(f"  {lang_info['name']} ({lang_code}): {('[OK] Success' if success else '[ERROR] Failed')}")
             except Exception as e:
                 print(f"  {lang_info['name']} ({lang_code}): [ERROR] {e}")
-    _clean_uv_locks()
     print('\n' + '=' * 60)
     print('  DONE')
     print('=' * 60)

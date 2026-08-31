@@ -5,16 +5,9 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+from script_common import PROJECT_ROOT, require_deep_translator
+GoogleTranslator = require_deep_translator()
 
-try:
-    from deep_translator import GoogleTranslator
-except ImportError:
-    print('Installing deep-translator...')
-    import subprocess
-    subprocess.check_call(['uv', 'pip', 'install', 'deep-translator'])
-    from deep_translator import GoogleTranslator
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 TAB_GUIDE_SRC = PROJECT_ROOT / 'resources' / 'tab_guide' / 'en'
 TAB_GUIDE_DIR = PROJECT_ROOT / 'resources' / 'tab_guide'
 
