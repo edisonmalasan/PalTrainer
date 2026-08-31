@@ -11,6 +11,14 @@ from i18n import t
 from palworld_aio import constants
 from palworld_aio.utils import sav_to_json, json_to_sav, sav_to_gvasfile, gvasfile_to_sav, are_equal_uuids, as_uuid, is_valid_level, extract_value, format_duration, sanitize_filename, resolve_name, calculate_max_hp, canonical_player_entries
 from palworld_aio.managers.data_manager import delete_base_camp, load_game_data_map
+from palworld_aio.managers.operations import (
+    clean_character_save_parameter_map as _clean_character_map,
+    collect_death_bag_ids,
+    delete_player_pals as _delete_player_pals,
+    is_death_bag as _is_death_bag,
+    is_death_penalty_chest_obj as _is_death_penalty_chest_obj,
+    is_dropped_character as _is_dropped_character,
+)
 from palworld_aio.editor.dialogs import GameDaysInputDialog
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from resource_resolver import resource_path
@@ -20,33 +28,17 @@ def scan_and_protect_death_bags(parent=None):
     constants.death_bag_protected_instance_ids.clear()
     constants.death_bag_protected_container_ids.clear()
     wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-    map_objects = wsd.get('MapObjectSaveData', {}).get('value', {}).get('values', [])
+    result = collect_death_bag_ids(wsd)
+    constants.death_bag_protected_instance_ids.update(result.protected_instance_ids)
+    constants.death_bag_protected_container_ids.update(result.protected_container_ids)
     dropped_pals_count = 0
     death_penalty_chests_count = 0
-    for obj in map_objects:
+    for obj in wsd.get('MapObjectSaveData', {}).get('value', {}).get('values', []):
         try:
             map_object_id = obj.get('MapObjectId', {}).get('value', '')
-            raw_data = obj.get('ConcreteModel', {}).get('value', {}).get('RawData', {}).get('value', {})
             if map_object_id == 'DroppedCharacter':
-                instance_id = raw_data.get('instance_id', '')
-                stored_param_id = raw_data.get('stored_parameter_id', '')
-                if instance_id:
-                    constants.death_bag_protected_instance_ids.add(str(instance_id).replace('-', '').lower())
-                if stored_param_id:
-                    constants.death_bag_protected_instance_ids.add(str(stored_param_id).replace('-', '').lower())
                 dropped_pals_count += 1
             elif map_object_id == 'DeathPenaltyChest':
-                instance_id = raw_data.get('instance_id', '')
-                if instance_id:
-                    constants.death_bag_protected_instance_ids.add(str(instance_id).replace('-', '').lower())
-                module_map = obj.get('ConcreteModel', {}).get('value', {}).get('ModuleMap', {}).get('value', [])
-                for module in module_map:
-                    if module.get('key') == 'EPalMapObjectConcreteModelModuleType::ItemContainer':
-                        module_raw = module.get('value', {}).get('RawData', {}).get('value', {})
-                        target_container_id = module_raw.get('target_container_id')
-                        if target_container_id:
-                            constants.death_bag_protected_container_ids.add(str(target_container_id).replace('-', '').lower())
-                        break
                 death_penalty_chests_count += 1
         except Exception as e:
             continue
@@ -60,11 +52,11 @@ def is_death_penalty_container_protected(container_id):
         return False
     return str(container_id).replace('-', '').lower() in constants.death_bag_protected_container_ids
 def is_dropped_character(obj):
-    return obj.get('MapObjectId', {}).get('value') == 'DroppedCharacter'
+    return _is_dropped_character(obj)
 def is_death_penalty_chest_obj(obj):
-    return obj.get('MapObjectId', {}).get('value') == 'DeathPenaltyChest'
+    return _is_death_penalty_chest_obj(obj)
 def is_death_bag(obj):
-    return is_dropped_character(obj) or is_death_penalty_chest_obj(obj)
+    return _is_death_bag(obj)
 def get_entity_location(entity_data):
     try:
         if 'Model' in entity_data:
@@ -95,49 +87,9 @@ def is_entity_in_exclusion_zones(entity_data):
         logging.warning(f'Failed to check zone exclusion: {e}')
         return False
 def delete_player_pals(wsd, to_delete_uids):
-    char_save_map = wsd.get('CharacterSaveParameterMap', {}).get('value', [])
-    removed_pals = 0
-    uids_set = {uid.replace('-', '').lower() for uid in to_delete_uids if uid}
-    ownership = ContainerOwnership.build(char_save_map, wsd.get('CharacterContainerSaveData', {}).get('value', []))
-    new_map = []
-    for entry in char_save_map:
-        try:
-            val = entry['value']['RawData']['value']['object']['SaveParameter']['value']
-            struct_type = entry['value']['RawData']['value']['object']['SaveParameter']['struct_type']
-            owner_uid = val.get('OwnerPlayerUId', {}).get('value')
-            owner_uid_str = str(owner_uid).replace('-', '').lower() if owner_uid else ''
-            in_delete_set = owner_uid_str in uids_set
-            if not in_delete_set:
-                effective = ownership.get_effective_owner(entry.get('key', {}).get('InstanceId', {}).get('value'), owner_uid)
-                if effective in uids_set:
-                    in_delete_set = True
-            if struct_type in ('PalIndividualCharacterSaveParameter', 'PlayerCharacterSaveParameter') and in_delete_set:
-                removed_pals += 1
-                continue
-        except:
-            pass
-        new_map.append(entry)
-    wsd['CharacterSaveParameterMap']['value'] = new_map
-    return removed_pals
+    return _delete_player_pals(wsd, to_delete_uids).changed_entities
 def clean_character_save_parameter_map(data_source, valid_uids):
-    if 'CharacterSaveParameterMap' not in data_source:
-        return
-    entries = data_source['CharacterSaveParameterMap'].get('value', [])
-    keep = []
-    for entry in entries:
-        key = entry.get('key', {})
-        value = entry.get('value', {}).get('RawData', {}).get('value', {})
-        saveparam = value.get('object', {}).get('SaveParameter', {}).get('value', {})
-        owner_uid_obj = saveparam.get('OwnerPlayerUId')
-        if owner_uid_obj is None:
-            keep.append(entry)
-            continue
-        owner_uid = owner_uid_obj.get('value', '')
-        no_owner = owner_uid in ('', '00000000-0000-0000-0000-000000000000')
-        player_uid = key.get('PlayerUId', {}).get('value', '')
-        if player_uid and str(player_uid).replace('-', '') in valid_uids or str(owner_uid).replace('-', '') in valid_uids or no_owner:
-            keep.append(entry)
-    entries[:] = keep
+    _clean_character_map(data_source, valid_uids)
 def delete_empty_guilds(parent=None):
     if not constants.loaded_level_json:
         return 0
