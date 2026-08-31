@@ -41,6 +41,7 @@ MODULE_MAP: dict[str, dict] = {
     'clean_code':             {'import_as': 'clean_code',             'parent': 'scripts/scrs'},
     'auto_update':            {'import_as': 'auto_update',            'parent': 'scripts/scrs'},
     'build_cx':               {'import_as': 'build_cx',               'parent': 'scripts/scrs'},
+    'generate_test_fixtures': {'import_as': 'generate_test_fixtures', 'parent': 'scripts/scrs'},
 }
 
 _PARENT_CACHE: dict[str, Path] = {}
