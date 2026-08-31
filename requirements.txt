@@ -1,0 +1,14 @@
+PyQt6>=6.8
+cx-freeze>=8.3.0
+nerdfont
+orjson
+pefile
+packaging
+Pillow
+brotli
+cbor2
+msgpack
+zstandard
+
+pytest
+./src/palsav

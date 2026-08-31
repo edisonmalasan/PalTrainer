@@ -1,58 +1,75 @@
 # PalTrainer
 
-PalTrainer is a TypeScript + Tauri desktop app for inspecting and editing
-Palworld save data. The Phase 1 scaffold intentionally does not parse or mutate
-save files yet.
+PalTrainer is a desktop utility for inspecting, repairing, converting, and editing Palworld save data. It is built with Python, PyQt6, and the local `palsav` serialization engine.
 
-## Setup
+## Capabilities
 
-```bash
-pnpm install
-```
+- Inspect and write compressed world, player, and global storage saves.
+- Edit players, guilds, bases, Pals, inventories, equipment, technology, and world options.
+- Export and import Pals and base data in JSON and legacy compact formats.
+- Convert save formats, transfer characters between worlds, and repair host-save data.
+- Discover, extract, and package Xbox Game Pass save containers.
+- Restore map exploration, unlock fast travel, adjust coordinates, and inject Palbox slots.
+- Find invalid, orphaned, duplicated, inactive, and overfilled data before cleanup.
+- Reset supported world events and protect selected entities with persistent exclusions.
+- Browse world and tree maps with markers, calibration, and exclusion zones.
+- Use localized UI text, in-app guides, backups, and diagnostic logging.
 
-Rust stable and the Tauri v2 system prerequisites are required for desktop
-builds.
+Every write operation must create a backup, validate the selected save location, and use an atomic replacement path. Real save files should be copied to a disposable test directory before editing.
 
-## Development
+## Requirements
 
-```bash
-pnpm dev
-pnpm tauri dev
-```
+- Python 3.11 or newer.
+- `uv` for dependency and environment management.
+- PyQt6 runtime libraries supplied by the project dependencies.
 
-Use `pnpm tauri dev` when testing desktop behavior.
-
-## Verification
-
-```bash
-pnpm typecheck
-pnpm lint
-pnpm test
-pnpm format
-```
-
-Rust checks are run from `src-tauri` once Rust is installed:
+## Setup and launch
 
 ```bash
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test
+uv sync
+uv run start.py
 ```
 
-## Release and recovery documentation
+On Windows, `start.cmd` provides the same launcher. For direct application startup after dependencies are installed:
 
-- [Supported save versions](SUPPORTED_VERSIONS.md)
-- [Backup and restore](BACKUP_AND_RESTORE.md)
-- [Troubleshooting](TROUBLESHOOTING.md)
-- [Release notes template](.github/RELEASE_NOTES_TEMPLATE.md)
-- [Release signing policy](.github/RELEASE_SIGNING.md)
+```bash
+uv run python src/palworld_aio/main.py
+```
 
-Windows release bundles are configured for NSIS and MSI. A real installer
-build also requires the Tauri Windows prerequisites, including Visual Studio
-Build Tools with the MSVC and Windows SDK components.
+## Tests and checks
 
-## Game data provenance
+```bash
+uv run pytest -c tests/pytest.ini
+uv run python -m compileall -q src tests
+uv run pyright
+```
 
-`resources/game_data/` is versioned (`VERSION` → `v1/catalog.json`) and derived from
-`docs/PalworldSaveTools/resources/game_data/` (MIT, © PalworldSaveTools). See
-`resources/README.md` and `resources/game_data/README.md` for update procedure and license.
+The test harness includes structural import/resource audits and opt-in save fixtures. Do not place personal saves in the repository; use documented fixture directories and sanitized copies.
+
+## Building
+
+The supported release paths are kept under `build/`:
+
+```bash
+uv run python build/nuitka/build_nuitka.py --onefile
+uv run python build/cx_freeze/build_cx.py
+```
+
+Build output is written to ignored directories. Packaging metadata, platform requirements, and release verification are documented alongside those build scripts.
+
+## Project layout
+
+```text
+src/palsav/               Save serialization and compression engine
+src/palworld_aio/         PyQt6 application, managers, editors, and widgets
+src/palworld_toolsets/    Conversion, transfer, map, and slot tools
+src/palworld_xgp_import/  Xbox Game Pass discovery and packaging
+src/palworld_coord/       Coordinate transforms
+resources/                Game data, translations, guides, maps, and assets
+tests/                    Structural, integration, and unit tests
+build/                    Nuitka, cx_Freeze, installer, and verification tools
+```
+
+## License
+
+PalTrainer is distributed under the MIT License. See [LICENSE](LICENSE).
