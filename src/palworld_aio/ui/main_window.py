@@ -18,6 +18,7 @@ from loading_manager import show_question
 from .tabs.tools_tab import center_on_parent, DropOverlay
 GITHUB_LATEST_ZIP = 'https://github.com/edisonmalasan/PalTrainer/releases/latest'
 from palworld_aio import constants
+from palworld_aio.shell_state import ShellStateModel
 from palworld_aio.ui.chrome.styles import ThemeManager, MENU_STYLE, DIALOG_STYLE as DARK_THEME_STYLE
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from palworld_aio.utils import as_uuid
@@ -219,6 +220,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.is_dark_mode = True
         self._is_refreshing = False
+        self.shell_state = ShellStateModel()
         self.user_settings = {}
         self.lang_map = {'English': 'en_US', '中文': 'zh_CN', 'Русский': 'ru_RU', 'Français': 'fr_FR', 'Español': 'es_ES', 'Deutsch': 'de_DE', '日本語': 'ja_JP', '한국어': 'ko_KR', 'Português (Brasil)': 'pt_BR', 'Português (Portugal)': 'pt_PT'}
         load_exclusions()
@@ -501,7 +503,9 @@ class MainWindow(QMainWindow):
         action.triggered.connect(callback)
         return action
     def _setup_connections(self):
+        save_manager.load_started.connect(self.shell_state.begin_load)
         save_manager.load_finished.connect(self._on_load_finished)
+        save_manager.save_started.connect(self.shell_state.begin_save)
         save_manager.save_finished.connect(self._on_save_finished)
     def _create_message_box(self, icon=QMessageBox.Information):
         msg_box = QMessageBox(self)
@@ -622,6 +626,7 @@ class MainWindow(QMainWindow):
     def _unlock_ui(self):
         pass
     def _on_load_finished(self, success):
+        self.shell_state.finish_load(success)
         if success:
             if 'inventory_tab' in self.__dict__:
                 self.inventory_tab.clear_player()
@@ -646,6 +651,7 @@ class MainWindow(QMainWindow):
             msg_box.addButton(t('button.ok'), QMessageBox.AcceptRole)
             msg_box.exec()
     def _on_save_finished(self, duration):
+        self.shell_state.finish_save(True)
         self.status_bar.showMessage(f"{(t('status.saved') if t else 'Save completed')}({duration:.2f}s)", 5000)
         if constants.xgp_loaded:
             return
