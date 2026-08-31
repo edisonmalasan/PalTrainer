@@ -383,21 +383,13 @@ class ToolsTab(QWidget):
         return data.get(key, {}).get('value', [])
 
     def _update_stats(self):
-        if not hasattr(constants, 'loaded_level_json') or not constants.loaded_level_json:
-            return
-        wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-        group_data = self._safe_list(wsd, 'GroupSaveDataMap')
-        base_data = self._safe_list(wsd, 'BaseCampSaveData')
-        char_data = self._safe_list(wsd, 'CharacterSaveParameterMap')
-        total_players = sum((len(g['value']['RawData']['value'].get('players', [])) for g in group_data if g['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild'))
-        total_guilds = sum((1 for g in group_data if g['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild'))
-        total_bases = len(base_data)
-        total_pals = sum((1 for c in char_data if c.get('value', {}).get('RawData', {}).get('value', {}).get('object', {}).get('SaveParameter', {}).get('struct_type') == 'PalIndividualCharacterSaveParameter' and (not c.get('value', {}).get('RawData', {}).get('value', {}).get('object', {}).get('SaveParameter', {}).get('value', {}).get('IsPlayer', {}).get('value'))))
+        from palworld_aio.managers.save_manager import save_manager
+        stats = save_manager.get_current_stats()
         try:
-            self._stat_cards['players'].setText(str(total_players))
-            self._stat_cards['guilds'].setText(str(total_guilds))
-            self._stat_cards['bases'].setText(str(total_bases))
-            self._stat_cards['pals'].setText(str(total_pals))
+            self._stat_cards['players'].setText(str(stats['Players']))
+            self._stat_cards['guilds'].setText(str(stats['Guilds']))
+            self._stat_cards['bases'].setText(str(stats['Bases']))
+            self._stat_cards['pals'].setText(str(stats['Pals']))
         except:
             pass
         if hasattr(self, 'parent_window') and self.parent_window and hasattr(self.parent_window, 'results_widget'):
