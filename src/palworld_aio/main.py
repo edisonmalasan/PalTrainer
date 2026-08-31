@@ -105,7 +105,7 @@ def run_aio():
     except Exception:
         init_language('en_US')
     from cli import parse_app_options
-    opts = parse_app_options(sys.argv)
+    opts = parse_app_options(sys.argv[1:])
     if opts.save_path:
         path_arg = opts.save_path
         options = {'logs': opts.logs, 'fix': opts.fix}

@@ -45,21 +45,14 @@ def parse_boot_options(argv: Optional[Sequence[str]] = None) -> BootOptions:
     )
 
 
-def _looks_like_save_path(value: str) -> bool:
-    return value.lower().endswith('.sav')
-
-
 def parse_app_options(argv: Optional[Sequence[str]] = None) -> AppOptions:
     """Parse the save-processing CLI surface used by the Qt entry point.
 
-    Accepts either arguments only (as from ``sys.argv[1:]``) or the full
-    ``sys.argv`` list including the script name in the first position. A
-    leading script-name element (first argument that is neither a ``--`` flag
-    nor a ``.sav`` path) is skipped so both call forms behave identically.
+    ``argv`` is the argument list without the script name (as from
+    ``sys.argv[1:]``). The first non-``--`` argument is the save path and is
+    preserved verbatim, so legacy paths without a ``.sav`` suffix are kept.
     """
     args = list(argv) if argv is not None else sys.argv[1:]
-    if args and not args[0].startswith('--') and not _looks_like_save_path(args[0]):
-        args = args[1:]
     opts = AppOptions()
     if args and not args[0].startswith('--'):
         opts.save_path = args[0].strip().strip('"')

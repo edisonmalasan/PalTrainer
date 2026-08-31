@@ -53,31 +53,19 @@ def test_parse_app_options_test_loading_popup():
     assert opts.test_loading_popup is True
 
 
-def test_parse_app_options_full_argv_with_script_name():
-    opts = parse_app_options(['main.py', 'C:/world/Level.sav', '-logs'])
-    assert opts.save_path == 'C:/world/Level.sav'
-    assert opts.logs is True
-    assert opts.fix is False
-
-
-def test_parse_app_options_full_argv_script_name_only():
-    opts = parse_app_options(['main.py'])
-    assert opts.save_path is None
-    assert opts.logs is False
-    assert opts.fix is False
-
-
-def test_parse_app_options_full_argv_script_name_with_flags():
-    opts = parse_app_options(['main.py', '--test-loading-popup'])
-    assert opts.save_path is None
-    assert opts.test_loading_popup is True
-
-
-def test_parse_app_options_full_argv_save_path_after_script_name():
-    opts = parse_app_options(['main.py', 'C:/world/Level.sav'])
-    assert opts.save_path == 'C:/world/Level.sav'
+def test_parse_app_options_preserves_legacy_path_without_extension():
+    opts = parse_app_options(['C:/some-legacy-save-path'])
+    assert opts.save_path == 'C:/some-legacy-save-path'
     assert opts.logs is True
     assert opts.fix is True
+
+
+def test_parse_app_options_main_style_argv_is_args_only():
+    full_argv = ['main.py', 'C:/world/Level.sav', '-logs']
+    opts = parse_app_options(full_argv[1:])
+    assert opts.save_path == 'C:/world/Level.sav'
+    assert opts.logs is True
+    assert opts.fix is False
 
 
 def test_parse_boot_options_flags():
