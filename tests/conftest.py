@@ -7,7 +7,7 @@ from collections import Counter
 import pytest
 from pathlib import Path
 
-from tests.test_registry import PROJECT_ROOT, get_all_parent_dirs, find_source_for_test
+from tests.test_registry import PROJECT_ROOT, SAVE_TEST_DIR, get_all_parent_dirs, find_source_for_test
 from tests.structural_report import StructuralReport
 from tests.harness.file_pairer import run_file_pairer
 from tests.harness.graph_validator import run_graph_validator
@@ -103,6 +103,13 @@ def pytest_sessionstart(session):
         import sys
         if parent_str not in sys.path:
             sys.path.insert(0, parent_str)
+
+    if not (SAVE_TEST_DIR / 'Level.sav').is_file():
+        try:
+            from generate_test_fixtures import generate_sanitized_fixtures
+            generate_sanitized_fixtures(SAVE_TEST_DIR)
+        except Exception:
+            pass
 
     report = _run_structural_audit(session.config)
     if report is None:
