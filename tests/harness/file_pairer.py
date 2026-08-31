@@ -23,6 +23,7 @@ _TEST_STEM_ALIASES: dict[str, str] = {
     'json_tools': 'palsav.json_tools',
     'graph_validator_relative_imports': 'graph_validator',
     'characterization': 'save_engine/__init__',
+    'domain_stats': 'stats',
 }
 
 _INSTALLED_MODULES: dict[str, str] = {
