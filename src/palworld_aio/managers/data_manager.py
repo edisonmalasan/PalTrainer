@@ -4,6 +4,7 @@ import palworld_coord
 from palsav.archive import UUID
 from i18n import t
 from palworld_aio import constants
+from palworld_aio.read_models import SaveProjections
 from palworld_aio.utils import are_equal_uuids, as_uuid, fast_deepcopy
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from functools import lru_cache
@@ -63,63 +64,53 @@ def cleanup_player_references(wsd, deleted_uids):
             raw['individual_character_handle_ids'] = cleaned_handles
         except:
             pass
+def _wsd():
+    return constants.loaded_level_json['properties']['worldSaveData']['value']
 def get_tick():
-    return constants.loaded_level_json['properties']['worldSaveData']['value']['GameTimeSaveData']['value']['RealDateTimeTicks']['value']
+    return SaveProjections.get_tick(_wsd())
 def get_guilds():
     if not constants.loaded_level_json:
         return []
-    out = []
-    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-    for g in wsd['GroupSaveDataMap']['value']:
-        if g['value']['GroupType']['value']['value'] != 'EPalGroupType::Guild':
-            continue
-        gid = str(g['key'])
-        gname = g['value']['RawData']['value'].get('guild_name', 'Unknown')
-        glevel = g['value']['RawData']['value'].get('base_camp_level', 1)
-        gmembers = g['value']['RawData']['value'].get('players', [])
-        out.append({'id': gid, 'name': gname, 'level': glevel, 'member_count': len(gmembers)})
-    return out
+    return [{'id': g['id'], 'name': g['name'], 'level': g['level'], 'member_count': g['member_count']}
+            for g in SaveProjections.get_guilds(_wsd())]
 def get_guild_members(gid):
     if not constants.loaded_level_json:
         return []
-    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
     tick = get_tick()
     target = as_uuid(gid)
-    for g in wsd['GroupSaveDataMap']['value']:
+    admin_uid = None
+    for g in _wsd()['GroupSaveDataMap']['value']:
         if g['value']['GroupType']['value']['value'] != 'EPalGroupType::Guild':
             continue
         if as_uuid(g['key']) != target:
             continue
         admin_uid = as_uuid(g['value']['RawData']['value'].get('admin_player_uid', ''))
-        out = []
-        for p in g['value']['RawData']['value'].get('players', []):
-            uid = str(p.get('player_uid', ''))
-            name = p.get('player_info', {}).get('player_name', 'Unknown')
-            last = p.get('player_info', {}).get('last_online_real_time')
-            lastseen = 'Unknown'
-            last_sort = None
-            if last is not None:
-                last_sort = (tick - last) / 10000000.0
-                from ..utils import format_duration_short
-                lastseen = format_duration_short(last_sort)
-            level = constants.player_levels.get(uid.replace('-', ''), 1)
-            pals = constants.PLAYER_PAL_COUNTS.get(uid.replace('-', '').lower(), 0)
-            is_leader = as_uuid(uid) == admin_uid
-            role = p.get('role', 3)
-            role_label = GUILD_ROLE_LABELS.get(role, f'?{role}')
-            out.append({'uid': uid, 'name': name, 'lastseen': lastseen, 'last_sort': last_sort, 'level': level, 'pals': pals, 'is_leader': is_leader, 'role': role, 'role_label': role_label})
-        if out and (not any((m['is_leader'] for m in out))):
-            out[0]['is_leader'] = True
-        return out
-    return []
+        break
+    out = []
+    for m in SaveProjections.get_guild_members(_wsd(), gid):
+        uid = m['uid']
+        last = m['last_online_real_time']
+        lastseen = 'Unknown'
+        last_sort = None
+        if last is not None:
+            last_sort = (tick - last) / 10000000.0
+            from ..utils import format_duration_short
+            lastseen = format_duration_short(last_sort)
+        level = constants.player_levels.get(uid.replace('-', ''), 1)
+        pals = constants.PLAYER_PAL_COUNTS.get(uid.replace('-', '').lower(), 0)
+        is_leader = as_uuid(uid) == admin_uid
+        role = m['role']
+        role_label = GUILD_ROLE_LABELS.get(role, f'?{role}')
+        out.append({'uid': uid, 'name': m['name'], 'lastseen': lastseen, 'last_sort': last_sort, 'level': level, 'pals': pals, 'is_leader': is_leader, 'role': role, 'role_label': role_label})
+    if out and (not any((m['is_leader'] for m in out))):
+        out[0]['is_leader'] = True
+    return out
 def get_bases():
     if not constants.loaded_level_json:
         return []
     out = []
-    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-    base_list = wsd.get('BaseCampSaveData', {}).get('value', [])
-    for b in base_list:
-        bid = str(b['key'])
+    for b in SaveProjections.get_bases(_wsd()):
+        bid = b['id']
         lookup = constants.base_guild_lookup.get(bid.lower(), {})
         gid = lookup.get('GuildID', 'Unknown')
         gname = lookup.get('GuildName', 'Unknown')
@@ -128,15 +119,13 @@ def get_bases():
 def get_base_coords(base_id):
     if not constants.loaded_level_json:
         return (None, None)
-    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-    for b in wsd.get('BaseCampSaveData', {}).get('value', []):
-        if are_equal_uuids(b['key'], base_id):
-            try:
-                trans = b['value']['RawData']['value']['transform']['translation']
-                return palworld_coord.sav_to_map_by_z(trans['x'], trans['y'], trans['z'])
-            except:
-                return (None, None)
-    return (None, None)
+    coords = SaveProjections.get_base_coords(_wsd(), str(base_id))
+    if coords is None:
+        return (None, None)
+    try:
+        return palworld_coord.sav_to_map_by_z(coords[0], coords[1], coords[2])
+    except:
+        return (None, None)
 def delete_base_camp(base_entry, guild_id, level_json=None, delete_workers=False):
     if level_json is None:
         level_json = constants.loaded_level_json
