@@ -328,6 +328,16 @@ class MainWindow(QMainWindow):
         self.results_widget = ResultsWidget()
         self.results_widget.hide_requested.connect(self._toggle_dashboard)
         self.splitter.addWidget(self.results_widget)
+        saved_sizes = self.user_settings.get('splitter_sizes')
+        if isinstance(saved_sizes, list) and len(saved_sizes) == 2 and all(isinstance(v, int) and v >= 0 for v in saved_sizes):
+            QTimer.singleShot(0, lambda: self.splitter.setSizes(saved_sizes))
+        else:
+            self.splitter.setSizes([1000, 350])
+        self._splitter_save_timer = QTimer(self)
+        self._splitter_save_timer.setSingleShot(True)
+        self._splitter_save_timer.setInterval(400)
+        self._splitter_save_timer.timeout.connect(self._persist_splitter_sizes)
+        self.splitter.splitterMoved.connect(self._on_splitter_moved)
         body_layout.addWidget(self.splitter, stretch=1)
         if self._init_collapse:
             self.results_widget.hide()
@@ -590,6 +600,13 @@ class MainWindow(QMainWindow):
     def _on_sidebar_collapsed_changed(self, collapsed):
         self.user_settings['sidebar_collapsed'] = collapsed
         self._save_user_settings()
+    def _on_splitter_moved(self, pos, index):
+        self._splitter_save_timer.start()
+    def _persist_splitter_sizes(self):
+        sizes = self.splitter.sizes()
+        if len(sizes) == 2 and self.results_widget.isVisible():
+            self.user_settings['splitter_sizes'] = sizes
+            self._save_user_settings()
     def _toggle_maximize(self):
         if self.isMaximized():
             self.showNormal()
@@ -637,6 +654,7 @@ class MainWindow(QMainWindow):
                 self.base_inventory_tab._clear_guild_selection()
             self.refresh_all()
             constants.dirty = False
+            self.header_widget.set_dirty(False)
             self.results_widget.clear_selection()
             self.results_widget.refresh_stats_before()
             self.status_bar.showMessage(t('status.loaded') if t else 'Save loaded successfully', 5000)
@@ -652,6 +670,8 @@ class MainWindow(QMainWindow):
             msg_box.exec()
     def _on_save_finished(self, duration):
         self.shell_state.finish_save(True)
+        constants.dirty = False
+        self.header_widget.set_dirty(False)
         self.status_bar.showMessage(f"{(t('status.saved') if t else 'Save completed')}({duration:.2f}s)", 5000)
         if constants.xgp_loaded:
             return
@@ -691,6 +711,7 @@ class MainWindow(QMainWindow):
         if self._is_refreshing:
             return
         constants.dirty = True
+        self.header_widget.set_dirty(True)
         self._is_refreshing = True
         try:
             self._refresh_players()
@@ -1116,6 +1137,7 @@ class MainWindow(QMainWindow):
             self.results_widget.set_guild(data[2])
     def closeEvent(self, event: QCloseEvent):
         if constants.dirty and constants.current_save_path:
+            self.header_widget.set_dirty(False)
             msg = QMessageBox(self)
             msg.setWindowTitle(t('error.unsaved_title', default='Unsaved Changes'))
             msg.setText(t('error.unsaved_msg', default='You have unsaved changes. Save before exiting?'))
