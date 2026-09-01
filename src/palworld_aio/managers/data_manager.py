@@ -5,6 +5,7 @@ from palsav.archive import UUID
 from i18n import t
 from palworld_aio import constants
 from palworld_aio.world.projections import SaveProjections
+from palworld_aio.world.operations import cleanup_player_references as _cleanup_player_references
 from palworld_aio.utils import are_equal_uuids, as_uuid, fast_deepcopy
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from functools import lru_cache
@@ -19,51 +20,7 @@ def normalize_uid(uid):
         return ''
     return str(uid).replace('-', '').lower()
 def cleanup_player_references(wsd, deleted_uids):
-    if not deleted_uids:
-        return
-    deleted_uids_normalized = {normalize_uid(uid) for uid in deleted_uids}
-    map_objs = wsd.get('MapObjectSaveData', {}).get('value', {}).get('values', [])
-    for obj in map_objs:
-        try:
-            raw = obj.get('Model', {}).get('value', {}).get('RawData', {}).get('value', {})
-            build_uid = raw.get('build_player_uid')
-            if build_uid and normalize_uid(build_uid) in deleted_uids_normalized:
-                raw['build_player_uid'] = '00000000-0000-0000-0000-000000000000'
-            stage_id = raw.get('stage_instance_id_belong_to', {})
-            if isinstance(stage_id, dict):
-                stage_guid = stage_id.get('id')
-                if stage_guid and normalize_uid(stage_guid) in deleted_uids_normalized:
-                    stage_id['id'] = '00000000-0000-0000-0000-000000000000'
-        except:
-            pass
-    char_containers = wsd.get('CharacterContainerSaveData', {}).get('value', [])
-    for cont in char_containers:
-        try:
-            slots = cont['value']['Slots']['value']['values']
-            for slot in slots:
-                player_uid = slot.get('RawData', {}).get('value', {}).get('player_uid')
-                if player_uid and normalize_uid(player_uid) in deleted_uids_normalized:
-                    slot['RawData']['value']['player_uid'] = '00000000-0000-0000-0000-000000000000'
-        except:
-            pass
-    group_map = wsd.get('GroupSaveDataMap', {}).get('value', [])
-    for g in group_map:
-        try:
-            raw = g['value']['RawData']['value']
-            handle_ids = raw.get('individual_character_handle_ids', [])
-            if not handle_ids:
-                continue
-            cleaned_handles = []
-            for h in handle_ids:
-                if isinstance(h, dict):
-                    guid = normalize_uid(h.get('guid', ''))
-                    if guid not in deleted_uids_normalized:
-                        cleaned_handles.append(h)
-                else:
-                    cleaned_handles.append(h)
-            raw['individual_character_handle_ids'] = cleaned_handles
-        except:
-            pass
+    _cleanup_player_references(wsd, deleted_uids)
 def _wsd():
     return constants.loaded_level_json['properties']['worldSaveData']['value']
 def get_tick():

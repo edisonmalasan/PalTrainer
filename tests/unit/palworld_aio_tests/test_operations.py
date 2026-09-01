@@ -180,3 +180,63 @@ def test_clean_character_save_parameter_map():
     assert result.changed_entities == 1
     remaining = wsd['CharacterSaveParameterMap']['value']
     assert len(remaining) == 2
+
+
+def test_cleanup_player_references_clears_world_links():
+    deleted_uid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    wsd = {
+        'MapObjectSaveData': {
+            'value': {
+                'values': [{
+                    'Model': {
+                        'value': {
+                            'RawData': {
+                                'value': {
+                                    'build_player_uid': deleted_uid,
+                                    'stage_instance_id_belong_to': {'id': deleted_uid},
+                                },
+                            },
+                        },
+                    },
+                }],
+            },
+        },
+        'CharacterContainerSaveData': {
+            'value': [{
+                'value': {
+                    'Slots': {
+                        'value': {
+                            'values': [{
+                                'RawData': {'value': {'player_uid': deleted_uid}},
+                            }],
+                        },
+                    },
+                },
+            }],
+        },
+        'GroupSaveDataMap': {
+            'value': [{
+                'value': {
+                    'RawData': {
+                        'value': {
+                            'individual_character_handle_ids': [
+                                {'guid': deleted_uid},
+                                {'guid': 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'},
+                                'legacy-handle',
+                            ],
+                        },
+                    },
+                },
+            }],
+        },
+    }
+
+    ops.cleanup_player_references(wsd, [deleted_uid])
+
+    raw_map_object = wsd['MapObjectSaveData']['value']['values'][0]['Model']['value']['RawData']['value']
+    assert raw_map_object['build_player_uid'] == '00000000-0000-0000-0000-000000000000'
+    assert raw_map_object['stage_instance_id_belong_to']['id'] == '00000000-0000-0000-0000-000000000000'
+    slot = wsd['CharacterContainerSaveData']['value'][0]['value']['Slots']['value']['values'][0]
+    assert slot['RawData']['value']['player_uid'] == '00000000-0000-0000-0000-000000000000'
+    handles = wsd['GroupSaveDataMap']['value'][0]['value']['RawData']['value']['individual_character_handle_ids']
+    assert handles == [{'guid': 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'}, 'legacy-handle']

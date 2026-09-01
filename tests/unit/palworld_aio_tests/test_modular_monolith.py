@@ -33,6 +33,7 @@ def test_legacy_facades_preserve_canonical_object_identity():
     assert legacy_projections.SaveProjections is canonical_projections.SaveProjections
     assert legacy_operations.OperationResult is canonical_operations.OperationResult
     assert legacy_operations.collect_death_bag_ids is canonical_operations.collect_death_bag_ids
+    assert legacy_operations.cleanup_player_references is canonical_operations.cleanup_player_references
     assert legacy_func_manager.check_is_illegal_pal is canonical_diagnostics.check_is_illegal_pal
 
 

@@ -155,3 +155,65 @@ def clean_character_save_parameter_map(data_source: dict, valid_uids: set) -> Op
             removed += 1
     entries[:] = keep
     return OperationResult(changed_entities=removed)
+
+
+def cleanup_player_references(wsd: dict, deleted_uids: list) -> None:
+    """Clear or remove references to deleted players in a world document.
+
+    The mutation intentionally tolerates partially decoded or malformed
+    entries, matching the deletion workflow's existing best-effort cleanup.
+    """
+    if not deleted_uids:
+        return
+
+    def normalize_uid(uid: object) -> str:
+        if isinstance(uid, dict):
+            uid = uid.get('value', uid)
+        if uid is None:
+            return ''
+        return str(uid).replace('-', '').lower()
+
+    deleted_uids_normalized = {normalize_uid(uid) for uid in deleted_uids}
+    zero_uuid = '00000000-0000-0000-0000-000000000000'
+
+    map_objects = wsd.get('MapObjectSaveData', {}).get('value', {}).get('values', [])
+    for obj in map_objects:
+        try:
+            raw_data = obj.get('Model', {}).get('value', {}).get('RawData', {}).get('value', {})
+            build_uid = raw_data.get('build_player_uid')
+            if build_uid and normalize_uid(build_uid) in deleted_uids_normalized:
+                raw_data['build_player_uid'] = zero_uuid
+            stage_id = raw_data.get('stage_instance_id_belong_to', {})
+            if isinstance(stage_id, dict):
+                stage_guid = stage_id.get('id')
+                if stage_guid and normalize_uid(stage_guid) in deleted_uids_normalized:
+                    stage_id['id'] = zero_uuid
+        except Exception:
+            pass
+
+    character_containers = wsd.get('CharacterContainerSaveData', {}).get('value', [])
+    for container in character_containers:
+        try:
+            slots = container['value']['Slots']['value']['values']
+            for slot in slots:
+                player_uid = slot.get('RawData', {}).get('value', {}).get('player_uid')
+                if player_uid and normalize_uid(player_uid) in deleted_uids_normalized:
+                    slot['RawData']['value']['player_uid'] = zero_uuid
+        except Exception:
+            pass
+
+    group_map = wsd.get('GroupSaveDataMap', {}).get('value', [])
+    for group in group_map:
+        try:
+            raw_group = group['value']['RawData']['value']
+            handle_ids = raw_group.get('individual_character_handle_ids', [])
+            if not handle_ids:
+                continue
+            raw_group['individual_character_handle_ids'] = [
+                handle
+                for handle in handle_ids
+                if not isinstance(handle, dict)
+                or normalize_uid(handle.get('guid', '')) not in deleted_uids_normalized
+            ]
+        except Exception:
+            pass

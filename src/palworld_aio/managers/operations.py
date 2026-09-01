@@ -3,6 +3,7 @@
 from palworld_aio.world.operations import (
     OperationResult,
     clean_character_save_parameter_map,
+    cleanup_player_references,
     collect_death_bag_ids,
     delete_player_pals,
     is_death_bag,
@@ -13,6 +14,7 @@ from palworld_aio.world.operations import (
 __all__ = [
     'OperationResult',
     'clean_character_save_parameter_map',
+    'cleanup_player_references',
     'collect_death_bag_ids',
     'delete_player_pals',
     'is_death_bag',
