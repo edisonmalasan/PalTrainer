@@ -6,6 +6,11 @@ from palworld_aio import constants
 from resource_resolver import resource_path
 from palworld_aio.utils import are_equal_uuids, as_uuid, format_duration_short, sav_to_gvasfile, gvasfile_to_sav
 from palworld_aio.world.projections import SaveProjections
+from palworld_aio.world.player_mutations import (
+    rename_player as _rename_player,
+    set_player_level as _set_player_level,
+    set_player_stats as _set_player_stats,
+)
 from palworld_aio.managers.data_manager import delete_player
 def _load_exp_data():
     base_dir = constants.get_base_path()
@@ -19,34 +24,8 @@ EXP_DATA = _load_exp_data()
 def rename_player(player_uid, new_name):
     if not constants.loaded_level_json:
         return False
-    p_uid_clean = str(player_uid).replace('-', '')
     wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-    for g in wsd['GroupSaveDataMap']['value']:
-        raw = g['value']['RawData']['value']
-        found = False
-        for p in raw.get('players', []):
-            uid = str(p.get('player_uid', '')).replace('-', '')
-            if uid == p_uid_clean:
-                p.setdefault('player_info', {})['player_name'] = new_name
-                found = True
-                break
-        if found:
-            break
-    char_map = wsd.get('CharacterSaveParameterMap', {}).get('value', [])
-    for entry in char_map:
-        raw = entry.get('value', {}).get('RawData', {}).get('value', {})
-        sp = raw.get('object', {}).get('SaveParameter', {})
-        if sp.get('struct_type') != 'PalIndividualCharacterSaveParameter':
-            continue
-        sp_val = sp.get('value', {})
-        if not sp_val.get('IsPlayer', {}).get('value'):
-            continue
-        uid_obj = entry.get('key', {}).get('PlayerUId', {})
-        uid = str(uid_obj.get('value', '')).replace('-', '') if isinstance(uid_obj, dict) else ''
-        if uid == p_uid_clean:
-            sp_val['NickName'] = {'id': None, 'type': 'StrProperty', 'value': new_name}
-            break
-    return True
+    return _rename_player(wsd, player_uid, new_name)
 def get_player_info(player_uid):
     if not constants.loaded_level_json:
         return None
@@ -95,35 +74,11 @@ def get_level_from_exp(exp):
 def set_player_level(player_uid, new_level):
     if not constants.loaded_level_json:
         return False
-    if new_level < 1 or new_level > 80:
-        return False
-    uid_clean = str(player_uid).replace('-', '')
     wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-    char_map = wsd.get('CharacterSaveParameterMap', {}).get('value', [])
-    for entry in char_map:
-        raw = entry.get('value', {}).get('RawData', {}).get('value', {})
-        sp = raw.get('object', {}).get('SaveParameter', {})
-        if sp.get('struct_type') != 'PalIndividualCharacterSaveParameter':
-            continue
-        sp_val = sp.get('value', {})
-        if not sp_val.get('IsPlayer', {}).get('value'):
-            continue
-        uid_obj = entry.get('key', {}).get('PlayerUId', {})
-        uid = str(uid_obj.get('value', '')).replace('-', '') if isinstance(uid_obj, dict) else ''
-        if uid == uid_clean:
-            if 'Level' not in sp_val or not sp_val['Level']:
-                sp_val['Level'] = {'id': None, 'type': 'ByteProperty', 'value': {'type': 'None'}}
-            if 'value' not in sp_val['Level']:
-                sp_val['Level']['value'] = {'type': 'None'}
-            sp_val['Level']['value']['value'] = new_level
-            exp_val = EXP_DATA[str(new_level)]['TotalEXP']
-            if 'Exp' not in sp_val:
-                sp_val['Exp'] = {'id': None, 'type': 'IntProperty', 'value': exp_val}
-            else:
-                sp_val['Exp']['value'] = exp_val
-            constants.player_levels[uid] = new_level
-            return True
-    return False
+    changed, normalized_uid = _set_player_level(wsd, player_uid, new_level, EXP_DATA)
+    if changed:
+        constants.player_levels[normalized_uid] = new_level
+    return changed
 def set_player_tech_points(player_uid, new_tech_points):
     if not constants.current_save_path:
         return False
@@ -165,52 +120,8 @@ def set_player_boss_tech_points(player_uid, new_boss_tech_points):
 def set_player_stats(player_uid, stat_changes, unused_stat_points=None):
     if not constants.loaded_level_json:
         return False
-    uid_clean = str(player_uid).replace('-', '')
     wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-    char_map = wsd.get('CharacterSaveParameterMap', {}).get('value', [])
-    for entry in char_map:
-        raw = entry.get('value', {}).get('RawData', {}).get('value', {})
-        sp = raw.get('object', {}).get('SaveParameter', {})
-        if sp.get('struct_type') != 'PalIndividualCharacterSaveParameter':
-            continue
-        sp_val = sp.get('value', {})
-        if not sp_val.get('IsPlayer', {}).get('value'):
-            continue
-        uid_obj = entry.get('key', {}).get('PlayerUId', {})
-        uid = str(uid_obj.get('value', '')).replace('-', '') if isinstance(uid_obj, dict) else ''
-        if uid == uid_clean:
-            got_list = sp_val.get('GotStatusPointList')
-            if isinstance(got_list, dict):
-                got_val = got_list.get('value')
-                if isinstance(got_val, dict):
-                    for status_item in got_val.get('values', []):
-                        if 'StatusName' in status_item and 'StatusPoint' in status_item:
-                            if isinstance(status_item['StatusPoint'], dict):
-                                if 'value' in status_item['StatusPoint']:
-                                    if isinstance(status_item['StatusName'], dict) and 'value' in status_item['StatusName']:
-                                        stat_name = status_item['StatusName']['value']
-                                        if stat_name in stat_changes:
-                                            status_item['StatusPoint']['value'] = stat_changes[stat_name]
-            ex_list = sp_val.get('GotExStatusPointList')
-            if isinstance(ex_list, dict):
-                ex_val = ex_list.get('value')
-                if isinstance(ex_val, dict):
-                    for status_item in ex_val.get('values', []):
-                        if 'StatusName' in status_item and 'StatusPoint' in status_item:
-                            if isinstance(status_item['StatusPoint'], dict):
-                                if 'value' in status_item['StatusPoint']:
-                                    if isinstance(status_item['StatusName'], dict) and 'value' in status_item['StatusName']:
-                                        stat_name = status_item['StatusName']['value']
-                                        if stat_name in stat_changes:
-                                            status_item['StatusPoint']['value'] = stat_changes[stat_name]
-            if 'UnusedStatusPoint' in sp_val:
-                if isinstance(sp_val['UnusedStatusPoint'], dict) and 'value' in sp_val['UnusedStatusPoint']:
-                    if unused_stat_points is not None:
-                        sp_val['UnusedStatusPoint']['value'] = unused_stat_points
-                    else:
-                        sp_val['UnusedStatusPoint']['value'] = 0
-            return True
-    return False
+    return _set_player_stats(wsd, player_uid, stat_changes, unused_stat_points)
 
 def _load_relic_data():
     relic_path = resource_path(constants.get_base_path(), 'game_data', 'relic_data.json')
