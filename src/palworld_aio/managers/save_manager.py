@@ -27,6 +27,7 @@ from palworld_aio.utils import sav_to_json, json_to_sav, sav_to_gvas_wrapper, wr
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from palworld_aio.managers.func_manager import check_is_illegal_pal
 from palworld_aio.world.indexes import count_owned_pals as _count_owned_pals
+from palworld_aio.world.projections import SaveProjections
 
 
 def count_owned_pals(level_json):
@@ -913,70 +914,47 @@ class SaveManager(QObject):
         if not constants.loaded_level_json:
             return {'Players': 0, 'Guilds': 0, 'Bases': 0, 'Pals': 0}
         wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-        group_data = wsd.get('GroupSaveDataMap', {}).get('value', [])
-        base_data = wsd.get('BaseCampSaveData', {}).get('value', [])
-        char_data = wsd.get('CharacterSaveParameterMap', {}).get('value', [])
-        total_players = sum((len(g['value']['RawData']['value'].get('players', [])) for g in group_data if g['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild'))
-        total_guilds = sum((1 for g in group_data if g['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild'))
-        total_bases = len(base_data)
-        total_pals = 0
-        for c in char_data:
-            val = c.get('value', {}).get('RawData', {}).get('value', {})
-            struct_type = val.get('object', {}).get('SaveParameter', {}).get('struct_type')
-            if struct_type == 'PalIndividualCharacterSaveParameter':
-                if 'IsPlayer' in val.get('object', {}).get('SaveParameter', {}).get('value', {}) and val['object']['SaveParameter']['value']['IsPlayer'].get('value'):
-                    continue
-                total_pals += 1
-        return dict(Players=total_players, Guilds=total_guilds, Bases=total_bases, Pals=total_pals)
+        return SaveProjections.get_world_stats(wsd)
+
     def get_players(self):
         if not constants.loaded_level_json:
             return []
-        out = []
         wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-        tick = wsd['GameTimeSaveData']['value']['RealDateTimeTicks']['value']
-        for g in wsd['GroupSaveDataMap']['value']:
-            if g['value']['GroupType']['value']['value'] != 'EPalGroupType::Guild':
-                continue
-            gid = str(g['key'])
-            players = g['value']['RawData']['value'].get('players', [])
-            for p in players:
-                uid_raw = p.get('player_uid')
-                uid = str(uid_raw) if uid_raw is not None else ''
-                name = p.get('player_info', {}).get('player_name', 'Unknown')
-                last = p.get('player_info', {}).get('last_online_real_time')
-                elapsed = None if last is None else (tick - last) / 10000000.0
-                lastseen = 'Unknown' if last is None else format_duration_short(elapsed)
-                level = constants.player_levels.get(uid.replace('-', ''), 1) if uid else 1
-                out.append((uid, name, gid, lastseen, level, elapsed))
-        return out
+        return [
+            (
+                row['uid'],
+                row['name'],
+                row['guild_id'],
+                'Unknown' if row['elapsed'] is None else format_duration_short(row['elapsed']),
+                row['level'],
+                row['elapsed'],
+            )
+            for row in SaveProjections.get_player_rows(wsd, constants.player_levels)
+        ]
+
     def get_guild_name_by_id(self, target_gid):
         if not constants.loaded_level_json:
             return 'Unknown Guild'
-        from ..utils import as_uuid
-        for g in constants.loaded_level_json['properties']['worldSaveData']['value']['GroupSaveDataMap']['value']:
-            current_gid = as_uuid(g['key'])
-            if g['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild' and current_gid == target_gid:
-                return g['value']['RawData']['value'].get('guild_name', 'Unnamed Guild')
+        wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+        guild = SaveProjections.get_guild_entry(wsd, target_gid)
+        if guild is not None:
+            return guild['value']['RawData']['value'].get('guild_name', 'Unnamed Guild')
         return 'No Guild'
+
     def get_guild_level_by_id(self, target_gid):
         if not constants.loaded_level_json:
             return 1
-        from ..utils import as_uuid
-        for g in constants.loaded_level_json['properties']['worldSaveData']['value']['GroupSaveDataMap']['value']:
-            current_gid = as_uuid(g['key'])
-            if g['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild' and current_gid == target_gid:
-                return g['value']['RawData']['value'].get('base_camp_level', 1)
+        wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+        guild = SaveProjections.get_guild_entry(wsd, target_gid)
+        if guild is not None:
+            return guild['value']['RawData']['value'].get('base_camp_level', 1)
         return 1
+
     def is_player_guild_leader(self, guild_id, player_uid):
         if not constants.loaded_level_json:
             return False
-        from ..utils import as_uuid
-        for g in constants.loaded_level_json['properties']['worldSaveData']['value']['GroupSaveDataMap']['value']:
-            current_gid = as_uuid(g['key'])
-            if g['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild' and current_gid == guild_id:
-                admin_uid = as_uuid(g['value']['RawData']['value'].get('admin_player_uid', ''))
-                return admin_uid == player_uid
-        return False
+        wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+        return SaveProjections.is_guild_leader(wsd, guild_id, player_uid)
     def _create_player_summary_json(self, data_source, log_folder, guild_name_map):
         from ..utils import as_uuid
         json_logger_folder = os.path.join(os.path.dirname(log_folder), 'Json Logger')

@@ -70,27 +70,33 @@ class SaveProjections:
         return out
 
     @staticmethod
+    def get_guild_entry(wsd: dict, guild_id: Any) -> dict | None:
+        """Return the raw guild entry whose ID matches the requested guild."""
+        guild_id_normalized = _normalize(guild_id)
+        for guild in wsd['GroupSaveDataMap']['value']:
+            if _guild_filter(guild) and _normalize(guild['key']) == guild_id_normalized:
+                return guild
+        return None
+
+    @staticmethod
     def get_guild_members(wsd: dict, guild_id: str) -> list[dict]:
-        gid_clean = _normalize(guild_id)
-        for g in wsd['GroupSaveDataMap']['value']:
-            if not _guild_filter(g):
-                continue
-            if _normalize(g['key']) == gid_clean:
-                r = _raw(g)
-                tick = SaveProjections.get_tick(wsd)
-                out: list[dict] = []
-                for p in r.get('players', []):
-                    uid = str(p.get('player_uid', ''))
-                    last = p.get('player_info', {}).get('last_online_real_time')
-                    elapsed = None if last is None else (tick - last) / 10000000.0
-                    out.append({
-                        'uid': uid,
-                        'name': p.get('player_info', {}).get('player_name', 'Unknown'),
-                        'role': p.get('role', 3),
-                        'last_online_real_time': last,
-                        'elapsed': elapsed,
-                    })
-                return out
+        guild = SaveProjections.get_guild_entry(wsd, guild_id)
+        if guild is not None:
+            raw_guild = _raw(guild)
+            tick = SaveProjections.get_tick(wsd)
+            out: list[dict] = []
+            for p in raw_guild.get('players', []):
+                uid = str(p.get('player_uid', ''))
+                last = p.get('player_info', {}).get('last_online_real_time')
+                elapsed = None if last is None else (tick - last) / 10000000.0
+                out.append({
+                    'uid': uid,
+                    'name': p.get('player_info', {}).get('player_name', 'Unknown'),
+                    'role': p.get('role', 3),
+                    'last_online_real_time': last,
+                    'elapsed': elapsed,
+                })
+            return out
         return []
 
     @staticmethod
@@ -107,17 +113,37 @@ class SaveProjections:
 
     @staticmethod
     def get_guild_name(wsd: dict, guild_id: str) -> str:
-        gid_clean = _normalize(guild_id)
-        for g in wsd['GroupSaveDataMap']['value']:
-            if not _guild_filter(g):
-                continue
-            if _normalize(g['key']) == gid_clean:
-                return _raw(g).get('guild_name', 'Unknown Guild')
+        guild = SaveProjections.get_guild_entry(wsd, guild_id)
+        if guild is not None:
+            return _raw(guild).get('guild_name', 'Unknown Guild')
         return 'Unknown Guild'
 
     # ------------------------------------------------------------------
     # Players
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def is_guild_leader(wsd: dict, guild_id: Any, player_uid: Any) -> bool:
+        guild = SaveProjections.get_guild_entry(wsd, guild_id)
+        if guild is None:
+            return False
+        return _normalize(_raw(guild).get('admin_player_uid', '')) == _normalize(player_uid)
+
+    @staticmethod
+    def get_player_rows(wsd: dict, player_levels: dict | None = None) -> list[dict]:
+        """Return the data needed for the UI's player list without formatting it."""
+        rows: list[dict] = []
+        for guild in SaveProjections.get_guilds(wsd):
+            for member in SaveProjections.get_guild_members(wsd, guild['id']):
+                uid = member['uid']
+                rows.append({
+                    'uid': uid,
+                    'name': member['name'],
+                    'guild_id': guild['id'],
+                    'elapsed': member['elapsed'],
+                    'level': (player_levels or {}).get(uid.replace('-', ''), 1) if uid else 1,
+                })
+        return rows
 
     @staticmethod
     def get_player_info(wsd: dict, player_uid: str,
@@ -181,6 +207,42 @@ class SaveProjections:
             if key_uid and _normalize(key_uid) == uid_clean:
                 return _sp(entry)
         return None
+
+    # ------------------------------------------------------------------
+    # Summary
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def get_world_stats(wsd: dict) -> dict[str, int]:
+        """Return player, guild, base, and Pal totals for a loaded world."""
+        group_data = wsd.get('GroupSaveDataMap', {}).get('value', [])
+        base_data = wsd.get('BaseCampSaveData', {}).get('value', [])
+        character_data = wsd.get('CharacterSaveParameterMap', {}).get('value', [])
+        total_players = sum(
+            len(guild['value']['RawData']['value'].get('players', []))
+            for guild in group_data
+            if guild['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild'
+        )
+        total_guilds = sum(
+            1
+            for guild in group_data
+            if guild['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild'
+        )
+        total_pals = 0
+        for character in character_data:
+            raw_data = character.get('value', {}).get('RawData', {}).get('value', {})
+            save_parameter = raw_data.get('object', {}).get('SaveParameter', {})
+            if save_parameter.get('struct_type') != 'PalIndividualCharacterSaveParameter':
+                continue
+            if save_parameter.get('value', {}).get('IsPlayer', {}).get('value'):
+                continue
+            total_pals += 1
+        return {
+            'Players': total_players,
+            'Guilds': total_guilds,
+            'Bases': len(base_data),
+            'Pals': total_pals,
+        }
 
     # ------------------------------------------------------------------
     # Bases

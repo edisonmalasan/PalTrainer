@@ -131,6 +131,31 @@ def test_get_guild_name():
     assert SaveProjections.get_guild_name(_wsd(), 'zzz') == 'Unknown Guild'
 
 
+def test_get_guild_entry_and_leadership():
+    guild = SaveProjections.get_guild_entry(_wsd(), '11111111-1111-1111-1111-111111111111')
+    assert guild is not None
+    assert SaveProjections.is_guild_leader(
+        _wsd(),
+        '11111111-1111-1111-1111-111111111111',
+        '22222222-2222-2222-2222-222222222222',
+    )
+    assert not SaveProjections.is_guild_leader(_wsd(), 'zzz', '22222222-2222-2222-2222-222222222222')
+
+
+def test_get_player_rows():
+    rows = SaveProjections.get_player_rows(
+        _wsd(),
+        player_levels={'22222222222222222222222222222222': 7},
+    )
+    assert rows == [{
+        'uid': '22222222-2222-2222-2222-222222222222',
+        'name': 'Alice',
+        'guild_id': '11111111-1111-1111-1111-111111111111',
+        'elapsed': 10.0,
+        'level': 7,
+    }]
+
+
 def test_get_player_info():
     info = SaveProjections.get_player_info(_wsd(), '22222222-2222-2222-2222-222222222222',
                                            player_levels={'22222222222222222222222222222222': 7},
@@ -163,6 +188,15 @@ def test_get_player_save_param():
     sp = SaveProjections.get_player_save_param(_wsd(), '22222222-2222-2222-2222-222222222222')
     assert sp is not None
     assert sp['Level']['value'] == 5
+
+
+def test_get_world_stats():
+    assert SaveProjections.get_world_stats(_wsd()) == {
+        'Players': 1,
+        'Guilds': 1,
+        'Bases': 1,
+        'Pals': 1,
+    }
 
 
 def test_get_bases():
