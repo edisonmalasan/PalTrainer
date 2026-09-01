@@ -166,10 +166,16 @@ Acceptance criteria:
 Verify: conversion, XGP, path-policy, and package import tests, followed by a
 frozen-build smoke check when packaging code changes.
 
-## Execution scope for this branch
+## Execution scope for this implementation series
 
-This branch executes MM-001 through MM-003 for the already-seamed core:
+The completed initial series executes MM-001 through MM-003 for the
+already-seamed core:
 save-session lifecycle, world projections, and world operations. MM-004 and
-MM-005 are deliberately staged follow-up slices because rewriting every
-manager/tool at once would weaken the project's save-data guarantees and make
-regressions impossible to isolate.
+MM-005 remain deliberately incremental because rewriting every manager/tool at
+once would weaken the project's save-data guarantees and make regressions
+impossible to isolate.
+
+The active MM-004 slice routes the legacy player-info display adapter through
+the canonical world projection while preserving the UI's existing formatted
+result. Further MM-004 work will follow the same characterization-first
+approach.

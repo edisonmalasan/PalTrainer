@@ -4,6 +4,7 @@ from tests.dynamic_importer import import_from
 
 constants = import_from('palworld_aio.constants')
 save_manager_module = import_from('palworld_aio.managers.save_manager')
+player_manager_module = import_from('palworld_aio.managers.player_manager')
 
 
 GUILD_ID = '11111111-1111-1111-1111-111111111111'
@@ -79,3 +80,28 @@ def test_save_manager_query_contracts_use_world_projections():
     finally:
         constants.loaded_level_json = old_document
         constants.player_levels = old_player_levels
+
+
+def test_player_manager_info_preserves_legacy_display_contract():
+    old_document = constants.loaded_level_json
+    old_player_levels = constants.player_levels
+    old_pal_counts = constants.PLAYER_PAL_COUNTS
+    try:
+        constants.loaded_level_json = _loaded_document()
+        constants.player_levels = {PLAYER_UID.replace('-', ''): 7}
+        constants.PLAYER_PAL_COUNTS = {PLAYER_UID.replace('-', ''): 3}
+
+        assert player_manager_module.get_player_info(PLAYER_UID) == {
+            'uid': PLAYER_UID,
+            'name': 'Alice',
+            'level': 7,
+            'pals': 3,
+            'lastseen': '10s ago',
+            'guild_id': GUILD_ID,
+            'guild_name': 'Test Guild',
+        }
+        assert player_manager_module.get_player_info('missing') is None
+    finally:
+        constants.loaded_level_json = old_document
+        constants.player_levels = old_player_levels
+        constants.PLAYER_PAL_COUNTS = old_pal_counts

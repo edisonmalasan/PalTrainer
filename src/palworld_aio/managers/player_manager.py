@@ -4,7 +4,8 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 from i18n import t
 from palworld_aio import constants
 from resource_resolver import resource_path
-from palworld_aio.utils import are_equal_uuids, as_uuid, sav_to_gvasfile, gvasfile_to_sav
+from palworld_aio.utils import are_equal_uuids, as_uuid, format_duration_short, sav_to_gvasfile, gvasfile_to_sav
+from palworld_aio.world.projections import SaveProjections
 from palworld_aio.managers.data_manager import delete_player
 def _load_exp_data():
     base_dir = constants.get_base_path()
@@ -49,25 +50,20 @@ def rename_player(player_uid, new_name):
 def get_player_info(player_uid):
     if not constants.loaded_level_json:
         return None
-    uid_clean = str(player_uid).replace('-', '').lower()
     wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-    tick = wsd['GameTimeSaveData']['value']['RealDateTimeTicks']['value']
-    for g in wsd['GroupSaveDataMap']['value']:
-        if g['value']['GroupType']['value']['value'] != 'EPalGroupType::Guild':
-            continue
-        gid = str(g['key'])
-        gname = g['value']['RawData']['value'].get('guild_name', 'Unknown Guild')
-        for p in g['value']['RawData']['value'].get('players', []):
-            uid = str(p.get('player_uid', '')).replace('-', '').lower()
-            if uid == uid_clean:
-                name = p.get('player_info', {}).get('player_name', 'Unknown')
-                last = p.get('player_info', {}).get('last_online_real_time')
-                from ..utils import format_duration_short
-                lastseen = 'Unknown' if last is None else format_duration_short((tick - last) / 10000000.0)
-                level = constants.player_levels.get(uid, 1)
-                pals = constants.PLAYER_PAL_COUNTS.get(uid, 0)
-                return {'uid': player_uid, 'name': name, 'level': level, 'pals': pals, 'lastseen': lastseen, 'guild_id': gid, 'guild_name': gname}
-    return None
+    info = SaveProjections.get_player_info(
+        wsd,
+        player_uid,
+        player_levels=constants.player_levels,
+        pal_counts=constants.PLAYER_PAL_COUNTS,
+    )
+    if info is None:
+        return None
+    elapsed = info['lastseen']
+    return {
+        **info,
+        'lastseen': 'Unknown' if elapsed is None else format_duration_short(elapsed),
+    }
 def get_player_pal_count(player_uid):
     uid = str(player_uid).replace('-', '').lower()
     return constants.PLAYER_PAL_COUNTS.get(uid, 0)
