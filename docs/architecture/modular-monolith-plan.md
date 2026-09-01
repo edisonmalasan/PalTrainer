@@ -175,7 +175,9 @@ MM-005 remain deliberately incremental because rewriting every manager/tool at
 once would weaken the project's save-data guarantees and make regressions
 impossible to isolate.
 
-The active MM-004 slice routes the legacy player-info display adapter through
-the canonical world projection while preserving the UI's existing formatted
-result. Further MM-004 work will follow the same characterization-first
-approach.
+Completed MM-004 slices route player and guild read models through canonical
+world projections, extract player index and mutation rules, isolate Pal
+diagnostics, and centralize player-reference cleanup. Legacy manager functions
+remain compatibility adapters, so existing UI callers retain their current
+interfaces. Further MM-004 work will follow the same
+characterization-first approach.
