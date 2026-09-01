@@ -23,6 +23,7 @@ from palworld_aio.world.operations import (
     is_death_penalty_chest_obj as _is_death_penalty_chest_obj,
     is_dropped_character as _is_dropped_character,
 )
+from palworld_aio.world.diagnostics import check_is_illegal_pal
 from palworld_aio.editor.dialogs import GameDaysInputDialog
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from resource_resolver import resource_path
@@ -2409,64 +2410,6 @@ def check_dynamic_containers_with_reporting(parent=None):
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.warning(parent, 'Error', f'Failed to analyze dynamic containers: {str(e)}')
         return False
-def check_is_illegal_pal(raw):
-    try:
-        try:
-            sp = raw['value']['RawData']['value']['object']['SaveParameter']['value']
-        except:
-            sp = raw.get('SaveParameter', {}).get('value', {})
-            if not sp:
-                return (False, [])
-        illegal_markers = []
-        level = extract_value(sp, 'Level', 1)
-        if level > 80:
-            illegal_markers.append('Level')
-        talent_hp = extract_value(sp, 'Talent_HP', 0)
-        talent_shot = extract_value(sp, 'Talent_Shot', 0)
-        talent_defense = extract_value(sp, 'Talent_Defense', 0)
-        if talent_hp > 100:
-            illegal_markers.append('HP IV')
-        if talent_shot > 100:
-            illegal_markers.append('ATK IV')
-        if talent_defense > 100:
-            illegal_markers.append('DEF IV')
-        rank_hp = extract_value(sp, 'Rank_HP', 0)
-        rank_attack = extract_value(sp, 'Rank_Attack', 0)
-        rank_defense = extract_value(sp, 'Rank_Defence', 0)
-        rank_craftspeed = extract_value(sp, 'Rank_CraftSpeed', 0)
-        if rank_hp > 20:
-            illegal_markers.append('HP Soul')
-        if rank_attack > 20:
-            illegal_markers.append('ATK Soul')
-        if rank_defense > 20:
-            illegal_markers.append('DEF Soul')
-        if rank_craftspeed > 20:
-            illegal_markers.append('Craft Soul')
-        ps_val = sp.get('PassiveSkillList')
-        if isinstance(ps_val, dict):
-            pv = ps_val.get('value')
-            if isinstance(pv, dict):
-                pv = pv.get('values', [])
-            if isinstance(pv, list):
-                if len(pv) > 4:
-                    illegal_markers.append('>4 Passives')
-                if len(pv) != len(set(pv)):
-                    illegal_markers.append('Duplicate Passives')
-        eq_val = sp.get('EquipWaza')
-        if isinstance(eq_val, dict):
-            ev = eq_val.get('value')
-            if isinstance(ev, dict):
-                ev = ev.get('values', [])
-            if isinstance(ev, list):
-                active_count = sum(1 for s in ev if s and s.strip())
-                if active_count > 3:
-                    illegal_markers.append('>3 Active Skills')
-        rank = extract_value(sp, 'Rank', 1)
-        if rank > 5:
-            illegal_markers.append('>4 Stars')
-        return (len(illegal_markers) > 0, illegal_markers)
-    except:
-        return (False, [])
 def _process_dps_file_worker(args):
     filename, players_dir, PAL_EXP_TABLE, NAMEMAP, valid_passive_set = args
     file_path = os.path.join(players_dir, filename)

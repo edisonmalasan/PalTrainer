@@ -25,7 +25,7 @@ from palworld_aio.application.derived_state import build_player_levels
 from palworld_aio.application.save_session import save_session, SavePathError, SaveNoPathError, SaveMissingPlayersError, SaveNotLevelError
 from palworld_aio.utils import sav_to_json, json_to_sav, sav_to_gvas_wrapper, wrapper_to_sav, sav_to_gvasfile, extract_value, sanitize_filename, format_duration_short, resolve_name, canonical_player_entries
 from palworld_aio.inventory.container_ownership import ContainerOwnership
-from palworld_aio.managers.func_manager import check_is_illegal_pal
+from palworld_aio.world.diagnostics import check_is_illegal_pal
 from palworld_aio.world.indexes import count_owned_pals as _count_owned_pals
 from palworld_aio.world.projections import SaveProjections
 

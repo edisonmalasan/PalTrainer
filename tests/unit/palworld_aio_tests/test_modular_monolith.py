@@ -25,12 +25,15 @@ def test_legacy_facades_preserve_canonical_object_identity():
     legacy_projections = import_from('palworld_aio.read_models')
     canonical_operations = import_from('palworld_aio.world.operations')
     legacy_operations = import_from('palworld_aio.managers.operations')
+    canonical_diagnostics = import_from('palworld_aio.world.diagnostics')
+    legacy_func_manager = import_from('palworld_aio.managers.func_manager')
 
     assert legacy_session.SaveSession is canonical_session.SaveSession
     assert legacy_session.save_session is canonical_session.save_session
     assert legacy_projections.SaveProjections is canonical_projections.SaveProjections
     assert legacy_operations.OperationResult is canonical_operations.OperationResult
     assert legacy_operations.collect_death_bag_ids is canonical_operations.collect_death_bag_ids
+    assert legacy_func_manager.check_is_illegal_pal is canonical_diagnostics.check_is_illegal_pal
 
 
 def test_canonical_core_modules_do_not_depend_on_presentation_or_legacy_managers():
@@ -40,6 +43,7 @@ def test_canonical_core_modules_do_not_depend_on_presentation_or_legacy_managers
         SRC_DIR / 'palworld_aio' / 'world' / 'projections.py',
         SRC_DIR / 'palworld_aio' / 'world' / 'operations.py',
         SRC_DIR / 'palworld_aio' / 'world' / 'indexes.py',
+        SRC_DIR / 'palworld_aio' / 'world' / 'diagnostics.py',
     )
     forbidden_prefixes = ('PyQt6', 'palworld_aio.ui', 'palworld_aio.editor', 'palworld_aio.managers')
 
