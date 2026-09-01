@@ -117,6 +117,7 @@ def test_get_guild_members():
     assert members[0]['name'] == 'Alice'
     assert members[0]['role'] == 1
     assert members[0]['elapsed'] == 10.0
+    assert members[0]['is_leader'] is True
     assert SaveProjections.get_guild_members(_wsd(), '00000000-0000-0000-0000-000000000000') == []
 
 

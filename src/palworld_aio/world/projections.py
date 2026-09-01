@@ -84,6 +84,7 @@ class SaveProjections:
         if guild is not None:
             raw_guild = _raw(guild)
             tick = SaveProjections.get_tick(wsd)
+            admin_player_uid = raw_guild.get('admin_player_uid', '')
             out: list[dict] = []
             for p in raw_guild.get('players', []):
                 uid = str(p.get('player_uid', ''))
@@ -95,6 +96,7 @@ class SaveProjections:
                     'role': p.get('role', 3),
                     'last_online_real_time': last,
                     'elapsed': elapsed,
+                    'is_leader': _normalize(uid) == _normalize(admin_player_uid),
                 })
             return out
         return []

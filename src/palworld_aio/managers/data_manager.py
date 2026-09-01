@@ -6,7 +6,7 @@ from i18n import t
 from palworld_aio import constants
 from palworld_aio.world.projections import SaveProjections
 from palworld_aio.world.operations import cleanup_player_references as _cleanup_player_references
-from palworld_aio.utils import are_equal_uuids, as_uuid, fast_deepcopy
+from palworld_aio.utils import are_equal_uuids, fast_deepcopy
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from functools import lru_cache
 from resource_resolver import resource_path
@@ -34,15 +34,6 @@ def get_guild_members(gid):
     if not constants.loaded_level_json:
         return []
     tick = get_tick()
-    target = as_uuid(gid)
-    admin_uid = None
-    for g in _wsd()['GroupSaveDataMap']['value']:
-        if g['value']['GroupType']['value']['value'] != 'EPalGroupType::Guild':
-            continue
-        if as_uuid(g['key']) != target:
-            continue
-        admin_uid = as_uuid(g['value']['RawData']['value'].get('admin_player_uid', ''))
-        break
     out = []
     for m in SaveProjections.get_guild_members(_wsd(), gid):
         uid = m['uid']
@@ -55,10 +46,9 @@ def get_guild_members(gid):
             lastseen = format_duration_short(last_sort)
         level = constants.player_levels.get(uid.replace('-', ''), 1)
         pals = constants.PLAYER_PAL_COUNTS.get(uid.replace('-', '').lower(), 0)
-        is_leader = as_uuid(uid) == admin_uid
         role = m['role']
         role_label = GUILD_ROLE_LABELS.get(role, f'?{role}')
-        out.append({'uid': uid, 'name': m['name'], 'lastseen': lastseen, 'last_sort': last_sort, 'level': level, 'pals': pals, 'is_leader': is_leader, 'role': role, 'role_label': role_label})
+        out.append({'uid': uid, 'name': m['name'], 'lastseen': lastseen, 'last_sort': last_sort, 'level': level, 'pals': pals, 'is_leader': m['is_leader'], 'role': role, 'role_label': role_label})
     if out and (not any((m['is_leader'] for m in out))):
         out[0]['is_leader'] = True
     return out
