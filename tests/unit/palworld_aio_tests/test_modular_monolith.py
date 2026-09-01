@@ -39,6 +39,7 @@ def test_canonical_core_modules_do_not_depend_on_presentation_or_legacy_managers
         SRC_DIR / 'palworld_aio' / 'application' / 'derived_state.py',
         SRC_DIR / 'palworld_aio' / 'world' / 'projections.py',
         SRC_DIR / 'palworld_aio' / 'world' / 'operations.py',
+        SRC_DIR / 'palworld_aio' / 'world' / 'indexes.py',
     )
     forbidden_prefixes = ('PyQt6', 'palworld_aio.ui', 'palworld_aio.editor', 'palworld_aio.managers')
 

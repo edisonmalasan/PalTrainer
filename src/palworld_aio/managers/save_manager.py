@@ -26,26 +26,15 @@ from palworld_aio.application.save_session import save_session, SavePathError, S
 from palworld_aio.utils import sav_to_json, json_to_sav, sav_to_gvas_wrapper, wrapper_to_sav, sav_to_gvasfile, extract_value, sanitize_filename, format_duration_short, resolve_name, canonical_player_entries
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from palworld_aio.managers.func_manager import check_is_illegal_pal
+from palworld_aio.world.indexes import count_owned_pals as _count_owned_pals
 
 
 def count_owned_pals(level_json):
-    owned_count = {}
     try:
-        level_data = level_json['properties']['worldSaveData']['value']
-        char_map = level_data['CharacterSaveParameterMap']['value']
-        ownership = ContainerOwnership.build(char_map, level_data.get('CharacterContainerSaveData', {}).get('value', []))
-        for item in char_map:
-            try:
-                sp = item['value']['RawData']['value']['object']['SaveParameter']['value']
-                owner_uid = sp.get('OwnerPlayerUId', {}).get('value')
-                effective = ownership.get_effective_owner(item.get('key', {}).get('InstanceId', {}).get('value'), owner_uid)
-                if effective:
-                    owned_count[effective] = owned_count.get(effective, 0) + 1
-            except:
-                continue
+        world_save_data = level_json['properties']['worldSaveData']['value']
     except:
-        pass
-    return owned_count
+        return {}
+    return _count_owned_pals(world_save_data)
 
 
 class SaveManager(QObject):

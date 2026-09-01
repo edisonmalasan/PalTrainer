@@ -6,8 +6,8 @@ import os
 from typing import Any, cast
 
 from palworld_aio import constants
-from palworld_aio.utils import canonical_player_entries, extract_value
 from palworld_aio.world.operations import collect_death_bag_ids
+from palworld_aio.world.indexes import build_player_index
 
 
 def _loaded_world_save_data() -> dict[str, Any]:
@@ -56,14 +56,7 @@ def build_player_levels() -> None:
         if constants.current_save_path
         else None
     )
-    canonical, duplicates = canonical_player_entries(world_save_data, players_dir)
-    uid_level_map: dict = {}
-    uid_entry_map: dict = {}
-    for uid, entry in canonical.items():
-        save_parameter = entry['value']['RawData']['value']['object']['SaveParameter']['value']
-        level = extract_value(save_parameter, 'Level', 1)
-        uid_level_map[uid] = int(level) if level is not None else 1
-        uid_entry_map[uid] = entry
-    constants.player_levels = dict(uid_level_map)
-    constants.player_character_cache = uid_entry_map
-    constants.player_duplicate_bodies = duplicates
+    index = build_player_index(world_save_data, players_dir)
+    constants.player_levels = dict(index.levels)
+    constants.player_character_cache = index.entries
+    constants.player_duplicate_bodies = index.duplicates
