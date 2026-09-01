@@ -68,8 +68,8 @@ TOOLTIP_STYLE = '\nQToolTip { background: rgba(18,20,24,0.98); color: #E2E8F0; b
 CONTENT_PANEL_STYLE = 'background: rgba(18,20,24,0.65); border: 1px solid rgba(125,211,252,0.15); border-radius: 10px;'
 SLOT_EMPTY_STYLE = 'background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;'
 SLOT_HOVER_STYLE = 'background: rgba(125,211,252,0.06); border: 1px solid rgba(125,211,252,0.2);'
-SLOT_SELECTED_STYLE = 'background: rgba(125,211,252,0.1); border: 2px solid #7DD3FC; border-radius: 8px;'
-SLOT_MULTI_SELECTED_STYLE = 'background: rgba(125,211,252,0.1); border: 2px solid #7DD3FC; border-radius: 8px;'
+SLOT_SELECTED_STYLE = 'background: rgba(125,211,252,0.1); border: 1px solid #7DD3FC; border-radius: 8px;'
+SLOT_MULTI_SELECTED_STYLE = 'background: rgba(125,211,252,0.2); border: 1px solid #7DD3FC; border-radius: 8px;'
 def slot_default(slot_class: str='') -> str:
     sel = f'{slot_class} {{ {SLOT_EMPTY_STYLE} }}' if slot_class else SLOT_EMPTY_STYLE
     return sel
@@ -77,7 +77,7 @@ def slot_full(slot_class: str='') -> str:
     s = slot_class or ''
     return f'{s} {{ {SLOT_EMPTY_STYLE} }} {s}:hover {{ {SLOT_HOVER_STYLE} }}'
 def slot_rarity(slot_class: str, color: str) -> str:
-    return f'{slot_class} {{ {SLOT_EMPTY_STYLE} border: 2px solid {color}; }} {slot_class}:hover {{ {SLOT_HOVER_STYLE} border: 2px solid {color}; }}'
+    return f'{slot_class} {{ {SLOT_EMPTY_STYLE} border: 1px solid {color}; }} {slot_class}:hover {{ {SLOT_HOVER_STYLE} border: 1px solid {color}; }}'
 def slot_selected(slot_class: str='') -> str:
     s = slot_class or ''
     return f'{s} {{ {SLOT_SELECTED_STYLE} }}'

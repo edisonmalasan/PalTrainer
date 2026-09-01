@@ -8,11 +8,20 @@ constants = import_from('palworld_aio.constants')
 
 def test_constants_exist():
     assert constants.BG == '#0A0B0E'
-    assert constants.ACCENT == '#3B8ED0'
+    assert constants.ACCENT == '#7DD3FC'
     assert constants.TEXT == '#E6EEF6'
+    assert constants.SUCCESS == '#4ADE80'
+    assert constants.WARNING == '#FBBF24'
+    assert constants.DANGER == '#FB7185'
+    assert constants.TEXT_MUTED == '#94A3B8'
+    assert constants.TEXT_DISABLED == '#475569'
     assert isinstance(constants.FONT_SIZE, int)
     assert isinstance(constants.SPACE_MEDIUM, int)
     assert isinstance(constants.CORNER_RADIUS, int)
+    assert constants.SPACE_SMALL == constants.SPACE_SM
+    assert constants.SPACE_MEDIUM == constants.SPACE_MD
+    assert constants.SPACE_LARGE == constants.SPACE_LG
+    assert constants.CONTROL_H_SM < constants.CONTROL_H_MD < constants.CONTROL_H_LG
 
 
 def test_urls_exist():
@@ -54,6 +63,12 @@ def test_module_exports():
     assert hasattr(constants, 'get_icon_path')
     assert hasattr(constants, 'get_container_lookup')
     assert hasattr(constants, 'invalidate_container_lookup')
+
+
+def test_semantic_alias_consistency():
+    assert constants.WARNING is constants.ALERT
+    assert constants.DANGER is constants.ERROR
+    assert constants.BUTTON_PRIMARY is constants.ACCENT
 
 
 def test_container_lookup_empty_when_no_data():

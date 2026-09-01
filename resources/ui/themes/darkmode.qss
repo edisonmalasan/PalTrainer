@@ -66,38 +66,6 @@ QPushButton#controlChip:hover {
     border: 1px solid rgba(128,128,128,0.3);
 }
 
-/* Sidebar collapse chip */
-QPushButton#sidebarChip {
-    background: rgba(255,210,77,0.08);
-    border: 1px solid rgba(255,210,77,0.12);
-    padding: 6px 10px;
-    border-radius: 10px;
-    font-size: 17px;
-    color: #FFD24D;
-}
-QPushButton#sidebarChip:hover {
-    background: rgba(255,210,77,0.15);
-    border: 1px solid rgba(255,210,77,0.25);
-    color: #FFE89D;
-}
-QPushButton#sidebarChip:pressed {
-    background: rgba(255,210,77,0.20);
-    border: 1px solid rgba(255,210,77,0.30);
-}
-
-/* Theme toggle chip */
-QPushButton#themeChip {
-    background: transparent;
-    border: none;
-    padding: 8px 12px;
-    font-size: 20px;
-    color: #f2e558;
-    text-align: center;
-}
-QPushButton#themeChip:hover {
-    color: #fffba8;
-}
-
 /* Discord chip */
 QPushButton#discordChip {
     border: 1px solid rgba(88,101,242,0.3);
@@ -308,22 +276,6 @@ QPushButton#warnBtn:hover {
 QPushButton#warnBtn:pressed {
     background: rgba(234,179,8,0.3);
 }
-/* Header discord button */
-QPushButton#discordChip {
-    border: 1px solid rgba(88,101,242,0.3);
-    background: rgba(88,101,242,0.1);
-    border-radius: 10px;
-    padding: 0px;
-    color: #818CF8;
-}
-QPushButton#discordChip:hover {
-    background: rgba(88,101,242,0.2);
-    border-color: rgba(88,101,242,0.5);
-    color: #A5B4FC;
-}
-QPushButton#discordChip:pressed {
-    background: rgba(88,101,242,0.3);
-}
 
 /* Footer */
 QStatusBar {
@@ -339,7 +291,7 @@ QMenu {
                 stop:0 rgba(10,12,16,0.95), stop:0.5 rgba(12,16,22,0.95), stop:1 rgba(8,10,14,0.95));
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 8px;
-    font-size: 16px;
+    font-size: 12px;
     color: #dfeefc;
 }
 QMenu::item {
@@ -382,6 +334,9 @@ QPushButton:disabled {
     background-color: rgba(255,255,255,0.03);
     color: rgba(148,163,184,0.4);
     border-color: rgba(255,255,255,0.06);
+}
+QPushButton:focus {
+    border: 1px solid rgba(125,211,252,0.6);
 }
 
 /* QFileDialog */
@@ -430,14 +385,23 @@ QLabel {
 
 /* QComboBox */
 QComboBox {
-    background-color: #444444;
+    background-color: rgba(255,255,255,0.06);
     color: #dfeefc;
-    border: 1px solid #555555;
+    border: 1px solid rgba(125,211,252,0.2);
     padding: 4px;
     border-radius: 4px;
 }
 QComboBox::drop-down {
     border: none;
+}
+QComboBox:hover {
+    border-color: rgba(125,211,252,0.35);
+}
+QComboBox:focus {
+    border-color: rgba(125,211,252,0.6);
+}
+QTreeWidget:focus, QListWidget:focus, QTreeView:focus {
+    border: 1px solid rgba(125,211,252,0.45);
 }
 
 /* QTreeWidget */
@@ -556,8 +520,11 @@ QPushButton#dialogCancel:hover {
 
 /* Results widget container */
 QWidget#resultsWidget {
-    background: rgba(18,20,24,0.85);
-    border-left: 1px solid rgba(255,255,255,0.04);
+    background: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(18,20,24,0.95),
+                stop:1 rgba(12,14,18,0.95));
+    border-left: 2px solid rgba(125,211,252,0.1);
+    border-radius: 0px 10px 10px 0px;
 }
 
 /* Splitter handle */
@@ -569,36 +536,6 @@ QSplitter::handle:horizontal {
 QSplitter::handle:horizontal:hover {
     background: rgba(125,211,252,0.3);
     width: 4px;
-}
-
-/* Context Menu Styling */
-QMenu {
-    background-color: rgba(18,20,24,0.95);
-    border: 1px solid rgba(125,211,252,0.2);
-    border-radius: 6px;
-    padding: 4px;
-}
-
-QMenu::item {
-    background-color: transparent;
-    padding: 6px 20px;
-    border-radius: 4px;
-    color: #E6EEF6;
-}
-
-QMenu::item:selected {
-    background-color: rgba(125,211,252,0.15);
-    color: #FFFFFF;
-}
-
-QMenu::item:selected:!enabled {
-    background-color: transparent;
-}
-
-QMenu::separator {
-    height: 1px;
-    background: rgba(255,255,255,0.1);
-    margin: 4px 10px;
 }
 
 /* Modern Futuristic Tab Styling */
@@ -778,18 +715,16 @@ QStackedWidget QLineEdit:focus {
 }
 
 QStackedWidget QComboBox {
-    background-color: #444444;
+    background-color: rgba(255,255,255,0.06);
     color: #dfeefc;
-    border: 1px solid #555555;
+    border: 1px solid rgba(125,211,252,0.2);
     padding: 4px;
     border-radius: 4px;
 }
 
-QStackedWidget QPushButton {
-    background-color: #555555;
-    color: white;
-    padding: 6px;
-    border-radius: 4px;
+QStackedWidget QPushButton:disabled {
+    background-color: rgba(255,255,255,0.03);
+    color: rgba(255,255,255,0.3);
 }
 
 QScrollArea#toolsScrollArea {
@@ -885,15 +820,6 @@ QPushButton#iconButton:hover {
 
 QPushButton#iconButton:pressed {
     background: rgba(125,211,252,0.25);
-}
-
-/* Results Widget Container with Gradient */
-QWidget#resultsWidget {
-    background: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1,
-                stop:0 rgba(18,20,24,0.95),
-                stop:1 rgba(12,14,18,0.95));
-    border-left: 2px solid rgba(125,211,252,0.1);
-    border-radius: 0px 10px 10px 0px;
 }
 
 /* ===== Collapsible Splitter Styles ===== */
@@ -1242,24 +1168,6 @@ QLabel#editPalsSection {
     font-size: 12px;
 }
 
-/* Pal card widgets */
-QFrame#palCard {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 8px;
-    padding: 8px;
-}
-
-QFrame#palCard:hover {
-    background: rgba(125,211,252,0.08);
-    border-color: rgba(125,211,252,0.2);
-}
-
-QFrame#palCard[selected="true"] {
-    background: rgba(125,211,252,0.15);
-    border-color: rgba(125,211,252,0.4);
-}
-
 /* Skill badges */
 QLabel#skillBadge {
     background: rgba(34,197,94,0.15);
@@ -1272,12 +1180,6 @@ QLabel#skillBadge {
 
 QLabel#skillBadge:hover {
     background: rgba(34,197,94,0.25);
-}
-
-/* Stats display */
-QLabel#statsValue {
-    color: #FFFFFF;
-    font-weight: 700;
 }
 
 QLabel#statsLabel {
@@ -1425,15 +1327,6 @@ QFrame#palSelectorWidget[selected="true"] {
 }
 
 /* Enhanced tab styling for Edit Pals */
-QTabWidget#editPalsTab::pane {
-    background: rgba(18,20,24,0.85);
-    border: 1px solid rgba(125,211,252,0.1);
-    border-radius: 10px;
-    padding: 12px;
-    margin-top: -1px;
-}
-
-/* Context menu for edit pals */
 QMenu#editPalsContextMenu {
     background: rgba(12,14,18,0.98);
     border: 1px solid rgba(125,211,252,0.2);
@@ -1564,8 +1457,7 @@ QLabel#statsDisplay {
 
 /* ===== Gender Icon Label ===== */
 
-QLabel#genderIconLabel {
-    font-size: 16px;
+QLabel#genderIconLabel {    font-size: 16px;
     font-weight: bold;
     padding: 2px 6px;
     border-radius: 4px;
