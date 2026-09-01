@@ -1,10 +1,11 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QGraphicsDropShadowEffect, QMenu, QLabel, QScrollArea
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QTimer, QEvent, QRect
 from PyQt6.QtGui import QFont, QColor, QCursor, QEnterEvent, QGuiApplication, QIcon
-class nf:
-    icons = {'nf-md-file': '📁', 'nf-md-function': '⚙️', 'nf-md-map': '🗺️', 'nf-md-playlist_remove': '🚫', 'nf-md-translate': '🌐', 'nf-md-cog': '⚙️', 'nf-md-chevron_right': '▶️', 'nf-md-update': '⬇️'}
+from palworld_aio.ui.chrome import icons as app_icons
 from i18n import t
 from palworld_aio import constants
+_MENU_CATEGORY_ICONS = {'nf-md-file': 'file', 'nf-md-function': 'function', 'nf-md-map': 'map', 'nf-md-playlist_remove': 'exclusions', 'nf-md-translate': 'translate', 'nf-md-cog': 'cog', 'nf-md-chevron_right': 'chevron_right', 'nf-md-update': 'update'}
+nf = type('nf', (), {'icons': {key: app_icons.get_icon(name) for key, name in _MENU_CATEGORY_ICONS.items()}})
 class ScrollableMenu(QWidget):
     def __init__(self, parent=None, is_dark=True):
         super().__init__(parent)
@@ -73,14 +74,14 @@ class HoverMenuButton(QWidget):
         layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(8)
         self.icon_label = QLabel(f'  {icon}')
-        self.icon_label.setFont(QFont(constants.FONT_FAMILY, 11))
+        self.icon_label.setFont(QFont(constants.FONT_FAMILY_NERD, 12))
         layout.addWidget(self.icon_label)
         self.text_label = QLabel(label)
         self.text_label.setFont(QFont(constants.FONT_FAMILY, 11))
         layout.addWidget(self.text_label)
         layout.addStretch()
-        self.chevron_label = QLabel('▶')
-        self.chevron_label.setFont(QFont(constants.FONT_FAMILY, 11))
+        self.chevron_label = QLabel(app_icons.get_icon('chevron_right'))
+        self.chevron_label.setFont(QFont(constants.FONT_FAMILY_NERD, 11))
         layout.addWidget(self.chevron_label)
         self._update_theme()
     def mousePressEvent(self, event):
