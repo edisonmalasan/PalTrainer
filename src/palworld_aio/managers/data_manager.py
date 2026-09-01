@@ -4,7 +4,7 @@ import palworld_coord
 from palsav.archive import UUID
 from i18n import t
 from palworld_aio import constants
-from palworld_aio.read_models import SaveProjections
+from palworld_aio.world.projections import SaveProjections
 from palworld_aio.utils import are_equal_uuids, as_uuid, fast_deepcopy
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from functools import lru_cache

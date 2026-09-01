@@ -1,8 +1,8 @@
 from __future__ import annotations
 from tests.dynamic_importer import import_from
 
-SaveProjections = import_from('palworld_aio.read_models').SaveProjections
-operations = import_from('palworld_aio.managers.operations')
+SaveProjections = import_from('palworld_aio.world.projections').SaveProjections
+operations = import_from('palworld_aio.world.operations')
 domain_stats = import_from('palworld_aio.domain.stats')
 container_types = import_from('palworld_xgp_import.container_types')
 shell_state = import_from('palworld_aio.shell_state')

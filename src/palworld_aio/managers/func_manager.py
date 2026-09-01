@@ -9,9 +9,13 @@ from palsav.archive import UUID
 from PyQt6.QtWidgets import QMessageBox, QInputDialog
 from i18n import t
 from palworld_aio import constants
+from palworld_aio.application.derived_state import (
+    build_player_levels,
+    refresh_death_bag_protection,
+)
 from palworld_aio.utils import sav_to_json, json_to_sav, sav_to_gvasfile, gvasfile_to_sav, are_equal_uuids, as_uuid, is_valid_level, extract_value, format_duration, sanitize_filename, resolve_name, calculate_max_hp, canonical_player_entries
 from palworld_aio.managers.data_manager import delete_base_camp, load_game_data_map
-from palworld_aio.managers.operations import (
+from palworld_aio.world.operations import (
     clean_character_save_parameter_map as _clean_character_map,
     collect_death_bag_ids,
     delete_player_pals as _delete_player_pals,
@@ -23,26 +27,7 @@ from palworld_aio.editor.dialogs import GameDaysInputDialog
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from resource_resolver import resource_path
 def scan_and_protect_death_bags(parent=None):
-    if not constants.loaded_level_json:
-        return {'dropped_pals': 0, 'death_penalty_chests': 0}
-    constants.death_bag_protected_instance_ids.clear()
-    constants.death_bag_protected_container_ids.clear()
-    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-    result = collect_death_bag_ids(wsd)
-    constants.death_bag_protected_instance_ids.update(result.protected_instance_ids)
-    constants.death_bag_protected_container_ids.update(result.protected_container_ids)
-    dropped_pals_count = 0
-    death_penalty_chests_count = 0
-    for obj in wsd.get('MapObjectSaveData', {}).get('value', {}).get('values', []):
-        try:
-            map_object_id = obj.get('MapObjectId', {}).get('value', '')
-            if map_object_id == 'DroppedCharacter':
-                dropped_pals_count += 1
-            elif map_object_id == 'DeathPenaltyChest':
-                death_penalty_chests_count += 1
-        except Exception as e:
-            continue
-    return {'dropped_pals': dropped_pals_count, 'death_penalty_chests': death_penalty_chests_count}
+    return refresh_death_bag_protection()
 def is_death_bag_protected(instance_id):
     if not instance_id:
         return False
@@ -93,7 +78,6 @@ def clean_character_save_parameter_map(data_source, valid_uids):
 def delete_empty_guilds(parent=None):
     if not constants.loaded_level_json:
         return 0
-    from palworld_aio.managers.save_manager import build_player_levels
     build_player_levels()
     wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
     group_data = wsd['GroupSaveDataMap']['value']
@@ -140,7 +124,6 @@ def delete_empty_guilds(parent=None):
 def delete_inactive_players(filter_params, parent=None):
     if not constants.loaded_level_json:
         return {'count': 0, 'details': []}
-    from palworld_aio.managers.save_manager import build_player_levels
     build_player_levels()
     mode = filter_params['mode']
     days_threshold = filter_params.get('days')
@@ -218,7 +201,6 @@ def delete_inactive_players(filter_params, parent=None):
 def delete_inactive_bases(filter_params, parent=None):
     if not constants.loaded_level_json:
         return {'count': 0, 'details': []}
-    from palworld_aio.managers.save_manager import build_player_levels
     build_player_levels()
     mode = filter_params['mode']
     days_threshold = filter_params.get('days')
@@ -373,7 +355,6 @@ def delete_duplicated_players(parent=None):
 def delete_unreferenced_data(parent=None):
     if not constants.loaded_level_json:
         return {}
-    from palworld_aio.managers.save_manager import build_player_levels
     build_player_levels()
     def normalize_uid(uid):
         if isinstance(uid, dict):

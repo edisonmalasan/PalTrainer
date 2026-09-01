@@ -116,7 +116,7 @@ def run_aio():
         if options['fix']:
             mode_desc.append('fix')
         print(f"Mode: {', '.join(mode_desc)}")
-        from palworld_aio.managers.save_session import save_session, SavePathError
+        from palworld_aio.application.save_session import save_session, SavePathError
         if constants.loaded_level_json is not None:
             save_session.reset()
         p = path_arg
