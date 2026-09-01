@@ -6,7 +6,7 @@ This document operationalizes the previous UI redesign milestones (UI-001…UI-0
 
 - Preserve the existing feature scope and save behavior. No new save-editing capabilities.
 - No change to serialization, storage, backup, stale-file, or mutation semantics.
-- One intentional, flagged exception: the JSON tab import guard (Section 6.10, P1) — approved separately because it closes a safety-invariant gap.
+- One intentional, flagged exception: the JSON tab import guard (Section 6.8, P1) — approved separately because it closes a safety-invariant gap.
 - No direct coupling between visual components and raw save data.
 - The redesign may improve navigation, layout, hierarchy, components, styling, responsiveness, accessibility, and usability. Existing visual styling and widget arrangement need not be preserved, but every workflow must remain available.
 
