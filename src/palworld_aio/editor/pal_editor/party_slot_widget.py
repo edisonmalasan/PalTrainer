@@ -357,18 +357,25 @@ class PartySlotWidget(QFrame):
             return None
 
     def _build(self):
-
-        self._lvl_overlay = None
-
         old_layout = self.layout()
 
         if old_layout:
+            # Remove layout items before releasing the layout. The previous
+            # implementation detached descendants without deleting them,
+            # leaving orphaned Qt wrappers after each refresh.
+            while old_layout.count():
+                old_layout.takeAt(0)
+            old_layout.setParent(None)
+            old_layout.deleteLater()
 
-            QWidget().setLayout(old_layout)
-
-        for child in self.findChildren(QWidget):
+        # Release only direct children; nested controls are destroyed with
+        # their direct parent and are not detached twice.
+        for child in self.findChildren(QWidget, Qt.FindDirectChildrenOnly):
             child.hide()
             child.setParent(None)
+            child.deleteLater()
+
+        self._lvl_overlay = None
         
         raw = self._get_raw()
 

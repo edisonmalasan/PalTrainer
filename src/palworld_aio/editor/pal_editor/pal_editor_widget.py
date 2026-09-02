@@ -2161,10 +2161,10 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         the shared pal dicts; last caller wins, earlier results are dropped.
         """
         from ui_debug import log
-        token = getattr(self, '_set_player_token', 0) + 1
-        self._set_player_token = token
-        log('pe.set_player.enter', uid=player_uid, token=token)
         with self._set_player_lock:
+            token = getattr(self, '_set_player_token', 0) + 1
+            self._set_player_token = token
+            log('pe.set_player.enter', uid=player_uid, token=token)
             if token != self._set_player_token:
                 log('pe.set_player.stale_dropped', uid=player_uid, token=token)
                 return
@@ -2234,6 +2234,12 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
                     if p_uid_raw == target_uid:
                         self.dps_file_path = os.path.join(players_dir, filename)
     def clear(self):
+        """Clear the editor without racing a background player load."""
+        with self._set_player_lock:
+            self._set_player_token = getattr(self, '_set_player_token', 0) + 1
+            self._clear_unlocked()
+
+    def _clear_unlocked(self):
         self.player_uid = None
         self.player_name = None
         self.party_container = None
@@ -2270,8 +2276,9 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
     def refresh(self):
         self._process_pending_changes()
         if self.player_uid:
-            self._load_pals()
-            self._load_dps_pals()
+            with self._set_player_lock:
+                self._load_pals()
+                self._load_dps_pals()
         self._update_party_slots()
         self._update_palbox_page()
         self._update_box_label()
