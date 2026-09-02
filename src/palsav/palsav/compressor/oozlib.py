@@ -129,7 +129,15 @@ class OozLib(Compressor):
         _stk = ''
         if _th.current_thread() is _th.main_thread():
             import traceback as _tb
-            _stk = ' <- '.join(f'{_tb.extract_stack()[-i-2].name}:{_tb.extract_stack()[-i-2].lineno}' for i in range(4))
+            try:
+                # extract_stack() can be shallower than the window we want
+                # (e.g. a bare CLI call) — slicing never raises, indexing
+                # element-by-element previously did (IndexError).
+                _frames = [f'{f.name}:{f.lineno}' for f in _tb.extract_stack()[-5:-1]]
+                _frames.reverse()
+                _stk = ' <- '.join(_frames)
+            except Exception:
+                _stk = ''
         _ui_log('oodle.decompress.begin', size=uncompressed_len, thread=_th.current_thread().ident, gui_stack=_stk)
         with _PALOOZ_LOCK:
             decompressed = self.palooz.decompress(compressed_data, uncompressed_len)

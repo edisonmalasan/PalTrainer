@@ -284,6 +284,44 @@ FOOD_POUCH_ITEMS = ['AutoMealPouch_Tier1', 'AutoMealPouch_Tier2', 'AutoMealPouch
 ACCESSORY_UNLOCK_ITEMS = ['UnlockEquipmentSlot_Accessory_01', 'UnlockEquipmentSlot_Accessory_02']
 WEAPON_UNLOCK_ITEMS = ['UnlockEquipmentSlot_Weapon_01', 'UnlockEquipmentSlot_Weapon_02']
 UI_SLOT_BINDINGS = [{'slot_name': 'weapon1', 'container': 'weapons', 'index': 0}, {'slot_name': 'weapon2', 'container': 'weapons', 'index': 1}, {'slot_name': 'weapon3', 'container': 'weapons', 'index': 2}, {'slot_name': 'weapon4', 'container': 'weapons', 'index': 3}, {'slot_name': 'weapon5', 'container': 'weapons', 'index': 4}, {'slot_name': 'weapon6', 'container': 'weapons', 'index': 5}, {'slot_name': 'head', 'container': 'armor', 'index': 0}, {'slot_name': 'body', 'container': 'armor', 'index': 1}, {'slot_name': 'accessory1', 'container': 'armor', 'index': 2}, {'slot_name': 'accessory2', 'container': 'armor', 'index': 3}, {'slot_name': 'shield', 'container': 'armor', 'index': 4}, {'slot_name': 'glider', 'container': 'armor', 'index': 5}, {'slot_name': 'accessory3', 'container': 'armor', 'index': 6}, {'slot_name': 'accessory4', 'container': 'armor', 'index': 7}, {'slot_name': 'sphere_mod', 'container': 'armor', 'index': 8}, {'slot_name': 'food1', 'container': 'foodbag', 'index': 0}, {'slot_name': 'food2', 'container': 'foodbag', 'index': 1}, {'slot_name': 'food3', 'container': 'foodbag', 'index': 2}, {'slot_name': 'food4', 'container': 'foodbag', 'index': 3}, {'slot_name': 'food5', 'container': 'foodbag', 'index': 4}]
+
+
+def get_cached_player_gvas(uid_clean: str):
+    """Return a shared GvasFile for Players/{uid}.sav, parsing only once.
+
+    The pal editor and the load scan already parsed the same file, and
+    re-decompressing it per tab selection was the redundant 77 KB palooz
+    call on every player switch. GvasFile objects live under a
+    ``__gvas__:`` prefix in the save_manager cache so they are never
+    confused with the SaveData dicts stored under plain uids.
+    """
+    if not constants.current_save_path:
+        return None
+    sav_file = os.path.join(constants.current_save_path, 'Players', f'{uid_clean}.sav')
+    if not os.path.exists(sav_file):
+        return None
+    from palworld_aio.managers.save_manager import save_manager as _sm
+    gvas_key = f'__gvas__:{uid_clean.lower()}'
+    try:
+        from palsav.gvas import GvasFile
+        with _sm.player_sav_cache_lock:
+            cached = _sm.player_sav_cache.get(gvas_key)
+        if isinstance(cached, GvasFile):
+            return cached
+    except Exception:
+        pass
+    try:
+        gvas = sav_to_gvasfile(sav_file)
+        try:
+            with _sm.player_sav_cache_lock:
+                _sm.player_sav_cache[gvas_key] = gvas
+        except Exception:
+            pass
+        return gvas
+    except Exception:
+        return None
+
+
 class PlayerInventory:
     def __init__(self, player_uid: str):
         self.player_uid = player_uid
@@ -435,10 +473,7 @@ class PlayerInventory:
         sav_file = os.path.join(constants.current_save_path, 'Players', f'{uid_clean}.sav')
         if not os.path.exists(sav_file):
             return None
-        try:
-            return sav_to_gvasfile(sav_file)
-        except Exception as e:
-            return None
+        return get_cached_player_gvas(uid_clean)
     def _get_container_ids(self) -> dict:
         if not self.player_gvas:
             return {}
@@ -576,8 +611,18 @@ class PlayerInventory:
         try:
             if hasattr(self.player_gvas, 'write'):
                 gvasfile_to_sav(self.player_gvas, sav_file)
+                # The cached GvasFile was just overwritten on disk; drop it so
+                # the next player switch re-parses the fresh file instead of
+                # returning a stale object identical to what we saved.
+                from palworld_aio.managers.save_manager import save_manager as _sm
+                try:
+                    with _sm.player_sav_cache_lock:
+                        _sm.player_sav_cache.pop(f'__gvas__:{uid_clean.lower()}', None)
+                except Exception:
+                    pass
         except:
             pass
+
     def _ensure_boss_defeat_flags(self, item_ids: list[str]) -> None:
         boss_item_ids = [i for i in item_ids if i.startswith('BossDefeatReward_')]
         if not boss_item_ids or not self.player_gvas:

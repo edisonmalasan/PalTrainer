@@ -132,3 +132,49 @@ def test_data_manager_guild_members_preserve_display_contract():
         constants.loaded_level_json = old_document
         constants.player_levels = old_player_levels
         constants.PLAYER_PAL_COUNTS = old_pal_counts
+
+
+ZERO_UUID = '00000000-0000-0000-0000-000000000000'
+
+
+def _dps_entry(inst_id: str, char_id: str = 'SheepBall') -> dict:
+    return {
+        'SaveParameter': {'value': {'CharacterID': {'value': char_id}}},
+        'InstanceId': {'value': {'InstanceId': {'value': {'ID': {'value': inst_id}}}}},
+    }
+
+
+def test_dps_entry_instance_id_reads_entry_level_guid():
+    entry = _dps_entry('9e03be9f-4537-f66d-f914-a99977f681e3')
+    assert save_manager_module._dps_entry_instance_id(entry) == '9e03be9f-4537-f66d-f914-a99977f681e3'
+
+
+def test_dps_entry_instance_id_handles_missing_or_malformed():
+    assert save_manager_module._dps_entry_instance_id({}) == ''
+    assert save_manager_module._dps_entry_instance_id({'InstanceId': {'value': {}}}) == ''
+    assert save_manager_module._dps_entry_instance_id({'InstanceId': {'value': {'InstanceId': {'value': None}}}}) == ''
+    assert save_manager_module._dps_entry_instance_id({'InstanceId': 7}) == ''
+
+
+def test_dps_scan_dedupes_placeholder_entries(monkeypatch, tmp_path):
+    """Glitched files pad the array with thousands of all-zero placeholders.
+
+    The scan must collapse them so the worker stays O(unique pals); the save
+    file itself is never touched by this path.
+    """
+    entries = (
+        [_dps_entry(ZERO_UUID, 'None')] * 8000
+        + [_dps_entry(f'{i + 1:08x}-0000-0000-0000-000000000000') for i in range(50)]
+        + [_dps_entry('0000000a-0000-0000-0000-000000000000')]
+    )
+    monkeypatch.setattr(save_manager_module, 'sav_to_gvasfile', lambda path: type(
+        'FakeGvas', (), {'properties': {'SaveParameterArray': {'value': {'values': entries}}}})())
+    monkeypatch.setattr(save_manager_module, 'load_game_data_map', lambda fname, key: {})
+
+    uid, pname, formatted, illegal = save_manager_module._process_dps_scan_worker(
+        ('uid-1', 'Tester', str(tmp_path / 'dps.sav'), str(tmp_path)))
+
+    # 8000 zero placeholders collapse to 1 + 50 unique pals; 'None' CharacterID
+    # entries are skipped for the log, so 50 formatted pals remain.
+    assert len(formatted) == 50
+    assert illegal == []
