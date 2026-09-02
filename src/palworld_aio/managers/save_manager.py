@@ -7,7 +7,6 @@ import logging
 import threading
 import re
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtCore import QObject, pyqtSignal
 from loading_manager import show_critical, show_question, is_loading_active
@@ -374,11 +373,12 @@ class SaveManager(QObject):
                     except:
                         pass
                     return None
-                with ThreadPoolExecutor(max_workers=min(32, os.cpu_count() or 1) + 4) as executor:
-                    results = executor.map(load_player_file, player_files)
-                    for result in results:
-                        if result:
-                            player_containers[result[0]] = result[1]
+                # Parsed GVAS values can contain shared-memory-backed map
+                # properties. The parser graph is not safe to build concurrently.
+                for filename in player_files:
+                    result = load_player_file(filename)
+                    if result:
+                        player_containers[result[0]] = result[1]
         cmap = data.get('CharacterSaveParameterMap', {}).get('value', [])
         ownership = ContainerOwnership.build(cmap, data.get('CharacterContainerSaveData', {}).get('value', []))
         guild_bases = defaultdict(set)
@@ -621,8 +621,10 @@ class SaveManager(QObject):
                         old_c = palworld_coord.sav_to_map(tx, ty, new=False)
                         new_c = palworld_coord.sav_to_map(tx, ty, new=True)
                         logger.info(f'Base {i}: Base ID: {base_id} | Old: {int(old_c[0])},{int(old_c[1])} | New: {int(new_c[0])},{int(new_c[1])} | RawData: {tx},{ty},{tz}')
-                with ThreadPoolExecutor() as executor:
-                    results = list(executor.map(lambda p: self._top_process_player(p, playerdir, log_folder), players))
+                results = [
+                    self._top_process_player(p, playerdir, log_folder)
+                    for p in players
+                ]
                 for uid, pname, uniques, caught, encounters in results:
                     level = constants.player_levels.get(str(uid).replace('-', ''), 1)
                     owned = owned_counts.get(str(uid).replace('-', '').lower(), 0)
@@ -659,29 +661,30 @@ class SaveManager(QObject):
                 illegal_pals_by_owner = defaultdict(lambda: defaultdict(list))
             else:
                 illegal_pals_by_owner = defaultdict(lambda: defaultdict(list), illegal_pals_by_owner)
-            with ThreadPoolExecutor(max_workers=min(32, os.cpu_count() or 1) + 4) as executor:
-                futures = {executor.submit(_process_dps_scan_worker, task): task for task in self.dps_tasks}
-                for future in as_completed(futures):
-                    try:
-                        uid, pname, pal_info_strings, illegal_pals = future.result()
-                        if pal_info_strings:
-                            clean_uid = str(uid).replace('-', '')
-                            pal_count = len(pal_info_strings)
-                            filename = f'({clean_uid})_({pname})_({pal_count})_dps.log'
-                            dps_log_path = os.path.join(dps_players_folder, filename)
-                            with open(dps_log_path, 'w', encoding='utf-8') as dps_log:
-                                dps_log.write(f"{pname}'s {pal_count} Pals\n")
-                                dps_log.write('=' * 40 + '\n')
-                                dps_log.write(f'\nDPS Storage(Count: {pal_count})\n')
-                                dps_log.write('-' * 40 + '\n')
-                                for pal_info in sorted(pal_info_strings):
-                                    dps_log.write(pal_info)
-                                    dps_log.write('-' * 20 + '\n')
-                        if illegal_pals:
-                            uid_str = str(uid).replace('-', '').lower()
-                            illegal_pals_by_owner[uid_str]['DPS Storage'].extend(illegal_pals)
-                    except Exception as e:
-                        print(f'Error processing DPS task: {e}')
+            # DPS parsing uses the same native-backed save objects. Keep it
+            # serialized; concurrent parser access can terminate Windows without
+            # raising a Python exception.
+            for task in self.dps_tasks:
+                try:
+                    uid, pname, pal_info_strings, illegal_pals = _process_dps_scan_worker(task)
+                    if pal_info_strings:
+                        clean_uid = str(uid).replace('-', '')
+                        pal_count = len(pal_info_strings)
+                        filename = f'({clean_uid})_({pname})_({pal_count})_dps.log'
+                        dps_log_path = os.path.join(dps_players_folder, filename)
+                        with open(dps_log_path, 'w', encoding='utf-8') as dps_log:
+                            dps_log.write(f"{pname}'s {pal_count} Pals\n")
+                            dps_log.write('=' * 40 + '\n')
+                            dps_log.write(f'\nDPS Storage(Count: {pal_count})\n')
+                            dps_log.write('-' * 40 + '\n')
+                            for pal_info in sorted(pal_info_strings):
+                                dps_log.write(pal_info)
+                                dps_log.write('-' * 20 + '\n')
+                    if illegal_pals:
+                        uid_str = str(uid).replace('-', '').lower()
+                        illegal_pals_by_owner[uid_str]['DPS Storage'].extend(illegal_pals)
+                except Exception as e:
+                    print(f"Error processing DPS task: {e}")
             self.dps_tasks.clear()
         if illegal_pals_by_owner:
             illegal_log_dir = os.path.join(base_path, 'Logs', 'Illegal Pal Logger')
