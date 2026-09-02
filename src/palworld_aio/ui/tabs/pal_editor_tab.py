@@ -49,11 +49,11 @@ class PalEditorTab(QWidget):
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(0)
-        self.placeholder_label = QLabel(t('pal_editor.select_player_hint', default='Select a player to edit their pals'))
-        self.placeholder_label.setAlignment(Qt.AlignCenter)
-        self.placeholder_label.setMinimumHeight(400)
-        self.placeholder_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.placeholder_label.setStyleSheet('QLabel { color: #888; font-size: 14px; background: transparent; }')
+        from palworld_aio.widgets.empty_state import EmptyState
+        self.placeholder_label = EmptyState(
+            t('pal_editor.select_player_hint', default='Select a player to edit their pals'),
+            icon_name='pal_editor',
+        )
         layout.addWidget(self.placeholder_label, 1)
         self.pal_editor_widget = PalEditorWidget()
         self.pal_editor_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)

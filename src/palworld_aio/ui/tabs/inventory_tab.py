@@ -922,7 +922,15 @@ class MissionPanelWidget(QFrame):
         self._scroll_layout = QVBoxLayout(scroll_content)
         self._scroll_layout.setContentsMargins(0, 0, 0, 0); self._scroll_layout.setSpacing(2)
         scroll.setWidget(scroll_content)
+        self._mission_scroll = scroll
+        from palworld_aio.widgets.empty_state import EmptyState
+        self._empty_state = EmptyState(
+            t('inventory.select_player_hint', default='Select a player to view missions'),
+            icon_name='players',
+        )
+        self._empty_state.setVisible(False)
         layout.addWidget(scroll, 1)
+        layout.addWidget(self._empty_state, 1)
     def refresh_labels(self):
         self._missions_title.setText(t('inventory.missions', default='Missions'))
         self._sel_all.setText(t('player_item.select_all', default='All'))
@@ -966,6 +974,11 @@ class MissionPanelWidget(QFrame):
             return 'active'
         return 'not_started'
     def _rebuild_list(self):
+        has_player = self._player_uid is not None
+        self._mission_scroll.setVisible(has_player)
+        self._empty_state.setVisible(not has_player)
+        if not has_player:
+            return
         while self._scroll_layout.count():
             item = self._scroll_layout.takeAt(0)
             w = item.widget()
@@ -1192,8 +1205,16 @@ class TechnologyPanelWidget(QFrame):
         self._scroll_layout = QVBoxLayout(self._scroll_ct)
         self._scroll_layout.setContentsMargins(0, 0, 0, 0); self._scroll_layout.setSpacing(6)
         self._scroll_layout.addStretch()
+        self._tech_scroll = scroll
         scroll.setWidget(self._scroll_ct)
+        from palworld_aio.widgets.empty_state import EmptyState
+        self._empty_state = EmptyState(
+            t('player_technology.select_player_hint', default='Select a player to view technology'),
+            icon_name='players',
+        )
+        self._empty_state.setVisible(False)
         layout.addWidget(scroll, 1)
+        layout.addWidget(self._empty_state, 1)
     def _make_tech_button(self, tech):
         asset = tech.get('asset', '')
         frame = QFrame()
@@ -1275,6 +1296,9 @@ class TechnologyPanelWidget(QFrame):
             elif obj_name == 'name_label':
                 child.setStyleSheet(f'font-size: 11px; color: {fg}; background: transparent;')
     def _rebuild(self):
+        has_player = self._player_uid is not None
+        self._tech_scroll.setVisible(has_player)
+        self._empty_state.setVisible(not has_player)
         if not self._widgets_built:
             self._build_all_widgets()
             self._widgets_built = True
@@ -2500,11 +2524,11 @@ class PlayerInventoryTab(QWidget):
         content_layout = QVBoxLayout(self.content_area)
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(0)
-        self.placeholder_label = QLabel(t('inventory.select_player_hint', default='Select a player to edit their inventory'))
-        self.placeholder_label.setAlignment(Qt.AlignCenter)
-        self.placeholder_label.setMinimumHeight(400)
-        self.placeholder_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.placeholder_label.setStyleSheet('QLabel { color: #888; font-size: 14px; background: transparent; }')
+        from palworld_aio.widgets.empty_state import EmptyState
+        self.placeholder_label = EmptyState(
+            t('inventory.select_player_hint', default='Select a player to edit their inventory'),
+            icon_name='player_inventory',
+        )
         content_layout.addWidget(self.placeholder_label, 1)
         inner_content = QHBoxLayout()
         inner_content.setContentsMargins(10, 10, 10, 10)

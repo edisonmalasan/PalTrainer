@@ -2957,11 +2957,11 @@ class BaseInventoryTab(QWidget):
         inv_layout = QVBoxLayout(self.inventory_page)
         inv_layout.setContentsMargins(10, 10, 10, 10)
         inv_layout.setSpacing(0)
-        self.placeholder_label = QLabel(t('base_inventory.select_guild_base_hint', default='Select a Guild/Base to edit their inventory'))
-        self.placeholder_label.setAlignment(Qt.AlignCenter)
-        self.placeholder_label.setMinimumHeight(400)
-        self.placeholder_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.placeholder_label.setStyleSheet('QLabel { color: #888; font-size: 14px; background: transparent; }')
+        from palworld_aio.widgets.empty_state import EmptyState
+        self.placeholder_label = EmptyState(
+            t('base_inventory.select_guild_base_hint', default='Select a Guild/Base to edit their inventory'),
+            icon_name='base_inventory',
+        )
         inv_layout.addWidget(self.placeholder_label, 1)
         self.splitter = QSplitter(Qt.Horizontal)
         self.splitter.setChildrenCollapsible(False)
