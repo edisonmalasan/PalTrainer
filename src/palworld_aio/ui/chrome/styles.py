@@ -1,6 +1,32 @@
 import os as _os
 import re as _re
 from boot_paths import GUI_DIR
+try:
+    from palworld_aio import constants as _c
+    from palworld_aio.ui.chrome import tokens as _t
+except ImportError:
+    _c = None
+    _t = None
+if _c is not None:
+    ACCENT_HEX = _c.ACCENT
+    MUTED_HEX = _c.MUTED
+    FONT_PX_BODY = _c.FONT_SIZE_PX_BODY
+    FONT_PX_SECONDARY = _c.FONT_SIZE_PX_SECONDARY
+    SURFACE = _t.SURFACE
+    ACCENT_BORDER_SUBTLE = _t.ACCENT_BORDER_SUBTLE
+    ACCENT_BG_FAINT = _t.ACCENT_BG_FAINT
+    ACCENT_BG = _t.ACCENT_BG
+    ACCENT_BG_STRONG = _t.ACCENT_BG_STRONG
+else:
+    ACCENT_HEX = '#7DD3FC'
+    MUTED_HEX = '#94A3B8'
+    FONT_PX_BODY = 12
+    FONT_PX_SECONDARY = 11
+    SURFACE = 'rgba(18,20,24,0.65)'
+    ACCENT_BORDER_SUBTLE = 'rgba(125,211,252,0.15)'
+    ACCENT_BG_FAINT = 'rgba(125,211,252,0.08)'
+    ACCENT_BG = 'rgba(125,211,252,0.12)'
+    ACCENT_BG_STRONG = 'rgba(125,211,252,0.2)'
 class ThemeManager:
     _darkmode_content = None
     @classmethod
@@ -70,6 +96,47 @@ SLOT_EMPTY_STYLE = 'background: rgba(255,255,255,0.03); border: 1px solid rgba(2
 SLOT_HOVER_STYLE = 'background: rgba(125,211,252,0.06); border: 1px solid rgba(125,211,252,0.2);'
 SLOT_SELECTED_STYLE = 'background: rgba(125,211,252,0.1); border: 1px solid #7DD3FC; border-radius: 8px;'
 SLOT_MULTI_SELECTED_STYLE = 'background: rgba(125,211,252,0.2); border: 1px solid #7DD3FC; border-radius: 8px;'
+TREE_WIDGET_QSS = f'''
+    QTreeWidget {{
+        background: {SURFACE};
+        border: 1px solid {ACCENT_BORDER_SUBTLE};
+        border-radius: 8px;
+        color: {MUTED_HEX};
+        font-size: {FONT_PX_BODY}px;
+        outline: none;
+        alternate-background-color: rgba(255,255,255,0.02);
+    }}
+    QTreeWidget::item {{
+        padding: 4px 8px;
+        border-radius: 4px;
+    }}
+    QTreeWidget::item:hover {{
+        background: {ACCENT_BG_FAINT};
+        color: {ACCENT_HEX};
+    }}
+    QTreeWidget::item:selected {{
+        background: {ACCENT_BG_STRONG};
+        color: {ACCENT_HEX};
+        border-left: 3px solid {ACCENT_HEX};
+    }}
+    QTreeWidget::item:selected:!active {{
+        background: {ACCENT_BG};
+        color: {ACCENT_HEX};
+    }}
+    QHeaderView::section {{
+        background: rgba(8,10,16,0.9);
+        color: {ACCENT_HEX};
+        padding: 6px 8px;
+        border: none;
+        border-bottom: 1px solid {ACCENT_BORDER_SUBTLE};
+        font-weight: 600;
+        font-size: {FONT_PX_SECONDARY}px;
+        text-align: center;
+    }}
+    QHeaderView::section:hover {{
+        background: {ACCENT_BG_FAINT};
+    }}
+'''
 def slot_default(slot_class: str='') -> str:
     sel = f'{slot_class} {{ {SLOT_EMPTY_STYLE} }}' if slot_class else SLOT_EMPTY_STYLE
     return sel

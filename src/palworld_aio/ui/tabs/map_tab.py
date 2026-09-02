@@ -1,4 +1,4 @@
-import os
+﻿import os
 from palsav import json_tools
 from palsav.archive import UUID
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGraphicsScene, QGraphicsPixmapItem, QMenu, QLineEdit, QTreeWidget, QTreeWidgetItem, QSplitter, QLabel, QFileDialog, QCheckBox, QStackedWidget, QDialog, QPushButton, QSizePolicy, QHeaderView, QApplication
@@ -342,50 +342,12 @@ class MapTab(QWidget):
         sidebar_layout.addLayout(search_tab_layout)
         self.map_tab_stack = QStackedWidget()
         self.map_tab_stack.setStyleSheet('QStackedWidget { border: none; background: transparent; margin: 0px; padding: 0px; }')
-        tree_css = f'''
-            QTreeWidget {{
-                background: rgba(18,20,24,0.65);
-                border: 1px solid rgba(125,211,252,0.15);
-                border-radius: 8px;
-                color: #A6B8C8;
-                font-size: 11px;
-                outline: none;
-            }}
-            QTreeWidget::item {{
-                padding: 4px 8px;
-                border-radius: 4px;
-            }}
-            QTreeWidget::item:hover {{
-                background: rgba(125,211,252,0.1);
-                color: #7DD3FC;
-            }}
-            QTreeWidget::item:selected {{
-                background: rgba(125,211,252,0.15);
-                color: #7DD3FC;
-                border-left: 3px solid #7DD3FC;
-            }}
-            QTreeWidget::item:selected:!active {{
-                background: rgba(125,211,252,0.1);
-                color: #7DD3FC;
-            }}
-            QHeaderView::section {{
-                background: rgba(8,10,16,0.9);
-                color: #7DD3FC;
-                padding: 6px 8px;
-                border: none;
-                border-bottom: 1px solid rgba(125,211,252,0.15);
-                font-weight: 600;
-                font-size: 10px;
-                text-align: center;
-            }}
-            QHeaderView::section:hover {{
-                background: rgba(125,211,252,0.08);
-            }}
-        '''
+        from palworld_aio.ui.chrome.styles import TREE_WIDGET_QSS
+        tree_css = TREE_WIDGET_QSS
         self.base_tree = QTreeWidget()
         self.base_tree.setObjectName('baseTree')
         self.base_tree.setHeaderLabels([t('map.header.guild') if t else 'Guild', t('map.header.leader') if t else 'Leader', t('map.header.lastseen') if t else 'Last Seen', t('map.header.bases') if t else 'Bases', t('map.header.base_pals') if t else 'Base Pals'])
-        self.base_tree.setAlternatingRowColors(False)
+        self.base_tree.setAlternatingRowColors(True)
         self.base_tree.setRootIsDecorated(False)
         self.base_tree.itemExpanded.connect(self._on_item_expanded)
         self.base_tree.itemClicked.connect(self._on_tree_item_clicked)
@@ -403,7 +365,7 @@ class MapTab(QWidget):
         self.player_tree = QTreeWidget()
         self.player_tree.setObjectName('playerTree')
         self.player_tree.setHeaderLabels([t('map.header.player') if t else 'Player', t('map.info.level') if t else 'Level', t('map.header.lastseen') if t else 'Last Seen', t('player.pals') if t else 'Pals'])
-        self.player_tree.setAlternatingRowColors(False)
+        self.player_tree.setAlternatingRowColors(True)
         self.player_tree.setRootIsDecorated(False)
         self.player_tree.itemClicked.connect(self._on_tree_item_clicked)
         self.player_tree.itemDoubleClicked.connect(self._on_tree_item_double_clicked)
@@ -2583,13 +2545,13 @@ class MapTab(QWidget):
         self._zone_shape_btn_rect = QPushButton()
         self._zone_shape_btn_rect.setFixedSize(36, 36)
         self._zone_shape_btn_rect.setStyleSheet('\n            QPushButton {\n                background-color: rgba(30, 35, 45, 0.9);\n                border: 2px solid rgba(125, 211, 252, 0.5);\n                border-radius: 4px;\n                color: white;\n                font-size: 18px;\n            }\n            QPushButton:hover {\n                background-color: rgba(59, 142, 208, 0.5);\n                border-color: rgba(125, 211, 252, 0.8);\n            }\n            QPushButton:pressed {\n                background-color: rgba(59, 142, 208, 0.7);\n            }\n        ')
-        self._zone_shape_btn_rect.setText('◻')
+        self._zone_shape_btn_rect.setText('â—»')
         self._zone_shape_btn_rect.setToolTip('Rectangle Zone')
         self._zone_shape_btn_rect.clicked.connect(lambda: self._on_zone_shape_selected('rect'))
         self._zone_shape_btn_poly = QPushButton()
         self._zone_shape_btn_poly.setFixedSize(36, 36)
         self._zone_shape_btn_poly.setStyleSheet('\n            QPushButton {\n                background-color: rgba(30, 35, 45, 0.9);\n                border: 2px solid rgba(125, 211, 252, 0.5);\n                border-radius: 4px;\n                color: white;\n                font-size: 18px;\n            }\n            QPushButton:hover {\n                background-color: rgba(59, 142, 208, 0.5);\n                border-color: rgba(125, 211, 252, 0.8);\n            }\n            QPushButton:pressed {\n                background-color: rgba(59, 142, 208, 0.7);\n            }\n        ')
-        self._zone_shape_btn_poly.setText('⬡')
+        self._zone_shape_btn_poly.setText('â¬¡')
         self._zone_shape_btn_poly.setToolTip('Polygon Zone')
         self._zone_shape_btn_poly.clicked.connect(lambda: self._on_zone_shape_selected('polygon'))
         self._zone_shape_buttons_container = QWidget(self.view)
