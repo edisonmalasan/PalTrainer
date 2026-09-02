@@ -1,4 +1,4 @@
-﻿from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QMenu, QProgressBar, QSizePolicy, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QMenu, QProgressBar, QSizePolicy, QVBoxLayout, QWidget
 from PyQt6.QtCore import QMimeData, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag
 from i18n import t
@@ -25,6 +25,19 @@ from .pal_info_widget import PalInfoWidget
 
 from PyQt6 import sip
 
+
+def _drain_layout(layout):
+    """Recursively remove all item references from *layout*.
+
+    After draining, the layout is empty and can be safely transferred
+    to a disposable ``QWidget`` without risking a use-after-free when
+    that owner is later deleted.
+    """
+    while layout.count():
+        item = layout.takeAt(0)
+        sub = item.layout()
+        if sub is not None:
+            _drain_layout(sub)
 
 class PartySlotWidget(QFrame):
 
@@ -360,10 +373,14 @@ class PartySlotWidget(QFrame):
         old_layout = self.layout()
 
         if old_layout:
-            # Transfer the installed layout to a temporary Qt owner. Merely
-            # clearing its QObject parent does not remove it from this
-            # widget, and the next rebuild then triggers Qt's "already has a
-            # layout" warning.
+            # Drain the layout so it no longer references child widgets.
+            # Without this, the temp owner's deleteLater deletes the layout
+            # which tries to access widgets already freed by the child loop
+            # below — causing a C++ use-after-free crash.
+            _drain_layout(old_layout)
+            # Transfer the empty layout shell to a temporary Qt owner so
+            # that this widget can accept a new layout without Qt's
+            # "already has a layout" warning.
             old_layout_owner = QWidget()
             old_layout_owner.setLayout(old_layout)
             old_layout_owner.deleteLater()
