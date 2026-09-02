@@ -8,10 +8,21 @@ from i18n import t, init_language
 from resource_resolver import get_base_dir, get_resources_dir, resource_path
 from palworld_aio import constants
 _queued_next = None
+_active_tasks = 0
+_active_tasks_lock = threading.Lock()
 def get_path(filename):
     return os.path.normpath(resource_path(get_base_dir(), filename))
 def is_loading_active():
-    return False
+    with _active_tasks_lock:
+        return _active_tasks > 0
+def _task_started():
+    global _active_tasks
+    with _active_tasks_lock:
+        _active_tasks += 1
+def _task_finished():
+    global _active_tasks
+    with _active_tasks_lock:
+        _active_tasks = max(0, _active_tasks - 1)
 if '--spawn-loader-simple' in sys.argv:
     app = QApplication(sys.argv)
     init_language()
@@ -186,10 +197,13 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
         parent.installEventFilter(OverlayResizer(overlay_widget))
     result = {'data': None, 'done': False}
     def task():
+        _task_started()
         try:
             result['data'] = func(*args, **kwargs)
         except Exception:
             result['data'] = traceback.format_exc()
+        finally:
+            _task_finished()
         result['done'] = True
     threading.Thread(target=task, daemon=True).start()
     def poll():

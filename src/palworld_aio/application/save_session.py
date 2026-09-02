@@ -158,6 +158,8 @@ class SaveSession:
         from palobject import MappingCacheObject
         if hasattr(MappingCacheObject, '_MappingCacheInstances'):
             MappingCacheObject._MappingCacheInstances.clear()
+        import gc
+        gc.collect()
         self.dps_tasks.clear()
         self.player_sav_cache.clear()
         if self._xgp_temp_dir:

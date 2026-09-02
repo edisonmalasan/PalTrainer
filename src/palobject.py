@@ -82,10 +82,27 @@ class MPMapProperty(list):
         del self.index
         del self.key_size
         del self.value_size
-        self.shm.buf.release()
-        self.shm.close()
+        try:
+            self.shm.buf.release()
+            self.shm.close()
+        except Exception:
+            pass
     def release(self):
-        self.shm.unlink()
+        try:
+            self.shm.unlink()
+        except Exception:
+            pass
+    def __del__(self):
+        try:
+            for key in self._worldSaveData:
+                if isinstance(self._worldSaveData[key]['value'], MPMapProperty):
+                    self._worldSaveData[key]['value'].close()
+                    self._worldSaveData[key]['value'].release()
+                elif isinstance(self._worldSaveData[key]['value'], dict) and 'values' in self._worldSaveData[key]['value'] and isinstance(self._worldSaveData[key]['value']['values'], MPArrayProperty):
+                    self._worldSaveData[key]['value']['values'].close()
+                    self._worldSaveData[key]['value']['values'].release()
+        except Exception:
+            pass
     def append(self, obj):
         if self.closed and (not self.loaded):
             raise ValueError('Share Memory closed')
