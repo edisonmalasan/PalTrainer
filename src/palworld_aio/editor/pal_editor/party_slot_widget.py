@@ -360,13 +360,13 @@ class PartySlotWidget(QFrame):
         old_layout = self.layout()
 
         if old_layout:
-            # Remove layout items before releasing the layout. The previous
-            # implementation detached descendants without deleting them,
-            # leaving orphaned Qt wrappers after each refresh.
-            while old_layout.count():
-                old_layout.takeAt(0)
-            old_layout.setParent(None)
-            old_layout.deleteLater()
+            # Transfer the installed layout to a temporary Qt owner. Merely
+            # clearing its QObject parent does not remove it from this
+            # widget, and the next rebuild then triggers Qt's "already has a
+            # layout" warning.
+            old_layout_owner = QWidget()
+            old_layout_owner.setLayout(old_layout)
+            old_layout_owner.deleteLater()
 
         # Release only direct children; nested controls are destroyed with
         # their direct parent and are not detached twice.
