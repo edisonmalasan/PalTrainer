@@ -197,9 +197,8 @@ def run_aio():
     if app is None:
         app = QApplication(sys.argv)
     app.setStyle('Fusion')
-    app.setStyleSheet(
-        'QToolTip { color: #e2e8f0; background: #1e2128; border: 1px solid #3B8ED0; '
-        'padding: 6px 10px; font-size: 11px; border-radius: 4px; }')
+    from palworld_aio.ui.chrome.styles import ThemeManager
+    ThemeManager.apply_global()
     if os.path.exists(constants.ICON_PATH):
         app.setWindowIcon(QIcon(constants.ICON_PATH))
     window = MainWindow()
