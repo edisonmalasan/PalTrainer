@@ -61,14 +61,25 @@ class PalEditorTab(QWidget):
         layout.addWidget(self.pal_editor_widget)
         return frame
     def select_player(self, uid, name, display):
+        from ui_debug import log
+        log('paltab.select_player.enter', uid=uid, syncing=self._syncing)
         if self._syncing:
             return
         self.current_player_uid = uid
         self.current_player_name = name
         self.player_select_btn.setText(display)
+        gen = self._selection_generation = getattr(self, '_selection_generation', 0) + 1
+
         def task():
+            log('paltab.select_player.task_begin', uid=uid, gen=gen)
             self.pal_editor_widget.set_player(uid, name)
+            log('paltab.select_player.task_done', uid=uid, gen=gen)
+
         def on_finished(_):
+            if self._selection_generation != gen:
+                log('paltab.select_player.stale_skipped', uid=uid, gen=gen, current=self._selection_generation)
+                return
+            log('paltab.select_player.ui_apply', uid=uid, gen=gen)
             self.placeholder_label.hide()
             self.pal_editor_widget.show()
             self.pal_editor_widget.apply_player_ui()
@@ -88,18 +99,22 @@ class PalEditorTab(QWidget):
     def clear_player(self):
         if self._syncing:
             return
-        def task():
-            pass
-        def on_finished(_):
-            self._clear_editor()
-            self.current_player_uid = None
+        # A selection worker may still be parsing a player save.  Its result
+        # must not be allowed to repaint this tab after the user clears it.
+        self._selection_generation = getattr(self, '_selection_generation', 0) + 1
         self.current_player_name = None
+        self.current_player_uid = None
         self.player_select_btn.setText(t('inventory.select_player', default='Select Player...'))
+        self._clear_editor()
     def _open_player_popup(self):
+        from ui_debug import log
+        log('paltab.popup.open', list_n=len(getattr(self, '_player_list', []) or []))
         if not self._player_list:
             self._load_players()
         chosen = show_player_select_popup(self.player_select_btn, self._player_list, self.current_player_uid)
+        log('paltab.popup.chosen', uid=(chosen or {}).get('uid') if isinstance(chosen, dict) else chosen)
         if chosen == '__clear__':
+            self._selection_generation = getattr(self, '_selection_generation', 0) + 1
             self._clear_editor()
             self.player_select_btn.setText(t('inventory.select_player', default='Select Player...'))
             if hasattr(self.parent_window, 'inventory_tab'):
@@ -162,20 +177,14 @@ class PalEditorTab(QWidget):
         if prev_uid:
             for p in self._player_list:
                 if p['uid'] == prev_uid:
-                    self.current_player_uid = prev_uid
-                    self.current_player_name = prev_name or p['name']
-                    self.player_select_btn.setText(p['display'])
-                    def do_refresh():
-                        self.pal_editor_widget.player_uid = prev_uid
-                        self.pal_editor_widget.player_name = prev_name or p['name']
-                        self.pal_editor_widget.set_player(prev_uid, prev_name or p['name'])
-                        self.pal_editor_widget.apply_player_ui()
-                        self.placeholder_label.hide()
-                        self.pal_editor_widget.show()
-                    from PyQt6.QtCore import QTimer
-                    QTimer.singleShot(0, do_refresh)
+                    # Reload data through the worker path: set_player may
+                    # decompress the player save and must never run on the
+                    # GUI thread (refresh() is called from refresh_all after
+                    # every load_finished).
+                    self.select_player(prev_uid, prev_name or p['name'], p['display'])
                     break
     def _load_players(self):
+        self._selection_generation = getattr(self, '_selection_generation', 0) + 1
         self._player_list = []
         self._clear_editor()
         if constants.loaded_level_json:

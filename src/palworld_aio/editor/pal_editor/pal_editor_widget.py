@@ -62,6 +62,8 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         self.dps_pals = {}
         self.dps_slots = []
         self.dps_total_slots = 0
+        self._set_player_lock = threading.Lock()
+        self._set_player_token = 0
 
         self.party_pals = {}
         self.palbox_pals = []
@@ -2152,22 +2154,39 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         self._reapply_multi_highlights()
         self._update_box_label()
     def set_player(self, player_uid, player_name):
-        self.player_uid = player_uid
-        self.player_name = player_name
-        self._clicked_pal = None
-        self.selected_pal_slot = None
-        self._clear_multi_selection()
-        self._palbox_mode = 'box'
-        self._get_container_ids()
-        PalFrame._load_maps()
-        self._load_pals()
-        self.dps_gvas = None
-        self.dps_loaded = False
-        self.dps_pals = {}
-        self.dps_total_slots = 0
-        self._dps_modified = False
+        """Load all data for one player. Safe on worker threads: touches no
+        widgets (multi-selection reset happens in apply_player_ui on the GUI
+        thread) — setStyleSheet on 990 slots from a worker corrupted the heap.
+        Serialized: two overlapping selections must not interleave writes to
+        the shared pal dicts; last caller wins, earlier results are dropped.
+        """
+        from ui_debug import log
+        token = getattr(self, '_set_player_token', 0) + 1
+        self._set_player_token = token
+        log('pe.set_player.enter', uid=player_uid, token=token)
+        with self._set_player_lock:
+            if token != self._set_player_token:
+                log('pe.set_player.stale_dropped', uid=player_uid, token=token)
+                return
+            self.player_uid = player_uid
+            self.player_name = player_name
+            self._clicked_pal = None
+            self.selected_pal_slot = None
+            self._palbox_mode = 'box'
+            self._get_container_ids()
+            log('pe.set_player.container_ids_done', uid=player_uid, token=token)
+            PalFrame._load_maps()
+            log('pe.set_player.maps_loaded', uid=player_uid, token=token)
+            self._load_pals()
+            log('pe.set_player.pals_loaded', uid=player_uid, token=token, party=len(self.party_pals), palbox=len(self.palbox_pal_dict))
+            self.dps_gvas = None
+            self.dps_loaded = False
+            self.dps_pals = {}
+            self.dps_total_slots = 0
+            self._dps_modified = False
 
     def apply_player_ui(self):
+        self._clear_multi_selection()
         self._clear_party_highlight()
         self._clear_palbox_highlight()
         self.pal_info.set_clicked_pal(None)

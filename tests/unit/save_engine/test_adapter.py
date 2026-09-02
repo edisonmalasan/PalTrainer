@@ -110,3 +110,21 @@ class TestInspect:
     def test_inspect_missing_file_raises_storage_error(self):
         with pytest.raises(StorageError):
             inspect_save(pathlib.Path('nonexistent_Level.sav'))
+
+
+def test_oozlib_rejects_invalid_payload_header_before_native_call():
+    oozlib = import_from('palsav.compressor.oozlib')
+    compressor = oozlib.OozLib.__new__(oozlib.OozLib)
+    called = False
+
+    class UnexpectedNativeCall:
+        def decompress(self, *_args):
+            nonlocal called
+            called = True
+            raise AssertionError('native decompressor must not receive invalid payloads')
+
+    compressor.palooz = UnexpectedNativeCall()
+    data = (1).to_bytes(4, 'little') + (20).to_bytes(4, 'little') + b'PlM' + bytes([0x31]) + b'payload' + b'\x00' * 5
+    with pytest.raises(ValueError, match='Invalid SAV header'):
+        compressor.decompress(data)
+    assert not called

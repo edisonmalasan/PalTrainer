@@ -5,6 +5,8 @@ import urllib.request
 import re
 import io
 import sys
+import collections
+import threading
 from functools import partial
 import logging
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QMenuBar, QMenu, QStatusBar, QSplitter, QMessageBox, QFileDialog, QInputDialog, QDialog, QComboBox, QApplication, QStackedWidget, QTextEdit, QLineEdit
@@ -141,19 +143,38 @@ class StatusBarStream(QObject):
         self.status_bar = status_bar
         self._main_window = parent
         self.stringio = io.StringIO()
+        self._stream_lock = threading.Lock()
         self.detached = False
         self.detach_window = None
         self.text_written.connect(self._handle_text)
+        self._pending = collections.deque()
+        self._pending_lock = threading.Lock()
+        self._drain_timer = QTimer(self)
+        self._drain_timer.setInterval(100)
+        self._drain_timer.timeout.connect(self._drain_pending)
+        self._drain_timer.start()
     def _handle_text(self, text):
         if self.detached and self.detach_window:
             self.detach_window.append_message(text)
         else:
             self.status_bar.showMessage(text)
     def write(self, text):
-        self.stringio.write(text)
+        with self._stream_lock:
+            self.stringio.write(text)
         if text.strip():
-            if QThread.currentThread() == QApplication.instance().thread():
-                self.text_written.emit(text.strip())
+            # Never touch Qt from a producer thread: queue and let the GUI
+            # thread drain. Cross-thread widget writes here were a source of
+            # heap corruption under concurrent worker logging.
+            with self._pending_lock:
+                self._pending.append(text.strip())
+    def _drain_pending(self):
+        if not self._pending:
+            return
+        with self._pending_lock:
+            batch = list(self._pending)
+            self._pending.clear()
+        for text in batch:
+            self.text_written.emit(text)
     def flush(self):
         pass
     def detach(self):

@@ -197,19 +197,27 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
         parent.installEventFilter(OverlayResizer(overlay_widget))
     result = {'data': None, 'done': False}
     def task():
+        from ui_debug import log, log_exception
+        log('worker.start', func=getattr(func, '__name__', repr(func)))
         _task_started()
         try:
             result['data'] = func(*args, **kwargs)
         except Exception:
+            log_exception('worker.exception')
             result['data'] = traceback.format_exc()
         finally:
             _task_finished()
+            log('worker.end', is_error=isinstance(result['data'], str))
         result['done'] = True
     threading.Thread(target=task, daemon=True).start()
+    from ui_debug import log as _log
+    _log('run_with_loading.spawn', func=getattr(func, '__name__', repr(func)))
     def poll():
         if not result['done']:
             QTimer.singleShot(100, poll)
             return
+        from ui_debug import log as _log2
+        _log2('run_with_loading.done', func=getattr(func, '__name__', repr(func)), is_error=isinstance(result['data'], str))
         if mode == 'header' and constants.header_loading_widget is not None:
             try:
                 constants.header_loading_widget.set_loading_state('idle')
@@ -228,7 +236,28 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
             else:
                 ErrorDialog(res, parent=parent)
         elif callback:
-            QTimer.singleShot(0, lambda: (callback(res), _dequeue_next()))
+            # Completion callbacks run in the Qt thread.  An exception here
+            # is otherwise reported by PyQt as an unraisable slot exception;
+            # on Windows that can terminate the whole application without a
+            # useful traceback.  Keep the loader boundary as defensive as the
+            # worker boundary and continue the queue after reporting it.
+            def finish_callback():
+                try:
+                    callback(res)
+                except Exception:
+                    error_text = traceback.format_exc()
+                    try:
+                        from ui_debug import log_exception
+                        log_exception('loading.callback_exception')
+                    except Exception:
+                        pass
+                    if on_error:
+                        on_error(error_text)
+                    else:
+                        ErrorDialog(error_text, parent=parent)
+                finally:
+                    _dequeue_next()
+            QTimer.singleShot(0, finish_callback)
             return
         _dequeue_next()
     QTimer.singleShot(100, poll)
