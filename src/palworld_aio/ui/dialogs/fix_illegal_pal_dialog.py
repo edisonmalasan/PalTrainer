@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QWidget, QFrame, QSplitter
+﻿from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QWidget, QFrame, QSplitter
 from PyQt6.QtCore import Qt, pyqtSignal
 from i18n import t
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
@@ -32,12 +32,12 @@ class PalRowWidget(QFrame):
         stars = rank - 1 if rank > 1 else 0
         info_parts = [f'Lv.{lvl}']
         if stars:
-            info_parts.append(f'{stars}★')
+            info_parts.append(f'{stars}â˜…')
         info_text = ' '.join(info_parts)
         ivs = f"IVs {self.pal_data.get('talent_hp', 0)}/{self.pal_data.get('talent_shot', 0)}/{self.pal_data.get('talent_defense', 0)}"
         souls = f"Souls {self.pal_data.get('rank_hp', 0)}/{self.pal_data.get('rank_attack', 0)}/{self.pal_data.get('rank_defense', 0)}/{self.pal_data.get('rank_craftspeed', 0)}"
         detail = f'{info_text} | {ivs} | {souls} | {self.pal_data.get("location", "")}'
-        line_label = QLabel(f'{name_text} — {detail}')
+        line_label = QLabel(f'{name_text} â€” {detail}')
         line_label.setStyleSheet('color: #e2e8f0; font-size: 11px;')
         top_row.addWidget(line_label, 1)
         main.addLayout(top_row)
@@ -134,12 +134,12 @@ class FixIllegalPalDialog(QDialog):
         left_btn_row = QHBoxLayout()
         left_sel_all = QPushButton(t('player_item.select_all') if t else 'All')
         left_sel_all.setFixedHeight(22)
-        left_sel_all.setStyleSheet('QPushButton { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 9px; } QPushButton:hover { background: rgba(74,222,128,0.2); }')
+        left_sel_all.setStyleSheet('QPushButton { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(74,222,128,0.2); }')
         left_sel_all.clicked.connect(lambda: self._set_all_players(True))
         left_btn_row.addWidget(left_sel_all)
         left_sel_none = QPushButton(t('player_item.deselect_all') if t else 'None')
         left_sel_none.setFixedHeight(22)
-        left_sel_none.setStyleSheet('QPushButton { background: rgba(251,113,133,0.12); color: #FB7185; border: 1px solid rgba(251,113,133,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 9px; } QPushButton:hover { background: rgba(251,113,133,0.2); }')
+        left_sel_none.setStyleSheet('QPushButton { background: rgba(251,113,133,0.12); color: #FB7185; border: 1px solid rgba(251,113,133,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(251,113,133,0.2); }')
         left_sel_none.clicked.connect(lambda: self._set_all_players(False))
         left_btn_row.addWidget(left_sel_none)
         left_btn_row.addStretch()
@@ -237,7 +237,7 @@ class FixIllegalPalDialog(QDialog):
             self._player_cards[uid].set_selected(True)
         data = self.scan_data.get(uid, {})
         pname = data.get('player_name', uid)
-        self.right_header.setText(t('fix_illegal_pal.pals_for_header', name=pname) if t else f'Illegal Pals — {pname}')
+        self.right_header.setText(t('fix_illegal_pal.pals_for_header', name=pname) if t else f'Illegal Pals â€” {pname}')
         for r in self._player_pal_rows.get(uid, []):
             r.setVisible(True)
     def _set_all_players(self, checked):

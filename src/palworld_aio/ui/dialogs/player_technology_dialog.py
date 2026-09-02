@@ -1,4 +1,4 @@
-import os
+﻿import os
 from palsav import json_tools
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QScrollArea, QGroupBox, QMessageBox, QAbstractItemView, QListView, QWidget, QFrame
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
@@ -207,7 +207,7 @@ class PlayerTechnologyActionDialog(QDialog):
                 vl.addWidget(il, 1)
         nl = QLabel(tech.get('name', ''))
         nl.setAlignment(Qt.AlignCenter)
-        nl.setStyleSheet('font-size: 7px; color: #e2e8f0; background: transparent;')
+        nl.setStyleSheet('font-size: 11px; color: #e2e8f0; background: transparent;')
         vl.addWidget(nl)
         a2 = tech.get('asset', '')
         tip = f'<b>{name}</b><br>({a2})'

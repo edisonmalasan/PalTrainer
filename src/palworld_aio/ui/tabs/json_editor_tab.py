@@ -375,6 +375,17 @@ class JsonEditorTab(QWidget):
             data = json_tools.load(path)
             from palsav.gvas import GvasFile
             new_gvas = GvasFile.load(data)
+        except Exception as e:
+            self._status_label.setText(f'Import failed: {e}')
+            QMessageBox.warning(
+                self,
+                'Import Error',
+                f'Failed to import:\n{e}'
+            )
+            return
+        if not self._confirm_import(path, data):
+            return
+        try:
             constants.loaded_level_json._gvas_file = new_gvas
             self._populate_tree(data)
             self._loaded_once = True
@@ -389,6 +400,44 @@ class JsonEditorTab(QWidget):
                 'Import Error',
                 f'Failed to import:\n{e}'
             )
+
+    def _confirm_import(self, source_path, data) -> bool:
+        """Destructive action guard: preview and explicit confirmation before
+        the in-memory GVAS file is replaced."""
+        import json
+        if constants.loaded_level_json is None:
+            QMessageBox.warning(
+                self,
+                'Import',
+                'No save is loaded; there is nothing to replace.'
+            )
+            return False
+        try:
+            preview = json.dumps(data, ensure_ascii=False)[:2000]
+        except Exception:
+            preview = str(data)[:2000]
+        current_path = constants.current_save_path or 'unknown'
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle('Confirm Import')
+        msg.setText(
+            'This replaces the entire in-memory save with the imported file.\n\n'
+            f'Source:  {source_path}\n'
+            f'Current save:  {current_path}\n\n'
+            'Preview (first 2000 characters):\n'
+            f'{preview}'
+        )
+        msg.setDetailedText(
+            'The replacement affects the in-memory state only until you save.\n'
+            'Saving afterwards writes the imported data to your save file.\n'
+            'A backup is created by the save flow before writing.'
+        )
+        cancel_btn = msg.addButton('Cancel', QMessageBox.RejectRole)
+        confirm_btn = msg.addButton('Replace in-memory save', QMessageBox.AcceptRole)
+        confirm_btn.setStyleSheet('font-weight: 600;')
+        msg.setDefaultButton(cancel_btn)
+        msg.exec()
+        return msg.clickedButton() is confirm_btn
 
     def showEvent(self, event):
         super().showEvent(event)

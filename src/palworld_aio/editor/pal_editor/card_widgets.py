@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QPushButton, QVBoxLayout, QWidget, QApplication
+﻿from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QPushButton, QVBoxLayout, QWidget, QApplication
 from PyQt6.QtCore import Qt, pyqtSignal
 from i18n import t
 from palworld_aio.ui.chrome.styles import slot_full, slot_selected
@@ -184,7 +184,7 @@ class PalIcon(QFrame):
 
         level_label = StrokedLabel(f'Lv{level}')
 
-        level_label.setStyleSheet('color: #FFFFFF; font-size: 9px; font-weight: bold; background: transparent;')
+        level_label.setStyleSheet('color: #FFFFFF; font-size: 11px; font-weight: bold; background: transparent;')
 
         level_label.setFixedSize(32, 14)
 
@@ -196,7 +196,7 @@ class PalIcon(QFrame):
 
         if is_lucky:
 
-            badge = QLabel('☆', self)
+            badge = QLabel('â˜†', self)
 
             badge.setStyleSheet('color: #A78BFA; font-size: 14px; font-weight: bold; background: rgba(0,0,0,0.6); border-radius: 8px; border: 1px solid rgba(167,139,250,0.4);')
 
@@ -212,7 +212,7 @@ class PalIcon(QFrame):
 
         elif is_boss:
 
-            badge = QLabel('α', self)
+            badge = QLabel('Î±', self)
 
             badge.setStyleSheet('color: #F59E0B; font-size: 12px; font-weight: bold; background: rgba(0,0,0,0.6); border-radius: 8px; border: 1px solid rgba(245,158,11,0.4);')
 
@@ -236,9 +236,9 @@ class PalIcon(QFrame):
             pred_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
             try:
                 import nerdfont as _nf
-                pred_badge.setText(_nf.icons.get('nf-fa-paw', '🐾'))
+                pred_badge.setText(_nf.icons.get('nf-fa-paw', 'ðŸ¾'))
             except Exception:
-                pred_badge.setText('🐾')
+                pred_badge.setText('ðŸ¾')
             pred_badge.show()
 
         pal_name = _strip_prefix_label(resolve_name(cid, PalFrame._NAMEMAP) or cid)
@@ -740,7 +740,7 @@ class PalCardWidget(QFrame):
 
         layout.addLayout(info)
 
-        lock_btn = QPushButton('🔓')
+        lock_btn = QPushButton('ðŸ”“')
 
         lock_btn.setFixedSize(24, 24)
 

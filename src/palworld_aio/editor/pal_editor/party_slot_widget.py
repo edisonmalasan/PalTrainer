@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QMenu, QProgressBar, QSizePolicy, QVBoxLayout, QWidget
+﻿from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QMenu, QProgressBar, QSizePolicy, QVBoxLayout, QWidget
 from PyQt6.QtCore import QMimeData, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag
 from i18n import t
@@ -518,7 +518,7 @@ class PartySlotWidget(QFrame):
 
         lvl_overlay.setAlignment(Qt.AlignCenter)
 
-        lvl_overlay.setStyleSheet('color: #7DD3FC; font-size: 9px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(125,211,252,0.25); border-radius: 3px;')
+        lvl_overlay.setStyleSheet('color: #7DD3FC; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(125,211,252,0.25); border-radius: 3px;')
 
         lvl_overlay.move(8, self.height() - 14)
 
@@ -560,7 +560,7 @@ class PartySlotWidget(QFrame):
 
         self.hp_bar.setFormat(f'{int(hp_val) // 1000} / {int(max_hp) // 1000}')
 
-        self.hp_bar.setStyleSheet('QProgressBar { background: rgba(55,65,81,0.5); border: 1px solid rgba(16,185,129,0.15); border-radius: 3px; text-align: center; font-size: 6px; font-weight: 700; color: #FFFFFF; } QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #10B981,stop:1 #34D399); border-radius: 2px; } QToolTip { background: rgba(18,20,24,0.98); color: #E2E8F0; border: 1px solid rgba(125,211,252,0.25); border-radius: 6px; padding: 6px 10px; font-size: 11px; }')
+        self.hp_bar.setStyleSheet('QProgressBar { background: rgba(55,65,81,0.5); border: 1px solid rgba(16,185,129,0.15); border-radius: 3px; text-align: center; font-size: 11px; font-weight: 700; color: #FFFFFF; } QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #10B981,stop:1 #34D399); border-radius: 2px; } QToolTip { background: rgba(18,20,24,0.98); color: #E2E8F0; border: 1px solid rgba(125,211,252,0.25); border-radius: 6px; padding: 6px 10px; font-size: 11px; }')
         if bd_hp:
             self.hp_bar.setToolTip(stat_breakdown_tooltip('HP', bd_hp))
 
@@ -618,9 +618,9 @@ class PartySlotWidget(QFrame):
 
             else:
 
-                fav_badge = QLabel('🔒', self)
+                fav_badge = QLabel('ðŸ”’', self)
 
-                fav_badge.setStyleSheet('font-size: 9px; color: rgba(255,255,255,0.65); background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;')
+                fav_badge.setStyleSheet('font-size: 11px; color: rgba(255,255,255,0.65); background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;')
 
                 fav_badge.setFixedSize(14, 14)
 
@@ -654,13 +654,13 @@ class PartySlotWidget(QFrame):
 
             else:
 
-                dna_icon = QLabel('🧬', self)
+                dna_icon = QLabel('ðŸ§¬', self)
 
                 dna_icon.setFixedSize(14, 14)
 
                 dna_icon.setAlignment(Qt.AlignCenter)
 
-                dna_icon.setStyleSheet('font-size: 9px; background: transparent;')
+                dna_icon.setStyleSheet('font-size: 11px; background: transparent;')
 
             dna_icon.setAttribute(Qt.WA_TransparentForMouseEvents)
 
@@ -690,9 +690,9 @@ class PartySlotWidget(QFrame):
 
             else:
 
-                awake_badge = QLabel('🔥', self)
+                awake_badge = QLabel('ðŸ”¥', self)
 
-                awake_badge.setStyleSheet('font-size: 9px; background: transparent;')
+                awake_badge.setStyleSheet('font-size: 11px; background: transparent;')
 
                 awake_badge.setFixedSize(12, 12)
 
@@ -764,12 +764,12 @@ class PartySlotWidget(QFrame):
             pred_badge = QLabel(self)
             pred_badge.setFixedSize(14, 14)
             pred_badge.setAlignment(Qt.AlignCenter)
-            pred_badge.setStyleSheet('background: transparent; border: none; font-size: 9px; font-weight: bold; color: #EF4444;')
+            pred_badge.setStyleSheet('background: transparent; border: none; font-size: 11px; font-weight: bold; color: #EF4444;')
             try:
                 import nerdfont as _nf
-                pred_badge.setText(_nf.icons.get('nf-fa-paw', '🐾'))
+                pred_badge.setText(_nf.icons.get('nf-fa-paw', 'ðŸ¾'))
             except Exception:
-                pred_badge.setText('🐾')
+                pred_badge.setText('ðŸ¾')
             pred_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
             pred_badge.move(badge_x - 14, badge_y)
             pred_badge.show()

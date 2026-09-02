@@ -1,4 +1,4 @@
-import os
+﻿import os
 import json
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QPushButton, QLabel,
@@ -115,7 +115,7 @@ _SORT_BTN_S = (
 )
 _FILTER_BTN_S = (
     'QPushButton { background: transparent; color: #94a3b8; border: 1px solid rgba(125,211,252,0.1); '
-    'border-radius: 4px; padding: 2px 6px; font-size: 9px; }'
+    'border-radius: 4px; padding: 2px 6px; font-size: 11px; }'
     'QPushButton:hover { background: rgba(125,211,252,0.08); color: #e2e8f0; }'
     'QPushButton[active=true] { background: rgba(125,211,252,0.18); color: #7DD3FC; '
     'border-color: #7DD3FC; font-weight: 700; }'
@@ -892,8 +892,8 @@ class WikiDetailPanel(QScrollArea):
         lo.setContentsMargins(0, 2, 0, 4)
         lo.setSpacing(4)
         for fid, label in options:
-            text = f'{label} ▲' if fid == self._pal_sort_by and not self._pal_sort_rev else (
-                f'{label} ▼' if fid == self._pal_sort_by else label)
+            text = f'{label} â–²' if fid == self._pal_sort_by and not self._pal_sort_rev else (
+                f'{label} â–¼' if fid == self._pal_sort_by else label)
             btn = QPushButton(text)
             btn.setProperty('active', fid == self._pal_sort_by)
             btn.setStyleSheet(_SORT_BTN_S)
@@ -1488,7 +1488,7 @@ class WikiCategoryPage(QWidget):
         for fid, btn in self._sort_btns.items():
             label = t(self._sort_labels[fid])
             if fid == self._sort_by:
-                arrow = '▼' if self._sort_reverse else '▲'
+                arrow = 'â–¼' if self._sort_reverse else 'â–²'
                 btn.setText(f'{label} {arrow}')
                 btn.setProperty('active', True)
             else:
@@ -1528,7 +1528,7 @@ class WikiCategoryPage(QWidget):
             for fid, btn in self._sort_btns.items():
                 label = t(self._sort_labels[fid])
                 if fid == self._sort_by:
-                    arrow = '▼' if self._sort_reverse else '▲'
+                    arrow = 'â–¼' if self._sort_reverse else 'â–²'
                     btn.setText(f'{label} {arrow}')
                 else:
                     btn.setText(label)

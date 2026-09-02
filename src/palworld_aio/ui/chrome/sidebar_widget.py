@@ -1,7 +1,7 @@
-import sys
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QStyleOptionButton, QStylePainter, QStyle
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QFont, QCursor, QPainter, QColor, QBrush, QFontMetrics
+from palworld_aio.ui.chrome import icons as app_icons
 try:
     import nerdfont as nf
 except:
@@ -9,11 +9,11 @@ except:
         icons = {'nf-fa-wrench': '\uf0ad', 'nf-fa-map': '\uf279', 'nf-fa-warehouse': '\ued92', 'nf-fa-suitcase': '\uf0f2', 'nf-fa-dragon': '\ueef8', 'nf-fa-users': '\uf0c0', 'nf-fa-shield': '\uf132', 'nf-fa-home': '\uf015', 'nf-fa-ban': '\uf05e', 'nf-fa-chevron_right': '\uf054', 'nf-fa-chevron_left': '\uf053', 'nf-fa-terminal': '\uf120', 'nf-fa-toolbox': '\uee1b', 'nf-fa-book': '\uf02d'}
 from palworld_aio import constants
 from i18n import t
-ICONS = {'tools': nf.icons.get('nf-fa-wrench', '\uf0ad'), 'map': nf.icons.get('nf-fa-map', '\uf279'), 'base_inventory': nf.icons.get('nf-fa-warehouse', '\ued92'), 'player_inventory': nf.icons.get('nf-fa-suitcase', '\uf0f2'), 'pal_editor': nf.icons.get('nf-fa-dragon', '\ueef8'), 'players': nf.icons.get('nf-fa-users', '\uf0c0'), 'guilds': nf.icons.get('nf-fa-shield', '\uf132'), 'bases': nf.icons.get('nf-fa-home', '\uf015'), 'exclusions': nf.icons.get('nf-fa-ban', '\uf05e'), 'json_editor': nf.icons.get('nf-cod-json', '\uf1c9'), 'collapse_open': nf.icons.get('nf-fa-chevron_right', '\uf054'), 'collapse_close': nf.icons.get('nf-fa-chevron_left', '\uf053'), 'console': nf.icons.get('nf-fa-terminal', '\uf120'), 'docs': nf.icons.get('nf-fa-book', '\uf02d'), 'breeding': nf.icons.get('nf-fa-egg', '\u2B55'), 'sidebar_expand': '\uf054\uf054', 'sidebar_collapse': '\uf053\uf053'}
+ICONS = {'tools': app_icons.get_icon('tools'), 'map': app_icons.get_icon('map'), 'base_inventory': app_icons.get_icon('base_inventory'), 'player_inventory': app_icons.get_icon('player_inventory'), 'pal_editor': app_icons.get_icon('pal_editor'), 'players': app_icons.get_icon('players'), 'guilds': app_icons.get_icon('guilds'), 'bases': app_icons.get_icon('bases'), 'exclusions': app_icons.get_icon('exclusions'), 'json_editor': app_icons.get_icon('json_editor'), 'collapse_open': app_icons.get_icon('collapse_open'), 'collapse_close': app_icons.get_icon('collapse_close'), 'console': app_icons.get_icon('console'), 'docs': app_icons.get_icon('docs'), 'breeding': app_icons.get_icon('breeding'), 'sidebar_expand': app_icons.get_icon('sidebar_expand'), 'sidebar_collapse': app_icons.get_icon('sidebar_collapse')}
 SIDEBAR_W_COLLAPSED = 48
-SIDEBAR_W_EXPANDED = 150
+SIDEBAR_W_EXPANDED = 168
 ITEM_H = 44
-LABEL_FONT_SIZE = 10 if sys.platform == 'darwin' else 7
+LABEL_FONT_SIZE = 11
 class NerdBtn(QPushButton):
     def paintEvent(self, event):
         sp = QStylePainter(self)
@@ -88,6 +88,12 @@ class NavItem(QPushButton):
         self.style().unpolish(self)
         self.style().polish(self)
         self.update()
+    def _paint_active_indicator(self, painter):
+        pw, ph = (5, 24)
+        px, py = (5, (self.height() - ph) // 2)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(QColor(constants.ACCENT)))
+        painter.drawRoundedRect(px, py, pw, ph, pw / 2, pw / 2)
     def paintEvent(self, event):
         sp = QStylePainter(self)
         opt = QStyleOptionButton()
@@ -122,11 +128,7 @@ class NavItem(QPushButton):
         if self.property('active'):
             p = QPainter(self)
             p.setRenderHint(QPainter.Antialiasing)
-            pw, ph = (5, 24)
-            px, py = (5, (self.height() - ph) // 2)
-            p.setPen(Qt.NoPen)
-            p.setBrush(QBrush(QColor('#7DD3FC')))
-            p.drawRoundedRect(px, py, pw, ph, pw / 2, pw / 2)
+            self._paint_active_indicator(p)
             p.end()
 class BottomBtn(QPushButton):
     def __init__(self, icon_code, tooltip, parent=None):
@@ -168,6 +170,12 @@ class BottomBtn(QPushButton):
         self.style().unpolish(self)
         self.style().polish(self)
         self.update()
+    def _paint_active_indicator(self, painter):
+        pw, ph = (5, 24)
+        px, py = (5, (self.height() - ph) // 2)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(QColor(constants.ACCENT)))
+        painter.drawRoundedRect(px, py, pw, ph, pw / 2, pw / 2)
     def paintEvent(self, event):
         sp = QStylePainter(self)
         opt = QStyleOptionButton()
@@ -191,7 +199,7 @@ class BottomBtn(QPushButton):
                 p.setFont(label_font)
                 p.setPen(self.palette().color(self.foregroundRole()))
                 lfm = QFontMetrics(label_font)
-                lx = 46
+                lx = 42
                 ly = (self.height() - lfm.height()) / 2 + lfm.ascent()
                 p.drawText(int(lx), int(ly), self._label)
         else:
@@ -203,11 +211,7 @@ class BottomBtn(QPushButton):
         if self.property('active'):
             p = QPainter(self)
             p.setRenderHint(QPainter.Antialiasing)
-            pw, ph = (5, 24)
-            px, py = (5, (self.height() - ph) // 2)
-            p.setPen(Qt.NoPen)
-            p.setBrush(QBrush(QColor('#7DD3FC')))
-            p.drawRoundedRect(px, py, pw, ph, pw / 2, pw / 2)
+            self._paint_active_indicator(p)
             p.end()
 class SidebarWidget(QWidget):
     nav_changed = pyqtSignal(str)

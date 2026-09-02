@@ -39,7 +39,7 @@ class _PassiveSkillDelegate(QStyledItemDelegate):
             painter.restore()
             return
         tc = index.data(Qt.UserRole + 3) or '#FFFFFF'
-        bd = index.data(Qt.UserRole + 4) or '#FFFFFFFF'
+        bd = index.data(Qt.UserRole + 4) or '#FFFFFF'
         border = QColor(bd)
         text_color = QColor(tc)
         selected = option.state & QStyle.State_Selected

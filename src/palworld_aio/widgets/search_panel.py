@@ -3,7 +3,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
 from i18n import t
 from palworld_aio import constants
-from palworld_aio.ui.chrome.styles import CONTENT_PANEL_STYLE
+from palworld_aio.ui.chrome.styles import CONTENT_PANEL_STYLE, TREE_WIDGET_QSS
 _SORT_ROLE = Qt.UserRole + 1
 class _SortableTreeWidgetItem(QTreeWidgetItem):
     def __lt__(self, other):
@@ -63,51 +63,12 @@ class SearchPanel(QWidget):
         self.tree.setObjectName('searchTree')
         self.columns = [t(k) if k else '' for k in self.column_keys]
         self.tree.setHeaderLabels(self.columns)
-        self.tree.setAlternatingRowColors(False)
+        self.tree.setAlternatingRowColors(True)
         self.tree.setRootIsDecorated(False)
         self.tree.setSelectionMode(self._selection_mode)
         self.tree.setSortingEnabled(True)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.tree.setStyleSheet(f'''
-            QTreeWidget {{
-                background: rgba(18,20,24,0.65);
-                border: 1px solid rgba(125,211,252,0.15);
-                border-radius: 8px;
-                color: #A6B8C8;
-                font-size: 11px;
-                outline: none;
-            }}
-            QTreeWidget::item {{
-                padding: 4px 8px;
-                border-radius: 4px;
-            }}
-            QTreeWidget::item:hover {{
-                background: rgba(125,211,252,0.1);
-                color: #7DD3FC;
-            }}
-            QTreeWidget::item:selected {{
-                background: rgba(125,211,252,0.15);
-                color: #7DD3FC;
-                border-left: 3px solid #7DD3FC;
-            }}
-            QTreeWidget::item:selected:!active {{
-                background: rgba(125,211,252,0.1);
-                color: #7DD3FC;
-            }}
-            QHeaderView::section {{
-                background: rgba(8,10,16,0.9);
-                color: #7DD3FC;
-                padding: 6px 8px;
-                border: none;
-                border-bottom: 1px solid rgba(125,211,252,0.15);
-                font-weight: 600;
-                font-size: 10px;
-                text-align: center;
-            }}
-            QHeaderView::section:hover {{
-                background: rgba(125,211,252,0.08);
-            }}
-        ''')
+        self.tree.setStyleSheet(TREE_WIDGET_QSS)
         header = self.tree.header()
         for i, width in enumerate(self.column_widths):
             if i < len(self.columns):

@@ -1,4 +1,4 @@
-import copy
+﻿import copy
 import os
 import re
 from PyQt6.QtWidgets import QAbstractItemView, QDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QScrollBar, QSizePolicy, QSpinBox, QVBoxLayout, QWidget
@@ -133,7 +133,7 @@ def _show_learned_moves_dialog(raw, parent):
             slot_layout.setAlignment(Qt.AlignVCenter)
             name_lbl = QLabel(move_name)
             name_lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
-            name_lbl.setStyleSheet('font-size: 9px; font-weight: 600; color: #E2E8F0; background: transparent; border: none;')
+            name_lbl.setStyleSheet('font-size: 11px; font-weight: 600; color: #E2E8F0; background: transparent; border: none;')
             slot_layout.addWidget(name_lbl, 1)
             elem_badge = QLabel()
             elem_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -147,7 +147,7 @@ def _show_learned_moves_dialog(raw, parent):
                     elem_badge.setStyleSheet('background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 2px; padding: 1px; margin: 0px;')
                 else:
                     elem_badge.setText(skill_elem[:4])
-                    elem_badge.setStyleSheet(f'font-size: 6px; font-weight: 700; color: {elem_color}; background: rgba(255,255,255,0.04); border: 1px solid {elem_color}40; border-radius: 2px;')
+                    elem_badge.setStyleSheet(f'font-size: 11px; font-weight: 700; color: {elem_color}; background: rgba(255,255,255,0.04); border: 1px solid {elem_color}40; border-radius: 2px;')
             else:
                 elem_badge.setStyleSheet('background: transparent; border: none;')
             slot_layout.addWidget(elem_badge)
@@ -155,7 +155,7 @@ def _show_learned_moves_dialog(raw, parent):
             power_lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
             power_lbl.setFixedWidth(24)
             power_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            power_lbl.setStyleSheet('font-size: 9px; font-weight: 700; color: #F59E0B; background: transparent; border: none;')
+            power_lbl.setStyleSheet('font-size: 11px; font-weight: 700; color: #F59E0B; background: transparent; border: none;')
             slot_layout.addWidget(power_lbl)
             if skill_info:
                 tip_parts = [f'<b>{move_name}</b>', f'Element: {skill_elem}', f'Power: {skill_power}']
@@ -218,7 +218,7 @@ def _show_learned_moves_dialog(raw, parent):
                 slot_layout.setAlignment(Qt.AlignVCenter)
                 name_lbl = QLabel(move_name)
                 name_lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
-                name_lbl.setStyleSheet('font-size: 9px; font-weight: 600; color: #E2E8F0; background: transparent; border: none;')
+                name_lbl.setStyleSheet('font-size: 11px; font-weight: 600; color: #E2E8F0; background: transparent; border: none;')
                 slot_layout.addWidget(name_lbl, 1)
                 elem_badge = QLabel()
                 elem_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -232,7 +232,7 @@ def _show_learned_moves_dialog(raw, parent):
                         elem_badge.setStyleSheet('background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 2px; padding: 1px; margin: 0px;')
                     else:
                         elem_badge.setText(skill_elem[:4])
-                        elem_badge.setStyleSheet(f'font-size: 6px; font-weight: 700; color: {elem_color}; background: rgba(255,255,255,0.04); border: 1px solid {elem_color}40; border-radius: 2px;')
+                        elem_badge.setStyleSheet(f'font-size: 11px; font-weight: 700; color: {elem_color}; background: rgba(255,255,255,0.04); border: 1px solid {elem_color}40; border-radius: 2px;')
                 else:
                     elem_badge.setStyleSheet('background: transparent; border: none;')
                 slot_layout.addWidget(elem_badge)
@@ -240,7 +240,7 @@ def _show_learned_moves_dialog(raw, parent):
                 power_lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
                 power_lbl.setFixedWidth(24)
                 power_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                power_lbl.setStyleSheet('font-size: 9px; font-weight: 700; color: #F59E0B; background: transparent; border: none;')
+                power_lbl.setStyleSheet('font-size: 11px; font-weight: 700; color: #F59E0B; background: transparent; border: none;')
                 slot_layout.addWidget(power_lbl)
                 if skill_info:
                     tip_parts = [f'<b>{move_name}</b>', f'Element: {skill_elem}', f'Power: {skill_power}']
@@ -915,7 +915,7 @@ class PalCreateDialog(QDialog):
         nick_layout.addWidget(self._name_mode_label)
         self._name_mode_combo = StyledCombo()
         self._name_mode_combo.addItem(t('edit_pals.name_mode_new') if t else 'New', 'new')
-        self._name_mode_combo.addItem(t('edit_pals.name_mode_copy') if t else '© Copy', 'copy')
+        self._name_mode_combo.addItem(t('edit_pals.name_mode_copy') if t else 'Â© Copy', 'copy')
         self._name_mode_combo.addItem(t('edit_pals.name_mode_none') if t else 'No Nickname', 'none')
         cur_mode = get_name_mode()
         self._name_mode_combo.setCurrentIndex(list(('new', 'copy', 'none')).index(cur_mode) if cur_mode in ('new', 'copy', 'none') else 0)
@@ -944,7 +944,7 @@ class PalCreateDialog(QDialog):
             self._name_mode_label.setText(t('edit_pals.name_mode') if t else 'Default name:')
         if hasattr(self, '_name_mode_combo'):
             self._name_mode_combo.setItemText(0, t('edit_pals.name_mode_new') if t else 'New')
-            self._name_mode_combo.setItemText(1, t('edit_pals.name_mode_copy') if t else '© Copy')
+            self._name_mode_combo.setItemText(1, t('edit_pals.name_mode_copy') if t else 'Â© Copy')
             self._name_mode_combo.setItemText(2, t('edit_pals.name_mode_none') if t else 'No Nickname')
     def _filter_pal_list(self):
         search_text = self._search_edit.text().lower() if hasattr(self, '_search_edit') else ''

@@ -1,6 +1,5 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QSizePolicy, QPushButton
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
 from i18n import t
 from palworld_aio import constants
 from palworld_aio.widgets import StatsPanel
@@ -25,17 +24,16 @@ class ResultsWidget(QWidget):
         if hasattr(self, 'stats_panel'):
             self.stats_panel.refresh_labels()
     def _setup_ui(self):
-        self.setMinimumWidth(350)
-        self.setMaximumWidth(350)
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        self.setMinimumWidth(320)
+        self.setMaximumWidth(480)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(16)
         self.results_title = QLabel(t('deletion.results_panel') if t else 'Selection & Stats')
         self.results_title.setObjectName('sectionHeader')
-        self.results_title.setStyleSheet('QLabel#sectionHeader { margin-left: 0px; padding-left: 10px; }')
         self.results_title.setAlignment(Qt.AlignCenter)
-        self.results_title.setFont(QFont(constants.FONT_FAMILY, 14, QFont.Bold))
+        self.results_title.setStyleSheet(f'QLabel#sectionHeader {{ margin-left: 0px; padding-left: 10px; font-size: {constants.FONT_SIZE_PX_SECTION}px; font-weight: 600; }}')
         title_layout = QHBoxLayout()
         title_layout.addWidget(self.results_title)
         self.close_btn = QPushButton('\u2715')
@@ -87,9 +85,8 @@ class ResultsWidget(QWidget):
         layout.addWidget(separator2)
         self.stats_title = QLabel(t('deletion.stats_panel') if t else 'Statistics')
         self.stats_title.setObjectName('sectionHeader')
-        self.stats_title.setStyleSheet('QLabel#sectionHeader { margin-left: 0px; padding-left: 10px; }')
         self.stats_title.setAlignment(Qt.AlignCenter)
-        self.stats_title.setFont(QFont(constants.FONT_FAMILY, 14, QFont.Bold))
+        self.stats_title.setStyleSheet(f'QLabel#sectionHeader {{ margin-left: 0px; padding-left: 10px; font-size: {constants.FONT_SIZE_PX_SECTION}px; font-weight: 600; }}')
         layout.addWidget(self.stats_title)
         stats_frame = QFrame()
         stats_frame.setObjectName('glassPanel')
@@ -113,12 +110,10 @@ class ResultsWidget(QWidget):
         card_layout.setContentsMargins(8, 6, 8, 6)
         card_layout.setSpacing(4)
         label = QLabel(label_text)
-        label.setFont(QFont(constants.FONT_FAMILY, 9, QFont.Bold))
         label.setObjectName('statsField')
         label.setStyleSheet('')
         card_layout.addWidget(label)
         value_label = QLabel('N/A')
-        value_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE))
         value_label.setObjectName('statsValue')
         value_label.setStyleSheet('')
         value_label.setWordWrap(True)

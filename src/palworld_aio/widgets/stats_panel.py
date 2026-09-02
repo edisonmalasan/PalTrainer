@@ -5,6 +5,7 @@ from i18n import t
 from loading_manager import show_information, show_warning
 from palworld_aio import constants
 from palworld_aio.ui.chrome.sidebar_widget import NerdBtn
+from palworld_aio.ui.chrome import icons as app_icons
 class StatsPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -19,13 +20,9 @@ class StatsPanel(QWidget):
         self.stat_key_labels = {}
         sections = [('before', 'deletion.stats.before'), ('after', 'deletion.stats.after'), ('result', 'deletion.stats.result')]
         fields = [('guilds', 'deletion.stats.guilds'), ('bases', 'deletion.stats.bases'), ('players', 'deletion.stats.players'), ('pals', 'deletion.stats.pals')]
-        try:
-            import nerdfont as nf
-            copy_icon = nf.icons.get('nf-cod-copy', '📋')
-        except:
-            copy_icon = '📋'
-        copy_btn = NerdBtn(copy_icon)
+        copy_btn = NerdBtn(app_icons.get_icon('copy'))
         copy_btn.setFixedSize(30, 24)
+        copy_btn.setToolTip(t('button.copy_stats') if t else 'Copy stats')
         copy_btn.setStyleSheet(f'\n            QPushButton {{\n                background-color: transparent;\n                border: none;\n                font-size: 14px;\n            }}\n            QPushButton:hover {{\n                background-color: {constants.BUTTON_HOVER};\n                border-radius: 4px;\n            }}\n        ')
         copy_btn.clicked.connect(self._copy_stats_to_clipboard)
         layout.addWidget(copy_btn, 0, len(sections) + 1, Qt.AlignRight)
