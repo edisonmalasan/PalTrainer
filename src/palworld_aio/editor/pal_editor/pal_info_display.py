@@ -1,4 +1,4 @@
-import os
+﻿import os
 import math
 import re
 from functools import partial
@@ -24,7 +24,7 @@ from .legacy_frame import PalFrame
 
 
 class PalInfoDisplayMixin:
-    _ELEMENT_MAP = {'Normal': ('⚪', '#9CA3AF'), 'Fire': ('🔥', '#EF4444'), 'Water': ('💧', '#3B82F6'), 'Leaf': ('🌿', '#4ADE80'), 'Grass': ('🌿', '#4ADE80'), 'Electricity': ('⚡', '#FBBF24'), 'Electric': ('⚡', '#FBBF24'), 'Ice': ('❄️', '#67E8F9'), 'Earth': ('🪨', '#A78BFA'), 'Ground': ('🪨', '#A78BFA'), 'Dark': ('🌑', '#6B21A8'), 'Dragon': ('🐉', '#818CF8'), 'None': ('○', '#6B7280')}
+    _ELEMENT_MAP = {'Normal': ('âšª', '#9CA3AF'), 'Fire': ('ðŸ”¥', '#EF4444'), 'Water': ('ðŸ’§', '#3B82F6'), 'Leaf': ('ðŸŒ¿', '#4ADE80'), 'Grass': ('ðŸŒ¿', '#4ADE80'), 'Electricity': ('âš¡', '#FBBF24'), 'Electric': ('âš¡', '#FBBF24'), 'Ice': ('â„ï¸', '#67E8F9'), 'Earth': ('ðŸª¨', '#A78BFA'), 'Ground': ('ðŸª¨', '#A78BFA'), 'Dark': ('ðŸŒ‘', '#6B21A8'), 'Dragon': ('ðŸ‰', '#818CF8'), 'None': ('â—‹', '#6B7280')}
     _ELEMENT_COLORS = {'Normal': '#9CA3AF', 'Fire': '#EF4444', 'Water': '#3B82F6', 'Leaf': '#4ADE80', 'Grass': '#4ADE80', 'Electricity': '#FBBF24', 'Electric': '#FBBF24', 'Ice': '#67E8F9', 'Earth': '#A78BFA', 'Ground': '#A78BFA', 'Dark': '#6B21A8', 'Dragon': '#818CF8', 'None': '#6B7280'}
 
     def _update_display(self, pal_data):
@@ -78,7 +78,7 @@ class PalInfoDisplayMixin:
                 if elements:
                     for elem_name in elements:
                         elem_pix = _icons._get_element_pixmap(elem_name, 'small', 16)
-                        elem_color = self._ELEMENT_MAP.get(elem_name, ('☆', '#A78BFA'))[1]
+                        elem_color = self._ELEMENT_MAP.get(elem_name, ('â˜†', '#A78BFA'))[1]
                         if elem_pix:
                             badge = QLabel()
                             badge.setFixedSize(16, 16)
@@ -87,7 +87,7 @@ class PalInfoDisplayMixin:
                             badge.setStyleSheet(f'background: transparent; border: 1px solid {elem_color}40; border-radius: 8px;')
                             badge.setAttribute(Qt.WA_TranslucentBackground)
                         else:
-                            elem_data = self._ELEMENT_MAP.get(elem_name, ('☆', '#A78BFA'))
+                            elem_data = self._ELEMENT_MAP.get(elem_name, ('â˜†', '#A78BFA'))
                             badge = QLabel(elem_data[0])
                             badge.setFixedSize(16, 16)
                             badge.setAlignment(Qt.AlignCenter)
@@ -216,7 +216,7 @@ class PalInfoDisplayMixin:
                     if isinstance(eff, QGraphicsOpacityEffect):
                         eff.setOpacity(1.0)
                     val_lbl.setText(str(ws_level))
-                    val_lbl.setStyleSheet('font-size: 9px; font-weight: 700; color: #4ADE80; background: transparent; border: none;')
+                    val_lbl.setStyleSheet('font-size: 11px; font-weight: 700; color: #4ADE80; background: transparent; border: none;')
                     val_badge.setStyleSheet('background: rgba(0,0,0,0.45); border: 1px solid rgba(74,222,128,0.2); border-radius: 2px;')
                     icon_lbl._ws_key = ws_key
                     icon_lbl.setCursor(Qt.PointingHandCursor)
@@ -227,7 +227,7 @@ class PalInfoDisplayMixin:
                     if isinstance(eff, QGraphicsOpacityEffect):
                         eff.setOpacity(0.06)
                     val_lbl.setText('')
-                    val_lbl.setStyleSheet('font-size: 9px; font-weight: 700; color: transparent; background: transparent; border: none;')
+                    val_lbl.setStyleSheet('font-size: 11px; font-weight: 700; color: transparent; background: transparent; border: none;')
                     val_badge.setStyleSheet('background: transparent; border: none;')
                     icon_lbl._ws_key = None
                     val_lbl._ws_key = None
@@ -353,7 +353,7 @@ class PalInfoDisplayMixin:
                 self.info_fav_btn.setText('')
             else:
                 self.info_fav_btn.setIcon(QIcon())
-                self.info_fav_btn.setText('★' * fav_idx_val if fav_idx_val else '★')
+                self.info_fav_btn.setText('â˜…' * fav_idx_val if fav_idx_val else 'â˜…')
             if fav_idx_val >= 1 and fav_idx_val <= 3:
                 self.info_fav_btn.setStyleSheet('QPushButton { background: rgba(251,191,36,0.15); border: 1px solid #FBBF24; border-radius: 4px; } QPushButton:hover { background: rgba(251,191,36,0.25); } QToolTip { background: rgba(18,20,24,0.98); color: #E2E8F0; border: 1px solid rgba(125,211,252,0.25); border-radius: 6px; padding: 6px 10px; font-size: 11px; }')
             else:
@@ -462,14 +462,14 @@ class PalInfoDisplayMixin:
                         elem_badge.setStyleSheet('background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 2px; padding: 1px; margin: 0px;')
                     else:
                         elem_badge.setText(skill_elem[:4])
-                        elem_badge.setStyleSheet(f'font-size: 6px; font-weight: 700; color: {elem_color}; background: rgba(255,255,255,0.04); border: 1px solid {elem_color}40; border-radius: 2px;')
+                        elem_badge.setStyleSheet(f'font-size: 11px; font-weight: 700; color: {elem_color}; background: rgba(255,255,255,0.04); border: 1px solid {elem_color}40; border-radius: 2px;')
                 else:
                     elem_badge.setStyleSheet('background: transparent; border: none;')
                 slot_layout.addWidget(elem_badge)
                 power_lbl = QLabel(str(skill_power) if skill_power is not None else '--')
                 power_lbl.setFixedWidth(24)
                 power_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                power_lbl.setStyleSheet('font-size: 9px; font-weight: 700; color: #F59E0B; background: transparent; border: none;')
+                power_lbl.setStyleSheet('font-size: 11px; font-weight: 700; color: #F59E0B; background: transparent; border: none;')
                 slot_layout.addWidget(power_lbl)
                 if e and skill_info:
                     tip_parts = [f'<b>{move_name}</b>', f'Element: {skill_elem}', f'Power: {skill_power}']

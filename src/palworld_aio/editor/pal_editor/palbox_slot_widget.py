@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QApplication, QFrame, QLabel, QMenu, QSizePolicy, QStyledItemDelegate, QStyle
+﻿from PyQt6.QtWidgets import QApplication, QFrame, QLabel, QMenu, QSizePolicy, QStyledItemDelegate, QStyle
 from PyQt6.QtCore import QMimeData, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QDrag, QPainter
 from i18n import t
@@ -457,7 +457,7 @@ class PalboxSlotWidget(QFrame):
 
         level_lbl = StrokedLabel(f'{level}', self)
 
-        level_lbl.setStyleSheet('color: #7DD3FC; font-size: 8px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(125,211,252,0.25); border-radius: 3px; padding: 0 3px;')
+        level_lbl.setStyleSheet('color: #7DD3FC; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(125,211,252,0.25); border-radius: 3px; padding: 0 3px;')
 
         level_lbl.adjustSize()
         level_lbl.setFixedHeight(11)
@@ -522,12 +522,12 @@ class PalboxSlotWidget(QFrame):
             pred_badge = QLabel(self)
             pred_badge.setFixedSize(14, 14)
             pred_badge.setAlignment(Qt.AlignCenter)
-            pred_badge.setStyleSheet('background: transparent; border: none; font-size: 9px; font-weight: bold; color: #EF4444;')
+            pred_badge.setStyleSheet('background: transparent; border: none; font-size: 11px; font-weight: bold; color: #EF4444;')
             try:
                 import nerdfont as _nf
-                pred_badge.setText(_nf.icons.get('nf-fa-paw', '🐾'))
+                pred_badge.setText(_nf.icons.get('nf-fa-paw', 'ðŸ¾'))
             except Exception:
-                pred_badge.setText('🐾')
+                pred_badge.setText('ðŸ¾')
             pred_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
             pred_badge._slot_child_kind = 'predator'
             pred_badge.show()
@@ -551,9 +551,9 @@ class PalboxSlotWidget(QFrame):
 
             else:
 
-                awake_badge = QLabel('🔥', self)
+                awake_badge = QLabel('ðŸ”¥', self)
 
-                awake_badge.setStyleSheet('font-size: 9px; background: transparent;')
+                awake_badge.setStyleSheet('font-size: 11px; background: transparent;')
 
                 awake_badge.setFixedSize(12, 12)
 
@@ -603,9 +603,9 @@ class PalboxSlotWidget(QFrame):
 
             if not lock_pix:
 
-                lock_badge = QLabel('🔒', self)
+                lock_badge = QLabel('ðŸ”’', self)
 
-                lock_badge.setStyleSheet('font-size: 9px; color: rgba(255,255,255,0.65); background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;')
+                lock_badge.setStyleSheet('font-size: 11px; color: rgba(255,255,255,0.65); background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;')
 
                 lock_badge.setFixedSize(14, 14)
 
@@ -725,9 +725,9 @@ class _PalSlotDelegate(QStyledItemDelegate):
             if is_predator_badge:
                 try:
                     import nerdfont as _nf2
-                    paw = _nf2.icons.get('nf-fa-paw', '🐾')
+                    paw = _nf2.icons.get('nf-fa-paw', 'ðŸ¾')
                 except Exception:
-                    paw = '🐾'
+                    paw = 'ðŸ¾'
                 painter.save()
                 painter.setRenderHint(QPainter.TextAntialiasing)
                 painter.setPen(QColor('#EF4444'))

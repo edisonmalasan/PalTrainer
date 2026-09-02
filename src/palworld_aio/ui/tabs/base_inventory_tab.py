@@ -1,4 +1,4 @@
-import os
+﻿import os
 import sys
 from functools import partial
 from palsav import json_tools
@@ -1150,7 +1150,7 @@ class ContainerListWidget(QTreeWidget):
                                 image_label.setPixmap(scaled)
                     break
         else:
-            image_label.setText('🏗️')
+            image_label.setText('ðŸ—ï¸')
         layout.addWidget(image_label)
         info_layout = QVBoxLayout()
         info_layout.setSpacing(2)
@@ -1180,9 +1180,9 @@ class ContainerListWidget(QTreeWidget):
                 scaled = pixmap.scaled(50, 50, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 image_label.setPixmap(scaled)
             else:
-                image_label.setText('📦')
+                image_label.setText('ðŸ“¦')
         else:
-            image_label.setText('📦')
+            image_label.setText('ðŸ“¦')
         layout.addWidget(image_label)
         info_layout = QVBoxLayout()
         info_layout.setSpacing(2)
@@ -1419,9 +1419,9 @@ class ContainerInfoWidget(QWidget):
                 scaled = pixmap.scaled(70, 70, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self.image_label.setPixmap(scaled)
             else:
-                self.image_label.setText('📦')
+                self.image_label.setText('ðŸ“¦')
         else:
-            self.image_label.setText('📦')
+            self.image_label.setText('ðŸ“¦')
     def _update_styles(self):
         self.setStyleSheet(f'\n                QWidget {{\n                    {CONTENT_PANEL_STYLE}\n                    color: #e0e0e0;\n                }}\n                QLabel {{\n                    color: #e0e0e0;\n                }}\n                QLabel[bold="true"] {{\n                    font-weight: bold;\n                }}\n            ')
 class _BasePalIcon(QFrame):
@@ -1597,7 +1597,7 @@ class _BasePalIcon(QFrame):
                     eb.show()
                     self._children.append(eb)
         level_lbl = StrokedLabel(f'{level}', self)
-        level_lbl.setStyleSheet('color: #7DD3FC; font-size: 8px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(125,211,252,0.25); border-radius: 3px; padding: 0 3px;')
+        level_lbl.setStyleSheet('color: #7DD3FC; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(125,211,252,0.25); border-radius: 3px; padding: 0 3px;')
         level_lbl.adjustSize()
         level_lbl.setFixedHeight(11)
         level_lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -1637,8 +1637,8 @@ class _BasePalIcon(QFrame):
                 awake_badge.setAlignment(Qt.AlignCenter)
                 awake_badge.setStyleSheet('background: transparent; border: none;')
             else:
-                awake_badge = QLabel('🔥', self)
-                awake_badge.setStyleSheet('font-size: 9px; background: transparent;')
+                awake_badge = QLabel('ðŸ”¥', self)
+                awake_badge.setStyleSheet('font-size: 11px; background: transparent;')
                 awake_badge.setFixedSize(12, 12)
                 awake_badge.setAlignment(Qt.AlignCenter)
             awake_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -1661,8 +1661,8 @@ class _BasePalIcon(QFrame):
             lock_key = f'lock_{int(fav_idx)}'
             lock_pix = _get_ui_icon_pixmap(lock_key, 14) or _get_ui_icon_pixmap('lock_1', 14) or _get_ui_icon_pixmap('lock', 14)
             if not lock_pix:
-                lock_badge = QLabel('🔒', self)
-                lock_badge.setStyleSheet('font-size: 9px; color: rgba(255,255,255,0.65); background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;')
+                lock_badge = QLabel('ðŸ”’', self)
+                lock_badge.setStyleSheet('font-size: 11px; color: rgba(255,255,255,0.65); background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;')
                 lock_badge.setFixedSize(14, 14)
                 lock_badge.setAlignment(Qt.AlignCenter)
             else:
@@ -1798,7 +1798,7 @@ class BasePalsContentWidget(QFrame):
         self.bulk_delete_btn.setCursor(Qt.PointingHandCursor)
         self.bulk_delete_btn.clicked.connect(self._open_bulk_delete)
         page_row.addWidget(self.bulk_delete_btn)
-        self.prev_page_btn = QPushButton('◀')
+        self.prev_page_btn = QPushButton('â—€')
         self.prev_page_btn.setFixedSize(28, 24)
         self.prev_page_btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.08); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(125,211,252,0.18); color: #FFFFFF; } QPushButton:disabled { background: rgba(100,100,100,0.1); color: #666; border-color: rgba(255,255,255,0.05); }')
         self.prev_page_btn.clicked.connect(self._prev_page)
@@ -1806,7 +1806,7 @@ class BasePalsContentWidget(QFrame):
         self.page_label = QLabel('Page 1/1')
         self.page_label.setStyleSheet('font-size: 11px; font-weight: 600; color: #7DD3FC; padding: 0 4px;')
         page_row.addWidget(self.page_label)
-        self.next_page_btn = QPushButton('▶')
+        self.next_page_btn = QPushButton('â–¶')
         self.next_page_btn.setFixedSize(28, 24)
         self.next_page_btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.08); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(125,211,252,0.18); color: #FFFFFF; } QPushButton:disabled { background: rgba(100,100,100,0.1); color: #666; border-color: rgba(255,255,255,0.05); }')
         self.next_page_btn.clicked.connect(self._next_page)
@@ -2916,7 +2916,7 @@ class BaseInventoryTab(QWidget):
         self.item_button.setCursor(Qt.PointingHandCursor)
         self.item_button.clicked.connect(self._show_item_picker)
         header_layout.addWidget(self.item_button)
-        self.clear_item_button = QPushButton('×')
+        self.clear_item_button = QPushButton('Ã—')
         self.clear_item_button.setFixedWidth(24)
         self.clear_item_button.setFixedHeight(28)
         self.clear_item_button.setStyleSheet('QPushButton { background: rgba(255,80,80,0.4); color: #fff; border: none; border-radius: 4px; font-weight: bold; font-size: 14px; } QPushButton:hover { background: rgba(255,80,80,0.7); }')
@@ -2932,7 +2932,7 @@ class BaseInventoryTab(QWidget):
         self.structure_button.setCursor(Qt.PointingHandCursor)
         self.structure_button.clicked.connect(self._show_structure_picker)
         header_layout.addWidget(self.structure_button)
-        self.clear_structure_button = QPushButton('×')
+        self.clear_structure_button = QPushButton('Ã—')
         self.clear_structure_button.setFixedWidth(24)
         self.clear_structure_button.setFixedHeight(28)
         self.clear_structure_button.setStyleSheet('QPushButton { background: rgba(255,80,80,0.4); color: #fff; border: none; border-radius: 4px; font-weight: bold; font-size: 14px; } QPushButton:hover { background: rgba(255,80,80,0.7); }')
