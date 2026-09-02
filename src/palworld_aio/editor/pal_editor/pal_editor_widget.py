@@ -2161,7 +2161,11 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         self._get_container_ids()
         PalFrame._load_maps()
         self._load_pals()
-        self._load_dps_pals()
+        self.dps_gvas = None
+        self.dps_loaded = False
+        self.dps_pals = {}
+        self.dps_total_slots = 0
+        self._dps_modified = False
 
     def apply_player_ui(self):
         self._clear_party_highlight()
