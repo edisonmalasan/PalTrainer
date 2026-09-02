@@ -10,7 +10,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtCore import QObject, pyqtSignal
-from loading_manager import show_critical, show_question
+from loading_manager import show_critical, show_question, is_loading_active
 from palsav.gvas import GvasFile
 from palsav.core import decompress_sav_to_gvas
 from palworld_aio.managers.data_manager import load_game_data_map
@@ -76,6 +76,11 @@ class SaveManager(QObject):
         self._process_scan_log(data_source, playerdir, log_folder, guild_name_map, base_path, illegal_pals_by_owner, owner_nicknames)
         return True
     def load_save(self, path=None, parent=None):
+        if is_loading_active():
+            if parent:
+                show_question(parent, t('error.title'),
+                    t('error.load_in_progress', default='A save is still loading. Please wait for it to finish, then try again.'))
+            return False
         if path is None:
             from common import get_preferred_save_path
             default_dir = get_preferred_save_path()
@@ -142,6 +147,11 @@ class SaveManager(QObject):
     def is_save_stale(self, level_sav_path=None) -> bool:
         return save_session.is_stale()
     def save_changes(self, parent=None):
+        if is_loading_active():
+            if parent:
+                show_question(parent, t('error.title'),
+                    t('error.load_in_progress', default='A save is still loading. Please wait for it to finish, then try again.'))
+            return
         if not constants.current_save_path or not constants.loaded_level_json:
             return
         if constants.xgp_loaded and not __import__('ctypes').windll.shell32.IsUserAnAdmin():
@@ -649,7 +659,7 @@ class SaveManager(QObject):
                 illegal_pals_by_owner = defaultdict(lambda: defaultdict(list))
             else:
                 illegal_pals_by_owner = defaultdict(lambda: defaultdict(list), illegal_pals_by_owner)
-            with ProcessPoolExecutor(max_workers=min(32, os.cpu_count() or 1) + 4) as executor:
+            with ThreadPoolExecutor(max_workers=min(32, os.cpu_count() or 1) + 4) as executor:
                 futures = {executor.submit(_process_dps_scan_worker, task): task for task in self.dps_tasks}
                 for future in as_completed(futures):
                     try:
