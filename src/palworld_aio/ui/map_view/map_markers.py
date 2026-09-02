@@ -1,4 +1,5 @@
 import math
+import qt_compat
 from PyQt6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem
 from PyQt6.QtCore import Qt, QRectF, QPointF
 from PyQt6.QtGui import QPixmap, QColor, QRadialGradient, QPainter, QPen, QBrush

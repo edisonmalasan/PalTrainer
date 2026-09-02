@@ -140,5 +140,9 @@ _alias(QDialogButtonBox, 'Ok', QDialogButtonBox.StandardButton.Ok)
 for name in ('AnchorUnderMouse',):
     _alias(QGraphicsView, name, getattr(QGraphicsView.ViewportAnchor, name))
 _alias(QGraphicsView, 'ScrollHandDrag', QGraphicsView.DragMode.ScrollHandDrag)
+from PyQt6.QtWidgets import QGraphicsItem as _QGraphicsItem
+for name in ('ItemIgnoresTransformations', 'ItemIsSelectable', 'ItemIsMovable', 'ItemIsFocusable',
+             'ItemSendsGeometryChanges', 'ItemUsesExtendedStyleOption'):
+    _alias(_QGraphicsItem, name, getattr(_QGraphicsItem.GraphicsItemFlag, name))
 _alias(QFontDatabase, 'FixedFont', QFontDatabase.SystemFont.FixedFont)
 _alias(QImage, 'Format_RGBA8888', QImage.Format.Format_RGBA8888)

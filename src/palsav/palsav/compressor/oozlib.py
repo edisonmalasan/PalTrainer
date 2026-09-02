@@ -2,8 +2,13 @@ import os
 import sys
 import platform
 import logging
+import threading
 logger = logging.getLogger(__name__)
 from palsav.compressor import Compressor, SaveType
+# Kraken decode/encode writes past the caller-provided buffer by design
+# (SAFE_SPACE) and must never run concurrently: overlapping calls corrupt
+# the heap and surface as access violations elsewhere in the process.
+_PALOOZ_LOCK = threading.Lock()
 class OodleCompressor:
     Kraken = 8
     Mermaid = 9
@@ -66,7 +71,8 @@ class OozLib(Compressor):
         if save_type != SaveType.PLM.value:
             raise ValueError(f'Unhandled compression type: 0x{save_type:02X}, only 0x31 (PLM) is supported')
         logger.debug('Compressing data...')
-        compressed_data = self.palooz.compress(OodleCompressor.Kraken, OodleLevel.Normal, data, uncompressed_len)
+        with _PALOOZ_LOCK:
+            compressed_data = self.palooz.compress(OodleCompressor.Kraken, OodleLevel.Normal, data, uncompressed_len)
         if not compressed_data:
             raise RuntimeError(f'palooz compress failed or returned empty result (code: {compressed_data})')
         compressed_len = len(compressed_data)
@@ -98,7 +104,8 @@ class OozLib(Compressor):
         logger.debug(f'  Data offset: {data_offset} bytes')
         logger.debug('Detected PLM format (Oodle), starting decompression...')
         compressed_data = data[data_offset:data_offset + compressed_len]
-        decompressed = self.palooz.decompress(compressed_data, uncompressed_len)
+        with _PALOOZ_LOCK:
+            decompressed = self.palooz.decompress(compressed_data, uncompressed_len)
         if len(decompressed) != uncompressed_len:
             raise ValueError(f'Decompressed data length {len(decompressed)} does not match expected uncompressed length {uncompressed_len}')
         logger.info(f'Decompression successful, decompressed size: {len(decompressed):,} bytes')
