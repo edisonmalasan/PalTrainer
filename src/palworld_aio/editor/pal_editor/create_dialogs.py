@@ -3,7 +3,7 @@ import os
 import re
 from PyQt6.QtWidgets import QAbstractItemView, QDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QScrollBar, QSizePolicy, QSpinBox, QVBoxLayout, QWidget
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QObject, QEvent
 from PyQt6.QtGui import QIcon
 from i18n import t
 from loading_manager import run_with_loading, show_information, show_warning, show_question
@@ -1619,6 +1619,26 @@ def _apply_food_buff(raw, food_id):
         raw.pop('FoodRegeneEffectInfo', None)
 
 
+class _FoodRowClick(QObject):
+    """Forward row presses to FoodPickerDialog._on_single_select.
+
+    Installed as an event filter on the food row; replaces a closure assigned
+    over QWidget.mousePressEvent, which PyQt6 does not reliably dispatch and
+    which leaks a reference cycle per row (AGENTS.md crash pattern).
+    """
+
+    def __init__(self, food_id, dialog, parent=None):
+        super().__init__(parent)
+        self._food_id = food_id
+        self._dialog = dialog
+
+    def eventFilter(self, a0, a1):
+        if a1.type() == QEvent.Type.MouseButtonPress and a1.button() == Qt.MouseButton.LeftButton:
+            self._dialog._on_single_select(self._food_id)
+            return True
+        return False
+
+
 class FoodPickerDialog(FramelessDialog):
     def __init__(self, parent=None, multi=False):
         super().__init__('edit_pals.food_picker_title', parent)
@@ -1745,7 +1765,11 @@ class FoodPickerDialog(FramelessDialog):
             row._cat_key = cat_key
             row._cb = cb
             if not self._multi:
-                row.mousePressEvent = lambda e, fid=food_id: self._on_single_select(fid)
+                # Event filter instead of assigning row.mousePressEvent:
+                # shadowing the C++ virtual with a Python closure keeps a
+                # reference cycle alive and is not reliably dispatched by
+                # PyQt6 (documented crash pattern in AGENTS.md).
+                row.installEventFilter(_FoodRowClick(food_id, self, row))
             self._list_layout.addWidget(row)
         self._list_layout.addStretch()
 

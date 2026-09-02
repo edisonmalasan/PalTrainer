@@ -136,16 +136,20 @@ class PalInfoHandlerMixin:
         self._refresh()
 
     def _start_star_shine(self):
-        if hasattr(self, '_star_shine_timer') and self._star_shine_timer:
-            return
-        self._star_shine_timer = QTimer()
-        self._star_shine_timer.timeout.connect(self._tick_star_shine)
-        self._star_shine_timer.start(1200)
+        # The timer must stay parented to this widget: an unparented QTimer
+        # survives the C++ widget tree and would fire _tick_star_shine into
+        # destroyed star labels. Reuse the timer created in _build_body.
+        timer = getattr(self, '_star_shine_timer', None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.timeout.connect(self._tick_star_shine)
+            self._star_shine_timer = timer
+        timer.start(1200)
 
     def _stop_star_shine(self):
-        if hasattr(self, '_star_shine_timer') and self._star_shine_timer:
-            self._star_shine_timer.stop()
-            self._star_shine_timer = None
+        timer = getattr(self, '_star_shine_timer', None)
+        if timer is not None:
+            timer.stop()
 
     def _tick_star_shine(self):
         self._star_shine_phase = (self._star_shine_phase + 0.0032) % 1.0

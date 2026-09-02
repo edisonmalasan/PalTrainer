@@ -133,6 +133,7 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
                     parent = widget
                     break
     overlay_widget = None
+    overlay_resizer = None
     if mode == 'header' and constants.header_loading_widget is not None:
         try:
             constants.header_loading_widget.set_loading_state('loading')
@@ -175,6 +176,7 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
         overlay_widget.show()
         overlay_widget.raise_()
         start_ts = time.time()
+
         def cycle_phrase():
             try:
                 phrase_lbl.setText(random.choice(phrases))
@@ -194,7 +196,8 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
         tt.timeout.connect(tick)
         tt.setInterval(250)
         tt.start()
-        parent.installEventFilter(OverlayResizer(overlay_widget))
+        overlay_resizer = OverlayResizer(overlay_widget)
+        parent.installEventFilter(overlay_resizer)
     result = {'data': None, 'done': False}
     def task():
         from ui_debug import log, log_exception
@@ -224,9 +227,20 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
             except RuntimeError:
                 pass
         if overlay_widget:
+            # Tear the overlay down completely: previously it was only
+            # hidden and orphaned via setParent(None), leaking a top-level
+            # widget with two running timers plus one OverlayResizer event
+            # filter on the window per run_with_loading call.
+            try:
+                if overlay_resizer is not None and parent is not None:
+                    parent.removeEventFilter(overlay_resizer)
+            except RuntimeError:
+                pass
             try:
                 overlay_widget.hide()
-                overlay_widget.setParent(None)
+                for child in overlay_widget.findChildren(QTimer):
+                    child.stop()
+                overlay_widget.deleteLater()
             except RuntimeError:
                 pass
         res = result['data']

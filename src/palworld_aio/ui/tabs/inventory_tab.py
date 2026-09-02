@@ -746,7 +746,7 @@ class StatsPanelWidget(QFrame):
             self._ability_status.setText(t('inventory.abilities_no_player_selected', default='No player loaded'))
             self._ability_status.setStyleSheet('color: #fbbf24; font-size: 10px; padding: 2px 4px;')
             return
-        from palworld_aio.utils import sav_to_gvasfile
+        from palworld_aio.inventory.inventory_manager import get_cached_player_gvas
         try:
             uid_clean = str(self._player_uid).replace('-', '').upper()
             sav_path = os.path.join(constants.current_save_path, 'Players', f'{uid_clean}.sav')
@@ -754,7 +754,11 @@ class StatsPanelWidget(QFrame):
                 self._ability_status.setText(t('inventory.abilities_no_player_selected', default='No player loaded'))
                 self._ability_status.setStyleSheet('color: #fbbf24; font-size: 10px; padding: 2px 4px;')
                 return
-            gvas = sav_to_gvasfile(sav_path)
+            # Reuse the cached GvasFile: re-decompressing the player sav on
+            # the GUI thread froze the window on every abilities tab load.
+            gvas = get_cached_player_gvas(uid_clean)
+            if gvas is None:
+                return
             sd = gvas.properties.get('SaveData', {}).get('value', {})
             rd = sd.get('RecordData', {}).get('value', {})
             rmap = rd.get('RelicPossessNumMap', {}).get('value', [])
@@ -944,12 +948,15 @@ class MissionPanelWidget(QFrame):
         self._player_uid = uid
         self._active_set = set(); self._completed_set = set()
         try:
-            from palworld_aio.utils import sav_to_gvasfile
+            from palworld_aio.inventory.inventory_manager import get_cached_player_gvas
             save_path = os.path.join(constants.current_save_path, 'Players', f'{self._uid_filename(uid)}.sav')
             if not os.path.exists(save_path):
                 self._rebuild_list()
                 return
-            gvas = sav_to_gvasfile(save_path)
+            gvas = get_cached_player_gvas(self._uid_filename(uid))
+            if gvas is None:
+                self._rebuild_list()
+                return
             sd = gvas.properties.get('SaveData', {}).get('value', {})
             completed = sd.get('CompletedQuestArray_FullRelease', {}).get('value', {}).get('values', [])
             if isinstance(completed, list):
@@ -1026,10 +1033,11 @@ class MissionPanelWidget(QFrame):
     def _get_selected_qids(self):
         return [entry['qid'] for entry in self._quest_rows if entry['cb'].isChecked()]
     def _gvas_for_player(self):
-        from palworld_aio.utils import sav_to_gvasfile
+        from palworld_aio.inventory.inventory_manager import get_cached_player_gvas
         save_path = os.path.join(constants.current_save_path, 'Players', f'{self._uid_filename(self._player_uid)}.sav')
         if not os.path.exists(save_path): return None, None
-        gvas = sav_to_gvasfile(save_path)
+        gvas = get_cached_player_gvas(self._uid_filename(self._player_uid))
+        if gvas is None: return None, None
         sd = gvas.properties.get('SaveData', {}).get('value', {})
         return gvas, sd
     def _save(self, gvas):
@@ -1134,11 +1142,13 @@ class TechnologyPanelWidget(QFrame):
         self._player_uid = uid
         self._unlocked = set(); self._tp_value = 0; self._atp_value = 0
         try:
-            from palworld_aio.utils import sav_to_gvasfile
+            from palworld_aio.inventory.inventory_manager import get_cached_player_gvas
             save_path = os.path.join(constants.current_save_path, 'Players', f'{self._uid_filename(uid)}.sav')
             if not os.path.exists(save_path):
                 self._rebuild(); return
-            gvas = sav_to_gvasfile(save_path)
+            gvas = get_cached_player_gvas(self._uid_filename(uid))
+            if gvas is None:
+                self._rebuild(); return
             sd = gvas.properties.get('SaveData', {}).get('value', {})
             uv = sd.get('UnlockedRecipeTechnologyNames', {}).get('value', {}).get('values', [])
             if isinstance(uv, list):

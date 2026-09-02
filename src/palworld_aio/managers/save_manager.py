@@ -47,6 +47,8 @@ class SaveManager(QObject):
         super().__init__()
         self.dps_tasks = []
         self.player_sav_cache = {}
+        # Written from selection workers, read/cleared on the GUI thread.
+        self.player_sav_cache_lock = threading.Lock()
         self._xgp_temp_dir = None
         self._disabled_adapters: list[str] = []
 
@@ -367,7 +369,8 @@ class SaveManager(QObject):
                         p_box = p_prop.get('PalStorageContainerId', {}).get('value', {}).get('ID', {}).get('value')
                         p_party = p_prop.get('OtomoCharacterContainerId', {}).get('value', {}).get('ID', {}).get('value')
                         # Cache full SaveData for reuse in _top_process_player / editor
-                        self.player_sav_cache[p_uid] = p_prop
+                        with self.player_sav_cache_lock:
+                            self.player_sav_cache[p_uid] = p_prop
                         if p_box and p_party:
                             return (p_uid, {'Party': str(p_party).lower(), 'PalBox': str(p_box).lower()})
                     except:
@@ -896,11 +899,13 @@ class SaveManager(QObject):
         dps_file = os.path.join(playerdir, f'{clean_uid}_dps.sav')
         if os.path.isfile(sav_file):
             try:
-                save_data = self.player_sav_cache.get(clean_lower)
+                with self.player_sav_cache_lock:
+                    save_data = self.player_sav_cache.get(clean_lower)
                 if save_data is None:
                     gvas_file = sav_to_gvasfile(sav_file)
                     save_data = gvas_file.properties.get('SaveData', {}).get('value', {})
-                    self.player_sav_cache[clean_lower] = save_data
+                    with self.player_sav_cache_lock:
+                        self.player_sav_cache[clean_lower] = save_data
                 record_data = save_data.get('RecordData', {}).get('value', {})
                 pal_capture_count_list = record_data.get('PalCaptureCount', {}).get('value', [])
                 uniques = len(pal_capture_count_list) if pal_capture_count_list else 0
@@ -1007,6 +1012,26 @@ class SaveManager(QObject):
             print(f'Created Json Logger: {json_file_path}')
         except Exception as e:
             print(f'Error creating Json Logger: {e}')
+_DPS_SCAN_MAX_ENTRIES = 5000
+
+
+def _dps_entry_instance_id(entry):
+    """Stable identity key for a SaveParameterArray entry.
+
+    The InstanceId lives on the entry itself (a sibling of SaveParameter) as
+    ``InstanceId.value.InstanceId.value.ID.value``. Entries that only pad the
+    array share the all-zero UUID.
+    """
+    try:
+        inner = entry.get('InstanceId', {}).get('value', {}).get('InstanceId', {})
+        val = inner.get('value', None)
+        if isinstance(val, dict):
+            return str(val.get('ID', {}).get('value', ''))
+        return str(val) if val is not None else ''
+    except AttributeError:
+        return ''
+
+
 def _process_dps_scan_worker(args):
     uid, pname, dps_file, log_folder = args
     PALMAP = load_game_data_map('characters.json', 'pals')
@@ -1021,7 +1046,32 @@ def _process_dps_scan_worker(args):
         save_param_array = gvas_file.properties.get('SaveParameterArray', {}).get('value', {}).get('values', [])
         if not save_param_array:
             return (uid, pname, formatted_pals, illegal_pals)
-        for idx, entry in enumerate(save_param_array):
+        # A glitched _dps.sav can pad the array with thousands of identical
+        # placeholder entries (observed: 9600 entries where 8212 were empty
+        # slots sharing the all-zero InstanceId). Collapsing identical
+        # InstanceIds keeps the scan O(unique pals) without touching the file.
+        seen_ids = set()
+        deduped = []
+        duplicate_count = 0
+        for entry in save_param_array:
+            if not isinstance(entry, dict):
+                continue
+            inst_key = _dps_entry_instance_id(entry)
+            if inst_key and inst_key in seen_ids:
+                duplicate_count += 1
+                continue
+            if inst_key:
+                seen_ids.add(inst_key)
+            deduped.append(entry)
+        if duplicate_count:
+            print(f'Warning: {pname} DPS storage contains {duplicate_count} '
+                  f'duplicate placeholder entries; they were skipped for the '
+                  f'scan log (the save file itself is not modified).')
+        if len(deduped) > _DPS_SCAN_MAX_ENTRIES:
+            print(f'Warning: {pname} DPS storage holds {len(deduped)} pals; '
+                  f'only the first {_DPS_SCAN_MAX_ENTRIES} were scanned.')
+            deduped = deduped[:_DPS_SCAN_MAX_ENTRIES]
+        for idx, entry in enumerate(deduped):
             if not isinstance(entry, dict):
                 continue
             try:

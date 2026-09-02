@@ -324,6 +324,12 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
             self.dps_gvas = sav_to_gvasfile(self.dps_file_path)
             save_param_array = self.dps_gvas.properties.get('SaveParameterArray', {}).get('value', {}).get('values', [])
             self.dps_total_slots = len(save_param_array)
+            # Glitched _dps.sav files can pad the array with thousands of
+            # identical placeholder entries (all-zero InstanceId). A repeated
+            # InstanceId is skipped so the widget grid shows each unique pal
+            # once; writes keep touching the original gvas untouched.
+            from palworld_aio.managers.save_manager import _dps_entry_instance_id
+            seen_ids = set()
             for idx, entry in enumerate(save_param_array):
                 if not isinstance(entry, dict):
                     continue
@@ -336,6 +342,11 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
                 char_id = extract_value(sp, 'CharacterID', 'None')
                 if char_id == 'None' or not char_id:
                     continue
+                inst_key = _dps_entry_instance_id(entry)
+                if inst_key:
+                    if inst_key in seen_ids:
+                        continue
+                    seen_ids.add(inst_key)
                 self.dps_pals[idx] = {'data': sp}
             self.dps_loaded = True
         except Exception as e:
@@ -2216,14 +2227,16 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
                     if p_uid_raw == target_uid:
                         self.player_sav_path = os.path.join(players_dir, filename)
                         from palworld_aio.managers.save_manager import save_manager as _sm
-                        save_data = _sm.player_sav_cache.get(target_uid) if target_uid else None
+                        with _sm.player_sav_cache_lock:
+                            save_data = _sm.player_sav_cache.get(target_uid) if target_uid else None
                         if not save_data:
                             try:
                                 p_gvas = sav_to_gvasfile(self.player_sav_path)
                                 p_prop = p_gvas.properties.get('SaveData', {})
                                 save_data = p_prop.get('value', {}) if isinstance(p_prop, dict) else None
                                 if save_data and target_uid:
-                                    _sm.player_sav_cache[target_uid] = save_data
+                                    with _sm.player_sav_cache_lock:
+                                        _sm.player_sav_cache[target_uid] = save_data
                             except Exception as e:
                                 print(f'Error loading player container IDs: {e}')
                         if save_data:
@@ -2353,15 +2366,19 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
             return
         if not cmap:
             return
-        self.party_pals = {}
-        self.palbox_pal_dict = {}
+        # Build into locals and swap atomically: apply_player_ui iterates
+        # party_pals / palbox_pal_dict on the GUI thread while this worker may
+        # still be filling them. In-place mutation here caused
+        # "dictionary changed size during iteration" inside GUI slots.
+        party_pals = {}
+        palbox_pal_dict = {}
         target_uid = self.player_uid.replace('-', '').lower() if self.player_uid else ''
         target_party = str(self.party_container).lower() if self.party_container else ''
         target_palbox = str(self.palbox_container).lower() if self.palbox_container else ''
         containers_raw = constants.loaded_level_json['properties']['worldSaveData']['value'].get('CharacterContainerSaveData', {})
         containers_list = containers_raw.get('value', []) if isinstance(containers_raw, dict) else []
         ownership = ContainerOwnership.build(cmap, containers_list)
-        self.total_slots = 960
+        total_slots = 960
         if target_palbox:
             for cont in containers_list:
                 try:
@@ -2369,7 +2386,7 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
                     if str(cid).lower() == target_palbox:
                         sn = cont['value']['SlotNum']['value']
                         if isinstance(sn, (int, float)) and sn >= 30:
-                            self.total_slots = int(sn)
+                            total_slots = int(sn)
                         break
                 except (KeyError, TypeError):
                     continue
@@ -2394,14 +2411,17 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
                         continue
                 slot_index = raw.get('SlotId', {}).get('value', {}).get('SlotIndex', {}).get('value', 0)
                 if slot_id_str == target_party:
-                    self.party_pals[slot_index] = item
+                    party_pals[slot_index] = item
                 elif slot_id_str == target_palbox:
                     csi = ownership.get_slot_index(inst_id)
                     if csi is not None:
                         slot_index = csi
-                    self.palbox_pal_dict[slot_index] = item
+                    palbox_pal_dict[slot_index] = item
             except (KeyError, TypeError, AttributeError):
                 continue
+        self.party_pals = party_pals
+        self.palbox_pal_dict = palbox_pal_dict
+        self.total_slots = total_slots
     def _update_party_slots(self):
         for slot in self.party_slots:
             slot.pal_data = None

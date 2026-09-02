@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
+import threading
 import time
 
 from palworld_aio import constants
@@ -76,6 +77,9 @@ class SaveSession:
         self.dps_futures: list = []
         self.dps_tasks: list = []
         self.player_sav_cache: dict = {}
+        # Mirror of save_manager.player_sav_cache_lock; the cache can be
+        # touched from selection workers as well as the GUI thread.
+        self.player_sav_cache_lock = threading.Lock()
         self._xgp_temp_dir: str | None = None
         self._disabled_adapters: list[str] = []
         self.last_guild_mapping_error: str | None = None
@@ -161,7 +165,8 @@ class SaveSession:
         import gc
         gc.collect()
         self.dps_tasks.clear()
-        self.player_sav_cache.clear()
+        with self.player_sav_cache_lock:
+            self.player_sav_cache.clear()
         if self._xgp_temp_dir:
             shutil.rmtree(self._xgp_temp_dir, ignore_errors=True)
             self._xgp_temp_dir = None
