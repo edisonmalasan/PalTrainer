@@ -246,6 +246,9 @@ class SaveSession:
     # ------------------------------------------------------------------
 
     def load(self, path: str) -> bool:
+        import os as _os
+        from ui_debug import log, log_exception
+        log('session.load.begin', path=path, size=_os.path.getsize(path) if _os.path.isfile(path) else None)
         if not os.path.isfile(path):
             return False
         constants.current_save_path = os.path.dirname(path)
@@ -256,7 +259,9 @@ class SaveSession:
             constants.loaded_level_json = sav_to_gvas_wrapper(path)
             constants.loaded_level_mtime = os.path.getmtime(path)
         except Exception:
+            log_exception('session.load.parse_failed')
             return False
+        log('session.load.parsed')
         constants.invalidate_container_lookup()
         refresh_death_bag_protection()
         from palworld_aio.inventory.dynamic_item_manager import get_dynamic_item_manager
@@ -268,11 +273,15 @@ class SaveSession:
         try:
             if hasattr(MappingCacheObject, 'clear_cache'):
                 MappingCacheObject.clear_cache()
+            log('session.load.mapping_begin')
             constants.srcGuildMapping = MappingCacheObject.get(data_source, use_mp=True)
+            log('session.load.mapping_done')
             if constants.srcGuildMapping._worldSaveData.get('GroupSaveDataMap') is None:
                 constants.srcGuildMapping.GroupSaveDataMap = {}
             self.last_guild_mapping_error = None
         except Exception as e:
+            from ui_debug import log_exception
+            log_exception('session.load.mapping_failed')
             constants.srcGuildMapping = None
             self.last_guild_mapping_error = str(e)
         constants.base_guild_lookup = {}

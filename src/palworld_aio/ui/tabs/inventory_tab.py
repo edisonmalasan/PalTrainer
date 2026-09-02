@@ -2810,12 +2810,17 @@ class PlayerInventoryTab(QWidget):
     def select_player(self, uid, name, display):
         if self._syncing:
             return
+        gen = self._selection_generation = getattr(self, '_selection_generation', 0) + 1
+
         def task():
             self.current_player_uid = uid
             self.current_player_name = name
             self.modified = False
             return get_player_inventory(self.current_player_uid)
+
         def on_finished(inv):
+            if self._selection_generation != gen:
+                return
             self.inventory = inv
             self.player_select_btn.setText(display)
             self.inv_tabs.setCurrentIndex(0)

@@ -36,43 +36,43 @@ class PalFrame(QFrame):
         with cls._maps_loaded_lock:
             if cls._maps_loaded:
                 return
-        cls._PASSMAP = dm.load_game_data_map('skills.json', 'passives')
-        cls._SKILLMAP = dm.load_game_data_map('skills.json', 'skills')
-        PALMAP = dm.load_game_data_map('characters.json', 'pals')
-        NPCMAP = dm.load_game_data_map('characters.json', 'npcs')
-        cls._PALMAP = PALMAP
-        cls._NAMEMAP = {**PALMAP, **NPCMAP}
-        cls._PAL_ZUKAN = {}
-        try:
-            base_dir = constants.get_base_path()
-            fp = resource_path(base_dir, 'game_data', 'characters.json')
-            js = json_tools.load(fp)
-            if isinstance(js, dict):
-                pals = js.get('pals', [])
-                for p in pals:
-                    if isinstance(p, dict) and 'asset' in p and ('stats' in p):
-                        asset_lower = p['asset'].lower()
-                        zukan_index = p['stats'].get('zukan_index', 0)
-                        cls._PAL_ZUKAN[asset_lower] = zukan_index
-        except Exception:
-            pass
-        cls._PASSFLAGS = {}
-        try:
-            fp = resource_path(constants.get_base_path(), 'game_data', 'skills.json')
-            js = json_tools.load(fp)
-            if isinstance(js, dict):
-                data = js.get('passives', [])
-                for x in data:
-                    if isinstance(x, dict) and 'asset' in x:
-                        asset_lower = x['asset'].lower()
-                        if 'rank' in x:
-                            cls._PASSRANK[asset_lower] = x['rank']
-                        cls._PASSFLAGS[asset_lower] = {'category': x.get('category', '')}
-        except Exception:
-            pass
-        cls._PASSMAP = {k: v for k, v in cls._PASSMAP.items() if not any((exc in v.lower() for exc in dm._SKILL_EXCLUSION_NAMES))}
-        cls._PASSMAP = {passive_id: name for passive_id, name in cls._PASSMAP.items() if cls._is_pal_passive(passive_id)}
-        cls._maps_loaded = True
+            cls._PASSMAP = dm.load_game_data_map('skills.json', 'passives')
+            cls._SKILLMAP = dm.load_game_data_map('skills.json', 'skills')
+            PALMAP = dm.load_game_data_map('characters.json', 'pals')
+            NPCMAP = dm.load_game_data_map('characters.json', 'npcs')
+            cls._PALMAP = PALMAP
+            cls._NAMEMAP = {**PALMAP, **NPCMAP}
+            cls._PAL_ZUKAN = {}
+            try:
+                base_dir = constants.get_base_path()
+                fp = resource_path(base_dir, 'game_data', 'characters.json')
+                js = json_tools.load(fp)
+                if isinstance(js, dict):
+                    pals = js.get('pals', [])
+                    for p in pals:
+                        if isinstance(p, dict) and 'asset' in p and ('stats' in p):
+                            asset_lower = p['asset'].lower()
+                            zukan_index = p['stats'].get('zukan_index', 0)
+                            cls._PAL_ZUKAN[asset_lower] = zukan_index
+            except Exception:
+                pass
+            cls._PASSFLAGS = {}
+            try:
+                fp = resource_path(constants.get_base_path(), 'game_data', 'skills.json')
+                js = json_tools.load(fp)
+                if isinstance(js, dict):
+                    data = js.get('passives', [])
+                    for x in data:
+                        if isinstance(x, dict) and 'asset' in x:
+                            asset_lower = x['asset'].lower()
+                            if 'rank' in x:
+                                cls._PASSRANK[asset_lower] = x['rank']
+                            cls._PASSFLAGS[asset_lower] = {'category': x.get('category', '')}
+            except Exception:
+                pass
+            cls._PASSMAP = {k: v for k, v in cls._PASSMAP.items() if not any((exc in v.lower() for exc in dm._SKILL_EXCLUSION_NAMES))}
+            cls._PASSMAP = {passive_id: name for passive_id, name in cls._PASSMAP.items() if cls._is_pal_passive(passive_id)}
+            cls._maps_loaded = True
     def __init__(self, pal_item, parent=None):
         super().__init__(parent)
         self._load_maps()

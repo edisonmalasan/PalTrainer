@@ -1,10 +1,16 @@
-import os
+﻿import os
 import sys
 import platform
 import logging
 import threading
+import time
 logger = logging.getLogger(__name__)
 from palsav.compressor import Compressor, SaveType
+try:
+    from ui_debug import log as _ui_log
+except ImportError:
+    def _ui_log(event, **fields):
+        return None
 # Kraken decode/encode writes past the caller-provided buffer by design
 # (SAFE_SPACE) and must never run concurrently: overlapping calls corrupt
 # the heap and surface as access violations elsewhere in the process.
@@ -71,8 +77,12 @@ class OozLib(Compressor):
         if save_type != SaveType.PLM.value:
             raise ValueError(f'Unhandled compression type: 0x{save_type:02X}, only 0x31 (PLM) is supported')
         logger.debug('Compressing data...')
+        import threading as _th
+        _t0 = time.perf_counter()
+        _ui_log('oodle.compress.begin', size=uncompressed_len, thread=_th.current_thread().ident)
         with _PALOOZ_LOCK:
             compressed_data = self.palooz.compress(OodleCompressor.Kraken, OodleLevel.Normal, data, uncompressed_len)
+        _ui_log('oodle.compress.end', out=len(compressed_data) if compressed_data else None, took=round(time.perf_counter() - _t0, 3))
         if not compressed_data:
             raise RuntimeError(f'palooz compress failed or returned empty result (code: {compressed_data})')
         compressed_len = len(compressed_data)
@@ -96,6 +106,16 @@ class OozLib(Compressor):
         elif format_result == -1:
             raise ValueError('Unknown SAV file format')
         uncompressed_len, compressed_len, magic, save_type, data_offset = self._parse_sav_header(data)
+        if uncompressed_len <= 0:
+            raise ValueError('Invalid SAV header: uncompressed size must be positive')
+        if compressed_len <= 0:
+            raise ValueError('Invalid SAV header: compressed size must be positive')
+        data_end = data_offset + compressed_len
+        if data_end > len(data):
+            raise ValueError(
+                f'Invalid SAV header: compressed payload ends at {data_end} '
+                f'bytes, file contains {len(data)} bytes'
+            )
         logger.debug('File information (Decompress):')
         logger.debug(f"  Magic bytes: {magic.decode('ascii', errors='ignore')}")
         logger.debug(f'  Save type: 0x{save_type:02X}')
@@ -104,8 +124,16 @@ class OozLib(Compressor):
         logger.debug(f'  Data offset: {data_offset} bytes')
         logger.debug('Detected PLM format (Oodle), starting decompression...')
         compressed_data = data[data_offset:data_offset + compressed_len]
+        import threading as _th
+        _t0 = time.perf_counter()
+        _stk = ''
+        if _th.current_thread() is _th.main_thread():
+            import traceback as _tb
+            _stk = ' <- '.join(f'{_tb.extract_stack()[-i-2].name}:{_tb.extract_stack()[-i-2].lineno}' for i in range(4))
+        _ui_log('oodle.decompress.begin', size=uncompressed_len, thread=_th.current_thread().ident, gui_stack=_stk)
         with _PALOOZ_LOCK:
             decompressed = self.palooz.decompress(compressed_data, uncompressed_len)
+        _ui_log('oodle.decompress.end', took=round(time.perf_counter() - _t0, 3))
         if len(decompressed) != uncompressed_len:
             raise ValueError(f'Decompressed data length {len(decompressed)} does not match expected uncompressed length {uncompressed_len}')
         logger.info(f'Decompression successful, decompressed size: {len(decompressed):,} bytes')
