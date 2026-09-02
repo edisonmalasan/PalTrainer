@@ -1223,7 +1223,7 @@ class TechnologyPanelWidget(QFrame):
         cl = QLabel(str(tech.get('cost', 0)))
         cl.setObjectName('cost_label')
         cl.setAlignment(Qt.AlignCenter)
-        cl.setStyleSheet('font-size: 9px; font-weight: 700; color: #fbbf24; background: transparent;')
+        cl.setStyleSheet('font-size: 11px; font-weight: 700; color: #fbbf24; background: transparent;')
         vl.addWidget(cl)
         nl = QLabel(tech.get('name', ''))
         nl.setObjectName('name_label')
@@ -1284,44 +1284,6 @@ class TechnologyPanelWidget(QFrame):
         for asset, frame in self._tech_buttons.items():
             self._apply_tech_style(frame, asset)
         self._scroll_ct.update()
-    def _make_tech_button(self, tech):
-        asset = tech.get('asset', '')
-        frame = QFrame()
-        frame.setFixedSize(self.BUTTON_SIZE, self.BUTTON_SIZE)
-        frame.setCursor(Qt.PointingHandCursor)
-        frame._tech_asset = asset
-        frame.installEventFilter(self)
-        name = tech.get('name', '')
-        tip = f'<b>{name}</b><br>({asset})'
-        tech_desc = tech.get('description', '')
-        if tech_desc:
-            cleaned = _clean_desc_for_tooltip(tech_desc)
-            tip += f'<br><br>{wrap_tooltip_text(cleaned)}'
-        tip += f'<br><br>Level {tech.get("level_cap",0)}  Cost: {tech.get("cost",0)}'
-        frame.setToolTip(tip)
-        vl = QVBoxLayout(frame); vl.setContentsMargins(2, 2, 2, 2); vl.setSpacing(0)
-        icon = tech.get('icon', '')
-        if icon:
-            base_dir = constants.get_base_path()
-            fp = resource_path(base_dir, 'game_data', icon.lstrip('/'))
-            if os.path.exists(fp):
-                pix = QPixmap(fp)
-                il = QLabel()
-                il.setPixmap(pix.scaled(36, 36, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-                il.setAlignment(Qt.AlignCenter)
-                vl.addWidget(il, 1)
-        cl = QLabel(str(tech.get('cost', 0)))
-        cl.setObjectName('cost_label')
-        cl.setAlignment(Qt.AlignCenter)
-        cl.setStyleSheet('font-size: 9px; font-weight: 700; color: #fbbf24; background: transparent;')
-        vl.addWidget(cl)
-        nl = QLabel(tech.get('name', ''))
-        nl.setObjectName('name_label')
-        nl.setAlignment(Qt.AlignCenter)
-        vl.addWidget(nl)
-        self._apply_tech_style(frame, asset)
-        self._tech_buttons[asset] = frame
-        return frame
     def _toggle_tech(self, asset):
         key = asset.lower()
         if key in self._unlocked:
@@ -2022,11 +1984,6 @@ class InventoryGridWidget(QWidget):
         self.tab_label.setAlignment(Qt.AlignCenter)
         header.addWidget(self.tab_label)
         header.addStretch()
-        self.sort_btn = QPushButton(t('inventory.sort', default='Sort'))
-        self.sort_btn.setFixedHeight(24)
-        self.sort_btn.setStyleSheet('QPushButton { background: rgba(168,85,247,0.15); color: #a855f7; border: 1px solid rgba(168,85,247,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(168,85,247,0.25); border-color: rgba(168,85,247,0.5); color: #FFFFFF; }')
-        self.sort_btn.setCursor(Qt.PointingHandCursor)
-        self.sort_btn.clicked.connect(self._sort_items)
         self.effigies_btn = QPushButton(t('inventory.max_all_abilities', default='Max All Abilities'))
         self.effigies_btn.setFixedHeight(24)
         self.effigies_btn.setStyleSheet('QPushButton { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(251,191,36,0.25); border-color: rgba(251,191,36,0.5); color: #FFFFFF; }')
@@ -2210,13 +2167,6 @@ class InventoryGridWidget(QWidget):
                 if slot_widget.rect().contains(widget_pos):
                     self.empty_slot_context_menu.emit(self.container_type, idx, pos)
                     break
-    def _sort_items(self):
-        if not self.current_items:
-            return
-        sorted_items = sorted(self.current_items, key=lambda x: (x.get('category', 'zzz'), x.get('item_name', '')))
-        for i, item in enumerate(sorted_items):
-            item['slot_index'] = i
-        self.load_items(sorted_items)
     def refresh_labels(self):
         self.tab_label.setText(t(f'inventory.{self.container_type}', default=self.container_type.title()))
         self.sort_btn.setText(t('inventory.sort', default='Sort'))
