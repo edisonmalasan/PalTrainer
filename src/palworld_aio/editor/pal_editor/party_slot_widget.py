@@ -370,7 +370,7 @@ class PartySlotWidget(QFrame):
 
         # Release only direct children; nested controls are destroyed with
         # their direct parent and are not detached twice.
-        for child in self.findChildren(QWidget, Qt.FindDirectChildrenOnly):
+        for child in self.findChildren(QWidget, Qt.FindChildOption.FindDirectChildrenOnly):
             child.hide()
             child.setParent(None)
             child.deleteLater()
