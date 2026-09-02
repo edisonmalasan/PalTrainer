@@ -416,6 +416,20 @@ Phases map to the superseded milestones: Phase 1 = UI-005, Phase 2 = UI-003, Pha
 
 Each phase ships as one or more independent feature branches (`feat/ui-tokens`, `feat/ui-shell`, …) with buildable commits.
 
+### Implementation status (updated as work lands)
+
+| Phase | Status | Notes |
+|---|---|---|
+| 1 — Foundation | **Done** | `feat/ui-tokens` commits `ed20e04`: token vocabulary in `constants.py`, `ui/chrome/tokens.py`, `ui/chrome/icons.py`, QSS dedup (1776→1438 lines, single-source blocks), scanner whitelist corrected to real paths, multi-select distinct + 1px jitter fix, global `:focus` rules, `saveBtn[dirty]` emphasis |
+| 2 — Shell | **Done** | commit `86f4421`: sidebar labels 7 pt→11 pt, expanded width 168, unified nav painting, header buttons 32×32 with accessible save name, results panel unlocked (320–480, splitter persisted), dirty-state save emphasis wired to `constants.dirty` |
+| 3 — Shared components | **Partial** | Done: menu emoji → registry glyphs, single-source tooltip style (`main.py` override removed), shared `TREE_WIDGET_QSS` (map/search deduped, alternating rows consistent), `EmptyState` widget (+ Mission/Technology empty states), inventory duplicate defs removed. Remaining: button/input QSS classes, hover-overlay merge, loading unification, menu consolidation |
+| 4a — Screens wave 1 | Not started | 11 px font floor already applied globally (commit `5e61382`); per-screen restyle pending |
+| 4b — Screens wave 2 | Not started | |
+| 5 — States & a11y | **Partial** | Global `:focus` QSS + accessible save-button name landed; tab-order sweep pending |
+| 6 — Cleanup | **Partial** | Dead `menus.py` removed. `legacy_frame.py` verified LIVE (6 importers) — plan's delete-candidate overruled by verification, stays. Remaining: `is_dark` plumbing, timer lifecycle, processEvents/dialog-hack refactors |
+
+Runtime smoke verification (offscreen `MainWindow` construction): 18/18 checks pass — sidebar sizing/labels, results panel bounds, dirty-state property, multi-select distinctness, icon registry, QSS focus rules. Test suite: 441 passed; 2 failures pre-existing on `main` (missing `assets/branding/PalTrainer.png`, unrelated to UI).
+
 ## 11. Priority Matrix
 
 | Priority | Items |
