@@ -2406,5 +2406,9 @@
     "inventory.palpedia_selected": "{count} selecionado",
     "inventory.palpedia_save_failed": "Falha ao salvar as alterações da Palpedia",
     "inventory.palpedia_click_register": "Clique para registrar",
-    "inventory.palpedia_click_unregister": "Clique para cancelar o registro"
+    "inventory.palpedia_click_unregister": "Clique para cancelar o registro",
+    "sidebar.section.inspect": "Carregar e inspecionar",
+    "sidebar.section.world": "Dados do mundo",
+    "sidebar.section.editing": "Edição",
+    "sidebar.section.reference": "Referência"
 }

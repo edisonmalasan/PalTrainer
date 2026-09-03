@@ -1,7 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QSizePolicy, QPushButton
 from PyQt6.QtCore import Qt, pyqtSignal
 from i18n import t
-from palworld_aio import constants
 from palworld_aio.widgets import StatsPanel
 class ResultsWidget(QWidget):
     hide_requested = pyqtSignal()
@@ -33,29 +32,13 @@ class ResultsWidget(QWidget):
         self.results_title = QLabel(t('deletion.results_panel') if t else 'Selection & Stats')
         self.results_title.setObjectName('sectionHeader')
         self.results_title.setAlignment(Qt.AlignCenter)
-        self.results_title.setStyleSheet(f'QLabel#sectionHeader {{ margin-left: 0px; padding-left: 10px; font-size: {constants.FONT_SIZE_PX_SECTION}px; font-weight: 600; }}')
         title_layout = QHBoxLayout()
         title_layout.addWidget(self.results_title)
         self.close_btn = QPushButton('\u2715')
         self.close_btn.setFixedSize(28, 28)
         self.close_btn.setToolTip(t('sidebar.close') if t else 'Hide Results')
         self.close_btn.setObjectName('resultsCloseBtn')
-        self.close_btn.setStyleSheet('''
-            QPushButton#resultsCloseBtn {
-                background: rgba(125,211,252,0.10);
-                color: #7DD3FC;
-                border: 1px solid rgba(125,211,252,0.2);
-                border-radius: 6px;
-                font-size: 14px;
-                font-weight: 600;
-                padding: 0;
-            }
-            QPushButton#resultsCloseBtn:hover {
-                background: rgba(125,211,252,0.2);
-                border-color: rgba(125,211,252,0.4);
-                color: #FFFFFF;
-            }
-        ''')
+        self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.close_btn.clicked.connect(self.hide_requested.emit)
         title_layout.addWidget(self.close_btn)
         title_layout.addStretch()
@@ -86,7 +69,6 @@ class ResultsWidget(QWidget):
         self.stats_title = QLabel(t('deletion.stats_panel') if t else 'Statistics')
         self.stats_title.setObjectName('sectionHeader')
         self.stats_title.setAlignment(Qt.AlignCenter)
-        self.stats_title.setStyleSheet(f'QLabel#sectionHeader {{ margin-left: 0px; padding-left: 10px; font-size: {constants.FONT_SIZE_PX_SECTION}px; font-weight: 600; }}')
         layout.addWidget(self.stats_title)
         stats_frame = QFrame()
         stats_frame.setObjectName('glassPanel')
@@ -111,33 +93,32 @@ class ResultsWidget(QWidget):
         card_layout.setSpacing(4)
         label = QLabel(label_text)
         label.setObjectName('statsField')
-        label.setStyleSheet('')
         card_layout.addWidget(label)
-        value_label = QLabel('N/A')
+        value_label = QLabel('—')
         value_label.setObjectName('statsValue')
-        value_label.setStyleSheet('')
+        value_label.setProperty('placeholder', 'true')
         value_label.setWordWrap(True)
         card_layout.addWidget(value_label)
         return {'container': container, 'value_label': value_label, 'label': label}
+    def _set_value(self, label, name):
+        if name:
+            label.setText(str(name))
+            label.setProperty('placeholder', 'false')
+        else:
+            label.setText('—')
+            label.setProperty('placeholder', 'true')
+        label.style().unpolish(label)
+        label.style().polish(label)
     def set_player(self, name):
-        if name:
-            self.player_value.setText(str(name))
-        else:
-            self.player_value.setText('N/A')
+        self._set_value(self.player_value, name)
     def set_guild(self, name):
-        if name:
-            self.guild_value.setText(str(name))
-        else:
-            self.guild_value.setText('N/A')
+        self._set_value(self.guild_value, name)
     def set_base(self, base_id):
-        if base_id:
-            self.base_value.setText(str(base_id))
-        else:
-            self.base_value.setText('N/A')
+        self._set_value(self.base_value, base_id)
     def clear_selection(self):
-        self.player_value.setText('N/A')
-        self.guild_value.setText('N/A')
-        self.base_value.setText('N/A')
+        self.set_player(None)
+        self.set_guild(None)
+        self.set_base(None)
     def update_stats(self, stats):
         if hasattr(self, 'stats_panel') and self.stats_panel:
             self.stats_panel.update_stats(stats)

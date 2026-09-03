@@ -29,6 +29,27 @@ else:
     ACCENT_BG_STRONG = 'rgba(125,211,252,0.2)'
 class ThemeManager:
     _darkmode_content = None
+    _theme = None
+    @classmethod
+    def theme(cls):
+        return cls._theme or 'dark'
+    @classmethod
+    def set_theme(cls, name):
+        """Apply a named theme from the token system (falls back to file QSS)."""
+        cls._theme = name
+        try:
+            from palworld_aio.ui.chrome.qss_builder import build_qss
+            qss = build_qss(name)
+        except Exception:
+            return cls.apply_global()
+        try:
+            from PyQt6.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app:
+                app.setStyleSheet(qss)
+        except Exception:
+            pass
+        return True
     @classmethod
     def load_qss_content(cls):
         if cls._darkmode_content is None:
@@ -41,6 +62,9 @@ class ThemeManager:
         return cls._darkmode_content
     @classmethod
     def apply_global(cls):
+        # Applies the deployed theme file (generated global QSS + transitional
+        # extras). Runtime re-generation is not used here so un-migrated
+        # screens keep their objectName rules until their plan lands.
         qss = cls.load_qss_content()
         if not qss:
             return cls._apply_fallback_global()

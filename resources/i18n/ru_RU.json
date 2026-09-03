@@ -2117,5 +2117,9 @@
     "inventory.palpedia_selected": "{count} выбрано",
     "inventory.palpedia_save_failed": "Не удалось сохранить изменения Palpedia.",
     "inventory.palpedia_click_register": "Нажмите, чтобы зарегистрироваться",
-    "inventory.palpedia_click_unregister": "Нажмите, чтобы отменить регистрацию"
+    "inventory.palpedia_click_unregister": "Нажмите, чтобы отменить регистрацию",
+    "sidebar.section.inspect": "Загрузка и обзор",
+    "sidebar.section.world": "Данные мира",
+    "sidebar.section.editing": "Редактирование",
+    "sidebar.section.reference": "Справка"
 }

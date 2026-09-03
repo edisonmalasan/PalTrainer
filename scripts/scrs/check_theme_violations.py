@@ -80,6 +80,8 @@ WHITELIST_PATHS: Set[str] = {
     'palworld_aio/ui/styles.py',
     'palworld_aio/ui/chrome/styles.py',
     'palworld_aio/ui/chrome/tokens.py',
+    'palworld_aio/ui/chrome/qss_builder.py',
+    'palworld_aio/ui/chrome/fonts.py',
     'palworld_aio/ui/chrome/icons.py',
     'palworld_aio/constants.py',
     'palworld_aio/edit_pals.py',

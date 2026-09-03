@@ -21,7 +21,7 @@ from .tabs.tools_tab import center_on_parent, DropOverlay
 GITHUB_LATEST_ZIP = 'https://github.com/edisonmalasan/PalTrainer/releases/latest'
 from palworld_aio import constants
 from palworld_aio.shell_state import ShellStateModel
-from palworld_aio.ui.chrome.styles import ThemeManager, MENU_STYLE, DIALOG_STYLE as DARK_THEME_STYLE
+from palworld_aio.ui.chrome.styles import ThemeManager
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from palworld_aio.utils import as_uuid
 from palworld_aio.managers.save_manager import save_manager
@@ -86,9 +86,8 @@ class DetachedStatusWindow(QWidget):
         ThemeManager.apply_to_widget(self)
     def setup_status_ui(self):
         head = QHBoxLayout()
-        txt_color = '#dfeefc' if self.is_dark else '#000000'
         self.title_label = QLabel(t('console.title'))
-        self.title_label.setStyleSheet(f'font-weight: bold; font-size: 14px; color: {txt_color};')
+        self.title_label.setObjectName('consoleTitleLabel')
         head.addWidget(self.title_label)
         head.addStretch()
         self.close_btn = QPushButton('✕')
@@ -104,8 +103,6 @@ class DetachedStatusWindow(QWidget):
     def update_theme(self, is_dark):
         self.is_dark = is_dark
         self._load_theme()
-        txt_color = '#dfeefc' if self.is_dark else '#000000'
-        self.title_label.setStyleSheet(f'font-weight: bold; font-size: 14px; color: {txt_color};')
     def refresh_title(self):
         self.title_label.setText(t('console.title'))
     def append_message(self, text):
@@ -412,26 +409,22 @@ class MainWindow(QMainWindow):
         self.players_panel.tree.customContextMenuRequested.connect(self._show_player_context_menu)
         layout.addWidget(self.players_panel)
         bulk_frame = QFrame()
-        bulk_frame.setStyleSheet('QFrame { background-color: rgba(30, 35, 45, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 8px; }')
+        bulk_frame.setObjectName('bulkActionBar')
         bulk_layout = QHBoxLayout(bulk_frame)
         self.bulk_label = QLabel(t('player.bulk_actions') if t else 'Bulk Actions:')
-        self.bulk_label.setStyleSheet('font-weight: bold; color: #e2e8f0;')
+        self.bulk_label.setObjectName('bulkActionLabel')
         bulk_layout.addWidget(self.bulk_label)
         bulk_layout.addSpacing(10)
         self.bulk_item_btn = QPushButton(t('player.bulk_item_management') if t else 'Bulk Item Management')
-        self.bulk_item_btn.setStyleSheet('\n            QPushButton {\n                background: rgba(125, 211, 252, 0.12);\n                color: #7DD3FC;\n                border: 1px solid rgba(125, 211, 252, 0.2);\n                border-radius: 6px;\n                padding: 8px 16px;\n                font-weight: 600;\n            }\n            QPushButton:hover {\n                background: rgba(125, 211, 252, 0.2);\n                border-color: rgba(125, 211, 252, 0.4);\n                color: #FFFFFF;\n            }\n        ')
         self.bulk_item_btn.clicked.connect(self._open_bulk_player_item_dialog)
         bulk_layout.addWidget(self.bulk_item_btn)
         self.bulk_pal_btn = QPushButton(t('player.bulk_pal_management') if t else 'Bulk Pal Management')
-        self.bulk_pal_btn.setStyleSheet('\n            QPushButton {\n                background: rgba(125, 211, 252, 0.12);\n                color: #7DD3FC;\n                border: 1px solid rgba(125, 211, 252, 0.2);\n                border-radius: 6px;\n                padding: 8px 16px;\n                font-weight: 600;\n            }\n            QPushButton:hover {\n                background: rgba(125, 211, 252, 0.2);\n                border-color: rgba(125, 211, 252, 0.4);\n                color: #FFFFFF;\n            }\n        ')
         self.bulk_pal_btn.clicked.connect(self._open_bulk_player_pal_dialog)
         bulk_layout.addWidget(self.bulk_pal_btn)
         self.bulk_tech_btn = QPushButton(t('player.bulk_technology_management') if t else 'Bulk Technology Management')
-        self.bulk_tech_btn.setStyleSheet('\n            QPushButton {\n                background: rgba(125, 211, 252, 0.12);\n                color: #7DD3FC;\n                border: 1px solid rgba(125, 211, 252, 0.2);\n                border-radius: 6px;\n                padding: 8px 16px;\n                font-weight: 600;\n            }\n            QPushButton:hover {\n                background: rgba(125, 211, 252, 0.2);\n                border-color: rgba(125, 211, 252, 0.4);\n                color: #FFFFFF;\n            }\n        ')
         self.bulk_tech_btn.clicked.connect(self._open_bulk_technology_dialog)
         bulk_layout.addWidget(self.bulk_tech_btn)
         self.bulk_guild_btn = QPushButton(t('guild.assign.btn_open') if t else 'Guild Assignments')
-        self.bulk_guild_btn.setStyleSheet('\n            QPushButton {\n                background: rgba(125, 211, 252, 0.12);\n                color: #7DD3FC;\n                border: 1px solid rgba(125, 211, 252, 0.2);\n                border-radius: 6px;\n                padding: 8px 16px;\n                font-weight: 600;\n            }\n            QPushButton:hover {\n                background: rgba(125, 211, 252, 0.2);\n                border-color: rgba(125, 211, 252, 0.4);\n                color: #FFFFFF;\n            }\n        ')
         self.bulk_guild_btn.clicked.connect(self._open_guild_assign_dialog)
         bulk_layout.addWidget(self.bulk_guild_btn)
         bulk_layout.addStretch()
@@ -535,9 +528,23 @@ class MainWindow(QMainWindow):
         return action
     def _setup_connections(self):
         save_manager.load_started.connect(self.shell_state.begin_load)
+        save_manager.load_started.connect(self._on_shell_loading)
         save_manager.load_finished.connect(self._on_load_finished)
         save_manager.save_started.connect(self.shell_state.begin_save)
+        save_manager.save_started.connect(self._on_shell_saving)
         save_manager.save_finished.connect(self._on_save_finished)
+    def _on_shell_loading(self):
+        try:
+            from palworld_aio.shell_state import ShellState
+            self.header_widget.set_shell_state(ShellState.LOADING)
+        except (RuntimeError, AttributeError, ImportError):
+            pass
+    def _on_shell_saving(self):
+        try:
+            from palworld_aio.shell_state import ShellState
+            self.header_widget.set_shell_state(ShellState.SAVING)
+        except (RuntimeError, AttributeError, ImportError):
+            pass
     def _create_message_box(self, icon=QMessageBox.Information):
         msg_box = QMessageBox(self)
         msg_box.setWindowFlags(Qt.Dialog | Qt.WindowType.Window | Qt.WindowStaysOnTopHint)
@@ -665,6 +672,11 @@ class MainWindow(QMainWindow):
         pass
     def _on_load_finished(self, success):
         self.shell_state.finish_load(success)
+        try:
+            from palworld_aio.shell_state import ShellState
+            self.header_widget.set_shell_state(ShellState.LOADED if success else ShellState.ERROR)
+        except (RuntimeError, AttributeError, ImportError):
+            pass
         if success:
             if 'inventory_tab' in self.__dict__:
                 self.inventory_tab.clear_player()
@@ -693,6 +705,11 @@ class MainWindow(QMainWindow):
         self.shell_state.finish_save(True)
         constants.dirty = False
         self.header_widget.set_dirty(False)
+        try:
+            from palworld_aio.shell_state import ShellState
+            self.header_widget.set_shell_state(ShellState.LOADED)
+        except (RuntimeError, AttributeError, ImportError):
+            pass
         self.status_bar.showMessage(f"{(t('status.saved') if t else 'Save completed')}({duration:.2f}s)", 5000)
         if constants.xgp_loaded:
             return
@@ -955,7 +972,6 @@ class MainWindow(QMainWindow):
             dlg.setIntValue(effigy_qty)
             dlg.setIntRange(1, constants.MAX_QUANTITY)
             dlg.setInputMode(QInputDialog.IntInput)
-            dlg.setStyleSheet(DARK_THEME_STYLE)
             if dlg.exec() == QDialog.Accepted:
                 effigy_qty = dlg.intValue()
                 effigy_accepted = True
@@ -1941,12 +1957,11 @@ class MainWindow(QMainWindow):
         from palworld_aio.editor.pal_editor.pal_ops import get_name_mode, set_name_mode, set_sync_nickname
         dialog = QDialog(self)
         dialog.setWindowTitle(t('pal_name_settings.title') if t else 'Pal Name Settings')
-        dialog.setStyleSheet(DARK_THEME_STYLE)
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(10)
         mode_label = QLabel(t('pal_name_settings.mode_label') if t else 'Name new pals with:')
-        mode_label.setStyleSheet('font-weight: bold; color: #E2E8F0;')
+        mode_label.setObjectName('bulkActionLabel')
         layout.addWidget(mode_label)
         combo = QComboBox()
         combo.addItem(t('edit_pals.name_mode_new') if t else 'New', 'new')
@@ -1954,10 +1969,9 @@ class MainWindow(QMainWindow):
         combo.addItem(t('edit_pals.name_mode_none') if t else 'No Nickname', 'none')
         cur_mode = get_name_mode()
         combo.setCurrentIndex(list(('new', 'copy', 'none')).index(cur_mode) if cur_mode in ('new', 'copy', 'none') else 0)
-        combo.setStyleSheet('QComboBox { background: rgba(255,255,255,0.06); color: #E2E8F0; border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; padding: 4px 8px; }')
         layout.addWidget(combo)
         hint_label = QLabel(t('pal_name_settings.mode_hint') if t else 'Applies when creating pals (Pal Editor, base pals, Global Pal Storage) and to clones. A typed nickname always overrides it.')
-        hint_label.setStyleSheet('color: #94A3B8; font-size: 11px;')
+        hint_label.setObjectName('bulkHintLabel')
         hint_label.setWordWrap(True)
         layout.addWidget(hint_label)
         nickname_chk = ToggleCheckBtn(t('pal_name_settings.sync_nickname') if t else 'Apply nickname during Bulk Sync')

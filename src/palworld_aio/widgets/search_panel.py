@@ -3,7 +3,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
 from i18n import t
 from palworld_aio import constants
-from palworld_aio.ui.chrome.styles import CONTENT_PANEL_STYLE, TREE_WIDGET_QSS
+from palworld_aio.ui.chrome.styles import TREE_WIDGET_QSS
 _SORT_ROLE = Qt.UserRole + 1
 class _SortableTreeWidgetItem(QTreeWidgetItem):
     def __lt__(self, other):
@@ -33,29 +33,12 @@ class SearchPanel(QWidget):
         self.search_label = QLabel(t(self.label_key) if t else self.label_key)
         self.search_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
         self.search_label.setObjectName('sectionHeader')
-        self.search_label.setStyleSheet('QLabel#sectionHeader { margin-left: 0px; padding-left: 10px; }')
         self.search_label.setAlignment(Qt.AlignCenter)
         search_layout.addWidget(self.search_label)
         self.search_input = QLineEdit()
         self.search_input.setObjectName('searchInput')
         self.search_input.setPlaceholderText(t('search.placeholder') if t else 'Type to search...')
-        self.search_input.setStyleSheet(f'''
-            QLineEdit {{
-                background: rgba(18,20,24,0.65);
-                border: 1px solid rgba(125,211,252,0.15);
-                border-radius: 6px;
-                padding: 4px 8px;
-                color: #E2E8F0;
-                font-size: 11px;
-                min-height: 24px;
-            }}
-            QLineEdit:focus {{
-                border-color: rgba(125,211,252,0.4);
-            }}
-            QLineEdit::placeholder {{
-                color: #6B7280;
-            }}
-        ''')
+        self.search_input.setClearButtonEnabled(True)
         self.search_input.textChanged.connect(self._on_search)
         search_layout.addWidget(self.search_input, stretch=1)
         layout.addLayout(search_layout)

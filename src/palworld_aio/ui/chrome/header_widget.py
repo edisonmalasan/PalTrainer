@@ -1,5 +1,5 @@
 import os
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QSpacerItem, QSizePolicy
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QSpacerItem, QSizePolicy, QFrame
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QPoint, QTimer
 from PyQt6.QtGui import QPixmap, QFont, QCursor, QFontDatabase
 try:
@@ -19,6 +19,16 @@ class HeaderWidget(QWidget):
     about_clicked = pyqtSignal()
     save_clicked = pyqtSignal()
     toolbox_clicked = pyqtSignal()
+
+    _SAVE_STATE_STYLES = {
+        'no_save': None,
+        'loading': 'loading',
+        'loaded': 'success',
+        'dirty': 'warning',
+        'saving': 'loading',
+        'error': 'danger',
+    }
+    _SPIN_FRAMES = '\u25D0\u25D3\u25D1\u25D2'
     def __init__(self, parent=None):
         super().__init__(parent)
         self._pulse_timer = None
@@ -102,6 +112,16 @@ class HeaderWidget(QWidget):
         self.game_version_label.setFont(QFont(constants.FONT_FAMILY_NERD, 11))
         self.game_version_label.setToolTip(t('game_version.tooltip', version=game_version) if t else f'Palworld v{game_version}')
         layout.addWidget(self.game_version_label, alignment=Qt.AlignVCenter)
+        layout.addSpacing(8)
+        from palworld_aio.shell_state import ShellState
+        self._shell_state = ShellState.NO_SAVE
+        self._spin_frame = 0
+        self._spin_timer = None
+        self.save_state_chip = QLabel()
+        self.save_state_chip.setObjectName('saveStateChip')
+        self.save_state_chip.setFont(QFont(constants.FONT_FAMILY_NERD, 11))
+        self.save_state_chip.setAlignment(Qt.AlignVCenter)
+        layout.addWidget(self.save_state_chip, alignment=Qt.AlignVCenter)
         btn_style = 'text-align: center;'
         self.info_btn = NerdBtn(nf.icons['nf-md-information'])
         self.info_btn.setObjectName('infoBtn')
@@ -257,6 +277,14 @@ class HeaderWidget(QWidget):
         self.save_btn.style().unpolish(self.save_btn)
         self.save_btn.style().polish(self.save_btn)
         self.save_btn.update()
+        try:
+            from palworld_aio.shell_state import ShellState
+            if dirty and self._shell_state == ShellState.LOADED:
+                self.set_shell_state(ShellState.DIRTY)
+            elif not dirty and self._shell_state == ShellState.DIRTY:
+                self.set_shell_state(ShellState.LOADED)
+        except (RuntimeError, AttributeError, ImportError):
+            pass
     def _show_menu_popup(self):
         from ...widgets import MenuPopup
         if self._menu_popup is None:
@@ -297,6 +325,50 @@ class HeaderWidget(QWidget):
         if self._menu_popup is None:
             self._menu_popup = MenuPopup(self)
         self._menu_popup.set_menu_actions(actions_dict)
+
+    def set_shell_state(self, state) -> None:
+        """Reflect the ShellStateModel lifecycle in the save-state chip."""
+        from palworld_aio.shell_state import ShellState
+        self._shell_state = state
+        if not hasattr(self, 'save_state_chip'):
+            return
+        key = state.value if isinstance(state, ShellState) else str(state)
+        style_key = self._SAVE_STATE_STYLES.get(key)
+        self._stop_state_spin()
+        if style_key == 'loading':
+            self.save_state_chip.setText(self._SPIN_FRAMES[0])
+            self._spin_timer = QTimer(self)
+            self._spin_timer.timeout.connect(self._tick_state_spin)
+            self._spin_timer.start(200)
+        elif key == 'dirty':
+            self.save_state_chip.setText(f"{nf.icons['nf-fa-warning']}")
+        elif key == 'success' or key == 'loaded':
+            self.save_state_chip.setText(f"{nf.icons['nf-fa-check']}")
+        elif key == 'error':
+            self.save_state_chip.setText(f"{nf.icons['nf-fa-close']}")
+        else:
+            self.save_state_chip.setText('')
+        self.save_state_chip.setProperty('state', key)
+        self.save_state_chip.style().unpolish(self.save_state_chip)
+        self.save_state_chip.style().polish(self.save_state_chip)
+        self.save_state_chip.update()
+
+    def _tick_state_spin(self):
+        self._spin_frame = (self._spin_frame + 1) % 4
+        try:
+            self.save_state_chip.setText(self._SPIN_FRAMES[self._spin_frame])
+        except RuntimeError:
+            self._stop_state_spin()
+
+    def _stop_state_spin(self):
+        if self._spin_timer is not None:
+            try:
+                self._spin_timer.stop()
+            except RuntimeError:
+                pass
+            self._spin_timer = None
+        self._spin_frame = 0
+
     def get_menu_popup(self):
         from ...widgets import MenuPopup
         if self._menu_popup is None:

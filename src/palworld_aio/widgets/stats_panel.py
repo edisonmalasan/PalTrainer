@@ -23,7 +23,7 @@ class StatsPanel(QWidget):
         copy_btn = NerdBtn(app_icons.get_icon('copy'))
         copy_btn.setFixedSize(30, 24)
         copy_btn.setToolTip(t('button.copy_stats') if t else 'Copy stats')
-        copy_btn.setStyleSheet(f'\n            QPushButton {{\n                background-color: transparent;\n                border: none;\n                font-size: 14px;\n            }}\n            QPushButton:hover {{\n                background-color: {constants.BUTTON_HOVER};\n                border-radius: 4px;\n            }}\n        ')
+        copy_btn.setObjectName('copyStatsBtn')
         copy_btn.clicked.connect(self._copy_stats_to_clipboard)
         layout.addWidget(copy_btn, 0, len(sections) + 1, Qt.AlignRight)
         empty_label = QLabel('')
@@ -31,21 +31,22 @@ class StatsPanel(QWidget):
         for col, (sec_key, sec_label_key) in enumerate(sections, start=1):
             header_label = QLabel(t(sec_label_key) if t else sec_key.title())
             header_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
-            header_label.setStyleSheet(f'color: {constants.EMPHASIS};')
+            header_label.setObjectName('statsHeaderLabel')
             header_label.setAlignment(Qt.AlignCenter)
             layout.addWidget(header_label, 0, col)
             self.stat_key_labels[f'header_{sec_key}'] = (header_label, sec_label_key)
         for row, (field_key, field_label_key) in enumerate(fields, start=1):
             field_label = QLabel(t(field_label_key) + ':' if t else field_key.title() + ':')
             field_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE))
-            field_label.setStyleSheet(f'color: {constants.MUTED};')
+            field_label.setObjectName('statsFieldLabel')
             field_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             layout.addWidget(field_label, row, 0)
             self.stat_key_labels[f'field_{field_key}'] = (field_label, field_label_key)
             for col, (sec_key, _) in enumerate(sections, start=1):
-                value_label = QLabel('0')
+                value_label = QLabel('—')
                 value_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
-                value_label.setStyleSheet(f'color: {constants.EMPHASIS};')
+                value_label.setObjectName('statsValueLabel')
+                value_label.setProperty('placeholder', 'true')
                 value_label.setAlignment(Qt.AlignCenter)
                 layout.addWidget(value_label, row, col)
                 key = f'{sec_key}_{field_key}'
@@ -58,7 +59,12 @@ class StatsPanel(QWidget):
             if internal_key:
                 label_key = f'{section}_{internal_key}'
                 if label_key in self.stat_labels:
-                    self.stat_labels[label_key].setText(str(value))
+                    label = self.stat_labels[label_key]
+                    label.setText(str(value))
+                    is_zero = str(value).strip() in ('0', '—', '')
+                    label.setProperty('placeholder', 'true' if is_zero else 'false')
+                    label.style().unpolish(label)
+                    label.style().polish(label)
     def refresh_stats_before(self, stats_dict):
         self.stats_before = dict(stats_dict)
         self.update_stats(stats_dict, 'before')

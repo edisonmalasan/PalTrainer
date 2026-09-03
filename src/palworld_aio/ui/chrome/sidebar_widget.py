@@ -11,9 +11,16 @@ from palworld_aio import constants
 from i18n import t
 ICONS = {'tools': app_icons.get_icon('tools'), 'map': app_icons.get_icon('map'), 'base_inventory': app_icons.get_icon('base_inventory'), 'player_inventory': app_icons.get_icon('player_inventory'), 'pal_editor': app_icons.get_icon('pal_editor'), 'players': app_icons.get_icon('players'), 'guilds': app_icons.get_icon('guilds'), 'bases': app_icons.get_icon('bases'), 'exclusions': app_icons.get_icon('exclusions'), 'json_editor': app_icons.get_icon('json_editor'), 'collapse_open': app_icons.get_icon('collapse_open'), 'collapse_close': app_icons.get_icon('collapse_close'), 'console': app_icons.get_icon('console'), 'docs': app_icons.get_icon('docs'), 'breeding': app_icons.get_icon('breeding'), 'sidebar_expand': app_icons.get_icon('sidebar_expand'), 'sidebar_collapse': app_icons.get_icon('sidebar_collapse')}
 SIDEBAR_W_COLLAPSED = 48
-SIDEBAR_W_EXPANDED = 168
+SIDEBAR_W_EXPANDED = 200
 ITEM_H = 44
 LABEL_FONT_SIZE = 11
+# Visual groups; page ids and tab indexes are unchanged (grouping is labels only).
+SECTIONS = (
+    ('sidebar.section.inspect', ('tools', 'map')),
+    ('sidebar.section.world', ('base_inventory', 'players', 'guilds', 'bases', 'exclusions')),
+    ('sidebar.section.editing', ('player_inventory', 'pal_editor', 'json_editor')),
+    ('sidebar.section.reference', ('breeding', 'docs')),
+)
 class NerdBtn(QPushButton):
     def paintEvent(self, event):
         sp = QStylePainter(self)
@@ -66,6 +73,7 @@ class NavItem(QPushButton):
         self._expanded = False
         self.setProperty('sidebarItem', True)
         self.setCursor(QCursor(Qt.PointingHandCursor))
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setToolTip(label)
         self.clicked.connect(lambda: self.clicked_with_id.emit(self._id))
         self._update_display()
@@ -140,6 +148,7 @@ class BottomBtn(QPushButton):
         self.setProperty('sidebarItem', True)
         self.setProperty('active', False)
         self.setCursor(QCursor(Qt.PointingHandCursor))
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setToolTip(tooltip)
         self._update_display()
     def set_label(self, label):
@@ -236,12 +245,21 @@ class SidebarWidget(QWidget):
         self._collapse_btn.clicked.connect(self._toggle_collapsed)
         self._layout.addWidget(self._collapse_btn)
         nav_items = [('tools', ICONS['tools'], t('tools_tab') if t else 'Tools'), ('map', ICONS['map'], t('map.viewer') if t else 'Map'), ('base_inventory', ICONS['base_inventory'], t('base_inventory.tab') if t else 'Base Inventory'), ('player_inventory', ICONS['player_inventory'], t('inventory.tab') if t else 'Player Inventory'), ('pal_editor', ICONS['pal_editor'], t('pal_editor.tab') if t else 'Pal Editor'), ('players', ICONS['players'], t('deletion.search_players') if t else 'Players'), ('guilds', ICONS['guilds'], t('deletion.search_guilds') if t else 'Guilds'), ('bases', ICONS['bases'], t('deletion.search_bases') if t else 'Bases'), ('exclusions', ICONS['exclusions'], t('deletion.menu.exclusions') if t else 'Exclusions'), ('json_editor', ICONS['json_editor'], t('json_editor.tab') if t else 'JSON Editor'), ('breeding', ICONS['breeding'], t('breeding.tab') if t else 'Breeding'), ('docs', ICONS['docs'], t('docs.tab') if t else 'Docs')]
-        for btn_id, icon, label in nav_items:
-            item = NavItem(btn_id, icon, label)
-            item.clicked_with_id.connect(self._on_item_clicked)
-            self._buttons[btn_id] = item
-            self._nav_keys[btn_id] = btn_id
-            self._layout.addWidget(item)
+        items_by_id = {btn_id: (icon, label) for btn_id, icon, label in nav_items}
+        self._section_labels = []
+        for section_key, page_ids in SECTIONS:
+            label = QLabel(t(section_key) if t else section_key.split('.')[-1].title())
+            label.setObjectName('sidebarSection')
+            label.setAttribute(Qt.WA_TransparentForMouseEvents)
+            self._layout.addWidget(label)
+            self._section_labels.append((section_key, label))
+            for btn_id in page_ids:
+                icon, text = items_by_id[btn_id]
+                item = NavItem(btn_id, icon, text)
+                item.clicked_with_id.connect(self._on_item_clicked)
+                self._buttons[btn_id] = item
+                self._nav_keys[btn_id] = btn_id
+                self._layout.addWidget(item)
         self._layout.addStretch()
         self._console_btn = BottomBtn(ICONS['console'], t('console.detach') if t else 'Console')
         self._console_btn.set_label(t('console.detach') if t else 'Console')
@@ -256,6 +274,8 @@ class SidebarWidget(QWidget):
         w = SIDEBAR_W_COLLAPSED if self._collapsed else SIDEBAR_W_EXPANDED
         self.setFixedWidth(w)
         expanded = not self._collapsed
+        for section_key, label in self._section_labels:
+            label.setVisible(expanded)
         for btn in self._buttons.values():
             btn.set_expanded(expanded)
         self._console_btn.set_expanded(expanded)
@@ -291,6 +311,24 @@ class SidebarWidget(QWidget):
         self._right_panel_btn.set_active(self._right_panel_visible)
         self._update_right_panel_icon()
         self.right_panel_toggled.emit()
+    def keyPressEvent(self, event):
+        key = event.key()
+        if key in (Qt.Key_Down, Qt.Key_Up):
+            order = list(self._buttons.keys())
+            if self._active_id in order:
+                idx = order.index(self._active_id)
+            else:
+                idx = 0 if key == Qt.Key_Down else len(order) - 1
+            idx = (idx + 1) % len(order) if key == Qt.Key_Down else (idx - 1) % len(order)
+            self.set_active(order[idx])
+            self._buttons[order[idx]].setFocus()
+            event.accept()
+            return
+        if key in (Qt.Key_Return, Qt.Key_Enter) and self._active_id in self._buttons:
+            self._on_item_clicked(self._active_id)
+            event.accept()
+            return
+        super().keyPressEvent(event)
     def set_right_panel_visible(self, visible):
         self._right_panel_visible = visible
         self._right_panel_btn.set_active(visible)

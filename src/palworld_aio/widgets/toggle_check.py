@@ -3,6 +3,7 @@ from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QFont, QMouseEvent
 from palworld_aio import constants
 from palworld_aio.ui.chrome.sidebar_widget import NerdBtn
+from palworld_aio.ui.chrome import tokens as _tokens
 try:
     import nerdfont as nf
 except:
@@ -25,8 +26,7 @@ class ToggleCheckBtn(QWidget):
         self._icon_btn.clicked.connect(lambda: self._toggle(True))
         layout.addWidget(self._icon_btn)
         self._label = QLabel(label)
-        self._label.setStyleSheet('color: #e2e8f0; background: transparent;')
-        layout.addWidget(self._label)
+        self._label.setBackgroundRole(self._label.backgroundRole())
         self._update_style()
 
     def _toggle(self, from_btn=False):
@@ -41,17 +41,18 @@ class ToggleCheckBtn(QWidget):
         super().mousePressEvent(event)
 
     def _update_style(self):
+        t = _tokens.resolve()
         if self._checked:
             self._icon_btn.setText(nf.icons.get('nf-fa-check', '\uf00c'))
             self._icon_btn.setStyleSheet(
-                'NerdBtn { background: rgba(125,211,252,0.2); color: #7DD3FC;'
-                ' border: 1px solid rgba(125,211,252,0.3); border-radius: 4px; }'
+                f'NerdBtn {{ background: {t["accent_bg_strong"]}; color: {t["accent"]};'
+                f' border: 1px solid {t["accent_border"]}; border-radius: 4px; }}'
             )
         else:
             self._icon_btn.setText('')
             self._icon_btn.setStyleSheet(
-                'NerdBtn { background: rgba(255,255,255,0.05);'
-                ' border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; }'
+                f'NerdBtn {{ background: {_tokens.SURFACE_FAINT};'
+                f' border: 1px solid {t["border"]}; border-radius: 4px; }}'
             )
 
     def setChecked(self, checked):

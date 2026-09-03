@@ -39,6 +39,7 @@ MODULE_MAP: dict[str, dict] = {
     'palooz':                {'installed': True},
 
     'check_theme_violations': {'import_as': 'check_theme_violations', 'parent': 'scripts/scrs'},
+    'build_theme':            {'import_as': 'build_theme',            'parent': 'scripts/scrs'},
     'validate_imports':       {'import_as': 'validate_imports',       'parent': 'scripts/scrs'},
     'clean_code':             {'import_as': 'clean_code',             'parent': 'scripts/scrs'},
     'auto_update':            {'import_as': 'auto_update',            'parent': 'scripts/scrs'},

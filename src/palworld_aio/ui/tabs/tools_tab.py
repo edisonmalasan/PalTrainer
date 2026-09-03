@@ -181,25 +181,28 @@ class DropOverlay(QWidget):
         self._drop_text = t('tools.drop_title') if t else 'Drop Level.sav to Load Save'
         self._drop_hint = t('tools.drop_hint_overlay') if t else "Or click the 'Load Save' button above"
     def paintEvent(self, event):
+        from palworld_aio.ui.chrome import tokens as _tokens
+        pal = _tokens.resolve()
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        painter.fillRect(self.rect(), QColor(5, 8, 12, 220))
+        painter.fillRect(self.rect(), QColor(5, 7, 10, 220))
         inner = self.rect().adjusted(30, 30, -30, -30)
         path = QPainterPath()
-        path.addRoundedRect(QRectF(inner), 20, 20)
-        painter.fillPath(path, QColor(34, 197, 94, 25))
-        pen = QPen(QColor(34, 197, 94, 255))
+        path.addRoundedRect(QRectF(inner), 16, 16)
+        accent = QColor(pal['accent'])
+        painter.fillPath(path, QColor(accent.red(), accent.green(), accent.blue(), 20))
+        pen = QPen(accent)
         pen.setWidth(4)
         pen.setDashPattern([12, 6])
         painter.setPen(pen)
         painter.drawPath(path)
         box_h = inner.height()
         center_y = inner.y() + box_h / 2
-        icon_font = QFont(constants.FONT_FAMILY, 52, QFont.Bold)
+        icon_font = QFont(constants.FONT_FAMILY_NERD, 46, QFont.Bold)
         painter.setFont(icon_font)
-        painter.setPen(QColor(34, 197, 94, 255))
+        painter.setPen(accent)
         icon_rect = QRectF(inner.x(), center_y - 80, inner.width(), 60)
-        painter.drawText(icon_rect, Qt.AlignHCenter | Qt.AlignBottom, '📁')
+        painter.drawText(icon_rect, Qt.AlignHCenter | Qt.AlignBottom, '\uf07b')
         font = QFont(constants.FONT_FAMILY, 22, QFont.Bold)
         painter.setFont(font)
         painter.setPen(QColor(255, 255, 255, 255))
@@ -207,7 +210,7 @@ class DropOverlay(QWidget):
         painter.drawText(text_rect, Qt.AlignHCenter | Qt.AlignCenter, self._drop_text)
         font_small = QFont(constants.FONT_FAMILY, 13)
         painter.setFont(font_small)
-        painter.setPen(QColor(166, 184, 200, 255))
+        painter.setPen(QColor(pal['text_secondary']))
         hint_rect = QRectF(inner.x(), center_y + 40, inner.width(), 30)
         painter.drawText(hint_rect, Qt.AlignHCenter | Qt.AlignTop, self._drop_hint)
 class StatIconBtn(QPushButton):
@@ -218,7 +221,7 @@ class StatIconBtn(QPushButton):
         self.setFixedSize(44, 28)
         self.setCursor(QCursor(Qt.PointingHandCursor))
         self.setFocusPolicy(Qt.NoFocus)
-        self.setStyleSheet('QPushButton { background: rgba(125,211,252,0.08); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.15); border-radius: 6px; } QPushButton:hover { background: rgba(125,211,252,0.15); border-color: rgba(125,211,252,0.3); color: #FFFFFF; } QPushButton:pressed { background: rgba(125,211,252,0.25); }')
+        self.setObjectName('statIconBtn')
 
     @staticmethod
     def _resolve_nerdfont():
@@ -272,23 +275,24 @@ class ToolsTab(QWidget):
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(24, 24, 24, 24)
         card_layout.setSpacing(12)
-        icon_label = QLabel('📁')
+        import nerdfont as nf
+        icon_label = QLabel(nf.icons.get('nf-fa-folder_open', '\uf07c'))
+        icon_label.setObjectName('dashboardIconLabel')
+        icon_label.setProperty('iconkind', 'nerd')
+        icon_label.setFont(QFont(constants.FONT_FAMILY_NERD, 30))
         icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setStyleSheet('font-size: 36px; border: none; background: transparent;')
         card_layout.addWidget(icon_label)
         self._save_status_label = QLabel(t('dashboard.no_save') if t else 'No Save Loaded')
+        self._save_status_label.setObjectName('saveStatusLabel')
         self._save_status_label.setAlignment(Qt.AlignCenter)
         self._save_status_label.setWordWrap(True)
-        self._save_status_label.setStyleSheet('font-size: 15px; font-weight: 700; color: #e2e8f0; border: none; background: transparent;')
         card_layout.addWidget(self._save_status_label)
         self._save_path_label = QPushButton(t('tools.no_save_loaded') if t else 'No save loaded')
         self._save_path_label.setObjectName('savePathLabel')
         self._save_path_label.setFlat(True)
         self._save_path_label.setCursor(QCursor(Qt.PointingHandCursor))
-        self._save_path_label.setStyleSheet('font-size: 11px; color: rgba(148,163,184,0.6); border: none; background: transparent; text-align: center;')
         self._save_path_label.clicked.connect(lambda: self._on_save_path_label_clicked())
         card_layout.addWidget(self._save_path_label)
-        import nerdfont as nf
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
         _nf_font = QFont(constants.FONT_FAMILY_NERD, 12)
@@ -313,9 +317,9 @@ class ToolsTab(QWidget):
         self._refresh_save_btns()
         card_layout.addLayout(btn_row)
         self._drag_hint_label = QLabel(t('tools.drag_hint') if t else 'or drag & drop a Level.sav file here')
+        self._drag_hint_label.setObjectName('dragHintLabel')
         self._drag_hint_label.setAlignment(Qt.AlignCenter)
         self._drag_hint_label.setWordWrap(True)
-        self._drag_hint_label.setStyleSheet('font-size: 11px; color: rgba(148,163,184,0.4); border: none; background: transparent;')
         card_layout.addWidget(self._drag_hint_label)
         self._stats_frame = QFrame()
         self._stats_frame.setObjectName('saveStats')
@@ -334,12 +338,12 @@ class ToolsTab(QWidget):
                 icon_btn.clicked.connect(lambda checked, k=nav_key: (self.parent_window.sidebar.set_active(k), self.parent_window._on_nav_changed(k)))
             box.addWidget(icon_btn)
             val = QLabel('0')
+            val.setObjectName('statValueLabel')
             val.setAlignment(Qt.AlignCenter)
-            val.setStyleSheet('font-size: 16px; font-weight: 700; color: #e2e8f0; border: none; background: transparent;')
             box.addWidget(val)
             lbl = QLabel(t(label_key) if t else label_key)
+            lbl.setObjectName('statNameLabel')
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setStyleSheet('font-size: 10px; color: rgba(148,163,184,0.5); border: none; background: transparent;')
             box.addWidget(lbl)
             stats_layout.addStretch()
             stats_layout.addLayout(box)
@@ -373,11 +377,19 @@ class ToolsTab(QWidget):
         if success:
             if hasattr(self, '_save_path_label') and hasattr(constants, 'current_save_path') and constants.current_save_path:
                 self._save_path_label.setText(constants.current_save_path)
-                self._save_status_label.setText(t('tools.save_loaded') if t else 'Save Loaded')
-                self._save_status_label.setStyleSheet('font-size: 15px; font-weight: 700; color: #22c55e; border: none; background: transparent;')
+                self._set_save_status('loaded')
             self.refresh()
             if hasattr(self, '_stats_frame'):
                 self._stats_frame.setVisible(True)
+
+    def _set_save_status(self, state):
+        """state: 'no_save' | 'loaded' — styling via saveStatusLabel[state] QSS."""
+        if hasattr(self, '_save_status_label'):
+            text_key = 'tools.save_loaded' if state == 'loaded' else 'dashboard.no_save'
+            self._save_status_label.setText(t(text_key) if t else text_key)
+            self._save_status_label.setProperty('state', state)
+            self._save_status_label.style().unpolish(self._save_status_label)
+            self._save_status_label.style().polish(self._save_status_label)
     @staticmethod
     def _safe_list(data: dict, key: str) -> list:
         return data.get(key, {}).get('value', [])
@@ -402,7 +414,6 @@ class ToolsTab(QWidget):
         section_layout.setSpacing(8)
         title = QLabel(t(section_key) if t else section_key)
         title.setObjectName('sectionHeader')
-        title.setStyleSheet('QLabel#sectionHeader { margin-left: 0px; padding-left: 10px; }')
         title.setAlignment(Qt.AlignCenter)
         title.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
         self._section_titles.append((title, section_key))
@@ -443,8 +454,7 @@ class ToolsTab(QWidget):
         from palworld_aio.managers.save_manager import save_manager
         save_manager._reset_state()
         constants.invalidate_container_lookup()
-        self._save_status_label.setText(t('dashboard.no_save') if t else 'No Save Loaded')
-        self._save_status_label.setStyleSheet('font-size: 15px; font-weight: 700; color: #e2e8f0; border: none; background: transparent;')
+        self._set_save_status('no_save')
         self._save_path_label.setText(t('tools.no_save_loaded') if t else 'No save loaded')
         if hasattr(self, '_stats_frame'):
             self._stats_frame.setVisible(False)
@@ -545,11 +555,9 @@ class ToolsTab(QWidget):
         if hasattr(self, '_save_path_label') and self._save_path_label:
             if not (hasattr(constants, 'current_save_path') and constants.current_save_path):
                 self._save_path_label.setText(t('tools.no_save_loaded') if t else 'No save loaded')
-                self._save_status_label.setText(t('dashboard.no_save') if t else 'No Save Loaded')
-                self._save_status_label.setStyleSheet('font-size: 15px; font-weight: 700; color: #e2e8f0; border: none; background: transparent;')
+                self._set_save_status('no_save')
             else:
-                self._save_status_label.setText(t('tools.save_loaded') if t else 'Save Loaded')
-                self._save_status_label.setStyleSheet('font-size: 15px; font-weight: 700; color: #22c55e; border: none; background: transparent;')
+                self._set_save_status('loaded')
         if hasattr(self, '_drag_hint_label') and self._drag_hint_label:
             self._drag_hint_label.setText(t('tools.drag_hint') if t else 'or drag & drop a Level.sav file here')
         for title_label, section_key in self._section_titles:

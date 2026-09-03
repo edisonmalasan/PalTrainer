@@ -23,6 +23,8 @@ _TEST_STEM_ALIASES: dict[str, str] = {
     'json_tools': 'palsav.json_tools',
     'graph_validator_relative_imports': 'graph_validator',
     'characterization': 'save_engine/__init__',
+    'design_tokens': 'palworld_aio/ui/chrome/tokens',
+    'components': 'palworld_aio/ui/chrome/components',
     'domain_stats': 'stats',
     'palworld_coord': 'palworld_coord/__init__',
     'xgp_import': 'palworld_xgp_import/__init__',
