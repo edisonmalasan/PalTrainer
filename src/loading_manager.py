@@ -231,6 +231,7 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
             # hidden and orphaned via setParent(None), leaking a top-level
             # widget with two running timers plus one OverlayResizer event
             # filter on the window per run_with_loading call.
+            _log2('run_with_loading.overlay_teardown_begin')
             try:
                 if overlay_resizer is not None and parent is not None:
                     parent.removeEventFilter(overlay_resizer)
@@ -243,6 +244,7 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
                 overlay_widget.deleteLater()
             except RuntimeError:
                 pass
+            _log2('run_with_loading.overlay_teardown_end')
         res = result['data']
         if isinstance(res, str) and 'Traceback' in res:
             if on_error:
@@ -256,10 +258,13 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
             # useful traceback.  Keep the loader boundary as defensive as the
             # worker boundary and continue the queue after reporting it.
             def finish_callback():
+                _log2('loading.finish_callback_begin')
                 try:
                     callback(res)
+                    _log2('loading.finish_callback_end')
                 except Exception:
                     error_text = traceback.format_exc()
+                    _log2('loading.finish_callback_exception')
                     try:
                         from ui_debug import log_exception
                         log_exception('loading.callback_exception')

@@ -2197,14 +2197,24 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
             self._dps_modified = False
 
     def apply_player_ui(self):
+        from ui_debug import log
+        log('pe.apply_player_ui.begin')
         self._clear_multi_selection()
+        log('pe.apply_player_ui.multi_cleared')
         self._clear_party_highlight()
+        log('pe.apply_player_ui.party_highlight_cleared')
         self._clear_palbox_highlight()
+        log('pe.apply_player_ui.palbox_highlight_cleared')
         self.pal_info.set_clicked_pal(None)
+        log('pe.apply_player_ui.pal_info_cleared')
         self._update_party_slots()
+        log('pe.apply_player_ui.party_slots_updated')
         self._update_palbox_page()
+        log('pe.apply_player_ui.palbox_page_updated')
         self._update_box_label()
+        log('pe.apply_player_ui.box_label_updated')
         self._update_mode_buttons()
+        log('pe.apply_player_ui.end')
 
     def set_player_sync(self, player_uid, player_name):
         self.set_player(player_uid, player_name)

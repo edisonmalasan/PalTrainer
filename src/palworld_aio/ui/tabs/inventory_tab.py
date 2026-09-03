@@ -2839,9 +2839,13 @@ class PlayerInventoryTab(QWidget):
             self._refresh_display()
         run_with_loading(on_finished, task)
     def make_current(self, inv):
+        from ui_debug import log
+        log('inv.make_current.begin')
         self.inventory = inv
         self._show_inventory()
+        log('inv.make_current.show_done')
         self._refresh_display()
+        log('inv.make_current.refresh_done')
     def _select_player_ref_only(self, uid, name, display):
         if self._syncing:
             return
@@ -3021,13 +3025,16 @@ class PlayerInventoryTab(QWidget):
         except Exception as e:
             print(f'Error in _on_add_all_key_items: {e}')
     def _refresh_display(self):
+        from ui_debug import log
         if not self.inventory:
             return
+        log('inv.refresh.begin')
         self.inventory._calculate_max_slots()
         max_slots = self.inventory.max_slots
         main_container = self.inventory.get_container('main')
         if main_container:
             self.main_grid.load_items(main_container.slots, max_slots=max_slots)
+        log('inv.refresh.main_grid_done')
         key_container = self.inventory.get_container('key')
         if key_container:
             container_items = key_container.slots
@@ -3038,6 +3045,7 @@ class PlayerInventoryTab(QWidget):
             merged = container_items + bounty_items + effigy_items
             key_slot_count = max(50, len(merged) + 10)
             self.key_grid.load_items(merged, max_slots=key_slot_count)
+        log('inv.refresh.key_grid_done')
         unlocked_food_slots = self.inventory.get_unlocked_food_slots() if self.inventory else 0
         unlocked_accessory_slots = self.inventory.get_unlocked_accessory_slots() if self.inventory else 2
         unlocked_weapon_slots = self.inventory.get_unlocked_weapon_slots() if self.inventory else 4
@@ -3065,7 +3073,9 @@ class PlayerInventoryTab(QWidget):
                 slot_widget = self.equip_slots[slot_name]
                 if not slot_widget.is_locked():
                     slot_widget.set_item(item)
+        log('inv.refresh.equipment_done')
         self._update_stats()
+        log('inv.refresh.end')
     def _on_slot_unlock_request(self, slot_name: str):
         if not self.inventory:
             return

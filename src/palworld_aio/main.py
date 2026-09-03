@@ -98,6 +98,42 @@ def qt_message_handler(mode, context, message):
     if 'QThreadStorage' in str(message) and 'destroyed before end of thread' in str(message):
         return
 qInstallMessageHandler(qt_message_handler)
+def _install_exit_sentinel():
+    """Diagnostics for silent exit-code -1 terminations.
+
+    If the process exits through Python (sys.exit, normal shutdown), these
+    hooks log it. If the log ends without any sentinel line, the process was
+    killed by native code (CRT exit / ExitProcess / heap corruption).
+    """
+    import atexit
+    import faulthandler
+    import threading
+    try:
+        faulthandler.enable()
+    except Exception:
+        pass
+    from ui_debug import log
+
+    def _on_exit():
+        log('EXIT sentinel: python interpreter shutdown reached')
+
+    def _excepthook(tp, val, tb):
+        log(f'EXIT sys.excepthook: {tp.__name__}: {val!r}')
+        import traceback
+        log(traceback.format_exc())
+
+    def _thread_hook(args):
+        log(f'EXIT thread excepthook: {args.exc_type.__name__}: {args.exc_value!r} in {args.thread.name}')
+
+    def _unraisable(hook):
+        log(f'EXIT unraisable: {hook.exc_type.__name__}: {hook.exc_value!r} in {hook.object!r}')
+
+    sys.excepthook = _excepthook
+    threading.excepthook = _thread_hook
+    sys.unraisablehook = _unraisable
+    atexit.register(_on_exit)
+
+
 def run_aio():
     try:
         with redirect_stderr(stderr_capture):
@@ -204,6 +240,7 @@ def run_aio():
     window = MainWindow()
     center_window(window)
     window.show()
+    _install_exit_sentinel()
     sys.exit(app.exec())
 if __name__ == '__main__':
     run_aio()
