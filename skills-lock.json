@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "pyqt6-ui-designer": {
+      "source": "aminechraibi/pyqt6-ui-designer",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "e9881848015c2730afcdd7eb1edf3027262c0d88cb04c5bddfcfdd0679f24169"
+    }
+  }
+}
