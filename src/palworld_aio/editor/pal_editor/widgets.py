@@ -372,7 +372,7 @@ class _CircularIcon(QWidget):
 
         r = self.rect()
 
-        path.addEllipse(r.adjusted(2, 2, -2, -2))
+        path.addEllipse(QRectF(r.adjusted(2, 2, -2, -2)))
 
         painter.setClipPath(path)
 

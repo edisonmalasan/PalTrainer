@@ -123,7 +123,12 @@ for name in ('NoSelection', 'SingleSelection', 'ExtendedSelection', 'SelectRows'
         )
         _alias(owner, name, getattr(enum, name))
 for name in ('Adjust', 'IconMode'):
-    _alias(QListWidget, name, getattr(QListView.ResizeMode if name == 'Adjust' else QListView.ViewMode, name))
+    value = getattr(QListView.ResizeMode if name == 'Adjust' else QListView.ViewMode, name)
+    _alias(QListWidget, name, value)
+    # Several view classes reference the flat QListView.IconMode directly;
+    # PyQt6 only exposes it through QListView.ViewMode. Mutating the PyQt6
+    # class itself fixes every import site at once.
+    _alias(QListView, name, value)
 for name in ('IntInput', 'TextInput'):
     _alias(QInputDialog, name, getattr(QInputDialog.InputMode, name))
 for name in ('Resize', 'Leave', 'MouseButtonPress', 'Close', 'Hide', 'Wheel'):
