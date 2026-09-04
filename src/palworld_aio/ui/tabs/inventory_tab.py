@@ -90,7 +90,7 @@ class ItemSlotWidget(QFrame):
         self._children.append(icon_lbl)
         item_name = self.slot_data.get('item_name', 'Unknown')
         name_lbl = QLabel(item_name, self)
-        name_lbl.setStyleSheet('color: #94a3b8; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(125,211,252,0.15); border-radius: 2px; padding: 0 2px;')
+        name_lbl.setStyleSheet('color: #A69F94; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(245,158,11,0.15); border-radius: 2px; padding: 0 2px;')
         name_lbl.setAlignment(Qt.AlignCenter)
         name_lbl.adjustSize()
         name_lbl.setFixedHeight(10)
@@ -100,7 +100,7 @@ class ItemSlotWidget(QFrame):
         self._children.append(name_lbl)
         stack_count = self.slot_data.get('stack_count', 1)
         qty_lbl = QLabel(str(stack_count), self)
-        qty_lbl.setStyleSheet('color: #E2E8F0; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(125,211,252,0.25); border-radius: 3px; padding: 0 3px;')
+        qty_lbl.setStyleSheet('color: #ECE7E0; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(245,158,11,0.25); border-radius: 3px; padding: 0 3px;')
         qty_lbl.adjustSize()
         qty_lbl.setFixedHeight(11)
         qty_lbl.setAlignment(Qt.AlignCenter)
@@ -114,7 +114,7 @@ class ItemSlotWidget(QFrame):
             special_badge = QLabel('$' if is_booth_ask else 'â‡„', self)
             special_badge.setFixedSize(14, 14)
             special_badge.setAlignment(Qt.AlignCenter)
-            special_badge.setStyleSheet('font-size: 11px; font-weight: bold; color: #fbbf24; background: rgba(0,0,0,0.55); border: 1px solid rgba(251,191,36,0.3); border-radius: 7px;')
+            special_badge.setStyleSheet('font-size: 11px; font-weight: bold; color: #E8B44C; background: rgba(0,0,0,0.55); border: 1px solid rgba(232,180,76,0.3); border-radius: 7px;')
             special_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
             special_badge._slot_child_kind = 'special'
             special_badge.show()
@@ -127,13 +127,13 @@ class ItemSlotWidget(QFrame):
             cost_name = self.slot_data.get('cost_name', 'Unknown')
             cost_count = self.slot_data.get('cost_count', 0)
             tip = f'<b>{item_name}</b><br><i>{item_id}</i>'
-            tip += f'<br><br><span style="color:#fbbf24;font-weight:bold">&#xf0ec;</span> <b>{cost_name}</b> x{cost_count}'
+            tip += f'<br><br><span style="color:#E8B44C;font-weight:bold">&#xf0ec;</span> <b>{cost_name}</b> x{cost_count}'
         elif is_booth_ask:
             tip = f'<b>{item_name}</b><br>Qty: {qty}<br><i>{item_id}</i>'
-            tip += f'<br><br><span style="color:#fbbf24;font-weight:bold">&#xf0ec; Asking Price</span>'
+            tip += f'<br><br><span style="color:#E8B44C;font-weight:bold">&#xf0ec; Asking Price</span>'
         if item_desc:
             cleaned = _clean_desc_for_tooltip(item_desc)
-            tip += f'<br><br><span style="color:#94a3b8;font-size:11px">{wrap_tooltip_text(cleaned)}</span>'
+            tip += f'<br><br><span style="color:#A69F94;font-size:11px">{wrap_tooltip_text(cleaned)}</span>'
         self.setToolTip(tip)
         rarity = self.slot_data.get('rarity', 0)
         rarity_colors = {1: '#4ade80', 2: '#60a5fa', 3: '#a855f7'}
@@ -255,7 +255,7 @@ class EquipmentSlotWidget(QFrame):
             self.name_label.setText(t('inventory.locked', default='Locked'))
             self.name_label.setStyleSheet('font-size: 11px; color: #faa61a;')
             self.qty_label.clear()
-            self.setStyleSheet('EquipmentSlotWidget { background: rgba(255,255,255,0.03); border: 2px dashed #faa61a; border-radius: 8px; } EquipmentSlotWidget:hover { background: rgba(125,211,252,0.06); border: 2px dashed #ffc107; }')
+            self.setStyleSheet('EquipmentSlotWidget { background: rgba(236,231,224,0.03); border: 2px dashed #faa61a; border-radius: 8px; } EquipmentSlotWidget:hover { background: rgba(245,158,11,0.06); border: 2px dashed #ffc107; }')
         else:
             self.setEnabled(True)
             self.setCursor(Qt.PointingHandCursor)
@@ -305,7 +305,7 @@ class EquipmentSlotWidget(QFrame):
             tooltip = f'<b>{item_name}</b><br><i>{item_id}</i>'
             if item_desc:
                 cleaned = _clean_desc_for_tooltip(item_desc)
-                tooltip += f'<br><br><span style="color:#94a3b8;font-size:11px">{wrap_tooltip_text(cleaned)}</span>'
+                tooltip += f'<br><br><span style="color:#A69F94;font-size:11px">{wrap_tooltip_text(cleaned)}</span>'
             QToolTip.showText(QCursor.pos(), tooltip)
         super().enterEvent(event)
 def _load_exp_table():
@@ -382,7 +382,7 @@ class StatsPanelWidget(QFrame):
         self.level_input = QLineEdit('1')
         self.level_input.setFixedWidth(40)
         self.level_input.setAlignment(Qt.AlignCenter)
-        self.level_input.setStyleSheet('QLineEdit { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(125,211,252,0.2); border-radius: 3px; padding: 2px; font-size: 12px; font-weight: bold; }')
+        self.level_input.setStyleSheet('QLineEdit { background: rgba(236,231,224,0.06); color: #ECE7E0; border: 1px solid rgba(245,158,11,0.2); border-radius: 3px; padding: 2px; font-size: 12px; font-weight: bold; }')
         self.level_input.returnPressed.connect(self._on_level_input_changed)
         self.level_input.editingFinished.connect(self._on_level_input_changed)
         plus_lvl = self._make_btn('+')
@@ -404,7 +404,7 @@ class StatsPanelWidget(QFrame):
         layout.addWidget(self.exp_bar)
 
         self.max_all_btn = QPushButton(t('inventory.max_all_stats', default='Max All Stats'))
-        self.max_all_btn.setStyleSheet('QPushButton { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(251,191,36,0.25); color: #FFFFFF; }')
+        self.max_all_btn.setStyleSheet('QPushButton { background: rgba(232,180,76,0.15); color: #E8B44C; border: 1px solid rgba(232,180,76,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(232,180,76,0.25); color: #FFFFFF; }')
         self.max_all_btn.setCursor(Qt.PointingHandCursor)
         self.max_all_btn.clicked.connect(self._max_all)
         layout.addWidget(self.max_all_btn)
@@ -428,7 +428,7 @@ class StatsPanelWidget(QFrame):
             row_layout.addWidget(name_lbl)
 
             display_lbl = QLabel('0')
-            display_lbl.setStyleSheet('font-size: 12px; font-weight: bold; color: #e2e8f0; min-width: 50px;')
+            display_lbl.setStyleSheet('font-size: 12px; font-weight: bold; color: #ECE7E0; min-width: 50px;')
             display_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             row_layout.addWidget(display_lbl)
             row_layout.addStretch()
@@ -440,7 +440,7 @@ class StatsPanelWidget(QFrame):
             spin = QLineEdit('0')
             spin.setFixedWidth(34)
             spin.setAlignment(Qt.AlignCenter)
-            spin.setStyleSheet('QLineEdit { background: rgba(255,255,255,0.06); color: #7dd3fc; border: 1px solid rgba(125,211,252,0.2); border-radius: 3px; padding: 2px; font-size: 11px; font-weight: bold; } QLineEdit:focus { border-color: rgba(125,211,252,0.4); }')
+            spin.setStyleSheet('QLineEdit { background: rgba(236,231,224,0.06); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); border-radius: 3px; padding: 2px; font-size: 11px; font-weight: bold; } QLineEdit:focus { border-color: rgba(245,158,11,0.4); }')
             spin.returnPressed.connect(lambda k=key: self._on_stat_input_changed(k))
             spin.editingFinished.connect(lambda k=key: self._on_stat_input_changed(k))
             row_layout.addWidget(spin)
@@ -471,7 +471,7 @@ class StatsPanelWidget(QFrame):
         self.tp_spin = QSpinBox()
         self.tp_spin.setRange(0, 9999999)
         self.tp_spin.setFixedWidth(90)
-        self.tp_spin.setStyleSheet('QSpinBox { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(125,211,252,0.2); border-radius: 3px; padding: 2px; font-size: 11px; } QSpinBox:focus { border-color: rgba(125,211,252,0.4); }')
+        self.tp_spin.setStyleSheet('QSpinBox { background: rgba(236,231,224,0.06); color: #ECE7E0; border: 1px solid rgba(245,158,11,0.2); border-radius: 3px; padding: 2px; font-size: 11px; } QSpinBox:focus { border-color: rgba(245,158,11,0.4); }')
         self.tp_spin.valueChanged.connect(self._on_tp_changed)
         tp_l.addWidget(self.tp_label)
         tp_l.addStretch()
@@ -488,7 +488,7 @@ class StatsPanelWidget(QFrame):
         self.atp_spin = QSpinBox()
         self.atp_spin.setRange(0, 9999999)
         self.atp_spin.setFixedWidth(90)
-        self.atp_spin.setStyleSheet('QSpinBox { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(125,211,252,0.2); border-radius: 3px; padding: 2px; font-size: 11px; } QSpinBox:focus { border-color: rgba(125,211,252,0.4); }')
+        self.atp_spin.setStyleSheet('QSpinBox { background: rgba(236,231,224,0.06); color: #ECE7E0; border: 1px solid rgba(245,158,11,0.2); border-radius: 3px; padding: 2px; font-size: 11px; } QSpinBox:focus { border-color: rgba(245,158,11,0.4); }')
         self.atp_spin.valueChanged.connect(self._on_atp_changed)
         atp_l.addWidget(self.atp_label)
         atp_l.addStretch()
@@ -509,20 +509,20 @@ class StatsPanelWidget(QFrame):
         ab_header.addStretch()
         self.abilities_sel_all = QPushButton(t('player_item.select_all', default='All'))
         self.abilities_sel_all.setFixedHeight(20)
-        self.abilities_sel_all.setStyleSheet('QPushButton { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); border-radius: 4px; padding: 2px 6px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(74,222,128,0.2); color: #FFFFFF; }')
+        self.abilities_sel_all.setStyleSheet('QPushButton { background: rgba(45,212,191,0.12); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.2); border-radius: 4px; padding: 2px 6px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(45,212,191,0.2); color: #FFFFFF; }')
         self.abilities_sel_all.setCursor(Qt.PointingHandCursor)
         self.abilities_sel_all.clicked.connect(lambda: [w['toggle'].setChecked(True) for w in self._ability_widgets])
         ab_header.addWidget(self.abilities_sel_all)
         self.abilities_sel_none = QPushButton(t('player_item.deselect_all', default='None'))
         self.abilities_sel_none.setFixedHeight(20)
-        self.abilities_sel_none.setStyleSheet('QPushButton { background: rgba(251,113,133,0.12); color: #FB7185; border: 1px solid rgba(251,113,133,0.2); border-radius: 4px; padding: 2px 6px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(251,113,133,0.2); color: #FFFFFF; }')
+        self.abilities_sel_none.setStyleSheet('QPushButton { background: rgba(248,113,113,0.12); color: #F87171; border: 1px solid rgba(248,113,113,0.2); border-radius: 4px; padding: 2px 6px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(248,113,113,0.2); color: #FFFFFF; }')
         self.abilities_sel_none.setCursor(Qt.PointingHandCursor)
         self.abilities_sel_none.clicked.connect(lambda: [w['toggle'].setChecked(False) for w in self._ability_widgets])
         ab_header.addWidget(self.abilities_sel_none)
         layout.addLayout(ab_header)
 
         self._ability_status = QLabel('')
-        self._ability_status.setStyleSheet('color: #94a3b8; font-size: 10px; padding: 2px 4px;')
+        self._ability_status.setStyleSheet('color: #A69F94; font-size: 10px; padding: 2px 4px;')
         layout.addWidget(self._ability_status)
 
         scroll = QListWidget()
@@ -557,7 +557,7 @@ class StatsPanelWidget(QFrame):
                     icon_lbl.setPixmap(px)
             row_l.addWidget(icon_lbl)
             cur_lbl = QLabel('0')
-            cur_lbl.setStyleSheet('color: #94a3b8; font-size: 10px; min-width: 22px;')
+            cur_lbl.setStyleSheet('color: #A69F94; font-size: 10px; min-width: 22px;')
             cur_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             row_l.addWidget(cur_lbl)
             spinner = QSpinBox()
@@ -580,7 +580,7 @@ class StatsPanelWidget(QFrame):
         layout.addWidget(scroll, 1)
 
         self._abilities_apply_btn = QPushButton(t('inventory.edit_abilities_apply', default='Apply Ability Changes'))
-        self._abilities_apply_btn.setStyleSheet('QPushButton { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); border-radius: 6px; padding: 5px 12px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(74,222,128,0.25); color: #FFFFFF; }')
+        self._abilities_apply_btn.setStyleSheet('QPushButton { background: rgba(45,212,191,0.15); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.3); border-radius: 6px; padding: 5px 12px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(45,212,191,0.25); color: #FFFFFF; }')
         self._abilities_apply_btn.setCursor(Qt.PointingHandCursor)
         self._abilities_apply_btn.clicked.connect(self._on_apply_abilities)
         layout.addWidget(self._abilities_apply_btn)
@@ -744,7 +744,7 @@ class StatsPanelWidget(QFrame):
         self.atp_spin.setValue(0)
         if not self._player_uid or not constants.current_save_path:
             self._ability_status.setText(t('inventory.abilities_no_player_selected', default='No player loaded'))
-            self._ability_status.setStyleSheet('color: #fbbf24; font-size: 10px; padding: 2px 4px;')
+            self._ability_status.setStyleSheet('color: #E8B44C; font-size: 10px; padding: 2px 4px;')
             return
         from palworld_aio.inventory.inventory_manager import get_cached_player_gvas
         try:
@@ -752,7 +752,7 @@ class StatsPanelWidget(QFrame):
             sav_path = os.path.join(constants.current_save_path, 'Players', f'{uid_clean}.sav')
             if not os.path.exists(sav_path):
                 self._ability_status.setText(t('inventory.abilities_no_player_selected', default='No player loaded'))
-                self._ability_status.setStyleSheet('color: #fbbf24; font-size: 10px; padding: 2px 4px;')
+                self._ability_status.setStyleSheet('color: #E8B44C; font-size: 10px; padding: 2px 4px;')
                 return
             # Reuse the cached GvasFile: re-decompressing the player sav on
             # the GUI thread froze the window on every abilities tab load.
@@ -774,7 +774,7 @@ class StatsPanelWidget(QFrame):
                 self.atp_spin.setValue(atp.get('value', 0))
             name = self._player_name or str(self._player_uid)
             self._ability_status.setText(t('inventory.abilities_loaded', default='Loaded abilities for {name}').format(name=name))
-            self._ability_status.setStyleSheet('color: #7dd3fc; font-size: 10px; padding: 2px 4px;')
+            self._ability_status.setStyleSheet('color: #F59E0B; font-size: 10px; padding: 2px 4px;')
         except Exception as e:
             self._ability_status.setText(f'Error: {e}')
             self._ability_status.setStyleSheet('color: #f87171; font-size: 10px; padding: 2px 4px;')
@@ -793,7 +793,7 @@ class StatsPanelWidget(QFrame):
                 checked_count += 1
         if not ability_values:
             self._ability_status.setText(t('inventory.edit_abilities_none_checked', default='No abilities selected'))
-            self._ability_status.setStyleSheet('color: #fbbf24; font-size: 10px; padding: 2px 4px;')
+            self._ability_status.setStyleSheet('color: #E8B44C; font-size: 10px; padding: 2px 4px;')
             return
         from palworld_aio.managers.player_manager import set_ability_values, set_player_tech_points, set_player_boss_tech_points
         tech_ok = set_player_tech_points(self._player_uid, self.tp_spin.value())
@@ -801,7 +801,7 @@ class StatsPanelWidget(QFrame):
         abilities_ok = set_ability_values([self._player_uid], ability_values)
         if abilities_ok and tech_ok and boss_ok:
             self._ability_status.setText(t('inventory.edit_abilities_done', default='Abilities updated successfully.'))
-            self._ability_status.setStyleSheet('color: #4ade80; font-size: 10px; padding: 2px 4px;')
+            self._ability_status.setStyleSheet('color: #2DD4BF; font-size: 10px; padding: 2px 4px;')
             self._load_abilities()
         else:
             self._ability_status.setText(t('inventory.edit_abilities_failed', default='Failed to apply abilities.'))
@@ -895,25 +895,25 @@ class MissionPanelWidget(QFrame):
         header.addWidget(self._missions_title); header.addStretch()
         self._sel_all = QPushButton(t('player_item.select_all', default='All'))
         self._sel_all.setFixedHeight(20)
-        self._sel_all.setStyleSheet('QPushButton { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(74,222,128,0.2); color: #FFFFFF; }')
+        self._sel_all.setStyleSheet('QPushButton { background: rgba(45,212,191,0.12); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(45,212,191,0.2); color: #FFFFFF; }')
         self._sel_all.setCursor(Qt.PointingHandCursor)
         self._sel_all.clicked.connect(lambda: self._toggle_all(True))
         header.addWidget(self._sel_all)
         self._sel_none = QPushButton(t('player_item.deselect_all', default='None'))
         self._sel_none.setFixedHeight(20)
-        self._sel_none.setStyleSheet('QPushButton { background: rgba(251,113,133,0.12); color: #FB7185; border: 1px solid rgba(251,113,133,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(251,113,133,0.2); color: #FFFFFF; }')
+        self._sel_none.setStyleSheet('QPushButton { background: rgba(248,113,113,0.12); color: #F87171; border: 1px solid rgba(248,113,113,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(248,113,113,0.2); color: #FFFFFF; }')
         self._sel_none.setCursor(Qt.PointingHandCursor)
         self._sel_none.clicked.connect(lambda: self._toggle_all(False))
         header.addWidget(self._sel_none)
         layout.addLayout(header)
         btn_row = QHBoxLayout()
         self.complete_btn = QPushButton(t('inventory.missions_complete', default='Complete Selected'))
-        self.complete_btn.setStyleSheet('QPushButton { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(74,222,128,0.25); border-color: rgba(74,222,128,0.5); color: #FFFFFF; }')
+        self.complete_btn.setStyleSheet('QPushButton { background: rgba(45,212,191,0.15); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(45,212,191,0.25); border-color: rgba(45,212,191,0.5); color: #FFFFFF; }')
         self.complete_btn.setCursor(Qt.PointingHandCursor)
         self.complete_btn.clicked.connect(self._complete_selected)
         btn_row.addWidget(self.complete_btn)
         self.reset_btn = QPushButton(t('inventory.missions_reset', default='Reset Selected'))
-        self.reset_btn.setStyleSheet('QPushButton { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(251,191,36,0.25); border-color: rgba(251,191,36,0.5); color: #FFFFFF; }')
+        self.reset_btn.setStyleSheet('QPushButton { background: rgba(232,180,76,0.15); color: #E8B44C; border: 1px solid rgba(232,180,76,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(232,180,76,0.25); border-color: rgba(232,180,76,0.5); color: #FFFFFF; }')
         self.reset_btn.setCursor(Qt.PointingHandCursor)
         self.reset_btn.clicked.connect(self._reset_selected)
         btn_row.addWidget(self.reset_btn)
@@ -995,7 +995,7 @@ class MissionPanelWidget(QFrame):
                 w.deleteLater()
         self._quest_rows = []
         groups = [('not_started', t('inventory.missions_not_started', default='Not Started'), '#888'),
-                  ('active', t('inventory.missions_active', default='Active'), '#4ade80'),
+                  ('active', t('inventory.missions_active', default='Active'), '#2DD4BF'),
                   ('completed', t('inventory.missions_completed', default='Completed'), '#555')]
         for status_key, label_text, color in groups:
             items = [qid for qid in self._all_quest_ids if self._status(qid) == status_key]
@@ -1009,19 +1009,19 @@ class MissionPanelWidget(QFrame):
         self._scroll_layout.addStretch()
     def _make_quest_row(self, qid):
         row = QFrame(); row.setFixedHeight(24)
-        row.setStyleSheet('QFrame:hover { background: rgba(255,255,255,0.03); }')
+        row.setStyleSheet('QFrame:hover { background: rgba(236,231,224,0.03); }')
         rl = QHBoxLayout(row); rl.setContentsMargins(4, 0, 4, 0); rl.setSpacing(4)
         cb = ToggleCheckBtn('')
         rl.addWidget(cb)
         qtype = self._derive_type(qid)
-        type_colors = {'Main': '#fbbf24', 'Sub': '#7dd3fc', 'Hidden': '#a78bfa'}
+        type_colors = {'Main': '#E8B44C', 'Sub': '#F59E0B', 'Hidden': '#C084FC'}
         tc = type_colors.get(qtype, '#888')
         type_lbl = QLabel(qtype); type_lbl.setFixedWidth(45)
         type_lbl.setStyleSheet(f'font-size: 11px; font-weight: bold; color: {tc};')
         rl.addWidget(type_lbl)
         name = self._derive_name(qid)
         name_lbl = QLabel(name)
-        name_lbl.setStyleSheet('font-size: 10px; color: #e2e8f0;')
+        name_lbl.setStyleSheet('font-size: 10px; color: #ECE7E0;')
         rl.addWidget(name_lbl, 1)
         id_lbl = QLabel(qid); id_lbl.setStyleSheet('font-size: 11px; color: #555;')
         rl.addWidget(id_lbl)
@@ -1174,7 +1174,7 @@ class TechnologyPanelWidget(QFrame):
         layout.setContentsMargins(6, 6, 6, 6); layout.setSpacing(4)
         top = QHBoxLayout()
         self._tp_label = QLabel('Tech Points')
-        self._tp_label.setStyleSheet('font-size: 10px; font-weight: bold; color: #7dd3fc;')
+        self._tp_label.setStyleSheet('font-size: 10px; font-weight: bold; color: #F59E0B;')
         top.addWidget(self._tp_label)
         self._tp_spin = QSpinBox()
         self._tp_spin.setRange(0, 9999999); self._tp_spin.setFixedWidth(100)
@@ -1182,7 +1182,7 @@ class TechnologyPanelWidget(QFrame):
         top.addWidget(self._tp_spin)
         top.addSpacing(16)
         self._atp_label = QLabel('Ancient Tech Points')
-        self._atp_label.setStyleSheet('font-size: 10px; font-weight: bold; color: #a78bfa;')
+        self._atp_label.setStyleSheet('font-size: 10px; font-weight: bold; color: #C084FC;')
         top.addWidget(self._atp_label)
         self._atp_spin = QSpinBox()
         self._atp_spin.setRange(0, 9999999); self._atp_spin.setFixedWidth(100)
@@ -1191,19 +1191,19 @@ class TechnologyPanelWidget(QFrame):
         top.addStretch()
         self._sel_all_btn = QPushButton(t('player_technology.select_all', default='Select All'))
         self._sel_all_btn.setFixedHeight(22)
-        self._sel_all_btn.setStyleSheet('QPushButton { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(74,222,128,0.2); color: #FFFFFF; }')
+        self._sel_all_btn.setStyleSheet('QPushButton { background: rgba(45,212,191,0.12); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(45,212,191,0.2); color: #FFFFFF; }')
         self._sel_all_btn.setCursor(Qt.PointingHandCursor)
         self._sel_all_btn.clicked.connect(self._select_all)
         top.addWidget(self._sel_all_btn)
         self._desel_all_btn = QPushButton(t('player_technology.deselect_all', default='Deselect All'))
         self._desel_all_btn.setFixedHeight(22)
-        self._desel_all_btn.setStyleSheet('QPushButton { background: rgba(251,113,133,0.12); color: #FB7185; border: 1px solid rgba(251,113,133,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(251,113,133,0.2); color: #FFFFFF; }')
+        self._desel_all_btn.setStyleSheet('QPushButton { background: rgba(248,113,113,0.12); color: #F87171; border: 1px solid rgba(248,113,113,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(248,113,113,0.2); color: #FFFFFF; }')
         self._desel_all_btn.setCursor(Qt.PointingHandCursor)
         self._desel_all_btn.clicked.connect(self._deselect_all)
         top.addWidget(self._desel_all_btn)
         self._apply_btn = QPushButton(t('button.apply', default='Apply'))
         self._apply_btn.setFixedHeight(22)
-        self._apply_btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.12); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(125,211,252,0.2); color: #FFFFFF; }')
+        self._apply_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(245,158,11,0.2); color: #FFFFFF; }')
         self._apply_btn.setCursor(Qt.PointingHandCursor)
         self._apply_btn.clicked.connect(self._apply_changes)
         top.addWidget(self._apply_btn)
@@ -1254,7 +1254,7 @@ class TechnologyPanelWidget(QFrame):
         cl = QLabel(str(tech.get('cost', 0)))
         cl.setObjectName('cost_label')
         cl.setAlignment(Qt.AlignCenter)
-        cl.setStyleSheet('font-size: 11px; font-weight: 700; color: #fbbf24; background: transparent;')
+        cl.setStyleSheet('font-size: 11px; font-weight: 700; color: #E8B44C; background: transparent;')
         vl.addWidget(cl)
         nl = QLabel(tech.get('name', ''))
         nl.setObjectName('name_label')
@@ -1268,12 +1268,12 @@ class TechnologyPanelWidget(QFrame):
         for lc, g in groups.items():
             row_w = QWidget()
             row_w.setObjectName(f'techRow_{lc}')
-            row_w.setStyleSheet('QWidget:hover { background: rgba(255,255,255,0.02); }')
+            row_w.setStyleSheet('QWidget:hover { background: rgba(236,231,224,0.02); }')
             rl = QHBoxLayout(row_w); rl.setContentsMargins(0, 0, 0, 0); rl.setSpacing(4)
             badge = QLabel(str(lc))
             badge.setFixedSize(36, self.BUTTON_SIZE)
             badge.setAlignment(Qt.AlignCenter)
-            badge.setStyleSheet('font-size: 13px; font-weight: 700; color: #fbbf24; border: 2px solid rgba(251,191,36,0.3); border-radius: 6px; background: rgba(251,191,36,0.06);')
+            badge.setStyleSheet('font-size: 13px; font-weight: 700; color: #E8B44C; border: 2px solid rgba(232,180,76,0.3); border-radius: 6px; background: rgba(232,180,76,0.06);')
             rl.addWidget(badge)
             for tech in g['regular']:
                 rl.addWidget(self._make_tech_button(tech))
@@ -1281,7 +1281,7 @@ class TechnologyPanelWidget(QFrame):
                 ph = QWidget(); ph.setFixedSize(self.BUTTON_SIZE, self.BUTTON_SIZE); rl.addWidget(ph)
             div = QFrame()
             div.setFrameShape(QFrame.VLine)
-            div.setStyleSheet('background: rgba(167,139,250,0.3); max-width: 1px;')
+            div.setStyleSheet('background: rgba(192,132,252,0.3); max-width: 1px;')
             div.setFixedWidth(1)
             rl.addWidget(div)
             if g['ancient']:
@@ -1289,16 +1289,16 @@ class TechnologyPanelWidget(QFrame):
             else:
                 ph = QWidget()
                 ph.setFixedSize(self.BUTTON_SIZE, self.BUTTON_SIZE)
-                ph.setStyleSheet('background: rgba(167,139,250,0.04); border: 1px dashed rgba(167,139,250,0.1); border-radius: 4px;')
+                ph.setStyleSheet('background: rgba(192,132,252,0.04); border: 1px dashed rgba(192,132,252,0.1); border-radius: 4px;')
                 rl.addWidget(ph)
             rl.addStretch()
             self._scroll_layout.insertWidget(self._scroll_layout.count() - 1, row_w)
     def _apply_tech_style(self, frame, asset):
         unlocked = asset.lower() in self._unlocked
-        fg = '#e2e8f0' if unlocked else '#555'
-        bg = 'rgba(125,211,252,0.08)' if unlocked else 'rgba(255,255,255,0.03)'
-        bd = '1px solid rgba(125,211,252,0.3)' if unlocked else '1px solid rgba(255,255,255,0.06)'
-        frame.setStyleSheet(f'QFrame {{ background: {bg}; border: {bd}; border-radius: 4px; }} QFrame:hover {{ background: rgba(125,211,252,0.12); }}')
+        fg = '#ECE7E0' if unlocked else '#555'
+        bg = 'rgba(245,158,11,0.08)' if unlocked else 'rgba(236,231,224,0.03)'
+        bd = '1px solid rgba(245,158,11,0.3)' if unlocked else '1px solid rgba(236,231,224,0.06)'
+        frame.setStyleSheet(f'QFrame {{ background: {bg}; border: {bd}; border-radius: 4px; }} QFrame:hover {{ background: rgba(245,158,11,0.12); }}')
         for child in frame.findChildren(QLabel):
             obj_name = child.objectName()
             if obj_name == 'cost_label':
@@ -1677,19 +1677,19 @@ class PalpediaPanelWidget(QFrame):
         if sphere_lbl is not None:
             if caught >= 5:
                 sphere_lbl.setText(SPHERE_ICON)
-                sphere_lbl.setStyleSheet('color: #fbbf24; background: transparent; border: none;')
+                sphere_lbl.setStyleSheet('color: #E8B44C; background: transparent; border: none;')
             elif caught >= 1:
                 sphere_lbl.setText(SPHERE_ICON)
-                sphere_lbl.setStyleSheet('color: #e2e8f0; background: transparent; border: none;')
+                sphere_lbl.setStyleSheet('color: #ECE7E0; background: transparent; border: none;')
             else:
                 sphere_lbl.setText('')
         caught_btn = getattr(row, '_caught_btn', None)
         if caught_btn is not None:
             caught_btn.setText(str(caught))
             if caught > 0:
-                caught_btn.setStyleSheet('font-size: 10px; font-weight: bold; color: #4ade80; background: rgba(74,222,128,0.10); border: 1px solid rgba(74,222,128,0.25); border-radius: 4px; padding: 1px 4px;')
+                caught_btn.setStyleSheet('font-size: 10px; font-weight: bold; color: #2DD4BF; background: rgba(45,212,191,0.10); border: 1px solid rgba(45,212,191,0.25); border-radius: 4px; padding: 1px 4px;')
             else:
-                caught_btn.setStyleSheet('font-size: 10px; font-weight: bold; color: #555; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 4px;')
+                caught_btn.setStyleSheet('font-size: 10px; font-weight: bold; color: #555; background: rgba(236,231,224,0.03); border: 1px solid rgba(236,231,224,0.08); border-radius: 4px; padding: 1px 4px;')
         reg_btn = getattr(row, '_reg_btn', None)
         if reg_btn is not None:
             if registered:
@@ -1699,7 +1699,7 @@ class PalpediaPanelWidget(QFrame):
             else:
                 reg_btn.setText(t('inventory.palpedia_not_registered', default='Not Registered'))
                 reg_btn.setToolTip(t('inventory.palpedia_click_register', default='Click to register'))
-                reg_btn.setStyleSheet('font-size: 11px; color: #555; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 5px;')
+                reg_btn.setStyleSheet('font-size: 11px; color: #555; background: rgba(236,231,224,0.03); border: 1px solid rgba(236,231,224,0.08); border-radius: 4px; padding: 1px 5px;')
 
     def _update_summary(self):
         total = len(self._pal_entries)
@@ -1793,10 +1793,10 @@ class PalpediaPanelWidget(QFrame):
         self._btn_unregister_all = QPushButton(t('inventory.palpedia_unregister_all', default='Unregister All'))
         self._btn_caught_all = QPushButton(t('inventory.palpedia_caught_all', default='Caught All'))
         for btn in (self._btn_register_all, self._btn_unregister_all, self._btn_caught_all):
-            btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.08); border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #e2e8f0; } QPushButton:hover { background: rgba(125,211,252,0.16); }')
+            btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #ECE7E0; } QPushButton:hover { background: rgba(245,158,11,0.16); }')
             toolbar.addWidget(btn)
         self._sel_label = QLabel('')
-        self._sel_label.setStyleSheet('color: #94a3b8; font-size: 10px; padding: 2px 6px;')
+        self._sel_label.setStyleSheet('color: #A69F94; font-size: 10px; padding: 2px 6px;')
         toolbar.addStretch()
         toolbar.addWidget(self._sel_label)
         self._btn_register_all.clicked.connect(self._on_register_all)
@@ -1805,7 +1805,7 @@ class PalpediaPanelWidget(QFrame):
         layout.addLayout(toolbar)
 
         self._summary = QLabel('')
-        self._summary.setStyleSheet('color: #94a3b8; font-size: 10px; padding: 2px 4px;')
+        self._summary.setStyleSheet('color: #A69F94; font-size: 10px; padding: 2px 4px;')
         self._summary.setAlignment(Qt.AlignCenter)
         layout.addWidget(self._summary)
         self._scroll = QScrollArea()
@@ -1822,7 +1822,7 @@ class PalpediaPanelWidget(QFrame):
     def _make_row(self, entry):
         row = QFrame()
         row.setFixedHeight(42)
-        row.setStyleSheet('QFrame:hover { background: rgba(255,255,255,0.03); }')
+        row.setStyleSheet('QFrame:hover { background: rgba(236,231,224,0.03); }')
         rl = QHBoxLayout(row)
         rl.setContentsMargins(6, 2, 6, 2)
         rl.setSpacing(8)
@@ -1840,17 +1840,17 @@ class PalpediaPanelWidget(QFrame):
         sphere_lbl.setFont(QFont(constants.FONT_FAMILY_NERD, 14))
         if caught >= 5:
             sphere_lbl.setText(SPHERE_ICON)
-            sphere_lbl.setStyleSheet('color: #fbbf24; background: transparent; border: none;')
+            sphere_lbl.setStyleSheet('color: #E8B44C; background: transparent; border: none;')
         elif caught >= 1:
             sphere_lbl.setText(SPHERE_ICON)
-            sphere_lbl.setStyleSheet('color: #e2e8f0; background: transparent; border: none;')
+            sphere_lbl.setStyleSheet('color: #ECE7E0; background: transparent; border: none;')
         else:
             sphere_lbl.setText('')
         rl.addWidget(sphere_lbl)
         idx_lbl = QLabel(f'#{display_index}')
         idx_lbl.setFixedWidth(52)
         idx_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        idx_lbl.setStyleSheet('font-size: 10px; font-weight: bold; color: #7dd3fc;')
+        idx_lbl.setStyleSheet('font-size: 10px; font-weight: bold; color: #F59E0B;')
         rl.addWidget(idx_lbl)
         icon_lbl = QLabel()
         icon_lbl.setFixedSize(36, 36)
@@ -1861,7 +1861,7 @@ class PalpediaPanelWidget(QFrame):
             icon_lbl.setPixmap(pix)
         rl.addWidget(icon_lbl)
         name_lbl = QLabel(entry['name'])
-        name_lbl.setStyleSheet('font-size: 10px; color: #e2e8f0;')
+        name_lbl.setStyleSheet('font-size: 10px; color: #ECE7E0;')
         name_lbl.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         rl.addWidget(name_lbl, 1)
         for en in entry['elements'][:2]:
@@ -1877,9 +1877,9 @@ class PalpediaPanelWidget(QFrame):
         caught_btn.setCursor(Qt.PointingHandCursor)
         caught_btn.setToolTip(t('inventory.palpedia_edit_caught', default='Click to edit caught count'))
         if caught > 0:
-            caught_btn.setStyleSheet('font-size: 10px; font-weight: bold; color: #4ade80; background: rgba(74,222,128,0.10); border: 1px solid rgba(74,222,128,0.25); border-radius: 4px; padding: 1px 4px;')
+            caught_btn.setStyleSheet('font-size: 10px; font-weight: bold; color: #2DD4BF; background: rgba(45,212,191,0.10); border: 1px solid rgba(45,212,191,0.25); border-radius: 4px; padding: 1px 4px;')
         else:
-            caught_btn.setStyleSheet('font-size: 10px; font-weight: bold; color: #555; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 4px;')
+            caught_btn.setStyleSheet('font-size: 10px; font-weight: bold; color: #555; background: rgba(236,231,224,0.03); border: 1px solid rgba(236,231,224,0.08); border-radius: 4px; padding: 1px 4px;')
         caught_btn.clicked.connect(lambda checked=False, a=asset: self._edit_caught_count(a))
         rl.addWidget(caught_btn)
         registered = asset in self._deck_set
@@ -1893,7 +1893,7 @@ class PalpediaPanelWidget(QFrame):
         else:
             reg_btn.setText(t('inventory.palpedia_not_registered', default='Not Registered'))
             reg_btn.setToolTip(t('inventory.palpedia_click_register', default='Click to register'))
-            reg_btn.setStyleSheet('font-size: 11px; color: #555; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 5px;')
+            reg_btn.setStyleSheet('font-size: 11px; color: #555; background: rgba(236,231,224,0.03); border: 1px solid rgba(236,231,224,0.08); border-radius: 4px; padding: 1px 5px;')
         reg_btn.setCursor(Qt.PointingHandCursor)
         reg_btn.clicked.connect(lambda checked=False, a=asset: self._toggle_register(a))
         rl.addWidget(reg_btn)
@@ -1926,7 +1926,7 @@ class PalpediaPanelWidget(QFrame):
             except Exception:
                 cleaned = _clean_desc_for_tooltip(desc)
                 if cleaned:
-                    tip += f'<br><br><span style="color:#94a3b8;font-size:11px">{wrap_tooltip_text(cleaned)}</span>'
+                    tip += f'<br><br><span style="color:#A69F94;font-size:11px">{wrap_tooltip_text(cleaned)}</span>'
         return tip
 
     def _rebuild(self):
@@ -2020,21 +2020,21 @@ class InventoryGridWidget(QWidget):
         header.addStretch()
         self.effigies_btn = QPushButton(t('inventory.max_all_abilities', default='Max All Abilities'))
         self.effigies_btn.setFixedHeight(24)
-        self.effigies_btn.setStyleSheet('QPushButton { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(251,191,36,0.25); border-color: rgba(251,191,36,0.5); color: #FFFFFF; }')
+        self.effigies_btn.setStyleSheet('QPushButton { background: rgba(232,180,76,0.15); color: #E8B44C; border: 1px solid rgba(232,180,76,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(232,180,76,0.25); border-color: rgba(232,180,76,0.5); color: #FFFFFF; }')
         self.effigies_btn.setCursor(Qt.PointingHandCursor)
         self.effigies_btn.clicked.connect(self.add_all_effigies_requested.emit)
         self.effigies_btn.setVisible(self.container_type == 'key_items')
         header.addWidget(self.effigies_btn)
         self.key_items_btn = QPushButton(t('inventory.add_all_key_items', default='Add All Key Items'))
         self.key_items_btn.setFixedHeight(24)
-        self.key_items_btn.setStyleSheet('QPushButton { background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(99,102,241,0.25); border-color: rgba(99,102,241,0.5); color: #FFFFFF; }')
+        self.key_items_btn.setStyleSheet('QPushButton { background: rgba(147,183,221,0.15); color: #93B7DD; border: 1px solid rgba(147,183,221,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(147,183,221,0.25); border-color: rgba(147,183,221,0.5); color: #FFFFFF; }')
         self.key_items_btn.setCursor(Qt.PointingHandCursor)
         self.key_items_btn.clicked.connect(self.add_all_key_items_requested.emit)
         self.key_items_btn.setVisible(self.container_type == 'key_items')
         header.addWidget(self.key_items_btn)
         self.clear_key_btn = QPushButton(t('inventory.clear_key_btn', default='Clear'))
         self.clear_key_btn.setFixedHeight(24)
-        self.clear_key_btn.setStyleSheet('QPushButton { background: rgba(251,113,133,0.15); color: #FB7185; border: 1px solid rgba(251,113,133,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(251,113,133,0.25); border-color: rgba(251,113,133,0.5); color: #FFFFFF; }')
+        self.clear_key_btn.setStyleSheet('QPushButton { background: rgba(248,113,113,0.15); color: #F87171; border: 1px solid rgba(248,113,113,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(248,113,113,0.25); border-color: rgba(248,113,113,0.5); color: #FFFFFF; }')
         self.clear_key_btn.setCursor(Qt.PointingHandCursor)
         self.clear_key_btn.setVisible(self.container_type == 'key_items')
         self.clear_key_btn.clicked.connect(self.clear_key_items_requested.emit)
@@ -2059,21 +2059,21 @@ class InventoryGridWidget(QWidget):
         del_btn.setObjectName('invMultiDeleteBtn')
         del_btn.setFixedHeight(22)
         del_btn.setCursor(Qt.PointingHandCursor)
-        del_btn.setStyleSheet('QPushButton { background: rgba(251,113,133,0.12); color: #FB7185; border: 1px solid rgba(251,113,133,0.25); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(251,113,133,0.25); color: #FFFFFF; }')
+        del_btn.setStyleSheet('QPushButton { background: rgba(248,113,113,0.12); color: #F87171; border: 1px solid rgba(248,113,113,0.25); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(248,113,113,0.25); color: #FFFFFF; }')
         del_btn.clicked.connect(self._on_multi_delete)
         mt_layout.addWidget(del_btn)
         clear_btn = QPushButton(t('inventory.multi_clear_btn', default='Clear Qty'))
         clear_btn.setObjectName('invMultiClearBtn')
         clear_btn.setFixedHeight(22)
         clear_btn.setCursor(Qt.PointingHandCursor)
-        clear_btn.setStyleSheet('QPushButton { background: rgba(251,191,36,0.12); color: #FBBF24; border: 1px solid rgba(251,191,36,0.25); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(251,191,36,0.25); color: #FFFFFF; }')
+        clear_btn.setStyleSheet('QPushButton { background: rgba(232,180,76,0.12); color: #E8B44C; border: 1px solid rgba(232,180,76,0.25); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(232,180,76,0.25); color: #FFFFFF; }')
         clear_btn.clicked.connect(self._on_multi_clear_qty)
         mt_layout.addWidget(clear_btn)
         deselect_btn = QPushButton(t('inventory.multi_deselect_btn', default='Deselect'))
         deselect_btn.setObjectName('invMultiDeselectBtn')
         deselect_btn.setFixedHeight(22)
         deselect_btn.setCursor(Qt.PointingHandCursor)
-        deselect_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #9CA3AF; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(255,255,255,0.1); color: #FFFFFF; }')
+        deselect_btn.setStyleSheet('QPushButton { background: rgba(236,231,224,0.05); color: #9CA3AF; border: 1px solid rgba(236,231,224,0.1); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(236,231,224,0.1); color: #FFFFFF; }')
         deselect_btn.clicked.connect(self._clear_multi_selection)
         mt_layout.addWidget(deselect_btn)
         header.addWidget(self.multi_toolbar)
@@ -2293,7 +2293,7 @@ class ItemPickerDialog(QDialog):
         self.results_list.itemDoubleClicked.connect(self._on_item_double_clicked)
         layout.addWidget(self.results_list)
         self.desc_label = QLabel('')
-        self.desc_label.setStyleSheet('color: #94a3b8; font-size: 11px; padding: 2px 4px;')
+        self.desc_label.setStyleSheet('color: #A69F94; font-size: 11px; padding: 2px 4px;')
         self.desc_label.setWordWrap(True)
         self.desc_label.setVisible(False)
         self.desc_label.setMaximumHeight(50)
@@ -2303,7 +2303,7 @@ class ItemPickerDialog(QDialog):
         self.qty_input = QLineEdit('1')
         self.qty_input.setValidator(QIntValidator(1, constants.MAX_QUANTITY))
         self.qty_input.setFixedWidth(100)
-        self.qty_input.setStyleSheet('QLineEdit { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; padding: 2px 6px; }')
+        self.qty_input.setStyleSheet('QLineEdit { background: rgba(236,231,224,0.06); color: #ECE7E0; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 2px 6px; }')
         qty_layout.addWidget(self.qty_label)
         qty_layout.addWidget(self.qty_input)
         if self._hide_quantity:
@@ -2372,7 +2372,7 @@ class ItemPickerDialog(QDialog):
             tooltip = f'<b>{item_name}</b><br>ID: {item_id}<br>Category: {category}'
             if item_desc:
                 cleaned = _clean_desc_for_tooltip(item_desc)
-                tooltip += f'<br><br><span style="color:#94a3b8;font-size:11px">{wrap_tooltip_text(cleaned)}</span>'
+                tooltip += f'<br><br><span style="color:#A69F94;font-size:11px">{wrap_tooltip_text(cleaned)}</span>'
             list_item.setToolTip(tooltip)
             list_item.setSizeHint(QSize(80, 80))
             self.results_list.addItem(list_item)
@@ -2437,16 +2437,16 @@ class ModifyInventorySlotsDialog(QDialog):
         status_layout.setContentsMargins(0, 0, 0, 0)
         status_layout.setSpacing(4)
         self.current_slots_label = QLabel(t('inventory.modify_slots_current_slots', count=self.current_slots, default=f'Current Slots: {self.current_slots}'))
-        self.current_slots_label.setStyleSheet('font-weight: bold; color: #e2e8f0;')
+        self.current_slots_label.setStyleSheet('font-weight: bold; color: #ECE7E0;')
         status_layout.addWidget(self.current_slots_label)
         self.current_items_label = QLabel(t('inventory.modify_slots_current_items', count=self.current_items, default=f'Current Items: {self.current_items}'))
-        self.current_items_label.setStyleSheet('font-weight: bold; color: #94a3b8;')
+        self.current_items_label.setStyleSheet('font-weight: bold; color: #A69F94;')
         status_layout.addWidget(self.current_items_label)
         layout.addWidget(status_group)
         input_row = QHBoxLayout()
         input_row.setSpacing(8)
         new_label = QLabel(t('inventory.modify_slots_new', default='New Slot Count'))
-        new_label.setStyleSheet('color: #e2e8f0;')
+        new_label.setStyleSheet('color: #ECE7E0;')
         input_row.addWidget(new_label)
         input_row.addStretch()
         self.slot_spinbox = QSpinBox()
@@ -2507,26 +2507,20 @@ class PlayerInventoryTab(QWidget):
         self._context_slot_index = 0
         self._setup_ui()
     def _setup_ui(self):
+        from palworld_aio.ui.chrome.components import create_page_ribbon
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
-        header = QHBoxLayout()
-        header.setContentsMargins(0, 0, 0, 0)
-        self.title_label = QLabel(t('inventory.title', default='Player Inventory'))
-        self.title_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
-        self.title_label.setObjectName('sectionHeader')
-        self.title_label.setStyleSheet('QLabel#sectionHeader { margin-left: 0px; padding-left: 10px; }')
-        self.title_label.setAlignment(Qt.AlignCenter)
-        header.addWidget(self.title_label)
-        header.addStretch()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        # 011-r02: ribbon owns the player selector; the old centered title
+        # bar and per-button inline QSS are retired.
+        ribbon = create_page_ribbon(t('inventory.title', default='Player Inventory'), (t('sidebar.section.editing') if t else 'Editing').upper(), self)
         self.player_select_btn = QPushButton(t('inventory.select_player', default='Select Player...'))
-        self.player_select_btn.setMinimumWidth(220)
-        self.player_select_btn.setMaximumHeight(28)
-        self.player_select_btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.12); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.2); border-radius: 6px; padding: 4px 12px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(125,211,252,0.2); border-color: rgba(125,211,252,0.4); color: #FFFFFF; }')
+        self.player_select_btn.setObjectName('ghostBtn')
+        self.player_select_btn.setMinimumWidth(200)
         self.player_select_btn.setCursor(Qt.PointingHandCursor)
         self.player_select_btn.clicked.connect(self._open_player_popup)
-        header.addWidget(self.player_select_btn)
-        main_layout.addLayout(header)
+        ribbon._ribbon_actions_slot.addWidget(self.player_select_btn)
+        main_layout.addWidget(ribbon)
         self.content_area = QFrame()
         self.content_area.setObjectName('inventoryContent')
         self.content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -2554,7 +2548,7 @@ class PlayerInventoryTab(QWidget):
         self.main_grid.item_double_clicked.connect(self._delete_item_direct)
         self.main_grid.empty_slot_double_clicked.connect(self._on_empty_slot_double_clicked)
         self.unlock_all_map_btn = QPushButton(t('inventory.unlock_all_map', default='Unlock All Map + Fast Travel'))
-        self.unlock_all_map_btn.setStyleSheet('QPushButton { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(74,222,128,0.25); border-color: rgba(74,222,128,0.5); color: #FFFFFF; }')
+        self.unlock_all_map_btn.setObjectName('pageSwitchBtn')
         self.unlock_all_map_btn.setCursor(Qt.PointingHandCursor)
         self.unlock_all_map_btn.setFixedHeight(24)
         self.unlock_all_map_btn.clicked.connect(self._on_unlock_all_map_clicked)
@@ -2562,20 +2556,20 @@ class PlayerInventoryTab(QWidget):
         self.main_grid.header_layout.insertWidget(sort_idx, self.unlock_all_map_btn)
         self.main_grid.sort_requested.connect(self._on_sort_requested)
         self.inv_loadout_btn = QPushButton(t('inventory.loadouts_btn', default='Loadouts'))
+        self.inv_loadout_btn.setObjectName('toolButton')
         self.inv_loadout_btn.setFixedHeight(24)
-        self.inv_loadout_btn.setStyleSheet('QPushButton { background: rgba(168,85,247,0.15); color: #a855f7; border: 1px solid rgba(168,85,247,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(168,85,247,0.25); border-color: rgba(168,85,247,0.5); color: #FFFFFF; }')
         self.inv_loadout_btn.setCursor(Qt.PointingHandCursor)
         self.inv_loadout_btn.clicked.connect(self._on_inventory_loadout)
         self.main_grid.header_layout.insertWidget(sort_idx, self.inv_loadout_btn)
         self.inv_clear_btn = QPushButton(t('inventory.clear_btn', default='Clear'))
+        self.inv_clear_btn.setObjectName('toolButton')
         self.inv_clear_btn.setFixedHeight(24)
-        self.inv_clear_btn.setStyleSheet('QPushButton { background: rgba(251,113,133,0.15); color: #FB7185; border: 1px solid rgba(251,113,133,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(251,113,133,0.25); border-color: rgba(251,113,133,0.5); color: #FFFFFF; }')
         self.inv_clear_btn.setCursor(Qt.PointingHandCursor)
         self.inv_clear_btn.clicked.connect(self._clear_all_inventory)
         self.main_grid.header_layout.insertWidget(sort_idx + 2, self.inv_clear_btn)
         self.inv_modify_slots_btn = QPushButton(t('inventory.modify_slots_btn', default='Modify Slots'))
+        self.inv_modify_slots_btn.setObjectName('toolButton')
         self.inv_modify_slots_btn.setFixedHeight(24)
-        self.inv_modify_slots_btn.setStyleSheet('QPushButton { background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(56,189,248,0.25); border-color: rgba(56,189,248,0.5); color: #FFFFFF; }')
         self.inv_modify_slots_btn.setCursor(Qt.PointingHandCursor)
         self.inv_modify_slots_btn.clicked.connect(self._on_modify_inventory_slots)
         self.main_grid.header_layout.insertWidget(sort_idx + 3, self.inv_modify_slots_btn)
@@ -2635,19 +2629,19 @@ class PlayerInventoryTab(QWidget):
         equip_header_row = QHBoxLayout()
         equip_header_row.setContentsMargins(0, 0, 0, 0)
         self.equip_title = QLabel(t('inventory.equipment', default='Equipment'))
-        self.equip_title.setStyleSheet('font-size: 11px; font-weight: bold; color: #E6EEF6;')
+        self.equip_title.setStyleSheet('font-size: 11px; font-weight: bold; color: #ECE7E0;')
         self.equip_title.setAlignment(Qt.AlignCenter)
         equip_header_row.addWidget(self.equip_title)
         equip_header_row.addStretch()
         self.equip_loadout_btn = QPushButton(t('inventory.equip_loadouts_btn', default='Loadouts'))
+        self.equip_loadout_btn.setObjectName('toolButton')
         self.equip_loadout_btn.setFixedHeight(22)
-        self.equip_loadout_btn.setStyleSheet('QPushButton { background: rgba(168,85,247,0.15); color: #a855f7; border: 1px solid rgba(168,85,247,0.3); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(168,85,247,0.25); border-color: rgba(168,85,247,0.5); color: #FFFFFF; }')
         self.equip_loadout_btn.setCursor(Qt.PointingHandCursor)
         self.equip_loadout_btn.clicked.connect(self._on_equipment_loadout)
         equip_header_row.addWidget(self.equip_loadout_btn)
         self.equip_clear_btn = QPushButton(t('inventory.equip_clear_btn', default='Clear'))
+        self.equip_clear_btn.setObjectName('toolButton')
         self.equip_clear_btn.setFixedHeight(22)
-        self.equip_clear_btn.setStyleSheet('QPushButton { background: rgba(251,113,133,0.15); color: #FB7185; border: 1px solid rgba(251,113,133,0.3); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(251,113,133,0.25); border-color: rgba(251,113,133,0.5); color: #FFFFFF; }')
         self.equip_clear_btn.setCursor(Qt.PointingHandCursor)
         self.equip_clear_btn.clicked.connect(self._clear_all_equipment)
         equip_header_row.addWidget(self.equip_clear_btn)
@@ -3969,7 +3963,6 @@ class PlayerInventoryTab(QWidget):
             self.parent_window.pal_editor_tab.select_player(uid, name or uid, display)
             self._syncing = False
     def refresh_labels(self):
-        self.title_label.setText(t('inventory.title', default='Player Inventory'))
         self.stats_panel.refresh_labels()
         self.main_grid.refresh_labels()
         self.key_grid.refresh_labels()
@@ -4023,7 +4016,7 @@ class QuantityDialog(QDialog):
         max_q = max_val if max_val is not None else constants.MAX_QUANTITY
         self.qty_input = QLineEdit(str(current_qty))
         self.qty_input.setValidator(QIntValidator(1, max_q))
-        self.qty_input.setStyleSheet('QLineEdit { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; padding: 4px 8px; font-size: 14px; }')
+        self.qty_input.setStyleSheet('QLineEdit { background: rgba(236,231,224,0.06); color: #ECE7E0; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 4px 8px; font-size: 14px; }')
         layout.addWidget(self.qty_input)
         btn_layout = QHBoxLayout()
         ok_btn = QPushButton(t('button.ok', default='OK'))
@@ -4112,30 +4105,30 @@ class InventoryLoadoutDialog(QDialog):
         il.setContentsMargins(8, 4, 8, 8)
         il.setSpacing(6)
         list_lbl = QLabel(self._t('loadouts_saved', default='Saved Loadouts:'))
-        list_lbl.setStyleSheet('font-size: 10px; font-weight: 600; color: #7DD3FC; background: transparent; border: none;')
+        list_lbl.setStyleSheet('font-size: 10px; font-weight: 600; color: #F59E0B; background: transparent; border: none;')
         il.addWidget(list_lbl)
         self.list_widget = QListWidget()
-        self.list_widget.setStyleSheet('QListWidget { background: rgba(10,14,20,0.95); border: 1px solid rgba(125,211,252,0.15); border-radius: 4px; color: #E2E8F0; font-size: 10px; } QListWidget::item { padding: 6px 8px; } QListWidget::item:hover { background: rgba(125,211,252,0.08); } QListWidget::item:selected { background: rgba(125,211,252,0.15); color: #7DD3FC; }')
+        self.list_widget.setStyleSheet('QListWidget { background: rgba(20,19,18,0.95); border: 1px solid rgba(245,158,11,0.15); border-radius: 4px; color: #ECE7E0; font-size: 10px; } QListWidget::item { padding: 6px 8px; } QListWidget::item:hover { background: rgba(245,158,11,0.08); } QListWidget::item:selected { background: rgba(245,158,11,0.15); color: #F59E0B; }')
         self._refresh_list()
         il.addWidget(self.list_widget, 1)
         info_lbl = QLabel(self._t('loadouts_info', default=''))
-        info_lbl.setStyleSheet('font-size: 11px; color: #94a3b8; background: transparent; border: none; padding: 2px 0;')
+        info_lbl.setStyleSheet('font-size: 11px; color: #A69F94; background: transparent; border: none; padding: 2px 0;')
         info_lbl.setWordWrap(True)
         il.addWidget(info_lbl)
         btn_row = QHBoxLayout()
         btn_row.setSpacing(4)
         save_btn = QPushButton(self._t('loadouts_save', default='Save Current'))
-        save_btn.setStyleSheet('QPushButton { background: rgba(16,185,129,0.12); color: #4ADE80; border: 1px solid rgba(16,185,129,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(16,185,129,0.22); color: #FFFFFF; }')
+        save_btn.setStyleSheet('QPushButton { background: rgba(45,212,191,0.12); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(45,212,191,0.22); color: #FFFFFF; }')
         btn_row.addWidget(save_btn)
         load_btn = QPushButton(self._t('loadouts_apply', default='Apply Selected'))
-        load_btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.12); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(125,211,252,0.22); color: #FFFFFF; }')
+        load_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(245,158,11,0.22); color: #FFFFFF; }')
         btn_row.addWidget(load_btn)
         delete_btn = QPushButton(self._t('loadouts_delete_btn', default='Delete'))
-        delete_btn.setStyleSheet('QPushButton { background: rgba(251,113,133,0.12); color: #FB7185; border: 1px solid rgba(251,113,133,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(251,113,133,0.22); color: #FFFFFF; }')
+        delete_btn.setStyleSheet('QPushButton { background: rgba(248,113,113,0.12); color: #F87171; border: 1px solid rgba(248,113,113,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(248,113,113,0.22); color: #FFFFFF; }')
         btn_row.addWidget(delete_btn)
         btn_row.addStretch()
         close_btn = QPushButton(self._t('loadouts_close', default='Close'))
-        close_btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.08); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; padding: 6px 20px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(125,211,252,0.16); color: #FFFFFF; }')
+        close_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.08); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 6px 20px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(245,158,11,0.16); color: #FFFFFF; }')
         btn_row.addWidget(close_btn)
         il.addLayout(btn_row)
         save_btn.clicked.connect(self._do_save)
