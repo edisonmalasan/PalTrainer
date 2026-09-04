@@ -1,5 +1,9 @@
 # UI Overhaul Progress
 
+> Note (2026-09-04): the numbered plan files (001–025, r02 revisions) and the
+> plan index were removed after implementation completed. They remain
+> recoverable from git history (commits bd0f196..4a6e03e).
+
 ## Current Status
 
 Current phase: IMPLEMENTATION COMPLETE (plans 019–025 incl. geometry-r02

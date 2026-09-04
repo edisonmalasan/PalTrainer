@@ -2,7 +2,8 @@
 
 This file is the persistent source of truth for the UI overhaul's design decisions.
 Any session (human or AI) continuing the overhaul must read this file first, together
-with `000-index.md` and `PROGRESS.md`. Update it whenever a significant design or
+with `PROGRESS.md` (the numbered plan files were removed after completion —
+recoverable from git history). Update it whenever a significant design or
 architectural decision is made.
 
 ---
