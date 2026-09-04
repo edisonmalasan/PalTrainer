@@ -164,6 +164,11 @@ class MapTab(QWidget):
                 return
         self.player_icon_pixmap = None
     def _setup_ui(self):
+        from palworld_aio.ui.chrome.components import create_page_ribbon
+        root_v = QVBoxLayout(self)
+        root_v.setContentsMargins(0, 0, 0, 0)
+        root_v.setSpacing(0)
+        root_v.addWidget(create_page_ribbon(t('map.viewer') if t else 'Map', (t('sidebar.section.inspect') if t else 'Load & Inspect').upper(), self))
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._map_widget = QWidget()
@@ -172,7 +177,7 @@ class MapTab(QWidget):
         map_layout.setContentsMargins(0, 0, 0, 0)
         map_layout.setSpacing(0)
         self.view = MapGraphicsView(self.config)
-        self.view.setBackgroundBrush(QColor(14, 16, 20))
+        self.view.setBackgroundBrush(QColor(20, 19, 18))
         self.view.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.view.setMinimumSize(0, 0)
         self.scene = QGraphicsScene()
@@ -292,15 +297,14 @@ class MapTab(QWidget):
         self._sidebar_widget = QWidget()
         self._sidebar_widget.setMinimumWidth(340)
         self._sidebar_widget.setAttribute(Qt.WA_StyledBackground, True)
-        self._sidebar_widget.setStyleSheet('background-color: rgba(14, 16, 20, 0.95);')
+        # 008-r02: sidebar is now a floating legend card over the canvas
+        self._sidebar_widget.setObjectName('mapLegendCard')
         sidebar_layout = QVBoxLayout(self._sidebar_widget)
         sidebar_layout.setContentsMargins(8, 8, 8, 8)
         sidebar_layout.setSpacing(8)
         self.sidebar_label = QLabel(t('map.sidebar.label') if t else 'Map Browser')
-        self.sidebar_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
-        self.sidebar_label.setObjectName('sectionHeader')
-        self.sidebar_label.setStyleSheet('QLabel#sectionHeader { margin-left: 0px; padding-left: 10px; }')
-        self.sidebar_label.setAlignment(Qt.AlignCenter)
+        self.sidebar_label.setObjectName('dialogTitle')
+        self.sidebar_label.setAlignment(Qt.AlignLeft)
         sidebar_layout.addWidget(self.sidebar_label)
         search_tab_layout = QHBoxLayout()
         search_tab_layout.setContentsMargins(0, 0, 0, 0)
@@ -308,42 +312,25 @@ class MapTab(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setObjectName('searchInput')
         self.search_input.setPlaceholderText(t('map.search.placeholder') if t else 'Search guilds,leaders,bases...')
-        self.search_input.setStyleSheet(f'''
-            QLineEdit {{
-                background: rgba(18,20,24,0.65);
-                border: 1px solid rgba(125,211,252,0.15);
-                border-radius: 6px;
-                padding: 4px 8px;
-                color: #E2E8F0;
-                font-size: 11px;
-                min-height: 24px;
-            }}
-            QLineEdit:focus {{
-                border-color: rgba(125,211,252,0.4);
-            }}
-            QLineEdit::placeholder {{
-                color: #6B7280;
-            }}
-        ''')
         self.search_input.textChanged.connect(self._on_search_changed)
         search_tab_layout.addWidget(self.search_input, 1)
         self.bases_tab_btn = QPushButton(t('map.toggle.bases') if t else 'Bases')
+        self.bases_tab_btn.setObjectName('pageSwitchBtn')
+        self.bases_tab_btn.setCheckable(True)
+        self.bases_tab_btn.setChecked(True)
         self.bases_tab_btn.setFixedHeight(28)
-        self.bases_tab_btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.2); color: #fff; border: 1px solid rgba(125,211,252,0.4); border-radius: 6px; padding: 4px 12px; font-weight: 700; font-size: 12px; } QPushButton:hover { background: rgba(125,211,252,0.25); }')
         self.bases_tab_btn.setCursor(Qt.PointingHandCursor)
         self.bases_tab_btn.clicked.connect(lambda: self._switch_map_tab(0))
         search_tab_layout.addWidget(self.bases_tab_btn)
         self.players_tab_btn = QPushButton(t('map.toggle.players') if t else 'Players')
+        self.players_tab_btn.setObjectName('pageSwitchBtn')
+        self.players_tab_btn.setCheckable(True)
         self.players_tab_btn.setFixedHeight(28)
-        self.players_tab_btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.12); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.2); border-radius: 6px; padding: 4px 12px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(125,211,252,0.2); border-color: rgba(125,211,252,0.4); color: #FFFFFF; }')
         self.players_tab_btn.setCursor(Qt.PointingHandCursor)
         self.players_tab_btn.clicked.connect(lambda: self._switch_map_tab(1))
         search_tab_layout.addWidget(self.players_tab_btn)
         sidebar_layout.addLayout(search_tab_layout)
         self.map_tab_stack = QStackedWidget()
-        self.map_tab_stack.setStyleSheet('QStackedWidget { border: none; background: transparent; margin: 0px; padding: 0px; }')
-        from palworld_aio.ui.chrome.styles import TREE_WIDGET_QSS
-        tree_css = TREE_WIDGET_QSS
         self.base_tree = QTreeWidget()
         self.base_tree.setObjectName('baseTree')
         self.base_tree.setHeaderLabels([t('map.header.guild') if t else 'Guild', t('map.header.leader') if t else 'Leader', t('map.header.lastseen') if t else 'Last Seen', t('map.header.bases') if t else 'Bases', t('map.header.base_pals') if t else 'Base Pals'])
@@ -355,12 +342,11 @@ class MapTab(QWidget):
         self.base_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.base_tree.customContextMenuRequested.connect(self._on_tree_context_menu)
         self.base_tree.setSortingEnabled(True)
-        self.base_tree.setStyleSheet(tree_css)
         self.base_tree.header().setMouseTracking(True)
         self.base_tree.header().setAttribute(Qt.WA_Hover, True)
         self.base_tree.header().setSectionsClickable(True)
         self.base_tree.header().setStretchLastSection(True)
-        self.base_tree.header().setDefaultAlignment(Qt.AlignCenter)
+        self.base_tree.header().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.base_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.player_tree = QTreeWidget()
         self.player_tree.setObjectName('playerTree')
@@ -372,21 +358,19 @@ class MapTab(QWidget):
         self.player_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.player_tree.customContextMenuRequested.connect(self._on_tree_context_menu)
         self.player_tree.setSortingEnabled(True)
-        self.player_tree.setStyleSheet(tree_css)
         self.player_tree.header().setMouseTracking(True)
         self.player_tree.header().setAttribute(Qt.WA_Hover, True)
         self.player_tree.header().setSectionsClickable(True)
         self.player_tree.header().setStretchLastSection(True)
-        self.player_tree.header().setDefaultAlignment(Qt.AlignCenter)
+        self.player_tree.header().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.player_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.map_tab_stack.addWidget(self.base_tree)
         self.map_tab_stack.addWidget(self.player_tree)
         sidebar_layout.addWidget(self.map_tab_stack, 1)
         self.info_label = QLabel(t('map.info.select_base') if t else 'Click on a base marker or list item to view details')
         self.info_label.setWordWrap(True)
-        self.info_label.setObjectName('sectionHeader')
-        self.info_label.setStyleSheet('QLabel#sectionHeader { margin: 0px; padding: 8px 10px; } QLabel a { color: #e0e0e0; text-decoration: none; } QLabel a:hover { color: #7DD3FC; }')
-        self.info_label.setAlignment(Qt.AlignCenter)
+        self.info_label.setObjectName('bulkHintLabel')
+        self.info_label.setAlignment(Qt.AlignLeft)
         self.info_label.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse)
         self.info_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.info_label.linkActivated.connect(self._on_info_link_clicked)
@@ -394,10 +378,19 @@ class MapTab(QWidget):
         body_layout = QHBoxLayout()
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(0)
-        body_layout.addWidget(self._map_widget, stretch=3)
-        body_layout.addWidget(self._sidebar_widget, stretch=2)
+        # canvas-first: the map takes the full page; the legend card floats
+        body_layout.addWidget(self._map_widget, stretch=1)
         layout.addLayout(body_layout)
+        self._sidebar_widget.setParent(self.view)
+        self._sidebar_widget.move(10, 44)
+        self._sidebar_widget.raise_()
+        self._sidebar_widget.show()
         QTimer.singleShot(100, self._fix_initial_layout)
+
+    def _reposition_legend_card(self):
+        if hasattr(self, '_sidebar_widget') and self._sidebar_widget:
+            self._sidebar_widget.raise_()
+            self._sidebar_widget.move(10, 44)
     def _fix_initial_layout(self):
         self.updateGeometry()
         if self.scene and self.map_width > 0 and (self.map_height > 0):
@@ -454,6 +447,7 @@ class MapTab(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._reposition_map_overlay()
+        self._reposition_legend_card()
         QTimer.singleShot(100, self._fit_map_to_viewport)
     def _setup_animation(self):
         self.anim_timer = QTimer(self)

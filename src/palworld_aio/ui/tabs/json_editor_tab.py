@@ -4,7 +4,7 @@ import traceback
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
     QPushButton, QLabel, QLineEdit, QFileDialog, QMessageBox,
-    QHeaderView, QTreeWidgetItemIterator
+    QHeaderView, QTreeWidgetItemIterator, QFrame
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QFontDatabase, QColor, QCursor, QBrush
@@ -15,32 +15,9 @@ except:
         icons = {'nf-fa-chevron_up': '\uf077', 'nf-fa-chevron_down': '\uf078'}
 from i18n import t
 from palworld_aio import constants
-from palworld_aio.ui.chrome.sidebar_widget import NerdBtn
 from palsav import json_tools
 
 _JSON_KEY = 'json_editor'
-_TOOLBAR_STYLE = (
-    'QPushButton {'
-    '  background: rgba(125, 211, 252, 0.12);'
-    '  color: #7DD3FC;'
-    '  border: 1px solid rgba(125, 211, 252, 0.2);'
-    '  border-radius: 6px;'
-    '  padding: 6px 14px;'
-    '  font-weight: 600;'
-    '  font-size: 12px;'
-    '}'
-    'QPushButton:hover {'
-    '  background: rgba(125, 211, 252, 0.2);'
-    '  border-color: rgba(125, 211, 252, 0.4);'
-    '  color: #FFFFFF;'
-    '}'
-    'QPushButton:disabled {'
-    '  background: rgba(100, 100, 100, 0.2);'
-    '  color: #666;'
-    '  border-color: rgba(100, 100, 100, 0.1);'
-    '}'
-)
-_STATUS_STYLE = 'color: #94a3b8; font-size: 12px; padding: 4px 8px;'
 
 
 def _type_label(val):
@@ -129,70 +106,50 @@ class JsonEditorTab(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
+        from palworld_aio.ui.chrome.components import create_page_ribbon
+        from palworld_aio.ui.chrome.styles import ThemeManager
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        toolbar = QHBoxLayout()
-        toolbar.setSpacing(8)
-        self._refresh_btn = QPushButton(t(f'{_JSON_KEY}.refresh') if t else 'Refresh from Save')
-        self._refresh_btn.setStyleSheet(_TOOLBAR_STYLE)
-        self._refresh_btn.clicked.connect(self._load_from_save)
-        toolbar.addWidget(self._refresh_btn)
-
-        self._export_btn = QPushButton(t(f'{_JSON_KEY}.export') if t else 'Export JSON')
-        self._export_btn.setStyleSheet(_TOOLBAR_STYLE)
-        self._export_btn.clicked.connect(self._export_json)
-        toolbar.addWidget(self._export_btn)
-
-        self._import_btn = QPushButton(t(f'{_JSON_KEY}.import') if t else 'Import JSON')
-        self._import_btn.setStyleSheet(_TOOLBAR_STYLE)
-        self._import_btn.clicked.connect(self._import_json)
-        toolbar.addWidget(self._import_btn)
-
-        toolbar.addStretch()
-        self._status_label = QLabel(t(f'{_JSON_KEY}.no_save') if t else 'No save loaded')
-        self._status_label.setStyleSheet(_STATUS_STYLE)
-        toolbar.addWidget(self._status_label)
-        layout.addLayout(toolbar)
+        head_row = QHBoxLayout()
+        head_row.setContentsMargins(16, 0, 170, 0)
+        head_row.addWidget(self._build_toolbar())
+        layout.addLayout(head_row)
+        layout.addWidget(create_page_ribbon(t(f'{_JSON_KEY}.tab') if t else 'JSON Editor', (t('sidebar.section.editing') if t else 'Editing').upper(), self))
 
         search_bar = QHBoxLayout()
+        search_bar.setContentsMargins(16, 8, 170, 8)
         search_bar.setSpacing(6)
         self._search_input = QLineEdit()
+        self._search_input.setObjectName('searchInput')
         self._search_input.setPlaceholderText(t(f'{_JSON_KEY}.search_placeholder') if t else 'Search...')
-        self._search_input.setStyleSheet(
-            'QLineEdit {'
-            '  background: #1a1d23; color: #e2e8f0; border: 1px solid rgba(255,255,255,0.12);'
-            '  border-radius: 6px; padding: 6px 10px; font-size: 12px;'
-            '}'
-            'QLineEdit:focus { border-color: rgba(125, 211, 252, 0.5); }'
-        )
         self._search_input.textChanged.connect(self._on_search_changed)
-        search_bar.addWidget(self._search_input)
+        search_bar.addWidget(self._search_input, 1)
 
-        self._search_prev_btn = NerdBtn(nf.icons.get('nf-fa-chevron_up', '\uf077'))
+        self._search_prev_btn = QPushButton(nf.icons.get('nf-fa-chevron_up', '\uf077'))
+        self._search_prev_btn.setObjectName('toolButton')
         self._search_prev_btn.setFixedSize(28, 28)
-        self._search_prev_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 14))
+        self._search_prev_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 12))
         self._search_prev_btn.setToolTip(t(f'{_JSON_KEY}.search_prev') if t else 'Previous match')
-        self._search_prev_btn.setStyleSheet(_TOOLBAR_STYLE)
         self._search_prev_btn.clicked.connect(self._search_prev)
         search_bar.addWidget(self._search_prev_btn)
 
-        self._search_next_btn = NerdBtn(nf.icons.get('nf-fa-chevron_down', '\uf078'))
+        self._search_next_btn = QPushButton(nf.icons.get('nf-fa-chevron_down', '\uf078'))
+        self._search_next_btn.setObjectName('toolButton')
         self._search_next_btn.setFixedSize(28, 28)
-        self._search_next_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 14))
+        self._search_next_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 12))
         self._search_next_btn.setToolTip(t(f'{_JSON_KEY}.search_next') if t else 'Next match')
-        self._search_next_btn.setStyleSheet(_TOOLBAR_STYLE)
         self._search_next_btn.clicked.connect(self._search_next)
         search_bar.addWidget(self._search_next_btn)
 
         self._search_count_label = QLabel('')
-        self._search_count_label.setStyleSheet('color: #94a3b8; font-size: 12px; padding: 4px 6px;')
+        self._search_count_label.setObjectName('searchCount')
         search_bar.addWidget(self._search_count_label)
-        search_bar.addStretch()
         layout.addLayout(search_bar)
 
         self._tree = QTreeWidget()
+        self._tree.setObjectName('jsonTree')
         self._tree.setHeaderLabels([
             t(f'{_JSON_KEY}.col_key') if t else 'Key',
             t(f'{_JSON_KEY}.col_value') if t else 'Value',
@@ -202,46 +159,47 @@ class JsonEditorTab(QWidget):
         self._tree.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self._tree.header().setSectionResizeMode(1, QHeaderView.Stretch)
         self._tree.header().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self._tree.header().setDefaultAlignment(Qt.AlignCenter)
+        self._tree.header().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self._tree.setAlternatingRowColors(True)
         self._tree.setAnimated(True)
-        self._tree.setStyleSheet(
-            'QTreeWidget {'
-            '  background-color: #1a1d23;'
-            '  color: #e2e8f0;'
-            '  border: 1px solid rgba(255,255,255,0.08);'
-            '  border-radius: 6px;'
-            '  alternate-background-color: #1e2229;'
-            '}'
-            'QTreeWidget::item {'
-            '  padding: 3px 6px;'
-            '}'
-            'QTreeWidget::item:hover {'
-            '  background-color: rgba(125, 211, 252, 0.08);'
-            '}'
-            'QTreeWidget::item:selected {'
-            '  background-color: rgba(125, 211, 252, 0.15);'
-            '  color: #7DD3FC;'
-            '}'
-            'QHeaderView::section {'
-            '  background: rgba(8,10,16,0.9);'
-            '  color: #7DD3FC;'
-            '  padding: 6px 8px;'
-            '  border: none;'
-            '  border-bottom: 1px solid rgba(125,211,252,0.15);'
-            '  font-weight: 600;'
-            '  font-size: 10px;'
-            '  text-align: center;'
-            '}'
-            'QHeaderView::section:hover {'
-            '  background: rgba(125,211,252,0.08);'
-            '}'
-        )
         mono = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         mono.setPointSize(10)
         self._tree.setFont(mono)
         self._tree.itemExpanded.connect(self._on_item_expanded)
         layout.addWidget(self._tree, 1)
+
+        footer = QFrame()
+        footer.setObjectName('tableFooter')
+        footer_lay = QHBoxLayout(footer)
+        footer_lay.setContentsMargins(16, 6, 170, 6)
+        footer_lay.setSpacing(8)
+        self._refresh_btn = QPushButton(t(f'{_JSON_KEY}.refresh') if t else 'Refresh from Save')
+        self._refresh_btn.setObjectName('ghostBtn')
+        self._refresh_btn.clicked.connect(self._load_from_save)
+        footer_lay.addWidget(self._refresh_btn)
+        self._export_btn = QPushButton(t(f'{_JSON_KEY}.export') if t else 'Export JSON')
+        self._export_btn.setObjectName('ghostBtn')
+        self._export_btn.clicked.connect(self._export_json)
+        footer_lay.addWidget(self._export_btn)
+        self._import_btn = QPushButton(t(f'{_JSON_KEY}.import') if t else 'Import JSON')
+        self._import_btn.setObjectName('ghostBtn')
+        self._import_btn.clicked.connect(self._import_json)
+        footer_lay.addWidget(self._import_btn)
+        footer_lay.addStretch()
+        self._status_label = QLabel(t(f'{_JSON_KEY}.no_save') if t else 'No save loaded')
+        self._status_label.setObjectName('bulkHintLabel')
+        footer_lay.addWidget(self._status_label)
+        layout.addWidget(footer)
+        # theme application is global (ThemeManager); per-tab styles removed
+
+    def _build_toolbar(self):
+        # status chip row above the ribbon: read-only badge + save path (mono)
+        row = QWidget()
+        row_lay = QHBoxLayout(row)
+        row_lay.setContentsMargins(0, 0, 0, 0)
+        row_lay.setSpacing(8)
+        row_lay.addStretch(1)
+        return row
 
     def _on_item_expanded(self, item):
         if isinstance(item, LazyJsonItem):
