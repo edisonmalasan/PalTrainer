@@ -9,7 +9,6 @@ from loading_manager import show_critical
 from palworld_aio import constants
 from resource_resolver import resource_path
 from palworld_aio.ui.chrome.styles import ThemeManager
-from ..chrome.sidebar_widget import ICONS
 CONVERTING_TOOL_KEYS = ['tool.convert.saves', 'tool.convert.gamepass.steam', 'tool.convert.steamid', 'tool.restore_map']
 MANAGEMENT_TOOL_KEYS = ['tool.slot_injector', 'tool.character_transfer', 'tool.fix_host_save']
 TOOL_DESCRIPTIONS = {'tool.convert.saves': 'tool.convert.saves.desc', 'tool.convert.gamepass.steam': 'tool.convert.gamepass.steam.desc', 'tool.convert.steamid': 'tool.convert.steamid.desc', 'tool.restore_map': 'tool.restore_map.desc', 'tool.slot_injector': 'tool.slot_injector.desc', 'tool.character_transfer': 'tool.character_transfer.desc', 'tool.fix_host_save': 'tool.fix_host_save.desc'}
@@ -79,20 +78,22 @@ class ConversionOptionsDialog(QDialog):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(14, 14, 14, 14)
         main_layout.setSpacing(12)
-        glass = QFrame()
-        glass.setObjectName('glass')
-        glass_layout = QVBoxLayout(glass)
-        glass_layout.setContentsMargins(12, 12, 12, 12)
-        glass_layout.setSpacing(12)
+        sheet = QFrame()
+        sheet.setObjectName('dialogSheet')
+        sheet_layout = QVBoxLayout(sheet)
+        sheet_layout.setContentsMargins(0, 0, 0, 0)
+        sheet_layout.setSpacing(12)
+        kicker = QLabel((t('tools.section.converting') if t else 'Converting').upper())
+        kicker.setObjectName('dialogKicker')
+        sheet_layout.addWidget(kicker)
         title_label = QLabel(t('tool.convert.saves') if t else 'Convert Save Files')
-        title_label.setFont(QFont(constants.FONT_FAMILY, 13, QFont.Bold))
-        title_label.setAlignment(Qt.AlignCenter)
-        glass_layout.addWidget(title_label)
+        title_label.setObjectName('dialogTitle')
+        sheet_layout.addWidget(title_label)
         separator = QFrame()
         separator.setFrameShape(QFrame.HLine)
         separator.setObjectName('dialogSeparator')
-        glass_layout.addWidget(separator)
-        glass_layout.addSpacing(4)
+        sheet_layout.addWidget(separator)
+        sheet_layout.addSpacing(4)
         options = [('tool.convert.any.to_json', 0), ('tool.convert.any.to_sav', 1)]
         for key, index in options:
             btn = QPushButton(t(key) if t else key)
@@ -100,14 +101,14 @@ class ConversionOptionsDialog(QDialog):
             btn.setFixedHeight(36)
             btn.setCursor(QCursor(Qt.PointingHandCursor))
             btn.clicked.connect(lambda checked, idx=index: self._on_option_selected(idx))
-            glass_layout.addWidget(btn)
-        glass_layout.addStretch(1)
+            sheet_layout.addWidget(btn)
+        sheet_layout.addStretch(1)
         cancel_btn = QPushButton(t('Cancel') if t else 'Cancel')
         cancel_btn.setObjectName('dialogCancel')
         cancel_btn.setCursor(QCursor(Qt.PointingHandCursor))
         cancel_btn.clicked.connect(self.reject)
-        glass_layout.addWidget(cancel_btn, alignment=Qt.AlignCenter)
-        main_layout.addWidget(glass)
+        sheet_layout.addWidget(cancel_btn, alignment=Qt.AlignCenter)
+        main_layout.addWidget(sheet)
     def _on_option_selected(self, index):
         self.selected_option = index
         self.accept()
@@ -249,110 +250,217 @@ class StatIconBtn(QPushButton):
         p.drawText(int(x), int(y), self.text())
         p.end()
 class ToolsTab(QWidget):
+    """Start page v2 (plan 021): operations masthead + field report + campaign
+    strip + mission columns. All 7 tool entry points and deep-links preserved;
+    the old centered save card and glass tool-card grids are retired."""
+
+    # (translation key, handler attribute, handler index) per mission zone
+    MISSION_ZONES = (
+        ('tools.section.converting', (
+            ('tool.convert.saves', '_run_converting_tool', 0),
+            ('tool.convert.gamepass.steam', '_run_converting_tool', 1),
+            ('tool.convert.steamid', '_run_converting_tool', 2),
+        )),
+        ('tools.section.management', (
+            ('tool.slot_injector', '_run_management_tool', 0),
+            ('tool.character_transfer', '_run_management_tool', 1),
+            ('tool.fix_host_save', '_run_management_tool', 2),
+        )),
+        ('tools.section.world', (
+            ('tool.restore_map', '_run_converting_tool', 3),
+        )),
+    )
+    CAMPAIGN_STEPS = (
+        ('tool.convert.saves', '_run_converting_tool', 0),
+        ('tool.convert.gamepass.steam', '_run_converting_tool', 1),
+        ('tool.character_transfer', '_run_management_tool', 1),
+        ('tool.fix_host_save', '_run_management_tool', 2),
+    )
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
-        self.tool_buttons = []
-        self._section_titles = []
+        self._mission_rows = []
+        self._campaign_btns = []
         self._setup_ui()
+
     def _setup_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(18, 18, 18, 18)
-        main_layout.setSpacing(14)
-        main_layout.addWidget(self._create_save_card(), alignment=Qt.AlignHCenter)
-        footer_row = QHBoxLayout()
-        footer_row.setSpacing(14)
-        footer_row.addWidget(self._create_section('tools.section.converting', CONVERTING_TOOL_KEYS, self._run_converting_tool), stretch=1)
-        footer_row.addWidget(self._create_section('tools.section.management', MANAGEMENT_TOOL_KEYS, self._run_management_tool), stretch=1)
-        main_layout.addLayout(footer_row)
+        from palworld_aio.ui.chrome.components import create_page_ribbon
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        root.addWidget(create_page_ribbon(t('tools_tab') if t else 'Start', (t('sidebar.section.inspect') if t else 'Load & Inspect').upper(), self))
+        canvas = QWidget()
+        canvas.setObjectName('startCanvas')
+        body = QVBoxLayout(canvas)
+        body.setContentsMargins(24, 18, 24, 20)
+        body.setSpacing(18)
+        body.addWidget(self._create_ops_masthead())
+        body.addWidget(self._create_field_report())
+        body.addWidget(self._create_campaign_strip())
+        columns_row = QHBoxLayout()
+        columns_row.setSpacing(24)
+        for zone_key, rows in self.MISSION_ZONES:
+            columns_row.addWidget(self._create_mission_column(zone_key, rows), stretch=1)
+        columns_row.addStretch(0)
+        body.addLayout(columns_row)
+        body.addStretch(1)
+        scroll = QScrollArea()
+        scroll.setObjectName('startScroll')
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(canvas)
+        root.addWidget(scroll, stretch=1)
         self._setup_save_manager_connection()
-    def _create_header_bar(self):
-        return QWidget()
-    def _create_save_card(self):
-        card = QFrame()
-        card.setObjectName('saveCard')
-        card.setFixedWidth(340)
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(24, 24, 24, 24)
-        card_layout.setSpacing(12)
-        import nerdfont as nf
-        icon_label = QLabel(nf.icons.get('nf-fa-folder_open', '\uf07c'))
-        icon_label.setObjectName('dashboardIconLabel')
-        icon_label.setProperty('iconkind', 'nerd')
-        icon_label.setFont(QFont(constants.FONT_FAMILY_NERD, 30))
-        icon_label.setAlignment(Qt.AlignCenter)
-        card_layout.addWidget(icon_label)
+
+    # ------------------------------------------------------------- masthead
+    def _create_ops_masthead(self):
+        mast = QFrame()
+        mast.setObjectName('opsMasthead')
+        lay = QVBoxLayout(mast)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        kicker = QLabel((t('ops.save_ledger') if t else 'WORLD SAVE LEDGER').upper())
+        kicker.setObjectName('opsKicker')
+        lay.addWidget(kicker)
+        top_row = QHBoxLayout()
+        top_row.setSpacing(12)
         self._save_status_label = QLabel(t('dashboard.no_save') if t else 'No Save Loaded')
-        self._save_status_label.setObjectName('saveStatusLabel')
-        self._save_status_label.setAlignment(Qt.AlignCenter)
-        self._save_status_label.setWordWrap(True)
-        card_layout.addWidget(self._save_status_label)
-        self._save_path_label = QPushButton(t('tools.no_save_loaded') if t else 'No save loaded')
-        self._save_path_label.setObjectName('savePathLabel')
-        self._save_path_label.setFlat(True)
-        self._save_path_label.setCursor(QCursor(Qt.PointingHandCursor))
-        self._save_path_label.clicked.connect(lambda: self._on_save_path_label_clicked())
-        card_layout.addWidget(self._save_path_label)
+        self._save_status_label.setObjectName('opsWorldName')
+        top_row.addWidget(self._save_status_label)
+        self._save_state_dot = QLabel()
+        self._save_state_dot.setObjectName('opsStateDot')
+        self._save_state_dot.setFixedSize(10, 10)
+        top_row.addWidget(self._save_state_dot)
+        top_row.addStretch(1)
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
-        _nf_font = QFont(constants.FONT_FAMILY_NERD, 12)
+        import nerdfont as nf
+        _nf_font = QFont(constants.FONT_FAMILY_NERD, 11)
         self._load_steam_btn = QPushButton()
+        self._load_steam_btn.setObjectName('opsLoadBtn')
         self._load_steam_btn.setFont(_nf_font)
-        self._load_steam_btn.setObjectName('loadSteamBtn')
         self._load_steam_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self._load_steam_btn.setMinimumHeight(42)
-        self._load_steam_btn.setMinimumWidth(140)
-        self._load_steam_btn.setMaximumWidth(200)
+        self._load_steam_btn.setMinimumHeight(36)
         self._load_steam_btn.clicked.connect(self._on_load_save_clicked)
         btn_row.addWidget(self._load_steam_btn)
         self._load_xgp_btn = QPushButton()
+        self._load_xgp_btn.setObjectName('opsLoadBtn')
+        self._load_xgp_btn.setProperty('loadKind', 'secondary')
         self._load_xgp_btn.setFont(_nf_font)
-        self._load_xgp_btn.setObjectName('loadXgpBtn')
         self._load_xgp_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self._load_xgp_btn.setMinimumHeight(42)
-        self._load_xgp_btn.setMinimumWidth(140)
-        self._load_xgp_btn.setMaximumWidth(200)
+        self._load_xgp_btn.setMinimumHeight(36)
         self._load_xgp_btn.clicked.connect(self._on_load_xgp_clicked)
         btn_row.addWidget(self._load_xgp_btn)
         self._refresh_save_btns()
-        card_layout.addLayout(btn_row)
+        top_row.addLayout(btn_row)
+        lay.addLayout(top_row)
+        self._save_path_label = QPushButton(t('tools.no_save_loaded') if t else 'No save loaded')
+        self._save_path_label.setObjectName('opsSavePath')
+        self._save_path_label.setFlat(True)
+        self._save_path_label.setCursor(QCursor(Qt.PointingHandCursor))
+        self._save_path_label.clicked.connect(lambda: self._on_save_path_label_clicked())
+        lay.addWidget(self._save_path_label)
         self._drag_hint_label = QLabel(t('tools.drag_hint') if t else 'or drag & drop a Level.sav file here')
-        self._drag_hint_label.setObjectName('dragHintLabel')
-        self._drag_hint_label.setAlignment(Qt.AlignCenter)
-        self._drag_hint_label.setWordWrap(True)
-        card_layout.addWidget(self._drag_hint_label)
-        self._stats_frame = QFrame()
-        self._stats_frame.setObjectName('saveStats')
-        stats_layout = QHBoxLayout(self._stats_frame)
-        stats_layout.setContentsMargins(0, 8, 0, 0)
-        stats_layout.setSpacing(16)
+        self._drag_hint_label.setObjectName('opsDropHint')
+        lay.addWidget(self._drag_hint_label)
+        return mast
+
+    def _create_field_report(self):
+        frame = QFrame()
+        frame.setObjectName('fieldReport')
+        lay = QHBoxLayout(frame)
+        lay.setContentsMargins(12, 8, 12, 8)
+        lay.setSpacing(24)
+        kicker = QLabel((t('ops.field_report') if t else 'FIELD REPORT').upper())
+        kicker.setObjectName('opsKicker')
+        lay.addWidget(kicker)
         self._stat_cards = {}
         self._stat_label_refs = {}
-        stats = [('players', ICONS['players'], 'dashboard.stat_players'), ('guilds', ICONS['guilds'], 'dashboard.stat_guilds'), ('bases', ICONS['bases'], 'dashboard.stat_bases'), ('pals', ICONS['pal_editor'], 'dashboard.stat_pals')]
-        for key, icon, label_key in stats:
-            box = QVBoxLayout()
-            box.setSpacing(2)
-            icon_btn = StatIconBtn(icon)
+        stats = [('players', 'dashboard.stat_players'), ('guilds', 'dashboard.stat_guilds'), ('bases', 'dashboard.stat_bases'), ('pals', 'dashboard.stat_pals')]
+        for key, label_key in stats:
+            chip = QWidget()
+            chip.setObjectName('fieldMetric')
+            chip.setCursor(QCursor(Qt.PointingHandCursor))
+            cl = QVBoxLayout(chip)
+            cl.setContentsMargins(0, 0, 0, 0)
+            cl.setSpacing(0)
+            val = QLabel('—')
+            val.setObjectName('fieldMetricValue')
+            cl.addWidget(val)
+            lbl = QLabel(t(label_key) if t else key)
+            lbl.setObjectName('trayLabel')
+            cl.addWidget(lbl)
             nav_key = {'players': 'players', 'guilds': 'guilds', 'bases': 'bases', 'pals': 'pal_editor'}.get(key)
             if nav_key and hasattr(self, 'parent_window') and self.parent_window:
-                icon_btn.clicked.connect(lambda checked, k=nav_key: (self.parent_window.sidebar.set_active(k), self.parent_window._on_nav_changed(k)))
-            box.addWidget(icon_btn)
-            val = QLabel('0')
-            val.setObjectName('statValueLabel')
-            val.setAlignment(Qt.AlignCenter)
-            box.addWidget(val)
-            lbl = QLabel(t(label_key) if t else label_key)
-            lbl.setObjectName('statNameLabel')
-            lbl.setAlignment(Qt.AlignCenter)
-            box.addWidget(lbl)
-            stats_layout.addStretch()
-            stats_layout.addLayout(box)
+                chip.mouseReleaseEvent = self._make_nav_release(nav_key)
+            lay.addWidget(chip)
             self._stat_cards[key] = val
             self._stat_label_refs[key] = lbl
-        stats_layout.addStretch()
-        card_layout.addWidget(self._stats_frame)
-        card_layout.addStretch()
-        return card
+        lay.addStretch(1)
+        return frame
+
+    def _make_nav_release(self, nav_key):
+        def _handler(event):
+            if event.button() == Qt.LeftButton and hasattr(self, 'parent_window') and self.parent_window:
+                self.parent_window.nexus_band.set_active(nav_key)
+                self.parent_window._on_nav_changed(nav_key)
+        return _handler
+
+    def _create_campaign_strip(self):
+        strip = QFrame()
+        strip.setObjectName('campaignStrip')
+        lay = QHBoxLayout(strip)
+        lay.setContentsMargins(12, 6, 12, 6)
+        lay.setSpacing(16)
+        kicker = QLabel((t('ops.campaign') if t else 'CAMPAIGN').upper())
+        kicker.setObjectName('opsKicker')
+        lay.addWidget(kicker)
+        for idx, (tool_key, handler, hidx) in enumerate(self.CAMPAIGN_STEPS, start=1):
+            btn = QPushButton(f'{idx:02d}  {t(tool_key) if t else tool_key}')
+            btn.setObjectName('campaignStep')
+            btn.setCursor(QCursor(Qt.PointingHandCursor))
+            btn.clicked.connect(lambda checked=False, h=handler, i=hidx: getattr(self, h)(i))
+            lay.addWidget(btn)
+            self._campaign_btns.append((btn, tool_key))
+        lay.addStretch(1)
+        return strip
+
+    def _create_mission_column(self, zone_key, rows):
+        col = QWidget()
+        col.setObjectName('missionColumn')
+        v = QVBoxLayout(col)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(2)
+        head = QLabel((t(zone_key) if t else zone_key).upper())
+        head.setObjectName('missionZone')
+        v.addWidget(head)
+        v.addWidget(self._make_hairline())
+        for tool_key, handler, hidx in rows:
+            row = QPushButton()
+            row.setObjectName('missionRow')
+            row.setCursor(QCursor(Qt.PointingHandCursor))
+            row.setMinimumHeight(44)
+            name = t(tool_key) if t else tool_key
+            desc_key = TOOL_DESCRIPTIONS.get(tool_key)
+            desc = t(desc_key) if desc_key and t else ''
+            row.setText(name)
+            row.setToolTip(desc or name)
+            row.clicked.connect(lambda checked=False, h=handler, i=hidx: getattr(self, h)(i))
+            v.addWidget(row)
+            self._mission_rows.append((row, tool_key))
+        v.addStretch(1)
+        return col
+
+    @staticmethod
+    def _make_hairline():
+        line = QFrame()
+        line.setObjectName('bandZoneRule')
+        line.setFixedHeight(1)
+        return line
+
+    def _create_header_bar(self):
+        return QWidget()
     def _on_save_path_label_clicked(self):
         if constants.current_save_path:
             import subprocess
@@ -379,17 +487,19 @@ class ToolsTab(QWidget):
                 self._save_path_label.setText(constants.current_save_path)
                 self._set_save_status('loaded')
             self.refresh()
-            if hasattr(self, '_stats_frame'):
-                self._stats_frame.setVisible(True)
 
     def _set_save_status(self, state):
-        """state: 'no_save' | 'loaded' — styling via saveStatusLabel[state] QSS."""
+        """state: 'no_save' | 'loaded' — styling via opsWorldName[state] QSS."""
         if hasattr(self, '_save_status_label'):
             text_key = 'tools.save_loaded' if state == 'loaded' else 'dashboard.no_save'
             self._save_status_label.setText(t(text_key) if t else text_key)
             self._save_status_label.setProperty('state', state)
             self._save_status_label.style().unpolish(self._save_status_label)
             self._save_status_label.style().polish(self._save_status_label)
+        if hasattr(self, '_save_state_dot'):
+            self._save_state_dot.setProperty('state', state)
+            self._save_state_dot.style().unpolish(self._save_state_dot)
+            self._save_state_dot.style().polish(self._save_state_dot)
     @staticmethod
     def _safe_list(data: dict, key: str) -> list:
         return data.get(key, {}).get('value', [])
@@ -398,42 +508,20 @@ class ToolsTab(QWidget):
         from palworld_aio.managers.save_manager import save_manager
         stats = save_manager.get_current_stats()
         try:
-            self._stat_cards['players'].setText(str(stats['Players']))
-            self._stat_cards['guilds'].setText(str(stats['Guilds']))
-            self._stat_cards['bases'].setText(str(stats['Bases']))
-            self._stat_cards['pals'].setText(str(stats['Pals']))
-        except:
+            for key, label in self._stat_cards.items():
+                raw = stats.get(key.title(), 0)
+                try:
+                    value = int(str(raw))
+                except (TypeError, ValueError):
+                    value = 0
+                label.setText(str(value) if value else '—')
+                label.setProperty('placeholder', 'false' if value else 'true')
+                label.style().unpolish(label)
+                label.style().polish(label)
+        except (KeyError, AttributeError):
             pass
         if hasattr(self, 'parent_window') and self.parent_window and hasattr(self.parent_window, 'results_widget'):
             self.parent_window.results_widget.refresh_stats_after()
-    def _create_section(self, section_key, tool_keys, run_handler):
-        section_frame = QFrame()
-        section_frame.setObjectName('glass')
-        section_layout = QVBoxLayout(section_frame)
-        section_layout.setContentsMargins(14, 10, 14, 10)
-        section_layout.setSpacing(8)
-        title = QLabel(t(section_key) if t else section_key)
-        title.setObjectName('sectionHeader')
-        title.setAlignment(Qt.AlignCenter)
-        title.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
-        self._section_titles.append((title, section_key))
-        section_layout.addWidget(title, alignment=Qt.AlignLeft)
-        grid = QGridLayout()
-        grid.setSpacing(8)
-        for idx, key in enumerate(tool_keys):
-            icon_path = None
-            desc_key = TOOL_DESCRIPTIONS.get(key)
-            desc_text = t(desc_key) if desc_key and t else None
-            card = ToolCard(t(key) if t else key, t(key) if t else key, desc_text, icon_path)
-            card.clicked.connect(lambda i=idx, h=run_handler: h(i))
-            row = idx // 2
-            col = idx % 2
-            grid.addWidget(card, row, col)
-            self.tool_buttons.append((card, key))
-        grid.setRowStretch(0, 1)
-        grid.setRowStretch(1, 1)
-        section_layout.addLayout(grid, stretch=1)
-        return section_frame
     def _import_and_call(self, module_name, function_name, *args):
         try:
             src_path = constants.get_src_path()
@@ -456,10 +544,8 @@ class ToolsTab(QWidget):
         constants.invalidate_container_lookup()
         self._set_save_status('no_save')
         self._save_path_label.setText(t('tools.no_save_loaded') if t else 'No save loaded')
-        if hasattr(self, '_stats_frame'):
-            self._stats_frame.setVisible(False)
         for key in self._stat_cards:
-            self._stat_cards[key].setText('0')
+            self._stat_cards[key].setText('—')
     def _run_converting_tool(self, index):
         self._reset_save_session()
         try:
@@ -560,15 +646,14 @@ class ToolsTab(QWidget):
                 self._set_save_status('loaded')
         if hasattr(self, '_drag_hint_label') and self._drag_hint_label:
             self._drag_hint_label.setText(t('tools.drag_hint') if t else 'or drag & drop a Level.sav file here')
-        for title_label, section_key in self._section_titles:
-            title_label.setText(t(section_key) if t else section_key)
-        for card, key in self.tool_buttons:
-            label = t(key) if t else key
-            card.title_label.setText(label)
-            card.title_label.setToolTip(label)
-            desc_key = TOOL_DESCRIPTIONS.get(key)
-            if desc_key and hasattr(card, 'desc_label') and card.desc_label:
-                card.desc_label.setText(t(desc_key) if t else '')
+        for row, tool_key in self._mission_rows:
+            label = t(tool_key) if t else tool_key
+            row.setText(label)
+            desc_key = TOOL_DESCRIPTIONS.get(tool_key)
+            row.setToolTip((t(desc_key) if t else desc_key) if desc_key else label)
+        for btn, tool_key in self._campaign_btns:
+            idx = self._campaign_btns.index((btn, tool_key)) + 1
+            btn.setText(f'{idx:02d}  {t(tool_key) if t else tool_key}')
         if hasattr(self.parent_window, '_drop_overlay'):
             self.parent_window._drop_overlay._drop_text = t('tools.drop_title') if t else 'Drop Level.sav to Load Save'
             self.parent_window._drop_overlay._drop_hint = t('tools.drop_hint_overlay') if t else "Or click the 'Load Save' button above"
