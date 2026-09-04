@@ -444,7 +444,7 @@ class RadiusPreviewDialog(ThemedDialog):
         current_label = QLabel(t('base.radius.current') if t else 'Current Radius:')
         current_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
         self.current_display = QLabel(f'{self.current_percent}% ({int(self.current_actual_radius)})')
-        self.current_display.setStyleSheet('color: #4ade80; font-weight: bold; font-size: 14px;')
+        self.current_display.setStyleSheet('color: #2DD4BF; font-weight: bold; font-size: 14px;')
         current_layout.addWidget(current_label)
         current_layout.addStretch()
         current_layout.addWidget(self.current_display)
@@ -482,7 +482,7 @@ class RadiusPreviewDialog(ThemedDialog):
         input_layout.addWidget(self.input_field)
         self.input_suffix = QLabel('%')
         self.input_suffix.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
-        self.input_suffix.setStyleSheet('color: #64748b;')
+        self.input_suffix.setStyleSheet('color: #5C564E;')
         input_layout.addWidget(self.input_suffix)
         self.apply_btn = QPushButton(t('base.radius.apply') if t else 'Apply')
         self.apply_btn.setMinimumWidth(80)
@@ -511,7 +511,7 @@ class RadiusPreviewDialog(ThemedDialog):
         slider_layout.addWidget(self.slider)
         range_label = QLabel(t('base.radius.range') if t else 'Range: 50% (1,750) to 1000% (35,000)')
         range_label.setAlignment(Qt.AlignCenter)
-        range_label.setStyleSheet('color: #64748b; font-size: 11px;')
+        range_label.setStyleSheet('color: #5C564E; font-size: 11px;')
         slider_layout.addWidget(range_label)
         layout.addWidget(slider_group)
         actual_frame = QFrame()
@@ -521,7 +521,7 @@ class RadiusPreviewDialog(ThemedDialog):
         actual_label = QLabel(t('base.radius.actual') if t else 'Actual Value:')
         actual_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
         self.actual_display = QLabel(f'{int(self.current_actual_radius)}')
-        self.actual_display.setStyleSheet('color: #fbbf24; font-weight: bold; font-size: 14px;')
+        self.actual_display.setStyleSheet('color: #E8B44C; font-weight: bold; font-size: 14px;')
         actual_layout.addWidget(actual_label)
         actual_layout.addStretch()
         actual_layout.addWidget(self.actual_display)
@@ -544,7 +544,7 @@ class RadiusPreviewDialog(ThemedDialog):
         button_layout.addWidget(ok_btn)
         layout.addLayout(button_layout)
         self.preview_status = QLabel(t('base.radius.preview.ready') if t else 'Preview ready - drag slider or enter value to adjust')
-        self.preview_status.setStyleSheet('color: #64748b; font-size: 11px; font-style: italic;')
+        self.preview_status.setStyleSheet('color: #5C564E; font-size: 11px; font-style: italic;')
         layout.addWidget(self.preview_status)
     def _connect_signals(self):
         self.slider.valueChanged.connect(self._on_slider_changed)
@@ -570,9 +570,9 @@ class RadiusPreviewDialog(ThemedDialog):
         self._update_input_field_style()
     def _update_input_field_style(self):
         if self.input_field.text().strip():
-            self.input_field.setStyleSheet('QLineEdit { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(125,211,252,0.2); border-radius: 6px; padding: 6px 10px; }')
+            self.input_field.setStyleSheet('QLineEdit { background: rgba(236,231,224,0.06); color: #ECE7E0; border: 1px solid rgba(245,158,11,0.2); border-radius: 6px; padding: 6px 10px; }')
         else:
-            self.input_field.setStyleSheet('QLineEdit { background: rgba(255,255,255,0.04); color: #64748b; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 10px; }')
+            self.input_field.setStyleSheet('QLineEdit { background: rgba(236,231,224,0.04); color: #5C564E; border: 1px solid rgba(236,231,224,0.08); border-radius: 6px; padding: 6px 10px; }')
     def _on_input_applied(self):
         text = self.input_field.text().strip()
         if not text:
@@ -608,7 +608,7 @@ class RadiusPreviewDialog(ThemedDialog):
         QTimer.singleShot(3000, self._reset_status_style)
     def _reset_status_style(self):
         self.preview_status.setText(t('base.radius.preview.ready') if t else 'Preview ready - drag slider or enter value to adjust')
-        self.preview_status.setStyleSheet('color: #64748b; font-size: 11px; font-style: italic;')
+        self.preview_status.setStyleSheet('color: #5C564E; font-size: 11px; font-style: italic;')
     def _get_current_percent(self):
         if self.input_mode == 'percentage':
             return self.slider.value()
@@ -767,7 +767,7 @@ class PalDefenderDialog(ThemedDialog):
         h.setStretchLastSection(True)
         for i in range(8):
             h.setSectionResizeMode(i, QHeaderView.Stretch)
-        self.tree.setStyleSheet(f'\n            QTreeWidget {{\n                background-color: rgba(18,20,24,0.65);\n                color: #A6B8C8;\n                border: 1px solid rgba(125,211,252,0.15);\n                border-radius: 8px;\n                font-size: 11px;\n                outline: none;\n            }}\n            QTreeWidget::item {{\n                padding: 4px 8px;\n                border-radius: 4px;\n            }}\n            QTreeWidget::item:hover {{\n                background: rgba(125,211,252,0.1);\n                color: #7DD3FC;\n            }}\n            QTreeWidget::item:selected {{\n                background: rgba(125,211,252,0.15);\n                color: #7DD3FC;\n                border-left: 3px solid #7DD3FC;\n            }}\n            QTreeWidget::item:selected:!active {{\n                background: rgba(125,211,252,0.1);\n                color: #7DD3FC;\n            }}\n            QHeaderView::section {{\n                background: rgba(8,10,16,0.9);\n                color: #7DD3FC;\n                padding: 6px 8px;\n                border: none;\n                border-bottom: 1px solid rgba(125,211,252,0.15);\n                font-weight: 600;\n                font-size: 10px;\n                text-align: center;\n            }}\n            QHeaderView::section:hover {{\n                background: rgba(125,211,252,0.08);\n            }}\n        ')
+        self.tree.setStyleSheet(f'\n            QTreeWidget {{\n                background-color: rgba(27,25,23,0.65);\n                color: #A6B8C8;\n                border: 1px solid rgba(245,158,11,0.15);\n                border-radius: 8px;\n                font-size: 11px;\n                outline: none;\n            }}\n            QTreeWidget::item {{\n                padding: 4px 8px;\n                border-radius: 4px;\n            }}\n            QTreeWidget::item:hover {{\n                background: rgba(245,158,11,0.1);\n                color: #F59E0B;\n            }}\n            QTreeWidget::item:selected {{\n                background: rgba(245,158,11,0.15);\n                color: #F59E0B;\n                border-left: 3px solid #F59E0B;\n            }}\n            QTreeWidget::item:selected:!active {{\n                background: rgba(245,158,11,0.1);\n                color: #F59E0B;\n            }}\n            QHeaderView::section {{\n                background: rgba(20,19,18,0.9);\n                color: #F59E0B;\n                padding: 6px 8px;\n                border: none;\n                border-bottom: 1px solid rgba(245,158,11,0.15);\n                font-weight: 600;\n                font-size: 10px;\n                text-align: center;\n            }}\n            QHeaderView::section:hover {{\n                background: rgba(245,158,11,0.08);\n            }}\n        ')
         layout.addWidget(self.tree)
         action_row = QHBoxLayout()
         self.gen_btn = QPushButton(t('paldefender.generate') if t else 'Generate Kill Commands')
@@ -1278,7 +1278,7 @@ class NudgeInputDialog(ThemedDialog):
         row1.setSpacing(8)
         self.current_coords_btn = QPushButton()
         self.current_coords_btn.setFlat(True)
-        self.current_coords_btn.setStyleSheet('QPushButton { font-size: 11px; color: #94A3B8; background: transparent; border: none; text-align: left; padding: 0; } QPushButton:hover { color: #7DD3FC; }')
+        self.current_coords_btn.setStyleSheet('QPushButton { font-size: 11px; color: #A69F94; background: transparent; border: none; text-align: left; padding: 0; } QPushButton:hover { color: #F59E0B; }')
         self.current_coords_btn.setCursor(Qt.PointingHandCursor)
         self.current_coords_btn.setToolTip((t('base.nudge.copy_current') if t else 'Click to copy current coordinates'))
         row1.addWidget(self.current_coords_btn)
@@ -1294,7 +1294,7 @@ class NudgeInputDialog(ThemedDialog):
         row2.setSpacing(8)
         self.result_coords_btn = QPushButton()
         self.result_coords_btn.setFlat(True)
-        self.result_coords_btn.setStyleSheet('QPushButton { font-size: 11px; color: #94A3B8; background: transparent; border: none; text-align: left; padding: 0; } QPushButton:hover { color: #7DD3FC; }')
+        self.result_coords_btn.setStyleSheet('QPushButton { font-size: 11px; color: #A69F94; background: transparent; border: none; text-align: left; padding: 0; } QPushButton:hover { color: #F59E0B; }')
         self.result_coords_btn.setCursor(Qt.PointingHandCursor)
         self.result_coords_btn.setToolTip((t('base.nudge.copy_result') if t else 'Click to copy resulting coordinates'))
         row2.addWidget(self.result_coords_btn)
