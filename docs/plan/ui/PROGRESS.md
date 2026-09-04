@@ -43,6 +43,8 @@ Status: COMPLETE (pending manual visual QA)
   switch + context row), Player Inventory (ribbon + tokenized action
   buttons), Pal Editor tab (ribbon). Residual: inner-zone workbench
   recomposition of pal_editor_widget (optional polish, palette done).
+- Branch committed in 10 logical increments on feat/ui-overhaul (no merge,
+  no PR — user review pending).
 
 ## Next Task
 
@@ -78,7 +80,7 @@ planned as new -r03 revisions.
 - `uv run pytest -c tests/pytest.ini -m slow` -> 20 passed
 - `uv run python -m compileall -q src tests scripts` -> OK
 - `uv run pyright src` -> 522 (below main baseline 523)
-- Theme scanner -> 1352 (44 files; down from 1390)
+- Theme scanner -> 1295 (43 files; down from 1390; geometry passes removed 57 more)
 - validate_imports -> all 16 modules OK
 - smoke_final -> PASS (12/12 pages, 10 shortcuts, search counts, exclusions
   switch, drawer Esc, 4-language cycle, DPR grab, 7 screenshots)
