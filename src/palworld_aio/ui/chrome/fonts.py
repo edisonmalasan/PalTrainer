@@ -1,13 +1,13 @@
 """Font loading and family stacks for the PalTrainer UI.
 
-Strategy (see docs/plan/ui/000-design-context.md):
-- body/UI: Segoe UI Variable Text with Segoe UI fallback (installed on Windows)
-- headings: Segoe UI Variable Display with Segoe UI fallback
+Strategy (plan 019 §6, bundled-font mandate):
+- display/headings/nav: Hanken Grotesk (bundled TTF), Segoe UI fallback
+- body/controls/tables: Inter (bundled TTF), Segoe UI fallback
 - data/mono: Cascadia Mono with Consolas fallback (no ligatures in Mono)
 - icons: bundled Hack Nerd Font (resources/assets/fonts)
 
-Every TTF/OTF under resources/assets/fonts is registered at startup so a future
-font bundle works without code changes.
+Every TTF/OTF under resources/assets/fonts is registered at startup once;
+per-widget font loading is banned (see design-context §9).
 """
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ import os
 
 from PyQt6.QtGui import QFont, QFontDatabase
 
-FONT_BODY_STACK = ['Segoe UI Variable Text', 'Segoe UI']
-FONT_HEADING_STACK = ['Segoe UI Variable Display', 'Segoe UI']
+FONT_BODY_STACK = ['Inter 28pt', 'Inter', 'Segoe UI']
+FONT_HEADING_STACK = ['Hanken Grotesk', 'Segoe UI']
 FONT_MONO_STACK = ['Cascadia Mono', 'Consolas']
 FONT_ICON = 'Hack Nerd Font'
 FONT_ICON_STACK = [FONT_ICON]
@@ -66,7 +66,7 @@ def body_font(px: int = 12, weight: int = 400) -> QFont:
     return _make(FONT_BODY_STACK, px, weight)
 
 
-def heading_font(px: int = 15, weight: int = 600) -> QFont:
+def heading_font(px: int = 14, weight: int = 700) -> QFont:
     return _make(FONT_HEADING_STACK, px, weight)
 
 

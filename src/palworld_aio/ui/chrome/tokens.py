@@ -38,52 +38,54 @@ def rgba(hex_color: str, alpha: float) -> str:
 # Palettes. Dark ships first; the dict shape is the contract for new themes.
 # ---------------------------------------------------------------------------
 PALETTES: dict[str, dict[str, str]] = {
+    # Deck Operations palette (plan 019): warm dark, opaque, amber accent,
+    # teal success. Cyan #7DD3FC and glass translucency are retired.
     'dark': {
-        # surfaces (canvas < surface < raised < input)
-        'canvas': '#0A0C10',
-        'surface': '#10141B',
-        'surface_raised': '#151B24',
-        'surface_input': '#1A212C',
-        'surface_hover': rgba('#7DD3FC', 0.06),
-        'surface_active': rgba('#7DD3FC', 0.10),
-        # text
-        'text': TEXT,
-        'text_secondary': MUTED,
-        'text_disabled': TEXT_DISABLED,
-        'text_on_accent': '#071018',
+        # surfaces (canvas < surface < raised < input) — warm, opaque
+        'canvas': '#141312',
+        'surface': '#1B1917',
+        'surface_raised': '#211E1B',
+        'surface_input': '#262220',
+        'surface_hover': rgba('#F59E0B', 0.07),
+        'surface_active': rgba('#F59E0B', 0.12),
+        # text (warm grays)
+        'text': '#ECE7E0',
+        'text_secondary': '#A69F94',
+        'text_disabled': '#5C564E',
+        'text_on_accent': '#1C1206',
         # borders
-        'border': rgba('#FFFFFF', 0.09),
-        'border_strong': rgba('#FFFFFF', 0.16),
+        'border': rgba('#ECE7E0', 0.10),
+        'border_strong': rgba('#ECE7E0', 0.18),
         # accent (interactive/selected/focus only)
-        'accent': ACCENT,
-        'accent_hover': '#A5E3FD',
-        'accent_pressed': '#58BCE8',
-        'accent_bg': rgba(ACCENT, 0.10),
-        'accent_bg_strong': rgba(ACCENT, 0.18),
-        'accent_border': rgba(ACCENT, 0.30),
-        'accent_border_strong': rgba(ACCENT, 0.50),
+        'accent': '#F59E0B',
+        'accent_hover': '#F7B03A',
+        'accent_pressed': '#D98A06',
+        'accent_bg': rgba('#F59E0B', 0.10),
+        'accent_bg_strong': rgba('#F59E0B', 0.18),
+        'accent_border': rgba('#F59E0B', 0.30),
+        'accent_border_strong': rgba('#F59E0B', 0.50),
         # semantic
-        'success': SUCCESS,
-        'success_bg': rgba(SUCCESS, 0.12),
-        'success_border': rgba(SUCCESS, 0.35),
-        'warning': WARNING,
-        'warning_bg': rgba(WARNING, 0.12),
-        'warning_border': rgba(WARNING, 0.35),
-        'danger': DANGER,
-        'danger_bg': rgba(DANGER, 0.12),
-        'danger_border': rgba(DANGER, 0.35),
-        'info': INFO,
-        'info_bg': rgba(INFO, 0.12),
-        'info_border': rgba(INFO, 0.30),
-        'special': SPECIAL,
-        'special_bg': rgba(SPECIAL, 0.12),
-        'special_border': rgba(SPECIAL, 0.30),
+        'success': '#2DD4BF',
+        'success_bg': rgba('#2DD4BF', 0.10),
+        'success_border': rgba('#2DD4BF', 0.30),
+        'warning': '#E8B44C',
+        'warning_bg': rgba('#E8B44C', 0.12),
+        'warning_border': rgba('#E8B44C', 0.35),
+        'danger': '#F87171',
+        'danger_bg': rgba('#F87171', 0.12),
+        'danger_border': rgba('#F87171', 0.35),
+        'info': '#93B7DD',
+        'info_bg': rgba('#93B7DD', 0.10),
+        'info_border': rgba('#93B7DD', 0.30),
+        'special': '#C084FC',
+        'special_bg': rgba('#C084FC', 0.12),
+        'special_border': rgba('#C084FC', 0.30),
         # legacy alias (kept so old code resolving ERROR/ALERT keeps meaning)
-        'error': ERROR,
+        'error': '#F87171',
         # floating layers
-        'tooltip_bg': rgba('#151B24', 0.98),
-        'menu_bg': rgba('#10141B', 0.98),
-        'overlay_scrim': rgba('#05070A', 0.60),
+        'tooltip_bg': rgba('#211E1B', 0.98),
+        'menu_bg': rgba('#1B1917', 0.98),
+        'overlay_scrim': rgba('#0D0C0B', 0.62),
     },
 }
 
@@ -99,11 +101,12 @@ def resolve(theme: str = DEFAULT_THEME) -> dict[str, str]:
 
 # ---------------------------------------------------------------------------
 # Typography scale: token -> (px, weight). Fonts live in chrome/fonts.py.
+# Deck Operations scale (plan 019 §6): Hanken display/heading/nav, Inter body.
 # ---------------------------------------------------------------------------
 TYPE: dict[str, tuple[int, int]] = {
-    'display': (20, 600),
-    'title': (15, 600),
-    'section': (13, 600),
+    'display': (19, 700),
+    'title': (14, 700),
+    'section': (12, 600),
     'body': (12, 400),
     'secondary': (11, 400),
     'micro': (10, 400),
@@ -123,8 +126,8 @@ SPACING: dict[str, int] = {
 }
 
 RADIUS: dict[str, int] = {
-    'sm': 4,
-    'md': 6,
+    'sm': 3,
+    'md': 5,
     'lg': 8,
     'pill': 9999,
 }
@@ -145,7 +148,7 @@ ROW: dict[str, int] = {
 # Transitional composite aliases. Existing modules (chrome/styles.py and
 # ~400 constants.* consumers) import these names; screen plans migrate them
 # to resolve()-based access. Values derive from the dark palette so there is
-# exactly one source of truth.
+# exactly one source of truth (plan 019: warm amber/teal family).
 # ---------------------------------------------------------------------------
 _DARK = PALETTES['dark']
 
@@ -160,25 +163,25 @@ ACCENT_BORDER_HOVER = rgba(ACCENT, 0.35)
 ACCENT_BORDER_FOCUS = rgba(ACCENT, 0.4)
 ACCENT_BORDER_STRONG = rgba(ACCENT, 0.25)
 ACCENT_GLOW = rgba(ACCENT, 0.1)
-TEXT_DIM = rgba(TEXT, 0.7)
-SUCCESS_BG = rgba(SUCCESS, 0.15)
-SUCCESS_BORDER = rgba(SUCCESS, 0.3)
-WARNING_BG = rgba(WARNING, 0.15)
-WARNING_BORDER = rgba(WARNING, 0.35)
-DANGER_BG = rgba(DANGER, 0.12)
-DANGER_BG_STRONG = rgba(DANGER, 0.2)
-DANGER_BORDER = rgba(DANGER, 0.3)
-INFO_BG = rgba(INFO, 0.15)
-INFO_BORDER = rgba(INFO, 0.3)
-SPECIAL_BG = rgba(SPECIAL, 0.12)
-SPECIAL_BORDER = rgba(SPECIAL, 0.3)
-SURFACE = rgba('#121418', 0.65)
-SURFACE_SOLID = rgba('#121418', 0.95)
-SURFACE_ELEVATED_SOLID = rgba('#161A20', 0.98)
-SURFACE_FAINT = rgba('#FFFFFF', 0.03)
-SURFACE_FAINTER = rgba('#FFFFFF', 0.05)
-BORDER_FAINT = rgba('#FFFFFF', 0.08)
-BORDER_FAINTER = rgba('#FFFFFF', 0.05)
+TEXT_DIM = rgba('#ECE7E0', 0.7)
+SUCCESS_BG = _DARK['success_bg']
+SUCCESS_BORDER = _DARK['success_border']
+WARNING_BG = _DARK['warning_bg']
+WARNING_BORDER = _DARK['warning_border']
+DANGER_BG = _DARK['danger_bg']
+DANGER_BG_STRONG = rgba('#F87171', 0.2)
+DANGER_BORDER = _DARK['danger_border']
+INFO_BG = _DARK['info_bg']
+INFO_BORDER = _DARK['info_border']
+SPECIAL_BG = _DARK['special_bg']
+SPECIAL_BORDER = _DARK['special_border']
+SURFACE = _DARK['surface']
+SURFACE_SOLID = rgba('#1B1917', 0.95)
+SURFACE_ELEVATED_SOLID = rgba('#211E1B', 0.98)
+SURFACE_FAINT = rgba('#ECE7E0', 0.03)
+SURFACE_FAINTER = rgba('#ECE7E0', 0.05)
+BORDER_FAINT = _DARK['border']
+BORDER_FAINTER = rgba('#ECE7E0', 0.06)
 
 ACCENT_HEX = ACCENT
 TEXT_HEX = TEXT

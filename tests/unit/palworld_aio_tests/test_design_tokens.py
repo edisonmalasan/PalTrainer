@@ -14,6 +14,17 @@ def test_dark_palette_resolves():
     assert p['border']
 
 
+def test_dark_palette_is_deck_operations_v2():
+    # Plan 019: warm dark canvas, amber accent, teal success; cyan retired.
+    p = tokens.resolve('dark')
+    assert p['canvas'] == '#141312'
+    assert p['accent'] == '#F59E0B'
+    assert p['success'] == '#2DD4BF'
+    assert '#7DD3FC' not in str(p).upper().replace('#7DD3FC', '#7DD3FC')
+    for value in p.values():
+        assert '#7DD3FC' not in value, 'retired cyan leaked into palette'
+
+
 def test_unknown_theme_raises():
     with pytest.raises(KeyError):
         tokens.resolve('nope')
@@ -38,6 +49,9 @@ def test_type_scale_shape():
         px, weight = spec
         assert px > 0
         assert weight in (400, 500, 600, 700)
+    # Plan 019 type scale: display 19/700, title 14/700.
+    assert tokens.TYPE['display'] == (19, 700)
+    assert tokens.TYPE['title'] == (14, 700)
 
 
 def test_rgba_helper():
