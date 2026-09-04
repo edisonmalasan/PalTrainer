@@ -11,7 +11,7 @@ from palworld_aio.editor.pal_editor.widgets import PassiveEffectOverlay
 from palworld_aio.editor.pal_editor import data as _pedata
 from palworld_aio.ui.dialogs.skill_picker import SkillPicker
 from palworld_aio.ui.chrome.styles import DIALOG_STYLE as DARK_THEME_STYLE, PICKER_BG_STYLE, PICKER_SEARCH_STYLE, PICKER_LIST_STYLE
-from palworld_aio.ui.chrome.sidebar_widget import NerdBtn
+from palworld_aio.ui.chrome.components import NerdBtn
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 try:
     import nerdfont as nf

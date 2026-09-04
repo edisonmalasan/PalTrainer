@@ -8,7 +8,8 @@ consume these.
 from __future__ import annotations
 
 from typing import Callable, Optional
-from PyQt6.QtCore import QPoint, Qt, QTimer
+from PyQt6.QtCore import pyqtSignal, Qt, QTimer
+from PyQt6.QtGui import QFontMetrics, QPainter
 from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
@@ -17,6 +18,9 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSizePolicy,
+    QStyle,
+    QStyleOptionButton,
+    QStylePainter,
     QVBoxLayout,
     QWidget,
 )
@@ -335,7 +339,8 @@ class DataTable(QWidget):
 # Dialog scaffold
 # ---------------------------------------------------------------------------
 class BaseDialog(QDialog):
-    """Shared dialog scaffold: title bar, content area, footer buttons.
+    """Shared dialog scaffold — 022 sheet grammar: kicker + title + rule +
+    content zone + footer with isolated danger slot at footer-left.
 
     Sizing: min sizes only (no fixed frames). Esc rejects; the confirm button
     (if created) accepts. Subclasses populate ``self.content_layout``.
@@ -347,6 +352,7 @@ class BaseDialog(QDialog):
         parent: Optional[QWidget] = None,
         min_size: Optional[tuple[int, int]] = None,
         danger: bool = False,
+        kicker: str = '',
     ):
         super().__init__(parent)
         self.setModal(True)
@@ -358,8 +364,16 @@ class BaseDialog(QDialog):
 
         head = QHBoxLayout()
         head.setSpacing(SPACING['sm'])
+        head_col = QVBoxLayout()
+        head_col.setSpacing(0)
+        if kicker:
+            kicker_lbl = QLabel(kicker.upper(), self)
+            kicker_lbl.setObjectName('dialogKicker')
+            head_col.addWidget(kicker_lbl)
         self.title_label = make_label(title, 'title')
-        head.addWidget(self.title_label)
+        self.title_label.setObjectName('dialogTitle')
+        head_col.addWidget(self.title_label)
+        head.addLayout(head_col)
         head.addStretch(1)
         self.close_btn = make_tool_button('\uf00d')
         self.close_btn.clicked.connect(self.reject)
@@ -373,6 +387,10 @@ class BaseDialog(QDialog):
 
         self.footer = QHBoxLayout()
         self.footer.setSpacing(SPACING['sm'])
+        # danger actions are isolated at footer-left (022 §3.1)
+        self.danger_slot = QHBoxLayout()
+        self.danger_slot.setSpacing(SPACING['sm'])
+        self.footer.addLayout(self.danger_slot)
         self.footer.addStretch(1)
         root.addLayout(self.footer)
         self.cancel_btn = make_button('Cancel', 'ghost')
@@ -382,7 +400,17 @@ class BaseDialog(QDialog):
     def add_confirm_button(self, text: str, danger: bool = False) -> QPushButton:
         btn = make_button(text, 'danger' if danger else 'primary')
         btn.clicked.connect(self.accept)
-        self.footer.addWidget(btn)
+        if danger:
+            self.danger_slot.addWidget(btn)
+        else:
+            self.footer.addWidget(btn)
+        return btn
+
+    def add_danger_button(self, text: str, on_clicked) -> QPushButton:
+        """Non-accepting destructive action, isolated footer-left."""
+        btn = make_button(text, 'danger')
+        btn.clicked.connect(on_clicked)
+        self.danger_slot.addWidget(btn)
         return btn
 
 
@@ -402,3 +430,78 @@ def confirm(
     btn.setFocus()
     result = dialog.exec()
     return result == QDialog.DialogCode.Accepted
+
+
+def create_page_ribbon(title: str, zone: str = '', parent=None) -> QFrame:
+    """Page ribbon (plan 020 section 4.4): per-page title header.
+
+    Returns a QFrame with a horizontal layout: display title, zone label,
+    stretch, and an action slot the caller can extend. Right padding is
+    reserved for the floating WindowControls overlay.
+    """
+    ribbon = QFrame(parent)
+    ribbon.setObjectName('pageRibbon')
+    lay = QHBoxLayout(ribbon)
+    lay.setContentsMargins(SPACING['xl'], SPACING['md'], 170, SPACING['md'])
+    lay.setSpacing(SPACING['sm'])
+    title_lbl = QLabel(title, ribbon)
+    title_lbl.setObjectName('ribbonTitle')
+    lay.addWidget(title_lbl)
+    if zone:
+        zone_lbl = QLabel(zone, ribbon)
+        zone_lbl.setObjectName('ribbonZone')
+        lay.addWidget(zone_lbl)
+    lay.addStretch(1)
+    ribbon._ribbon_actions_slot = lay
+    return ribbon
+
+
+class NerdBtn(QPushButton):
+    """Icon-font button: paints the glyph without QPushButton text mangling.
+    (Moved here from the retired sidebar_widget — plan 025.)"""
+
+    def paintEvent(self, event):
+        sp = QStylePainter(self)
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        opt.text = ''
+        sp.drawControl(QStyle.ControlElement.CE_PushButton, opt)
+        sp.end()
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.TextAntialiasing | QPainter.RenderHint.Antialiasing)
+        p.setFont(self.font())
+        p.setPen(self.palette().color(self.foregroundRole()))
+        fm = QFontMetrics(self.font())
+        br = fm.boundingRect(self.text())
+        x = (self.width() - br.width()) / 2 - br.x()
+        y = (self.height() - br.height()) / 2 - br.y()
+        p.drawText(int(x), int(y), self.text())
+        p.end()
+
+
+class NerdLabel(QLabel):
+    """Clickable icon-font label (chips)."""
+
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not self.text():
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.TextAntialiasing | QPainter.RenderHint.Antialiasing)
+        p.setFont(self.font())
+        p.setPen(self.palette().color(self.foregroundRole()))
+        fm = QFontMetrics(self.font())
+        br = fm.boundingRect(self.text())
+        x = (self.width() - br.width()) / 2 - br.x()
+        y = (self.height() - br.height()) / 2 - br.y()
+        p.drawText(int(x), int(y), self.text())
+        p.end()

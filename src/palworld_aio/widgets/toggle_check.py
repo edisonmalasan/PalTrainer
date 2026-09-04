@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QFont, QMouseEvent
 from palworld_aio import constants
-from palworld_aio.ui.chrome.sidebar_widget import NerdBtn
+from palworld_aio.ui.chrome.components import NerdBtn
 from palworld_aio.ui.chrome import tokens as _tokens
 try:
     import nerdfont as nf
