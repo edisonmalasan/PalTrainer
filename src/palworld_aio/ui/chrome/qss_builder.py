@@ -14,6 +14,10 @@ Rules of the road:
 from __future__ import annotations
 
 from palworld_aio.ui.chrome import fonts
+from palworld_aio.ui.chrome.fonts import (
+    FONT_BODY_STACK, FONT_HEADING_STACK, FONT_ICON_STACK, FONT_MONO_STACK,
+    font_family_qss,
+)
 from palworld_aio.ui.chrome.tokens import HEIGHT, RADIUS, SPACING, TYPE, resolve
 
 BUTTON_PAD = f'{SPACING["sm"] - 2}px {SPACING["lg"] - 2}px'
@@ -37,6 +41,7 @@ def build_qss(theme: str = 'dark') -> str:
 QWidget#central {{
     background-color: {p['canvas']};
     color: {p['text']};
+    font-family: {fonts.font_family_qss(fonts.FONT_BODY_STACK)};
 }}
 QLabel {{
     color: {p['text']};
@@ -53,8 +58,8 @@ QLabel[role="mono"] {{ font-family: {fonts.font_family_qss(fonts.FONT_MONO_STACK
 QStackedWidget {{
     background: transparent;
     border: none;
-    padding: 10px;
-    margin: 10px;
+    padding: 0px;
+    margin: 0px;
     color: {p['text']};
 }}
 QStackedWidget > QWidget {{
@@ -442,13 +447,27 @@ QTabBar::tab:hover:!selected {{
 }}
 QTabBar::close-button {{ image: none; subcontrol-position: right; }}
 
-/* ---- dialogs & system surfaces ---- */
+/* ---- dialogs & system surfaces (022 sheet grammar) ---- */
 QDialog {{
-    background-color: {p['canvas']};
+    background-color: {p['surface_raised']};
+    color: {p['text']};
+    border: 1px solid {p['border_strong']};
+}}
+QLabel#dialogKicker {{
+    color: {p['text_disabled']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 600;
+    letter-spacing: 2px;
+}}
+QLabel#dialogTitle {{
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['title'][0]}px;
+    font-weight: {TYPE['title'][1]};
     color: {p['text']};
 }}
 QMessageBox, QInputDialog {{
-    background-color: {p['surface']};
+    background-color: {p['surface_raised']};
     color: {p['text']};
 }}
 QMessageBox QLabel, QInputDialog QLabel {{ color: {p['text']}; }}
@@ -606,7 +625,196 @@ QFrame[class="searchField"] QLineEdit {{
 QFrame[class="searchField"] QLineEdit:focus {{ border: none; }}
 QFrame[class="searchField"] QLabel {{ color: {p['text_secondary']}; }}
 
-/* ---- application shell chrome (header_widget / sidebar_widget) ---- */
+/* ---- application shell chrome v2: NexusBand rail (plan 020) ---- */
+QWidget#nexusBand {{
+    background-color: {p['canvas']};
+    border-left: 1px solid {p['border']};
+}}
+QWidget#bandMiddle {{ background: transparent; }}
+QFrame#bandZoneRule {{
+    background: {p['border']};
+    border: none;
+    margin: 3px 10px;
+}}
+QPushButton[bandItem="true"] {{
+    background: transparent;
+    color: {p['text_secondary']};
+    border: none;
+    border-radius: {RADIUS['sm']}px;
+    text-align: center;
+    padding: 0px;
+}}
+QPushButton[bandItem="true"]:hover {{
+    background: {p['surface_hover']};
+    color: {p['text']};
+}}
+QPushButton[bandItem="true"]:focus {{
+    border: 1px solid {p['accent_border']};
+}}
+QPushButton[bandItem="true"][active="true"] {{
+    color: {p['accent']};
+    background: {p['accent_bg']};
+    font-weight: 600;
+}}
+QPushButton[bandItem="true"][active="true"]:hover {{
+    background: {p['accent_bg_strong']};
+    color: {p['accent_hover']};
+}}
+QPushButton[bandItem="true"]:disabled {{
+    color: {p['text_disabled']};
+    background: transparent;
+}}
+QPushButton[bandUtility="true"] {{
+    background: transparent;
+    color: {p['text_secondary']};
+    border: none;
+    border-radius: {RADIUS['sm']}px;
+}}
+QPushButton[bandUtility="true"]:hover {{
+    background: {p['surface_hover']};
+    color: {p['text']};
+}}
+QPushButton[bandUtility="true"]:pressed {{ background: {p['surface_active']}; }}
+QPushButton[bandUtility="true"]:focus {{ border: 1px solid {p['accent_border']}; }}
+QPushButton[bandUtility="true"]:disabled {{ color: {p['text_disabled']}; }}
+QPushButton[bandUtility="true"][active="true"] {{
+    color: {p['accent']};
+    background: {p['accent_bg']};
+}}
+QPushButton#bandMasthead {{
+    color: {p['text_secondary']};
+    font-size: 15px;
+}}
+QPushButton#bandMasthead[pulse="true"] {{
+    color: {p['warning']};
+    background: {p['warning_bg']};
+}}
+QLabel#bandDirtyDot {{
+    background: {p['accent']};
+    border-radius: 4px;
+}}
+
+/* ---- InstrumentTray (plan 020 §4.2) ---- */
+QWidget#instrumentTray {{ background: transparent; }}
+QPushButton#trayStateRow {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px;
+    margin: 0 6px;
+    text-align: left;
+}}
+QPushButton#trayStateRow:hover {{ border-color: {p['border_strong']}; background: {p['surface_raised']}; }}
+QPushButton#trayStateRow:focus {{ border-color: {p['accent_border']}; }}
+QPushButton#trayStateRow[state="loaded"] {{
+    background: {p['success_bg']};
+    border-color: {p['success_border']};
+}}
+QPushButton#trayStateRow[state="dirty"] {{
+    background: {p['warning_bg']};
+    border-color: {p['warning_border']};
+}}
+QPushButton#trayStateRow[state="error"] {{
+    background: {p['danger_bg']};
+    border-color: {p['danger_border']};
+}}
+QPushButton#trayStateRow[state="loading"], QPushButton#trayStateRow[state="saving"] {{
+    background: {p['info_bg']};
+    border-color: {p['info_border']};
+}}
+QLabel#trayStateIcon {{
+    background: transparent; border: none;
+    font-family: {font_family_qss(FONT_ICON_STACK)};
+    font-size: 11px;
+}}
+QLabel#trayStateIcon[state="loaded"] {{ color: {p['success']}; }}
+QLabel#trayStateIcon[state="dirty"] {{ color: {p['warning']}; }}
+QLabel#trayStateIcon[state="error"] {{ color: {p['danger']}; }}
+QLabel#trayStateIcon[state="loading"], QLabel#trayStateIcon[state="saving"] {{ color: {p['info']}; }}
+QLabel#trayStateText {{
+    background: transparent; border: none;
+    color: {p['text_secondary']};
+    font-size: {TYPE['micro'][0]}px;
+}}
+QLabel#traySection {{
+    color: {p['text_disabled']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 3px 8px 1px 8px;
+}}
+QLabel#trayLabel {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['micro'][0]}px;
+}}
+QLabel#trayValue {{
+    color: {p['text']};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 600;
+}}
+QLabel#trayValue[placeholder="true"] {{ color: {p['text_disabled']}; font-weight: 400; }}
+QLabel#trayMetricValue {{
+    color: {p['text']};
+    font-family: {font_family_qss(FONT_MONO_STACK)};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 600;
+}}
+QLabel#trayMetricValue[placeholder="true"] {{ color: {p['text_disabled']}; font-weight: 400; }}
+QPushButton#trayExpandBtn {{
+    background: transparent;
+    border: none;
+    border-radius: {RADIUS['sm']}px;
+    color: {p['text_secondary']};
+    font-size: {TYPE['micro'][0]}px;
+}}
+QPushButton#trayExpandBtn:hover {{ background: {p['surface_hover']}; color: {p['text']}; }}
+QPushButton#trayExpandBtn:focus {{ border: 1px solid {p['accent_border']}; }}
+
+/* ---- TrayDrawer overlay (canvas-local, plan 020 §4.2) ---- */
+QFrame#trayDrawer {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QLabel#drawerTitle {{
+    color: {p['text']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['title'][0]}px;
+    font-weight: {TYPE['title'][1]};
+}}
+QPushButton#drawerCloseBtn {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px;
+    color: {p['text_secondary']};
+    font-family: {font_family_qss(FONT_ICON_STACK)};
+}}
+QPushButton#drawerCloseBtn:hover {{ background: {p['danger_bg']}; color: {p['danger']}; border-color: {p['danger_border']}; }}
+
+/* ---- page ribbon (plan 020 §4.4) ---- */
+QFrame#pageRibbon {{
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid {p['border']};
+}}
+QLabel#ribbonTitle {{
+    color: {p['text']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['display'][0]}px;
+    font-weight: {TYPE['display'][1]};
+}}
+QLabel#ribbonZone {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['micro'][0]}px;
+    letter-spacing: 1px;
+    font-weight: 600;
+}}
+QLabel#ribbonSep {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['micro'][0]}px;
+}}
+
+/* ---- transitional: legacy sidebar/header blocks (removed in plan 025) ---- */
 QWidget#sideBar {{
     background-color: {p['canvas']};
     border-right: 1px solid {p['border']};
@@ -844,6 +1052,63 @@ QFrame#bulkActionBar {{
 }}
 QLabel#bulkActionLabel {{ font-weight: 600; color: {p['text_secondary']}; }}
 QLabel#bulkHintLabel {{ color: {p['text_secondary']}; font-size: {TYPE['secondary'][0]}px; }}
+QLabel#searchCount {{
+    color: {p['text_disabled']};
+    font-family: {font_family_qss(FONT_MONO_STACK)};
+    font-size: {TYPE['micro'][0]}px;
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['pill']}px;
+    padding: 1px 8px;
+}}
+QFrame#tableFooter {{
+    background: {p['surface']};
+    border: none;
+    border-top: 1px solid {p['border']};
+}}
+QPushButton#pageSwitchBtn {{
+    background: transparent;
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['pill']}px;
+    color: {p['text_secondary']};
+    padding: {SPACING['xs']}px {SPACING['md']}px;
+    font-size: {TYPE['secondary'][0]}px;
+}}
+QPushButton#pageSwitchBtn:hover {{ background: {p['surface_hover']}; color: {p['text']}; }}
+QPushButton#pageSwitchBtn:checked {{
+    background: {p['accent_bg']};
+    border-color: {p['accent_border']};
+    color: {p['accent']};
+    font-weight: 600;
+}}
+QPushButton#pageSwitchBtn:focus {{ border-color: {p['accent_border_strong']}; }}
+QPushButton#ghostBtn, QPushButton#toolButton {{
+    background: transparent;
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px;
+    color: {p['text_secondary']};
+    padding: {SPACING['xs']}px {SPACING['md']}px;
+    font-size: {TYPE['secondary'][0]}px;
+}}
+QPushButton#ghostBtn:hover, QPushButton#toolButton:hover {{
+    background: {p['surface_hover']};
+    color: {p['text']};
+    border-color: {p['border_strong']};
+}}
+QPushButton#ghostBtn:pressed, QPushButton#toolButton:pressed {{ background: {p['surface_active']}; }}
+QPushButton#ghostBtn:disabled, QPushButton#toolButton:disabled {{ color: {p['text_disabled']}; }}
+QTreeWidget#jsonTree {{
+    background: {p['canvas']};
+    alternate-background-color: {p['surface']};
+    border: none;
+    border-top: 1px solid {p['border']};
+}}
+/* Map viewer: floating legend card over the canvas (008-r02) */
+QWidget#mapLegendCard {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['md']}px;
+}}
 QLabel#saveStateChip {{
     background: {p['surface_raised']};
     border: 1px solid {p['border']};
@@ -857,81 +1122,124 @@ QLabel#saveStateChip[state="dirty"] {{ color: {p['warning']}; border-color: {p['
 QLabel#saveStateChip[state="saving"] {{ color: {p['info']}; border-color: {p['info_border']}; background: {p['info_bg']}; }}
 QLabel#saveStateChip[state="error"] {{ color: {p['danger']}; border-color: {p['danger_border']}; background: {p['danger_bg']}; }}
 
-/* ---- dashboard (tools tab) ---- */
-QFrame#saveCard {{
-    background: {p['surface']};
-    border: 1px solid {p['border']};
-    border-radius: {RADIUS['lg']}px;
-}}
-QFrame#saveStats {{ background: transparent; }}
-QLabel#saveStatusLabel {{ font-size: 15px; font-weight: 700; color: {p['text']}; }}
-QLabel#saveStatusLabel[state="loaded"] {{ color: {p['success']}; }}QPushButton#savePathLabel {{
-    background: {p['surface_input']};
-    color: {p['text_secondary']};
-    border: 1px solid {p['border']};
-    border-radius: {RADIUS['sm']}px;
-    padding: {SPACING['sm']}px {SPACING['md']}px;
-    font-size: {TYPE['secondary'][0]}px;
-    font-family: {fonts.font_family_qss(fonts.FONT_MONO_STACK)};
-}}
-QPushButton#savePathLabel:hover {{ border-color: {p['border_strong']}; color: {p['text']}; }}
-QPushButton#loadSteamBtn, QPushButton#loadXgpBtn {{
-    background: {p['accent_bg']};
-    border: 1px solid {p['accent_border']};
-    border-radius: {RADIUS['md']}px;
-    color: {p['accent']};
-    font-weight: 600;
-    padding: {SPACING['sm']}px {SPACING['lg']}px;
-}}
-QPushButton#loadSteamBtn:hover, QPushButton#loadXgpBtn:hover {{
-    background: {p['accent_bg_strong']};
-    border-color: {p['accent_border_strong']};
-    color: {p['text']};
-}}
-QPushButton#loadSteamBtn:pressed, QPushButton#loadXgpBtn:pressed {{ background: {p['accent_border']}; }}
-QPushButton#loadSteamBtn:disabled, QPushButton#loadXgpBtn:disabled {{
-    background: {p['surface']}; color: {p['text_disabled']}; border-color: {p['border']};
-}}
-QLabel#dashboardIconLabel {{
-    font-size: 34px;
-    color: {p['accent']};
+/* ---- Start page v2 (plan 021): masthead + field report + campaign + missions ---- */
+QWidget#startCanvas {{ background: transparent; }}
+QFrame#opsMasthead {{
     background: transparent;
     border: none;
-    font-family: {fonts.font_family_qss(fonts.FONT_ICON_STACK)};
+    border-bottom: 1px solid {p['border']};
+    padding-bottom: {SPACING['md']}px;
 }}
-QLabel#dashboardIconLabel[iconkind="nerd"] {{ font-size: 32px; }}
-QLabel#dragHintLabel {{ color: {p['text_disabled']}; font-size: {TYPE['secondary'][0]}px; }}
-QLabel#statValueLabel {{ font-size: 15px; font-weight: 700; color: {p['text']}; }}
-QLabel#statNameLabel {{ font-size: {TYPE['micro'][0]}px; color: {p['text_secondary']}; }}
-QPushButton#statIconBtn {{
-    background: {p['surface_raised']};
-    color: {p['accent']};
-    border: 1px solid {p['border']};
+QLabel#opsKicker {{
+    color: {p['text_disabled']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 600;
+    letter-spacing: 2px;
+}}
+QLabel#opsWorldName {{
+    color: {p['text']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['title'][0]}px;
+    font-weight: {TYPE['title'][1]};
+}}
+QLabel#opsWorldName[state="loaded"] {{ color: {p['success']}; }}
+QLabel#opsStateDot {{
+    background: {p['text_disabled']};
+    border-radius: 5px;
+}}
+QLabel#opsStateDot[state="loaded"] {{ background: {p['success']}; }}
+QLabel#opsStateDot[state="no_save"] {{ background: {p['text_disabled']}; }}
+QPushButton#opsLoadBtn {{
+    background: {p['accent']};
+    border: 1px solid {p['accent']};
     border-radius: {RADIUS['md']}px;
+    color: {p['text_on_accent']};
+    font-weight: 700;
+    padding: {SPACING['sm']}px {SPACING['lg']}px;
 }}
-QPushButton#statIconBtn:hover {{
+QPushButton#opsLoadBtn:hover {{ background: {p['accent_hover']}; border-color: {p['accent_hover']}; }}
+QPushButton#opsLoadBtn:pressed {{ background: {p['accent_pressed']}; }}
+QPushButton#opsLoadBtn[loadKind="secondary"] {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border_strong']};
+    color: {p['text']};
+}}
+QPushButton#opsLoadBtn[loadKind="secondary"]:hover {{
     background: {p['surface_hover']};
     border-color: {p['accent_border']};
-    color: {p['accent_hover']};
+    color: {p['accent']};
 }}
-QPushButton#statIconBtn:pressed {{ background: {p['surface_active']}; }}
-QFrame#toolCard {{
+QPushButton#opsSavePath {{
+    background: transparent;
+    color: {p['text_secondary']};
+    border: none;
+    border-radius: {RADIUS['sm']}px;
+    padding: 2px 0px;
+    text-align: left;
+    font-size: {TYPE['secondary'][0]}px;
+    font-family: {font_family_qss(FONT_MONO_STACK)};
+}}
+QPushButton#opsSavePath:hover {{ color: {p['accent']}; }}
+QLabel#opsDropHint {{ color: {p['text_disabled']}; font-size: {TYPE['micro'][0]}px; }}
+QFrame#fieldReport {{
     background: {p['surface']};
     border: 1px solid {p['border']};
     border-radius: {RADIUS['md']}px;
-    min-height: 64px;
 }}
-QFrame#toolCard:hover {{
+QWidget#fieldMetric {{ background: transparent; border-radius: {RADIUS['sm']}px; }}
+QWidget#fieldMetric:hover {{ background: {p['surface_hover']}; }}
+QLabel#fieldMetricValue {{
+    color: {p['text']};
+    font-family: {font_family_qss(FONT_MONO_STACK)};
+    font-size: 15px;
+    font-weight: 600;
+}}
+QLabel#fieldMetricValue[placeholder="true"] {{ color: {p['text_disabled']}; font-weight: 400; }}
+QFrame#campaignStrip {{
+    background: transparent;
+    border: none;
+    border-top: 1px solid {p['border']};
+    border-bottom: 1px solid {p['border']};
+}}
+QPushButton#campaignStep {{
+    background: transparent;
+    border: none;
+    border-radius: {RADIUS['sm']}px;
+    color: {p['text_secondary']};
+    padding: {SPACING['sm'] - 2}px {SPACING['md']}px;
+    font-size: {TYPE['body'][0]}px;
+    font-weight: 600;
+}}
+QPushButton#campaignStep:hover {{ background: {p['surface_hover']}; color: {p['accent']}; }}
+QPushButton#campaignStep:pressed {{ background: {p['surface_active']}; }}
+QPushButton#campaignStep:focus {{ border: 1px solid {p['accent_border']}; }}
+QWidget#missionColumn {{ background: transparent; }}
+QLabel#missionZone {{
+    color: {p['text_disabled']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['section'][0]}px;
+    font-weight: {TYPE['section'][1]};
+    letter-spacing: 1px;
+    padding: {SPACING['xs']}px 0;
+}}
+QPushButton#missionRow {{
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px;
+    color: {p['text']};
+    text-align: left;
+    padding: {SPACING['sm'] + 2}px {SPACING['md']}px;
+    font-size: {TYPE['body'][0]}px;
+}}
+QPushButton#missionRow:hover {{
     background: {p['surface_hover']};
-    border: 1px solid {p['accent_border']};
+    color: {p['accent']};
 }}
-QLabel#toolCardIcon {{
-    background: {p['surface_raised']};
-    border: 1px solid {p['border']};
-    border-radius: {RADIUS['md']}px;
-}}
-QLabel#toolCardTitle {{ color: {p['text']}; font-size: {TYPE['body'][0]}px; font-weight: 600; }}
-QLabel#toolCardDesc {{ color: {p['text_secondary']}; font-size: {TYPE['micro'][0]}px; }}
+QPushButton#missionRow:pressed {{ background: {p['surface_active']}; color: {p['accent_pressed']}; }}
+QPushButton#missionRow:focus {{ border: 1px solid {p['accent_border']}; }}
+
 QPushButton#dialogOption {{
     background: {p['surface_raised']};
     border: 1px solid {p['border']};
