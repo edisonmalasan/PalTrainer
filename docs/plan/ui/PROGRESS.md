@@ -2,67 +2,93 @@
 
 ## Current Status
 
-Current phase: 008 - Base Inventory
-Status: NOT STARTED (007 complete; session ended after 007)
+Current phase: IMPLEMENTATION COMPLETE (plans 019–025 incl. geometry-r02
+for the three heavy screens). Remaining: manual visual review by the user.
+
+Status: COMPLETE (pending manual visual QA)
 
 ## Completed
 
-- [x] Plans 001-018 + 000-index + 000-design-context
-- [x] 002 - Design system foundation (tokens, fonts, qss_builder, generated darkmode.qss,
-      legacy extras split, ThemeManager theme-aware; 8 token tests)
-- [x] 003 - Component library (components.py; toggle_check tokenized; 7 tests)
-- [x] 004 - Shell & navigation (header save-state chip; sidebar sections+keyboard; console)
-- [x] 005 - Dashboard (Tools tab fully tokenized, 0 inline styles)
-- [x] 006 - Results Panel & Statistics Panel (placeholder states, copy/close buttons)
-- [x] 007 - Search screens + GuildAssignDialog + pal-name settings + console title
+- [x] Session startup protocol + evidence audits (sessions 2–3)
+- [x] Mandatory Overhaul Reset (rejections, banners, design-context §0)
+- [x] 019 — design reset (thesis v2, divergence matrix, palette v2, fonts v2)
+- [x] 020 — shell v2 (NexusBand, InstrumentTray, TrayDrawer, WindowControls,
+      page ribbons, QSS shell rewrite)
+- [x] 021 — Start page v2 (masthead, field report, campaign strip, missions)
+- [x] 022 — dialog strategy (sheet grammar, danger isolation, QSS)
+- [x] 023 — table strategy (SearchPanel full-bleed, footer strips, counts)
+- [x] 024 — a11y (Ctrl+1..9/0 jumps, Esc drawer, focus states)
+- [x] Screen revisions: 007-r02 (via 023), 008-r02 (Map canvas-first +
+      floating legend), 012-r02 (Breeding), 013-r02 (JSON desk), 014-r02
+      (Exclusions segmented), 015-r02 (Docs shelf)
+- [x] Palette migration of the three heavy screens (base 168, inventory 213,
+      pal-editor family ~123 literals) + chrome/styles.py constants sweep
+- [x] 025 — close-out: legacy chrome files deleted (sidebar_widget/
+      header_widget/results_widget); NerdBtn/NerdLabel relocated to
+      components; facades + `_setup_ui_legacy` + `use_nexus_shell` removed;
+      all call sites direct to band/tray/controls; legacy-dark.qss purged
+      (80 dead blocks, 16.3 kB → 5.0 kB); default settings pruned;
+      docs/ui-system.md written; test_registry verified (dynamic loader)
+- [x] 000-visual-qa.md ledger maintained
 
 ## In Progress
 
-- (none - next session starts plan 008)
+- (none)
+
+## Rejected or Needs Revision
+
+- 004–007 REJECTED; 002–003 infra-only; 008–018 originals FROZEN
+  (superseded by -r02 revisions).
+- Geometry-level r02 completed for Base Inventory (ribbon + segmented view
+  switch + context row), Player Inventory (ribbon + tokenized action
+  buttons), Pal Editor tab (ribbon). Residual: inner-zone workbench
+  recomposition of pal_editor_widget (optional polish, palette done).
 
 ## Next Task
 
-Plan 008 per docs/plan/ui/008-plan.md (base_inventory_tab.py, 4176 ln, 123 inline
-styles): container list pane -> item grids (shared RarityBorderDelegate) -> pickers on
-BaseDialog -> economy stats. Migrate pane-by-pane with compile+launch between panes.
-Then 009 (Map), 010 (Pal Editor), 011 (Player Inventory), 012-015, 016 (dialogs),
-017 (a11y), 018 (regression/cleanup/docs).
+Manual visual review of `Logs/*.png` captures (shell_v2_shot, start_v2_shot,
+page_*.png) by the user or an image-capable agent, per the checklist in
+000-visual-qa.md. Any geometry-r02 passes the review calls for would then be
+planned as new -r03 revisions.
 
 ## Important Notes
 
-- Do not redesign established decisions in 000-design-context.md without documenting.
-- Existing save workflows must remain unchanged (see §9 invariants).
-- Use centralized tokens; avoid per-screen QSS duplication.
-- darkmode.qss is a build artifact: edit qss_builder.py + legacy-dark.qss, then run
+- Work only on `feat/ui-overhaul`; nothing committed (per instructions).
+- `ib/image` screenshots and rendered captures are both unreadable here
+  (no image input) — never claim screenshot-based visual QA
+  (design-context §2).
+- Fonts: Inter registers as "Inter 28pt" (stack ['Inter 28pt','Inter',
+  'Segoe UI']); loading centralized in chrome/fonts.py.
+- PyQt6 offscreen gotchas: scoped enums only (unscoped in paintEvent aborts
+  natively); QStylePainter/QStyleOptionButton live in QtWidgets.
+- Scanner baseline: 1352 (was 1390 at session start, 1353 before styles
+  sweep).
+- pyright: **522** — below the 523 main baseline (legacy-file deletion
+  removed 4 errors).
+- darkmode.qss is generated: edit qss_builder.py + legacy-dark.qss, run
   `uv run python scripts/scrs/build_theme.py`.
-- QSS contract: builder owns GLOBAL element rules + migrated screen chrome;
-  legacy-dark.qss owns remaining objectName-specific rules (~111 blocks) until
-  screens migrate (extras shrink per plan; delete file in plan 018).
-- MainWindow redirects sys.stdout/stderr (StatusBarStream) - smoke-test scripts must
-  write results to a file, not print.
-- Smoke test recipe: insert src + src/<subpkg> paths like main.py does; offscreen Qt;
-  i18n.init_language('en_US') before MainWindow; write results to a file.
-- Scanner baseline on main: 1442; branch: 1390 (falls per migrated file).
-- pyright: 523 errors on main, 524 on branch - the delta is line-shift noise in the
-  pre-existing reportIncompatibleMethodOverride convention (verified by error-set
-  diff: no new error classes). Do not mass-rename override params during migration.
-- Session continuity: read 000-index.md + 000-design-context.md + this file first.
+- Smoke recipe: `scripts/scrs/smoke_final.py` / `smoke_start_v2.py`
+  (results to Logs/*.txt; stdout is redirected).
+- Legacy settings keys tolerated but unread; `use_nexus_shell` removed.
+- UI system reference: docs/ui-system.md.
 
-## Last Verified State (end of session 1, 2026-09-03)
+## Last Verified State (end of session 3 close-out, 2026-09-04)
 
-- `uv run pytest -c tests/pytest.ini` -> 463 passed, 20 deselected
-- `uv run pytest -c tests/pytest.ini -m slow` -> 20 passed (save I/O roundtrips)
+- `uv run pytest -c tests/pytest.ini` -> 464 passed, 20 deselected
+- `uv run pytest -c tests/pytest.ini -m slow` -> 20 passed
 - `uv run python -m compileall -q src tests scripts` -> OK
-- `uv run pyright src` -> 524 (main baseline 523; delta = shifted-line noise of
-  pre-existing errors; zero new error classes; new chrome files: 0 errors)
-- Theme-violation scanner -> 1390 (main baseline 1442)
-- Smoke tests (offscreen): shell build + sections + save-state chip; tools tab
-  (7 tools, stat deep-links, status property transitions); results/stats panels
-  (placeholder semantics, copy button); search screens (filter machinery, guild
-  dialog assign-gating); fonts registered (Hack Nerd Font); theme applied (45 kB QSS)
+- `uv run pyright src` -> 522 (below main baseline 523)
+- Theme scanner -> 1352 (44 files; down from 1390)
+- validate_imports -> all 16 modules OK
+- smoke_final -> PASS (12/12 pages, 10 shortcuts, search counts, exclusions
+  switch, drawer Esc, 4-language cycle, DPR grab, 7 screenshots)
+- smoke_start_v2 -> PASS (masthead/field report/campaign/missions wired)
+- Deleted: ui/chrome/sidebar_widget.py, ui/chrome/header_widget.py,
+  ui/chrome/results_widget.py (imports migrated; suite green)
 
 Known issues:
-- 15 baseline screenshots supplied by user could not be read by this session
-  (model has no image input); analysis relies on code/QSS audit instead. Visual QA
-  must be performed by launching the app (test.cmd / uv run start.py).
-- QStackedWidget legacy 2px accent border replaced by flat transparent surface.
+
+- Screenshot-based visual QA pending manual review.
+- 31 legacy-dark.qss blocks remain for screens awaiting geometry r02.
+- chrome/styles.py constants are warm-palette now but remain a parallel
+  styling path (QSS builder is canonical; long-term merge optional).
