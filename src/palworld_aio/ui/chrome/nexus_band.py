@@ -57,8 +57,35 @@ def _nav_label(page_id: str) -> str:
     return t(key) if t else page_id.replace('_', ' ').title()
 
 
+# Rail micro-labels (ui-modernization Phase 1): one short word per
+# destination so the 76px rail never clips to a shared first word
+# ("Search" x3). Resolved via `nav.rail.<page_id>` so translators can
+# override; English ships as code defaults. The full `_nav_label` stays
+# as tooltip + accessible name.
+_RAIL_SHORT_ENGLISH: dict[str, str] = {
+    'tools': 'Tools',
+    'map': 'Map',
+    'base_inventory': 'Base',
+    'players': 'Players',
+    'guilds': 'Guilds',
+    'bases': 'Bases',
+    'exclusions': 'Excl.',
+    'player_inventory': 'Player',
+    'pal_editor': 'Pal',
+    'json_editor': 'JSON',
+    'breeding': 'Breeding',
+    'docs': 'Docs',
+}
+
+
+def _rail_short(page_id: str) -> str:
+    fallback = _RAIL_SHORT_ENGLISH.get(page_id, page_id.replace('_', ' ').title())
+    text = t(f'nav.rail.{page_id}', default=fallback) if t else fallback
+    return text
+
+
 def _txt(key: str, fallback: str) -> str:
-    return t(key) if t else fallback
+    return t(key, default=fallback) if t else fallback
 
 
 class _TrayScroll(QScrollArea):
