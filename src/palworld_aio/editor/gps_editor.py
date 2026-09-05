@@ -55,23 +55,8 @@ class GpsEditorDialog(FramelessDialog):
         self.player_uid = None
 
         PalFrame._load_maps()
-        self.setStyleSheet('''
-            QPushButton#navBtn {
-                background: rgba(245,158,11,0.08);
-                color: #F59E0B;
-                border: 1px solid rgba(245,158,11,0.2);
-                border-radius: 6px;
-                padding: 6px 14px;
-                font-size: 14px;
-                font-weight: 600;
-                min-width: 32px;
-            }
-            QPushButton#navBtn:hover {
-                background: rgba(245,158,11,0.18);
-                border-color: rgba(245,158,11,0.4);
-                color: #FFFFFF;
-            }
-        ''')
+        # Nav buttons (prev/next) are styled by the global QSS builder
+        # (QPushButton#navBtn rule); no per-dialog copy.
         self._setup_ui()
         self._load_pals()
 

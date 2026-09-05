@@ -1363,4 +1363,10 @@ QFrame[palRow="true"] {{
     border-radius: {RADIUS['md']}px;
 }}
 QFrame[palRow="true"]:hover {{ background: {p['surface_hover']}; }}
+/* transient skill-picker popup (Phase 4): floating card, global input/list rules inside */
+QWidget#skillPicker {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['lg']}px;
+}}
 """

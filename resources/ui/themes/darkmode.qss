@@ -1333,6 +1333,13 @@ QFrame[palRow="true"] {
     border-radius: 5px;
 }
 QFrame[palRow="true"]:hover { background: rgba(245,158,11,0.07); }
+/* transient skill-picker popup (Phase 4): floating card, global input/list rules inside */
+QWidget#skillPicker {
+    background: #211E1B;
+    border: 1px solid rgba(236,231,224,0.18);
+    border-radius: 8px;
+}
+
 
 /* Transitional extras — RETAINED BLOCKS ONLY (plan 025 purge).
    Blocks for retired objects (old sidebar/header/results/tools cards,

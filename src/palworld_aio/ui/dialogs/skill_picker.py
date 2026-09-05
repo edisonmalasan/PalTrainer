@@ -9,9 +9,26 @@ from palworld_aio import constants as palworld_constants
 from palworld_aio.editor.pal_editor import _get_cached_pixmap, _get_element_pixmap, _ensure_skill_data, _ensure_passive_data, _clean_desc_for_tooltip
 from palworld_aio.editor.pal_editor import data as _pedata
 import palworld_aio.managers.data_manager as dm
-from palworld_aio.ui.chrome.styles import PICKER_BG_STYLE, PICKER_SEARCH_STYLE, PICKER_LIST_STYLE
+from palworld_aio.ui.chrome import tokens as ui_tokens
+from palworld_aio.ui.chrome import tokens as ui_tokens
 from resource_resolver import resource_path
 from palsav import json_tools
+
+_PICKER_TOKENS = ui_tokens.resolve()
+
+
+def _alpha(hex_color: str, alpha: int) -> QColor:
+    color = QColor(hex_color)
+    color.setAlpha(alpha)
+    return color
+
+
+# Selection + animation accents derived from theme tokens (replaces the
+# retired blue/cyan QColor literals). Rank/element colors stay data-driven.
+_SEL_FILL = _alpha(_PICKER_TOKENS['accent'], 38)
+_SWEEP_FILL = _alpha(_PICKER_TOKENS['accent'], 40)
+_TRAIL_FILL = _alpha(_PICKER_TOKENS['special'], 140)
+_TRAIL_FILL_DIM = _alpha(_PICKER_TOKENS['special'], 80)
 
 _LEARNSET_CACHE = None
 _LEARNSET_CI = None
@@ -45,7 +62,7 @@ class _PassiveSkillDelegate(QStyledItemDelegate):
         selected = option.state & QStyle.State_Selected
         if selected:
             painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(QColor(59, 142, 208, 89)))
+            painter.setBrush(QBrush(_SEL_FILL))
             painter.drawRoundedRect(QRectF(rect).adjusted(0, 1, 0, -1), 4, 4)
         else:
             fill = QColor(bd)
@@ -101,9 +118,10 @@ class _PassiveSkillDelegate(QStyledItemDelegate):
         w = rect.width()
         ph = dm._anim_phase * 1.04 * w % (w * 1.4) - w * 0.2
         sweep = QLinearGradient(rect.x() + ph, 0, rect.x() + ph + w * 0.35, 0)
-        sweep.setColorAt(0, QColor(125, 211, 252, 0))
-        sweep.setColorAt(0.5, QColor(125, 211, 252, 40))
-        sweep.setColorAt(1, QColor(125, 211, 252, 0))
+        transparent = _alpha(_PICKER_TOKENS['accent'], 0)
+        sweep.setColorAt(0, transparent)
+        sweep.setColorAt(0.5, _SWEEP_FILL)
+        sweep.setColorAt(1, transparent)
         painter.setPen(Qt.NoPen)
         painter.setBrush(QBrush(sweep))
         painter.drawRoundedRect(QRectF(rect).adjusted(0, 1, 0, -1), 4, 4)
@@ -124,7 +142,9 @@ class _PassiveSkillDelegate(QStyledItemDelegate):
                 yy = rect.y() + y
                 if rect.y() <= yy < rect.y() + h:
                     alpha = max(0, 140 - i * 25)
-                    painter.fillRect(QRectF(cx, yy, col_w - 2, 1.5), QColor(168, 85, 247, alpha))
+                    fill = QColor(_TRAIL_FILL)
+                    fill.setAlpha(alpha)
+                    painter.fillRect(QRectF(cx, yy, col_w - 2, 1.5), fill)
             for i in range(2):
                 y = head_y + i * 2.5
                 if y >= cycle:
@@ -132,7 +152,9 @@ class _PassiveSkillDelegate(QStyledItemDelegate):
                 yy = rect.y() + y
                 if rect.y() <= yy < rect.y() + h:
                     alpha = 160 - i * 80
-                    painter.fillRect(QRectF(cx, yy, col_w - 2, 1.5), QColor(192, 132, 252, alpha))
+                    fill = QColor(_TRAIL_FILL_DIM)
+                    fill.setAlpha(alpha)
+                    painter.fillRect(QRectF(cx, yy, col_w - 2, 1.5), fill)
     def sizeHint(self, option, index):
         return QSize(200, 28)
 class _ActiveSkillDelegate(QStyledItemDelegate):
@@ -143,7 +165,7 @@ class _ActiveSkillDelegate(QStyledItemDelegate):
         selected = option.state & QStyle.State_Selected
         if selected:
             painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(QColor(59, 142, 208, 89)))
+            painter.setBrush(QBrush(_SEL_FILL))
             painter.drawRoundedRect(QRectF(rect).adjusted(0, 1, 0, -1), 4, 4)
         else:
             bg = QColor(255, 255, 255, 8)
@@ -174,19 +196,20 @@ class _ActiveSkillDelegate(QStyledItemDelegate):
     def sizeHint(self, option, index):
         return QSize(200, 28)
 class SkillPicker(QWidget):
+    """Transient skill popup. Blocking pick() loop and delegates unchanged;
+    chrome moved from PICKER_* constants to theme tokens (Phase 4)."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
-        self.setStyleSheet(PICKER_BG_STYLE)
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        self.setObjectName('skillPicker')
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(2)
         self._search = QLineEdit()
         self._search.setPlaceholderText('Search...')
-        self._search.setStyleSheet(PICKER_SEARCH_STYLE)
         layout.addWidget(self._search)
         self._list = QListWidget()
-        self._list.setStyleSheet(PICKER_LIST_STYLE)
         self._list.setMaximumHeight(100)
         self._list.setMinimumWidth(220)
         layout.addWidget(self._list)
