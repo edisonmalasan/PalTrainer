@@ -62,7 +62,7 @@ class DetachedStatusWindow(QWidget):
         self.fade_animation.setDuration(400)
         self.fade_animation.setStartValue(0.0)
         self.fade_animation.setEndValue(1.0)
-        self.fade_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self.fade_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self.fade_animation.start()
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -189,7 +189,7 @@ class StatusBarStream(QObject):
             self.detach_window.fade_animation.setDuration(300)
             self.detach_window.fade_animation.setStartValue(0.0)
             self.detach_window.fade_animation.setEndValue(1.0)
-            self.detach_window.fade_animation.setEasingCurve(QEasingCurve.InOutQuad)
+            self.detach_window.fade_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
             self.detach_window.fade_animation.start()
             self.detach_state_changed.emit(True)
     def attach(self):
@@ -246,7 +246,6 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._refresh_exclusions()
         self._load_theme()
-        self.nexus_band.set_active('tools')
         if getattr(self, 'nav_strip', None) is not None:
             self.nav_strip.set_active('tools')
         self._setup_menus()
@@ -281,7 +280,7 @@ class MainWindow(QMainWindow):
         logging.lastResort = None
         if self.user_settings.get('console_detached', False):
             self.status_stream.detach()
-            self.nexus_band.set_console_visible(True)
+            self.app_bar.set_console_visible(True)
     def _setup_ui(self):
         self.setWindowTitle(t('deletion.title') if t else 'All-in-One Tools')
         self.setMinimumSize(1200, 750)
@@ -314,13 +313,12 @@ class MainWindow(QMainWindow):
         self._drop_overlay.setGeometry(self.rect())
 
     def _setup_ui_v2(self, main_layout):
-        from .chrome.nexus_band import NexusBand, BAND_W
-        from .chrome.instrument_tray import TrayDrawer
+        from .chrome.stats_drawer import StatsDrawer
         from .chrome.app_bar import AppBar
         from .chrome.nav_strip import NavStrip
         self._shell_v2 = True
-        # shell v3 top chrome (top-nav-shell 3.1): app bar + nav strip above
-        # the canvas; the rail stays temporarily behind facades until task 5.1
+        # shell v3 top chrome (top-nav-shell 3.1/5.1): app bar + nav strip
+        # above the canvas; the right rail is retired.
         self.app_bar = AppBar()
         self.app_bar.save_clicked.connect(self._save_changes)
         self.app_bar.console_toggled.connect(self._detach_status)
@@ -339,33 +337,20 @@ class MainWindow(QMainWindow):
         body_layout.setSpacing(0)
         self.stacked_widget = QStackedWidget()
         self._build_pages()
-        # tray drawer overlay: canvas-local frame above the stack (hidden)
-        self._tray_drawer = TrayDrawer(self.stacked_widget)
+        # statistics drawer overlay: canvas-local frame above the stack
+        # (hidden; opened from the app-bar context indicator)
+        self._tray_drawer = StatsDrawer(self.stacked_widget)
         self._tray_drawer.hide()
         self._tray_drawer.close_requested.connect(self._close_tray_drawer)
+        self.app_bar.context_clicked.connect(
+            lambda: self._set_tray_drawer_visible(not self._tray_drawer.isVisible()))
         self._tray_scrim = QWidget(self.stacked_widget)
         self._tray_scrim.setObjectName('trayScrim')
         self._tray_scrim.hide()
-        self.nexus_band = NexusBand()
-        self.nexus_band.nav_changed.connect(self._on_nav_changed)
-        self.nexus_band.console_toggled.connect(self._detach_status)
-        self.nexus_band.about_clicked.connect(self._show_about)
-        self.nexus_band.guide_clicked.connect(self._show_tab_guide)
-        self.nexus_band.save_clicked.connect(self._save_changes)
-        self.nexus_band.masthead_clicked.connect(self._show_menu_popup_v2)
-        self.nexus_band.tray_expand_toggled.connect(self._on_tray_expand_toggled)
-        self.nexus_band.warn_btn.clicked.connect(self._show_warnings)
-        self.nexus_band.show_warning(True)
-        self.nexus_band.set_warning_slot(self._show_warnings)
         self._window_controls = self.app_bar.window_controls
         self._window_controls.minimize_clicked.connect(self.showMinimized)
         self._window_controls.maximize_clicked.connect(self._toggle_maximize)
         self._window_controls.close_clicked.connect(self.close)
-        # Rail retired from the layout (top-nav-shell 3.4): the NexusBand
-        # instance stays constructed for facade compatibility — legacy call
-        # sites (sidebar/results/header facades, tests, tools deep links)
-        # keep working against it while the nav strip drives navigation.
-        self.nexus_band.setParent(None)
         body_layout.addWidget(self.stacked_widget, stretch=1)
         main_layout.addLayout(body_layout, stretch=1)
         # loading_manager 'header' mode drives the app-bar save chip
@@ -377,19 +362,12 @@ class MainWindow(QMainWindow):
             self._menu_popup_v2 = MenuPopup(self)
             if getattr(self, '_menu_actions_dict', None):
                 self._menu_popup_v2.set_menu_actions(self._menu_actions_dict)
-        # anchor under the app-bar brand mark (shell v3); fall back to the
-        # legacy rail masthead until the rail is retired (task 3.x).
+        # anchor under the app-bar brand mark (shell v3)
         anchor = getattr(self, 'app_bar', None)
         if anchor is not None:
             gp = anchor.mapToGlobal(anchor.brand.geometry().topLeft())
             self._menu_popup_v2.show_at(QPoint(gp.x(), gp.y() + anchor.brand.height() + 4))
             return
-        band = self.nexus_band
-        gp = band.mapToGlobal(band.masthead_btn.geometry().topLeft())
-        self._menu_popup_v2.show_at(QPoint(gp.x() - self._menu_popup_v2.width() + band.width(), gp.y() + band.masthead_btn.height() + 4))
-
-    def _on_tray_expand_toggled(self, expanded):
-        self._set_tray_drawer_visible(expanded)
 
     def _set_tray_drawer_visible(self, visible):
         if not getattr(self, '_shell_v2', False):
@@ -408,7 +386,6 @@ class MainWindow(QMainWindow):
         else:
             drawer.hide()
             self._tray_scrim.hide()
-        self.nexus_band.tray.set_expanded(visible)
         self.user_settings['tray_expanded'] = visible
         self._save_user_settings()
 
@@ -670,11 +647,9 @@ class MainWindow(QMainWindow):
         self._esc_shortcut = esc
 
     def _activate_nav(self, page_id: str) -> None:
-        """Single keyboard/programmatic nav entry: syncs the strip and rail."""
+        """Single keyboard/programmatic nav entry."""
         if getattr(self, 'nav_strip', None) is not None:
             self.nav_strip.set_active(page_id)
-        if getattr(self, 'nexus_band', None) is not None:
-            self.nexus_band.set_active(page_id)
         self._on_nav_changed(page_id)
 
     def _on_global_escape(self):
@@ -684,8 +659,6 @@ class MainWindow(QMainWindow):
         if getattr(self, '_shell_v2', False) and self._tray_drawer.isVisible():
             self._close_tray_drawer()
     def _set_dirty(self, dirty):
-        self.nexus_band.set_dirty(dirty)
-        self.nexus_band.tray.set_dirty(dirty)
         if getattr(self, 'app_bar', None) is not None:
             self.app_bar.save_chip.set_dirty(dirty)
 
@@ -695,13 +668,11 @@ class MainWindow(QMainWindow):
             self._menu_popup_v2.set_menu_actions(actions_dict)
 
     def _update_stats_all(self, stats):
-        self.nexus_band.tray.update_metrics(stats)
         self._tray_drawer.stats_panel.update_stats(stats)
 
     def _refresh_stats_all_before(self):
         from palworld_aio.managers.save_manager import save_manager
         stats = save_manager.get_current_stats()
-        self.nexus_band.tray.update_metrics(stats)
         self._tray_drawer.stats_panel.refresh_stats_before(stats)
 
     def _refresh_stats_all_after(self):
@@ -712,14 +683,12 @@ class MainWindow(QMainWindow):
     def _on_shell_loading(self):
         try:
             from palworld_aio.shell_state import ShellState
-            self.nexus_band.tray.set_shell_state(ShellState.LOADING)
             self.app_bar.save_chip.set_shell_state(ShellState.LOADING)
         except (RuntimeError, AttributeError, ImportError):
             pass
     def _on_shell_saving(self):
         try:
             from palworld_aio.shell_state import ShellState
-            self.nexus_band.tray.set_shell_state(ShellState.SAVING)
             self.app_bar.save_chip.set_shell_state(ShellState.SAVING)
         except (RuntimeError, AttributeError, ImportError):
             pass
@@ -756,12 +725,9 @@ class MainWindow(QMainWindow):
             if constants.loaded_level_json:
                 self._refresh_tab(page_index)
         self.stacked_widget.setCurrentIndex(page_index)
-        # keep both nav surfaces in step (nav strip drives; rail stays synced
-        # until it is retired behind facades in task 5.1)
+        # keep the nav strip in step with programmatic navigation
         if getattr(self, 'nav_strip', None) is not None and self.nav_strip.active_id() != button_id:
             self.nav_strip.set_active(button_id)
-        if getattr(self, 'nexus_band', None) is not None and self.nexus_band._active_id != button_id:
-            self.nexus_band.set_active(button_id)
     def _load_user_settings(self):
         from boot_paths import CONFIG_DIR, USER_CONFIG_DIR
         user_cfg_path = str(USER_CONFIG_DIR / 'user.cfg')
@@ -810,7 +776,7 @@ class MainWindow(QMainWindow):
         self.user_settings['console_detached'] = self.status_stream.detached if self.status_stream else False
         self._save_user_settings()
     def _on_detach_state_changed(self, detached):
-        self.nexus_band.set_console_visible(detached)
+        self.app_bar.set_console_visible(detached)
     def _check_update(self):
         self.update_checker = UpdateChecker()
         self.update_checker.update_checked.connect(self._on_update_checked)
@@ -819,12 +785,11 @@ class MainWindow(QMainWindow):
         try:
             if not ok and latest:
                 tools_version = get_display_version()
-                self.nexus_band.start_pulse_animation(latest)
-                self.nexus_band.update_version_text(tools_version, latest)
+                self.app_bar.set_update_pulse(True)
                 branch_text = f' ({branch})' if branch else ''
                 self.status_bar.showMessage(f"{(t('update.current') if t else 'Current')}: {tools_version}{branch_text} | {(t('update.latest') if t else 'Latest')}: {latest} - Click version chip to update", 0)
             else:
-                self.nexus_band.stop_pulse_animation()
+                self.app_bar.set_update_pulse(False)
         except Exception as e:
             print(f'Update check callback error: {e}')
     def _lock_ui(self):
@@ -836,7 +801,6 @@ class MainWindow(QMainWindow):
         try:
             from palworld_aio.shell_state import ShellState
             state = ShellState.LOADED if success else ShellState.ERROR
-            self.nexus_band.tray.set_shell_state(state)
             self.app_bar.save_chip.set_shell_state(state)
         except (RuntimeError, AttributeError, ImportError):
             pass
@@ -851,7 +815,6 @@ class MainWindow(QMainWindow):
             self.refresh_all()
             constants.dirty = False
             self._set_dirty(False)
-            self.nexus_band.tray.clear_selection()
             self.app_bar.context.clear_selection()
             self._refresh_stats_all_before()
             self.status_bar.showMessage(t('status.loaded') if t else 'Save loaded successfully', 5000)
@@ -871,7 +834,6 @@ class MainWindow(QMainWindow):
         self._set_dirty(False)
         try:
             from palworld_aio.shell_state import ShellState
-            self.nexus_band.tray.set_shell_state(ShellState.LOADED)
             self.app_bar.save_chip.set_shell_state(ShellState.LOADED)
         except (RuntimeError, AttributeError, ImportError):
             pass
@@ -1007,7 +969,7 @@ class MainWindow(QMainWindow):
         while child is not None:
             if isinstance(child, (QPushButton, QComboBox, QLineEdit, QTextEdit)):
                 return False
-            if child is self.stacked_widget or child is getattr(self, 'nexus_band', None):
+            if child is self.stacked_widget:
                 break
             child = child.parentWidget()
         return True
@@ -1337,13 +1299,10 @@ class MainWindow(QMainWindow):
         run_with_loading(on_finished, task)
     def _on_player_selected(self, data):
         if data:
-            self.nexus_band.tray.set_player(data[0])
-            self.nexus_band.tray.set_guild(data[5])
             self.app_bar.context.set_player(data[0])
             self.app_bar.context.set_guild(data[5])
     def _on_guild_selected(self, data):
         if data:
-            self.nexus_band.tray.set_guild(data[0])
             self.app_bar.context.set_guild(data[0])
             self.guild_members_panel.clear()
             members = get_guild_members(data[1])
@@ -1356,12 +1315,9 @@ class MainWindow(QMainWindow):
     def _on_guild_member_selected(self, data):
         if data:
             name = data[0].replace('[L]', '')
-            self.nexus_band.tray.set_player(name)
             self.app_bar.context.set_player(name)
     def _on_base_selected(self, data):
         if data:
-            self.nexus_band.tray.set_base(data[0])
-            self.nexus_band.tray.set_guild(data[2])
             self.app_bar.context.set_base(data[0])
             self.app_bar.context.set_guild(data[2])
     def closeEvent(self, event: QCloseEvent):
@@ -2111,7 +2067,7 @@ class MainWindow(QMainWindow):
             return
         for i in range(self.stacked_widget.count()):
             if self.stacked_widget.widget(i) == self.map_tab:
-                self.nexus_band.set_active('map')
+                self._activate_nav('map')
                 self.stacked_widget.setCurrentIndex(i)
                 return
     def _generate_map(self):
@@ -2195,11 +2151,11 @@ class MainWindow(QMainWindow):
             if self.status_stream.detach_window:
                 self.status_stream.detach_window.refresh_title()
             self.setWindowTitle(t('deletion.title') if t else 'All-in-One Tools')
-            self.nexus_band.refresh_labels()
+            self.nav_strip.refresh_labels()
             self._setup_menus()
             self._refresh_texts()
             self.tools_tab.refresh_labels()
-            self.nexus_band.refresh_labels()
+            self.app_bar.refresh_labels()
             if getattr(self, '_window_controls', None):
                 self._window_controls.refresh_labels()
             if getattr(self, '_menu_popup_v2', None):
@@ -2626,7 +2582,7 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.Accepted:
             QTimer.singleShot(0, self.refresh_all)
     def _edit_player_inventory(self, uid, name):
-        self.nexus_band.set_active('player_inventory')
+        self._activate_nav('player_inventory')
         self.stacked_widget.setCurrentIndex(2)
         if 'inventory_tab' in self.__dict__:
             self.inventory_tab.load_player(uid, name)

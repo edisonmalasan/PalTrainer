@@ -100,22 +100,22 @@ try:
     log('drag_empty_area=' + str(w._hit_window_drag_zone(_FakeEvent(empty_pos))))
     log('drag_over_button=' + str(not w._hit_window_drag_zone(_FakeEvent(over_brand))))
 
-    # nav parity: strip routes all 12 ids and matches the rail
+    # nav strip routes all 12 ids; rail is retired (5.1)
     log('nav_strip_present=' + str(hasattr(w, 'nav_strip')))
     log('nav_strip_tabs=' + str(len(w.nav_strip._tabs)))
     expected_ids = {'tools', 'base_inventory', 'player_inventory', 'pal_editor',
                     'players', 'guilds', 'bases', 'map', 'exclusions',
                     'json_editor', 'breeding', 'docs'}
     log('nav_ids_match=' + str(set(w.nav_strip._tabs.keys()) == expected_ids))
+    log('rail_retired=' + str(not hasattr(w, 'nexus_band')))
     seen = []
     w.nav_strip.nav_changed.connect(lambda pid: seen.append(pid))
     w.nav_strip._on_tab('map')
     log('strip_nav_emit=' + repr(seen))
     log('strip_active_after=' + str(w.nav_strip.active_id()))
-    log('rail_active_synced=' + str(w.nexus_band._active_id == 'map'))
     seen.clear()
-    w.nexus_band._on_item_clicked('players')
-    log('rail_syncs_strip=' + str(w.nav_strip.active_id() == 'players'))
+    w._activate_nav('players')
+    log('activate_nav_syncs=' + str(w.nav_strip.active_id() == 'players'))
 
     # overflow behavior: collapse reference+edit and verify reachability
     w.nav_strip.collapse_zones({'nav.zone.reference', 'nav.zone.edit'})
@@ -130,7 +130,7 @@ try:
     log('shortcuts_registered=' + str(len(getattr(w, '_page_shortcuts', [])) == 12))
 
     # rail removed from layout in 3.4: attribute remains for facade compat
-    log('rail_off_layout=' + str(w.nexus_band.parent() is None))
+    log('rail_off_layout=' + str(not hasattr(w, 'nexus_band')))
 
     # selection syncs to app bar context (tray routing)
     w._on_player_selected(['Tester', 'uid', 'gid', '1h', 50, 'Guild A', 'gid', 5])

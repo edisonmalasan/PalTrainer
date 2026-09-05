@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 from palworld_aio.ui.chrome import fonts
+from palworld_aio.ui.chrome import icons as app_icons
 from palworld_aio.ui.chrome.tokens import HEIGHT, SPACING, TYPE
 
 _LEVELS = ('neutral', 'success', 'warning', 'danger', 'info', 'special', 'accent')
@@ -119,8 +120,8 @@ def make_button(
     if kind in ('primary', 'danger', 'ghost', 'tool'):
         btn.setProperty('class', kind)
     if icon:
-        btn.setText(f'{icon}  {text}')
-        btn.setFont(fonts.icon_font(13))
+        btn.setIcon(app_icons.get_qicon(icon, role='text_secondary'))
+        btn.setText(text)
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
     btn.setMinimumHeight(HEIGHT['comfortable'])
@@ -131,9 +132,12 @@ def make_button(
 
 
 def make_tool_button(icon: str, tooltip: str = '', parent: Optional[QWidget] = None) -> QPushButton:
-    btn = QPushButton(icon, parent)
+    """Icon-only button; ``icon`` is an SVG registry name (icon factory)."""
+    btn = QPushButton(parent)
     btn.setProperty('class', 'tool')
-    btn.setFont(fonts.icon_font(13))
+    icon_obj = app_icons.get_qicon(icon, role='text_secondary')
+    if icon_obj is not None:
+        btn.setIcon(icon_obj)
     btn.setFixedSize(HEIGHT['comfortable'], HEIGHT['comfortable'])
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     if tooltip:
@@ -187,14 +191,15 @@ def make_search_field(
     on_change: Optional[Callable[[str], None]] = None,
     parent: Optional[QWidget] = None,
 ) -> tuple[QFrame, QLineEdit]:
-    """Bordered search field with a search glyph. Returns (container, line_edit)."""
+    """Bordered search field with a search icon. Returns (container, line_edit)."""
     container = QFrame(parent)
     container.setProperty('class', 'searchField')
     row = QHBoxLayout(container)
     row.setContentsMargins(SPACING['sm'], 2, SPACING['sm'], 2)
     row.setSpacing(SPACING['sm'])
-    glyph = QLabel('\uf002', container)
-    glyph.setFont(fonts.icon_font(11))
+    glyph = QLabel(container)
+    glyph.setPixmap(app_icons.get_pixmap('search', role='text_secondary', size=12))
+    glyph.setFixedSize(12, 12)
     line = QLineEdit(container)
     line.setFrame(False)
     line.setFont(fonts.body_font())
@@ -224,7 +229,7 @@ class ErrorBanner(QFrame):
         row.setSpacing(SPACING['sm'])
         self._label = QLabel('')
         self._label.setWordWrap(True)
-        self._close = make_tool_button('\uf00d')
+        self._close = make_tool_button('close')
         self._close.clicked.connect(self.hide)
         row.addWidget(self._label, 1)
         row.addWidget(self._close)
@@ -241,7 +246,7 @@ class ErrorBanner(QFrame):
 class Toast(QFrame):
     """Ephemeral notification anchored to the parent widget, auto-dismissing."""
 
-    _ICONS = {'success': '\uf00c', 'warning': '\uf071', 'danger': '\uf00d', 'info': '\uf05a'}
+    _ICONS = {'success': 'check', 'warning': 'warning', 'danger': 'close', 'info': 'info'}
 
     def __init__(self, message: str, level: str = 'success',
                  duration_ms: int = 3000, parent: Optional[QWidget] = None):
@@ -252,8 +257,11 @@ class Toast(QFrame):
         row = QHBoxLayout(self)
         row.setContentsMargins(SPACING['md'], SPACING['sm'], SPACING['md'], SPACING['sm'])
         row.setSpacing(SPACING['sm'])
-        glyph = QLabel(self._ICONS.get(level, self._ICONS['info']))
-        glyph.setFont(fonts.icon_font(12))
+        glyph = QLabel()
+        glyph.setPixmap(app_icons.get_pixmap(
+            self._ICONS.get(level, self._ICONS['info']),
+            role=level if level in app_icons.ROLE_COLORS else 'text_secondary', size=12))
+        glyph.setFixedSize(12, 12)
         glyph.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         text = QLabel(message)
         text.setWordWrap(True)

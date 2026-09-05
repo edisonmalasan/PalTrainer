@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from palworld_aio.ui.chrome import fonts
 from palworld_aio.ui.chrome.fonts import (
-    FONT_BODY_STACK, FONT_HEADING_STACK, FONT_ICON_STACK, FONT_MONO_STACK,
+    FONT_BODY_STACK, FONT_HEADING_STACK, FONT_MONO_STACK,
     font_family_qss,
 )
 from palworld_aio.ui.chrome.tokens import HEIGHT, RADIUS, SPACING, TYPE, resolve
@@ -763,159 +763,16 @@ QFrame[class="searchField"] QLineEdit {{
 QFrame[class="searchField"] QLineEdit:focus {{ border: none; }}
 QFrame[class="searchField"] QLabel {{ color: {p['text_secondary']}; }}
 
-/* ---- application shell chrome v2: NexusBand rail (plan 020) ---- */
-QWidget#nexusBand {{
-    background-color: {p['canvas']};
-    border-left: 1px solid {p['border']};
-}}
-QWidget#bandMiddle {{ background: transparent; }}
+/* ---- shell hairline (reused by search panels / tools sections) ---- */
 QFrame#bandZoneRule {{
     background: {p['border']};
     border: none;
     margin: 3px 10px;
 }}
-QLabel#bandZoneCaption {{
-    color: {p['text_disabled']};
-    font-family: {font_family_qss(FONT_HEADING_STACK)};
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    background: transparent;
-    padding: 4px 2px 1px 2px;
-}}
-QPushButton[bandItem="true"] {{
-    background: transparent;
-    color: {p['text_secondary']};
-    border: none;
-    border-radius: {RADIUS['sm']}px;
-    text-align: center;
-    padding: 0px;
-}}
-QPushButton[bandItem="true"]:hover {{
-    background: {p['surface_hover']};
-    color: {p['text']};
-}}
-QPushButton[bandItem="true"]:focus {{
-    border: 1px solid {p['accent_border']};
-}}
-QPushButton[bandItem="true"][active="true"] {{
-    color: {p['accent']};
-    background: {p['accent_bg']};
-    font-weight: 600;
-}}
-QPushButton[bandItem="true"][active="true"]:hover {{
-    background: {p['accent_bg_strong']};
-    color: {p['accent_hover']};
-}}
-QPushButton[bandItem="true"]:disabled {{
-    color: {p['text_disabled']};
-    background: transparent;
-}}
-QPushButton[bandUtility="true"] {{
-    background: transparent;
-    color: {p['text_secondary']};
-    border: none;
-    border-radius: {RADIUS['sm']}px;
-}}
-QPushButton[bandUtility="true"]:hover {{
-    background: {p['surface_hover']};
-    color: {p['text']};
-}}
-QPushButton[bandUtility="true"]:pressed {{ background: {p['surface_active']}; }}
-QPushButton[bandUtility="true"]:focus {{ border: 1px solid {p['accent_border']}; }}
-QPushButton[bandUtility="true"]:disabled {{ color: {p['text_disabled']}; }}
-QPushButton[bandUtility="true"][active="true"] {{
-    color: {p['accent']};
-    background: {p['accent_bg']};
-}}
-QPushButton#bandMasthead {{
-    color: {p['text_secondary']};
-    font-size: 15px;
-}}
-QPushButton#bandMasthead[pulse="true"] {{
-    color: {p['warning']};
-    background: {p['warning_bg']};
-}}
-QLabel#bandDirtyDot {{
-    background: {p['accent']};
-    border-radius: 4px;
-}}
-
-/* ---- InstrumentTray (plan 020 §4.2) ---- */
-QWidget#instrumentTray {{ background: transparent; }}
-QPushButton#trayStateRow {{
-    background: {p['surface']};
-    border: 1px solid {p['border']};
-    border-radius: {RADIUS['sm']}px;
-    margin: 0 6px;
-    text-align: left;
-}}
-QPushButton#trayStateRow:hover {{ border-color: {p['border_strong']}; background: {p['surface_raised']}; }}
-QPushButton#trayStateRow:focus {{ border-color: {p['accent_border']}; }}
-QPushButton#trayStateRow[state="loaded"] {{
-    background: {p['success_bg']};
-    border-color: {p['success_border']};
-}}
-QPushButton#trayStateRow[state="dirty"] {{
-    background: {p['warning_bg']};
-    border-color: {p['warning_border']};
-}}
-QPushButton#trayStateRow[state="error"] {{
-    background: {p['danger_bg']};
-    border-color: {p['danger_border']};
-}}
-QPushButton#trayStateRow[state="loading"], QPushButton#trayStateRow[state="saving"] {{
-    background: {p['info_bg']};
-    border-color: {p['info_border']};
-}}
-QLabel#trayStateIcon {{
-    background: transparent; border: none;
-    font-family: {font_family_qss(FONT_ICON_STACK)};
-    font-size: 11px;
-}}
-QLabel#trayStateIcon[state="loaded"] {{ color: {p['success']}; }}
-QLabel#trayStateIcon[state="dirty"] {{ color: {p['warning']}; }}
-QLabel#trayStateIcon[state="error"] {{ color: {p['danger']}; }}
-QLabel#trayStateIcon[state="loading"], QLabel#trayStateIcon[state="saving"] {{ color: {p['info']}; }}
-QLabel#trayStateText {{
-    background: transparent; border: none;
-    color: {p['text_secondary']};
-    font-size: {TYPE['micro'][0]}px;
-}}
-QLabel#traySection {{
-    color: {p['text_disabled']};
-    font-family: {font_family_qss(FONT_HEADING_STACK)};
-    font-size: {TYPE['micro'][0]}px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    padding: 3px 8px 1px 8px;
-}}
 QLabel#trayLabel {{
     color: {p['text_disabled']};
     font-size: {TYPE['micro'][0]}px;
 }}
-QLabel#trayValue {{
-    color: {p['text']};
-    font-size: {TYPE['micro'][0]}px;
-    font-weight: 600;
-}}
-QLabel#trayValue[placeholder="true"] {{ color: {p['text_disabled']}; font-weight: 400; }}
-QLabel#trayMetricValue {{
-    color: {p['text']};
-    font-family: {font_family_qss(FONT_MONO_STACK)};
-    font-size: {TYPE['micro'][0]}px;
-    font-weight: 600;
-}}
-QLabel#trayMetricValue[placeholder="true"] {{ color: {p['text_disabled']}; font-weight: 400; }}
-QPushButton#trayExpandBtn {{
-    background: transparent;
-    border: none;
-    border-radius: {RADIUS['sm']}px;
-    color: {p['text_secondary']};
-    font-size: {TYPE['micro'][0]}px;
-}}
-QPushButton#trayExpandBtn:hover {{ background: {p['surface_hover']}; color: {p['text']}; }}
-QPushButton#trayExpandBtn:focus {{ border: 1px solid {p['accent_border']}; }}
 
 /* ---- TrayDrawer overlay (canvas-local, plan 020 §4.2) ---- */
 QFrame#trayDrawer {{
@@ -934,7 +791,6 @@ QPushButton#drawerCloseBtn {{
     border: 1px solid {p['border']};
     border-radius: {RADIUS['sm']}px;
     color: {p['text_secondary']};
-    font-family: {font_family_qss(FONT_ICON_STACK)};
 }}
 QPushButton#drawerCloseBtn:hover {{ background: {p['danger_bg']}; color: {p['danger']}; border-color: {p['danger_border']}; }}
 
@@ -1191,6 +1047,30 @@ QLineEdit#searchInput {{
     min-height: {HEIGHT['compact'] + 4}px;
 }}
 QLineEdit#searchInput:focus {{ border-color: {p['accent_border_strong']}; }}
+
+/* ---- map hover overlays (top-nav-shell 5.2: re-tokened from legacy cyan) ---- */
+QFrame#hoverOverlayContainer {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QLabel#hoverGuildLabel {{
+    color: {p['accent']};
+    font-weight: 600;
+}}
+QLabel#hoverDetailLabel {{
+    color: {p['text_secondary']};
+}}
+
+/* ---- pal editor container (top-nav-shell 5.2: re-tokened from legacy cyan) ---- */
+QWidget#editPalsContainer {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QWidget#editPalsContent {{
+    background: transparent;
+}}
 QFrame#bulkActionBar {{
     background: {p['surface']};
     border: 1px solid {p['border']};

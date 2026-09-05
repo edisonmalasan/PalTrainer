@@ -88,8 +88,6 @@ WHITELIST_PATHS: Set[str] = {
     'palworld_aio/ui/chrome/qss_builder.py',
     'palworld_aio/ui/chrome/fonts.py',
     'palworld_aio/ui/chrome/icons.py',
-    'palworld_aio/ui/chrome/nexus_band.py',
-    'palworld_aio/ui/chrome/instrument_tray.py',
     'palworld_aio/constants.py',
     'palworld_aio/edit_pals.py',
     'palworld_aio/editor/edit_pals.py',
@@ -343,6 +341,15 @@ def scan_qss_file(file_path: Path, root: Path, ruthless: bool = False) -> ScanRe
             result.violations.append(Violation(
                 file_path, lineno, 0, 'hardcolor-rgba', 'error',
                 'Uses rgba() color directly — should come from constants.py',
+                ln.strip(),
+            ))
+
+        retired_hex = [h for h in hexes if h.lower() in RETIRED_HEX]
+        if retired_hex or RE_RETIRED_RGBA.search(ln):
+            offender = retired_hex[0] if retired_hex else 'rgba(125,211,252,...)'
+            result.violations.append(Violation(
+                file_path, lineno, 0, 'retired-palette', 'error',
+                f'Uses retired palette color {offender} — see chrome/tokens.py RETIRED_COLORS',
                 ln.strip(),
             ))
 

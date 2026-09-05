@@ -1,6 +1,6 @@
 """AppBar — shell v3 top bar (top-nav-shell tasks 2.1-2.3).
 
-Replaces the floating WindowControls cluster and the NexusBand masthead/tray
+Replaces the floating WindowControls cluster and the retired rail masthead/tray
 with one 46px top bar, in reading order:
 
 - brand: circular logo mark + "PalTrainer" wordmark (click = app menu popup)
@@ -260,6 +260,7 @@ class ContextIndicator(_CompositeButton):
         self._col.addWidget(self.guild_label)
         self._col.addWidget(self.base_label)
         lay.addLayout(self._col)
+        self.clear_selection()
 
     def _make_row(self) -> QLabel:
         label = QLabel('—')
@@ -269,7 +270,7 @@ class ContextIndicator(_CompositeButton):
 
     @staticmethod
     def _set_row(label: QLabel, prefix: str, value) -> None:
-        text = f'{prefix} {value}' if value else prefix
+        text = f'{prefix}: {value}' if value else f'{prefix}: —'
         fm = label.fontMetrics()
         label.setText(fm.elidedText(text, Qt.TextElideMode.ElideRight,
                                     label.width() - 4))
@@ -277,7 +278,6 @@ class ContextIndicator(_CompositeButton):
 
     def set_player(self, name) -> None:
         self._set_row(self.player_label, _txt('deletion.selected_player_label', 'Player'), name)
-
     def set_guild(self, name) -> None:
         self._set_row(self.guild_label, _txt('deletion.selected_guild_label', 'Guild'), name)
 
@@ -317,6 +317,7 @@ class AppBar(QFrame):
     guide_clicked = pyqtSignal()
     about_clicked = pyqtSignal()
     masthead_clicked = pyqtSignal()
+    context_clicked = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -335,6 +336,7 @@ class AppBar(QFrame):
         lay.addWidget(self.save_chip)
 
         self.context = ContextIndicator()
+        self.context.clicked.connect(self.context_clicked.emit)
         lay.addWidget(self.context)
 
         lay.addStretch(1)
@@ -362,6 +364,17 @@ class AppBar(QFrame):
     # ------------------------------------------------------------ wiring
     def set_warning_slot(self, slot) -> None:
         self._warn_slot = slot
+
+    def set_console_visible(self, visible: bool) -> None:
+        """Reflect the detached-console state on the console utility."""
+        self.console_btn.setProperty('active', bool(visible))
+        self.console_btn.style().unpolish(self.console_btn)
+        self.console_btn.style().polish(self.console_btn)
+
+    def set_update_pulse(self, on: bool) -> None:
+        """Update-available affordance on brand + save chip."""
+        self.brand.set_pulse(bool(on))
+        self.save_chip.pulse_update(bool(on))
 
     def show_warning(self, show: bool = True) -> None:
         self.warn_btn.setVisible(show)

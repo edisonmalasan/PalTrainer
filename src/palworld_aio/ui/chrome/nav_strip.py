@@ -1,7 +1,7 @@
 """NavStrip — shell v3 top navigation (top-nav-shell tasks 3.1-3.2).
 
 A 38px strip of zone-grouped checkable tab buttons replacing the right
-NexusBand rail. Zones follow the confirmed grouping:
+retired right rail. Zones follow the confirmed grouping:
 
 - Start: Tools
 - World: Map, Bases, Players, Guilds, Exclusions
@@ -230,6 +230,13 @@ class NavStrip(QWidget):
 
     def active_id(self) -> str | None:
         return self._active_id
+
+    def refresh_labels(self) -> None:
+        for tab in self._tabs.values():
+            tab.refresh_labels()
+        for child in self.findChildren(ZoneCaption):
+            child.refresh_labels()
+        self._overflow_btn.setToolTip(_txt('nav.overflow', 'More pages'))
 
     # ---------------------------------------------------------- overflow
     def setOverflowHidden(self, hidden_ids: set[str]) -> None:

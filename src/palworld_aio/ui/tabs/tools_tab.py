@@ -200,11 +200,10 @@ class DropOverlay(QWidget):
         painter.drawPath(path)
         box_h = inner.height()
         center_y = inner.y() + box_h / 2
-        icon_font = QFont(constants.FONT_FAMILY_NERD, 46, QFont.Bold)
-        painter.setFont(icon_font)
-        painter.setPen(accent)
-        icon_rect = QRectF(inner.x(), center_y - 80, inner.width(), 60)
-        painter.drawText(icon_rect, Qt.AlignHCenter | Qt.AlignBottom, '\uf07b')
+        icon_pix = app_icons.get_pixmap('upload', pal['accent'], 48)
+        if icon_pix is not None:
+            icon_x = int(inner.x() + (inner.width() - 48) / 2)
+            painter.drawPixmap(icon_x, int(center_y - 88), icon_pix)
         font = QFont(constants.FONT_FAMILY, 22, QFont.Bold)
         painter.setFont(font)
         painter.setPen(QColor(255, 255, 255, 255))
@@ -215,41 +214,6 @@ class DropOverlay(QWidget):
         painter.setPen(QColor(pal['text_secondary']))
         hint_rect = QRectF(inner.x(), center_y + 40, inner.width(), 30)
         painter.drawText(hint_rect, Qt.AlignHCenter | Qt.AlignTop, self._drop_hint)
-class StatIconBtn(QPushButton):
-    def __init__(self, icon, parent=None):
-        super().__init__(icon, parent)
-        font_family = self._resolve_nerdfont()
-        self.setFont(QFont(font_family, 11))
-        self.setFixedSize(44, 28)
-        self.setCursor(QCursor(Qt.PointingHandCursor))
-        self.setFocusPolicy(Qt.NoFocus)
-        self.setObjectName('statIconBtn')
-
-    @staticmethod
-    def _resolve_nerdfont():
-        candidates = [constants.FONT_FAMILY_NERD, 'NerdFontsSymbolsOnly', 'Segoe Fluent Icons', 'Segoe UI Symbol', constants.FONT_FAMILY]
-        for name in candidates:
-            if name in QFontDatabase.families():
-                return name
-        return constants.FONT_FAMILY
-
-    def paintEvent(self, event):
-        sp = QStylePainter(self)
-        opt = QStyleOptionButton()
-        self.initStyleOption(opt)
-        opt.text = ''
-        sp.drawControl(QStyle.CE_PushButton, opt)
-        sp.end()
-        p = QPainter(self)
-        p.setRenderHint(QPainter.TextAntialiasing | QPainter.Antialiasing)
-        p.setFont(self.font())
-        p.setPen(self.palette().color(self.foregroundRole()))
-        fm = QFontMetrics(self.font())
-        br = fm.boundingRect(self.text())
-        x = (self.width() - br.width()) / 2 - br.x()
-        y = (self.height() - br.height()) / 2 - br.y()
-        p.drawText(int(x), int(y), self.text())
-        p.end()
 class ToolsTab(QWidget):
     """Start page v2 (plan 021): operations masthead + field report + campaign
     strip + mission columns. All 7 tool entry points and deep-links preserved;
@@ -405,8 +369,8 @@ class ToolsTab(QWidget):
             if event.button() == Qt.LeftButton and hasattr(self, 'parent_window') and self.parent_window:
                 if hasattr(self.parent_window, '_activate_nav'):
                     self.parent_window._activate_nav(nav_key)
-                else:
-                    self.parent_window.nexus_band.set_active(nav_key)
+                elif hasattr(self.parent_window, 'nav_strip'):
+                    self.parent_window.nav_strip.set_active(nav_key)
                     self.parent_window._on_nav_changed(nav_key)
         return _handler
 

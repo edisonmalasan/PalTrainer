@@ -61,7 +61,7 @@ try:
 
     for page_id in wanted:
         idx = PAGES[page_id]
-        w.nexus_band.set_active(page_id)
+        w._activate_nav(page_id)
         w._on_nav_changed(page_id)
         app.processEvents()
         shot = pathlib.Path.cwd() / 'Logs' / f'shot_{page_id}.png'
