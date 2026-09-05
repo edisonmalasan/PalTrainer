@@ -1,19 +1,18 @@
 import os
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QWidget, QFrame, QGridLayout
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QWidget, QFrame, QGridLayout
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from i18n import t, get_language
 from palworld_aio import constants
+from palworld_aio.ui.chrome.components import BaseDialog
+from palworld_aio.ui.chrome import tokens as ui_tokens
 from resource_resolver import resource_path
 
-HEADER_COLOR = '#4a90e2'
-TEXT_COLOR = '#e0e0e0'
-MUTED_COLOR = '#94a3b8'
-SUBSECTION_COLOR = '#7DD3FC'
-BG_COLOR = '#0A0B0E'
-CARD_BG = '#121418'
-BORDER_COLOR = '#1E2128'
+_GUIDE_TOKENS = ui_tokens.resolve()
 
+# Page-body HTML wrapper. Body files under resources/tab_guide/ carry their
+# own authored <style> blocks (content debt, not dialog chrome); the wrapper
+# only sets the base text/accent so unstyled text matches the theme.
 SECTION_HTML = '''<div style="color: {text_color}; font-family: '{font_family}'; font-size: 12px;">
 <h3 style="color: {header_color}; margin: 0 0 4px 0;">{title}</h3>
 {body}
@@ -38,39 +37,33 @@ SECTION_KEYS = [
 ]
 
 FMT = dict(
-    text_color=TEXT_COLOR, header_color=HEADER_COLOR,
+    text_color=_GUIDE_TOKENS['text'], header_color=_GUIDE_TOKENS['accent'],
     font_family=constants.FONT_FAMILY
 )
 
 
 class _TocBtn(QPushButton):
+    """TOC entry using the shared pageSwitchBtn grammar (checked = active)."""
+
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
         self.setCursor(Qt.PointingHandCursor)
-        self.setFlat(True)
+        self.setObjectName('pageSwitchBtn')
+        self.setCheckable(True)
         self.setFont(QFont(constants.FONT_FAMILY, 11))
-        self.setStyleSheet(f'''
-            QPushButton {{
-                color: {SUBSECTION_COLOR}; background: transparent;
-                border: 1px solid transparent; border-radius: 4px;
-                padding: 3px 8px; text-align: left;
-            }}
-            QPushButton:hover {{
-                color: {HEADER_COLOR}; background: rgba(74,144,226,0.08);
-                border-color: rgba(74,144,226,0.2);
-            }}
-            QPushButton:pressed {{
-                color: #FFFFFF; background: rgba(74,144,226,0.15);
-            }}
-        ''')
 
 
-class TabGuideDialog(QDialog):
+class TabGuideDialog(BaseDialog):
+    """Tab usage guide on the shared dialog scaffold (Phase 4).
+
+    TOC uses pageSwitchBtn checked-state; page bodies are authored HTML
+    content (their inner <style> blocks are content debt, untouched).
+    """
+
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(t('tab_guide.title') if t else 'Tab Usage Guide')
-        self.setModal(True)
-        self.setMinimumSize(720, 580)
+        title = t('tab_guide.title') if t else 'Tab Usage Guide'
+        super().__init__(title, parent, min_size=(720, 580))
+        self.setWindowTitle(title)
         self.resize(780, 660)
         self._page_label = None
         self._current_anchor = 'intro'
@@ -106,46 +99,21 @@ class TabGuideDialog(QDialog):
             self._page_label.setText(self._build_page_html(anchor, body))
             self._scroll_area.verticalScrollBar().setValue(0)
         for key, btn in self._toc_btns.items():
-            btn.setStyleSheet(self._toc_btn_style(key == anchor))
-
-    def _toc_btn_style(self, active=False):
-        if active:
-            return f'''
-                QPushButton {{
-                    color: #FFFFFF; background: rgba(74,144,226,0.18);
-                    border: 1px solid rgba(74,144,226,0.35); border-radius: 4px;
-                    padding: 3px 8px; text-align: left; font-weight: bold;
-                }}
-            QPushButton:hover {{ background: rgba(74,144,226,0.25); }}
-            QPushButton:pressed {{ color: #FFFFFF; background: rgba(74,144,226,0.35); }}
-        '''
-        return f'''
-            QPushButton {{
-                color: {SUBSECTION_COLOR}; background: transparent;
-                border: 1px solid transparent; border-radius: 4px;
-                padding: 3px 8px; text-align: left;
-            }}
-            QPushButton:hover {{
-                color: {HEADER_COLOR}; background: rgba(74,144,226,0.08);
-                border-color: rgba(74,144,226,0.2);
-            }}
-            QPushButton:pressed {{
-                color: #FFFFFF; background: rgba(74,144,226,0.15);
-            }}
-        '''
+            is_active = key == anchor
+            if btn.isChecked() != is_active:
+                btn.setChecked(is_active)
 
     def refresh_labels(self):
-        self.setWindowTitle(t('tab_guide.title') if t else 'Tab Usage Guide')
-        if hasattr(self, '_title_label'):
-            self._title_label.setText(t('tab_guide.title') if t else 'Tab Usage Guide')
+        title = t('tab_guide.title') if t else 'Tab Usage Guide'
+        self.setWindowTitle(title)
+        self.title_label.setText(title)
         if hasattr(self, '_subtitle_label'):
             self._subtitle_label.setText(t('tab_guide.subtitle') if t else 'Click behaviors, shortcuts, and tips for every section')
-        if hasattr(self, '_footer_label'):
-            self._footer_label.setText(t('tab_guide.footer') if t else 'Tip: Right-click menus are your friend — always check them for deeper options in every tab.')
         if hasattr(self, '_toc_title_label'):
             self._toc_title_label.setText(t('tab_guide.toc_title') if t else 'Table of Contents — click a page to open:')
-        if hasattr(self, '_close_btn'):
-            self._close_btn.setText(t('button.close') if t else 'Close')
+        self.cancel_btn.setText(t('button.close') if t else 'Close')
+        if hasattr(self, '_footer_label'):
+            self._footer_label.setText(t('tab_guide.footer') if t else 'Tip: Right-click menus are your friend — always check them for deeper options in every tab.')
         for anchor, prefix in SECTION_KEYS:
             label_text = t(f'{prefix}.toc')
             btn = self._toc_btns.get(anchor)
@@ -156,49 +124,32 @@ class TabGuideDialog(QDialog):
             self._page_label.setText(self._build_page_html(self._current_anchor, body))
 
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout = self.content_layout
 
-        # --- Header ---
-        header_frame = QFrame()
-        header_frame.setStyleSheet(f'background-color: {BG_COLOR}; border-bottom: 1px solid {BORDER_COLOR};')
-        header_layout = QHBoxLayout(header_frame)
-        header_layout.setContentsMargins(20, 12, 20, 12)
-        self._title_label = QLabel(t('tab_guide.title') if t else 'Tab Usage Guide')
-        self._title_label.setFont(QFont(constants.FONT_FAMILY, 16, QFont.Bold))
-        self._title_label.setStyleSheet(f'color: {HEADER_COLOR};')
-        header_layout.addWidget(self._title_label)
-        header_layout.addStretch()
+        # --- Subtitle (the scaffold owns the title row) ---
         self._subtitle_label = QLabel(t('tab_guide.subtitle') if t else 'Click behaviors, shortcuts, and tips for every section')
-        self._subtitle_label.setFont(QFont(constants.FONT_FAMILY, 10))
-        self._subtitle_label.setStyleSheet(f'color: {MUTED_COLOR};')
-        header_layout.addWidget(self._subtitle_label)
-        layout.addWidget(header_frame)
+        self._subtitle_label.setProperty('role', 'secondary')
+        self._subtitle_label.setWordWrap(True)
+        layout.addWidget(self._subtitle_label)
 
         # --- Scroll area: TOC + Stacked pages ---
         self._scroll_area = QScrollArea()
         self._scroll_area.setWidgetResizable(True)
         self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._scroll_area.setStyleSheet(f'''
-            QScrollArea {{ background-color: {BG_COLOR}; border: none; }}
-        ''')
 
         scroll_content = QWidget()
-        scroll_content.setStyleSheet(f'background-color: {BG_COLOR};')
         scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setContentsMargins(24, 12, 24, 16)
+        scroll_layout.setContentsMargins(0, 8, 0, 8)
         scroll_layout.setSpacing(0)
 
         # -- TOC --
         toc_frame = QFrame()
-        toc_frame.setStyleSheet(f'background-color: {CARD_BG}; border: 1px solid {BORDER_COLOR}; border-radius: 8px; margin: 4px 0 12px 0;')
+        toc_frame.setProperty('class', 'panel')
         toc_layout = QVBoxLayout(toc_frame)
         toc_layout.setContentsMargins(14, 10, 14, 10)
         toc_layout.setSpacing(6)
         self._toc_title_label = QLabel(t('tab_guide.toc_title') if t else 'Table of Contents — click a page to open:')
-        self._toc_title_label.setFont(QFont(constants.FONT_FAMILY, 11, QFont.Bold))
-        self._toc_title_label.setStyleSheet(f'color: {HEADER_COLOR}; background: transparent;')
+        self._toc_title_label.setObjectName('sectionHeader')
         toc_layout.addWidget(self._toc_title_label)
         grid = QGridLayout()
         grid.setSpacing(4)
@@ -219,7 +170,6 @@ class TabGuideDialog(QDialog):
         self._page_label.setWordWrap(True)
         self._page_label.setTextFormat(Qt.RichText)
         self._page_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self._page_label.setStyleSheet(f'background-color: {BG_COLOR}; color: {TEXT_COLOR}; padding: 0;')
         scroll_layout.addWidget(self._page_label)
         scroll_layout.addStretch()
 
@@ -229,29 +179,9 @@ class TabGuideDialog(QDialog):
         # Start on intro page
         self._switch_page('intro')
 
-        # --- Footer ---
-        footer_frame = QFrame()
-        footer_frame.setStyleSheet(f'background-color: {CARD_BG}; border-top: 1px solid {BORDER_COLOR};')
-        footer_layout = QHBoxLayout(footer_frame)
-        footer_layout.setContentsMargins(20, 10, 20, 10)
+        # --- Footer tip (the scaffold owns Close) ---
         self._footer_label = QLabel(t('tab_guide.footer') if t else 'Tip: Right-click menus are your friend — always check them for deeper options in every tab.')
-        self._footer_label.setFont(QFont(constants.FONT_FAMILY, 10))
-        self._footer_label.setStyleSheet(f'color: {MUTED_COLOR};')
-        footer_layout.addWidget(self._footer_label)
-        footer_layout.addStretch()
-        self._close_btn = QPushButton(t('button.close') if t else 'Close')
-        self._close_btn.setFixedSize(100, 32)
-        self._close_btn.setCursor(Qt.PointingHandCursor)
-        self._close_btn.setStyleSheet(f'''
-            QPushButton {{
-                background-color: {HEADER_COLOR}; color: white; border: none;
-                border-radius: 6px; font-weight: bold; font-size: 12px;
-            }}
-            QPushButton:hover {{ background-color: #5BA3E6; }}
-            QPushButton:pressed {{ background-color: #3A7BC8; }}
-        ''')
-        self._close_btn.clicked.connect(self.accept)
-        footer_layout.addWidget(self._close_btn)
-        layout.addWidget(footer_frame)
-
-        self.setStyleSheet(f'QDialog {{ background-color: {BG_COLOR}; }}')
+        self._footer_label.setProperty('role', 'secondary')
+        self._footer_label.setWordWrap(True)
+        self.footer.insertWidget(1, self._footer_label, stretch=1)
+        self.cancel_btn.setText(t('button.close') if t else 'Close')
