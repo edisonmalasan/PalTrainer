@@ -1,143 +1,136 @@
 # AGENTS.md - PalTrainer
 
-## Project identity
+## Project overview
 
-PalTrainer is a Python desktop application for inspecting, repairing, converting, and editing Palworld save files. The GUI uses PyQt6. The `palsav` workspace package owns save serialization and compression.
+PalTrainer is a Python 3.11+ PyQt6 desktop application for inspecting, repairing,
+converting, and editing Palworld save files. `palsav` owns save serialization,
+property codecs, compression, and containers; the application packages own UI and
+workflow orchestration.
 
-## Repository structure
+## Stack
+
+- Language: Python 3.11+
+- GUI: PyQt6
+- Storage: Palworld save files, JSON, archives, and Game Pass containers
+- Build/package: `uv`, Nuitka, cx_Freeze
+- Native requirements: C/C++ build toolchain and platform Qt prerequisites
+
+## Setup and verification commands
 
 ```text
-src/palsav/               Save serialization, property codecs, compression, and containers
-src/palworld_aio/         PyQt6 application, managers, editors, tabs, dialogs, and widgets
-src/palworld_toolsets/    Conversion, transfer, map restoration, and slot tools
-src/palworld_xgp_import/  Xbox Game Pass discovery, extraction, and packaging
-src/palworld_coord/       Coordinate conversion helpers
-src/                      Launch, paths, resources, localization, and shared imports
-resources/                Game data, translations, guides, maps, themes, and assets
-tests/                    Structural, integration, unit, and fixture tests
-build/                    Nuitka, cx_Freeze, installer, and build verification tools
-scripts/                  Local maintenance and test helpers
-```
-
-## Setup and development
-
-Required tools are Python 3.11+, `uv`, a C/C++ build toolchain for native save dependencies, and the platform Qt prerequisites.
-
-```bash
 uv sync
 uv run start.py
 uv run python src/palworld_aio/main.py
-```
-
-On Windows, `start.cmd` launches the application and `test.cmd` runs it with fault reporting enabled. Keep `uv.lock` under version control when it exists; launchers must not delete it.
-
-## Test, lint, typecheck, and format
-
-```bash
 uv run pytest -c tests/pytest.ini
 uv run pytest -c tests/pytest.ini -m slow
 uv run python -m compileall -q src tests
 uv run pyright src
 ```
 
-Pyright is the configured type checker. Do not claim that Ruff, Black, or another formatter is available until its configuration and dependency are added.
+Use focused pytest paths or node IDs when iterating. Do not claim a command passed
+unless it was actually run. Do not claim Ruff, Black, or another formatter exists
+unless its dependency and configuration are added.
 
-## Architecture and ownership
+## Repository ownership
 
-- `palsav` owns binary parsing, property dispatch, compression, save containers, serialization, and roundtrip behavior.
-- `palworld_aio` owns PyQt6 presentation, dialogs, tabs, navigation, user interaction, and workflow orchestration.
-- `palworld_toolsets` owns conversion, character transfer, host repair, map restoration, and slot injection.
-- `palworld_xgp_import` owns the Game Pass container layer. Keep wrapper bytes separate from inner save payloads.
-- `palworld_coord` owns coordinate transforms and known map-version boundaries.
-- Filesystem code owns path discovery, validation, backups, temporary workspaces, and atomic replacement. UI code must not bypass it.
-- Save mutation belongs in testable save/domain functions, not in widget event handlers.
-- Keep UI state separate from loaded save data and keep long-running work off the Qt GUI thread.
-- Preserve the dynamic test importer; update `tests/test_registry.py` when modules move.
+- `src/palsav/`: binary parsing, property dispatch, compression, containers, and roundtrips.
+- `src/palworld_aio/`: PyQt6 presentation, dialogs, tabs, navigation, and workflows.
+- `src/palworld_toolsets/`: conversion, transfer, host repair, map restoration, and slot tools.
+- `src/palworld_xgp_import/`: Game Pass discovery, extraction, and packaging.
+- `src/palworld_coord/`: coordinate transforms and map-version boundaries.
+- `resources/`: game data, translations, guides, maps, themes, and assets.
+- `tests/`: structural, integration, unit, and fixture tests.
 
-## Save-data invariants
+Filesystem code owns path validation, backups, temporary workspaces, and atomic
+replacement. UI code must not bypass it. Save mutation belongs in testable domain
+functions, not widget event handlers.
 
-- Treat all save files, imports, archives, JSON, and manifests as untrusted input.
-- Preserve unsupported properties, unknown bytes, trailing bytes, and container metadata when the engine cannot interpret them.
-- Never silently normalize, discard, or reorder data without a format contract and regression coverage.
-- Distinguish Level saves, player saves, global storage, and Game Pass wrappers.
-- Keep legacy export readers. New export formats must be versioned and validated before import.
-- The raw JSON editor is read-only by default. Write access requires a backup, strict diff, schema validation, and explicit confirmation.
-- Destructive actions require a preview and a separate commit step.
+## Durable engineering rules
+
+- Preserve unsupported properties, unknown bytes, trailing bytes, metadata, and roundtrip behavior.
+- Treat saves, imports, archives, JSON, and manifests as untrusted input.
+- Keep Level, player, global-storage, and Game Pass wrapper layers distinct.
+- Keep legacy export readers; version and validate new export formats.
+- JSON editing is read-only by default; writes require backup, strict diff, validation, and confirmation.
+- Destructive actions require preview followed by a separate commit step.
+- Keep long-running work off the Qt GUI thread and UI state separate from save data.
+- Use `pathlib.Path` for new filesystem code and type annotations on new public functions.
+- Keep entry points thin, control flow explicit, and user errors safe while logging diagnostics.
 
 ## PyQt6 rules
 
-- Use PyQt6 consistently; do not reintroduce another Qt binding.
-- Use `pyqtSignal`, `pyqtSlot`, and `pyqtProperty` for Qt declarations.
-- Follow Qt6 enum APIs and run focused GUI/import tests after widget changes.
-- Never mutate or delete widget trees from a modal dialog signal handler while `exec()` is active. Defer refreshes until the dialog returns.
-- Detach widgets from layouts before scheduling deletion. Avoid monkey-patching C++ virtual methods with closures and avoid QObject signal reference cycles.
+- Use PyQt6 consistently with `pyqtSignal`, `pyqtSlot`, and `pyqtProperty`.
+- Follow Qt6 enum APIs and run focused GUI/import checks after widget changes.
+- Do not mutate or delete widget trees from modal signal handlers while `exec()` is active; defer refreshes.
+- Detach widgets from layouts before scheduling deletion; avoid QObject signal cycles and C++ virtual monkey-patching.
 - Keep dialogs, workers, and timers owned by live Qt objects and stop them during shutdown.
+- Centralize QSS/design tokens; avoid per-screen style duplication and hard-coded visual values.
 
-## Coding conventions
+## UI overhaul context
 
-- Add type annotations to new public Python functions and keep control flow explicit.
-- Keep entry points thin and delegate behavior to testable functions.
-- Use `pathlib.Path` for new filesystem code.
-- Prefer structured parsers and serializers over string replacement for data files.
-- Show user-safe errors in dialogs and retain detailed diagnostics in logs.
-- Normalize UUIDs consistently where the save format requires it.
-- Add comments only for non-obvious format, security, or lifecycle behavior.
-- Keep changes close to their existing domain and avoid unrelated refactors.
+The UI overhaul is developed only on `feat/ui-overhaul`. Before UI work, read:
 
-## Skills
+- `docs/plan/ui/000-index.md`
+- `docs/plan/ui/000-design-context.md`
+- `docs/plan/ui/PROGRESS.md`
+- relevant OpenSpec artifacts and relevant files under `ib/image/`
 
-Read the complete applicable skill before planning, reviewing, or implementing its subject area. Project skills live under `.agents/skills/`.
+The `ib/image/` folders are read-only functional references organized by tab.
+They are not visual templates. The overhaul must create a substantially new layout,
+navigation model, palette, typography, hierarchy, spacing, and component composition.
+A recolor or small spacing change is not a successful overhaul. Record design and
+progress decisions in the UI context and progress files.
 
-- `private/codebase-analysis`: evidence-based repository inspection and architecture planning.
-- `design-taste-frontend-v1`: PyQt6 UI hierarchy, accessibility, interaction states, and polish.
-- `private/pal-trainer-save-pipeline`: save containers, compression, GVAS/property handling, and roundtrip preservation.
-- `private/pal-trainer-binary-schemas`: Booth and Guild layouts and byte-drift debugging.
-- `private/pal-trainer-pal-editor`: Pal projections, validation bounds, and Palbox/party placement.
-- `private/pal-trainer-stat-formula`: stat calculations and regression vectors.
-- `private/pal-trainer-breeding`: breeding formulas, exclusions, and deterministic lookups.
-- `private/pal-trainer-cli-tools`: coordinate transforms, UUID handling, and Game Pass workflows.
-- `clean-code`: focused refactoring without behavior changes.
-- `tdd`: test-first implementation for behavior changes.
-- `review`: correctness, security, regression, and test review.
-- `git-branch-naming`: branch naming rules.
-- `git-commit`: focused Conventional Commit workflow.
+## OpenSpec workflow
 
-If a private skill conflicts with a fixture or established invariant, document the uncertainty before changing behavior.
+This is a brownfield OpenSpec project. OpenSpec artifacts are the source of truth
+for approved capability behavior and change scope.
 
-## Security and storage
+- Check `openspec/changes/` before nontrivial work; continue a relevant in-flight change.
+- If no suitable change exists, use the installed OpenSpec propose/explore workflow before implementation.
+- Read the relevant `openspec/specs/` and active change artifacts before modifying a capability.
+- Use the OpenSpec apply workflow for implementation and update artifacts when reality differs from the plan.
+- Sync approved changes into `openspec/specs/` and archive completed changes using the installed workflows.
+- Do not manually edit generated OpenSpec skill files under `.agents/skills/`.
+- Keep project-specific rules here and OpenSpec-specific configuration in `openspec/config.yaml`.
+- Do not expand an active change with unrelated work.
 
-- Never access save files directly from widgets.
-- Canonicalize paths and enforce approved roots before access.
-- Back up before every mutation, detect stale inputs, and replace files atomically.
-- Use temporary directories for extraction and remove them on success and failure.
-- Reject archive traversal, symlink escapes, unexpected members, and oversized inputs.
-- Never commit real saves, exports, backups, logs, crash dumps, credentials, or machine-specific configuration.
-- Keep network and release integration opt-in and limited to documented update behavior.
+## Testing and completion
 
-## Files not to modify
+Behavior changes need focused regression coverage. Run the relevant tests before
+finishing and report failures or unavailable checks honestly. A change is complete
+only when its OpenSpec tasks/specifications, tests, security/storage invariants, and
+documentation are up to date.
 
-Do not modify generated or user-owned material without an explicit reason:
+## Boundaries
 
-- `.venv/`, `__pycache__/`, `dist/`, build outputs, standalone bundles, and native dependency build directories.
-- `node_modules/` or old frontend artifacts if present locally; they are not part of this Python project.
-- Real save directories, `*.sav`, `*.savc`, exports, backups, logs, and temporary extraction folders.
-- Lockfiles for package managers not used by this project.
-- Reference material under `ib/` unless explicitly requested.
+- Never commit real saves, exports, backups, logs, crash dumps, credentials, or machine configuration.
+- Do not modify `.venv/`, `__pycache__/`, `dist/`, build outputs, native build directories, or `node_modules/`.
+- Do not modify `*.sav`, `*.savc`, real save directories, temporary extraction folders, or lockfiles for unused package managers.
+- Treat `ib/` as reference material; do not modify it unless explicitly requested.
+- Do not upgrade dependencies or perform unrelated refactors without a task requirement.
 
-## Git workflow
+## Git safety
 
-- Do not work directly on `main` for implementation, documentation, configuration, or maintenance changes.
-- Use one branch per independently reviewable feature, fix, documentation change, configuration change, or process step.
-- Branch names use `{type}/{short-description}` in kebab-case with prefixes such as `feat/`, `fix/`, `docs/`, `chore/`, `refactor/`, `test/`, `ci/`, `hotfix/`, or `release/`.
-- Before each task, inspect `git status --short --branch` and `git branch --all --verbose --no-abbrev`.
-- Treat each plan as a planning group. Break it into independently verifiable features before editing.
-- Keep commits process-by-process and buildable. Do not combine unrelated work into a bulk commit.
-- Stage only the current feature, inspect `git diff --staged`, and use a clear Conventional Commit message.
-- Push the feature branch only after verification. Do not commit or push work merely because a task is in progress.
-- Open a pull request against `main` for each completed feature branch and identify the relevant plan item and verification.
-- Integrate through the pull request with a merge commit titled `Merge pull request for <branch> into main`; do not squash away feature history unless explicitly requested.
-- Never rewrite history or revert user changes without explicit authorization.
+- Work on a task branch, never directly on `main`; the current UI overhaul uses `feat/ui-overhaul` exclusively.
+- Check `git status --short --branch` before significant work and inspect `git diff` before finishing.
+- Never discard existing user changes or use destructive Git operations without explicit authorization.
+- Do not rewrite history, commit, push, or open a pull request unless requested.
+- Use focused Conventional Commits when commits are requested (`feat:`, `fix:`, `docs:`, `test:`, etc.).
 
-## Definition of Done
+## Source of truth order
 
-A change is complete when it follows this file and the relevant plan, has focused tests at the appropriate risk level, preserves save-data and security invariants, passes available import/test/type checks, and records any blocked verification honestly.
+1. Explicit user/task requirements
+2. Approved OpenSpec change artifacts
+3. Existing behavior and architecture
+4. Tests
+5. Repository documentation
+6. Agent assumptions
+
+When sources conflict, document the conflict and do not silently invent a resolution.
+
+## Multi-agent work
+
+Use OpenSpec artifacts as the shared source of truth. Determine file ownership before
+editing, do not have agents modify the same files concurrently without coordination,
+respect dependency order, and review prerequisite work before building on it.
