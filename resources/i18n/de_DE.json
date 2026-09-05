@@ -2147,5 +2147,6 @@
     "sidebar.section.inspect": "Laden & Anzeigen",
     "sidebar.section.world": "Weltdaten",
     "sidebar.section.editing": "Bearbeitung",
-    "sidebar.section.reference": "Referenz"
+    "sidebar.section.reference": "Referenz",
+    "tools.section.world": "Welt-Werkzeuge"
 }

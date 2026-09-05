@@ -299,9 +299,12 @@ class MainWindow(QMainWindow):
         # Deck Operations shell v2 (plan 020): full-bleed page canvas + right
         # NexusBand rail. Legacy sidebar/header/dock path removed (plan 025).
         self._setup_ui_v2(main_layout)
+        # Status strip (top-nav-shell 1.5): visible host for streamed
+        # load/save/log messages; detachable console behavior unchanged.
         self.status_bar = QStatusBar()
-        self.status_bar.setFixedHeight(0)
-        self.status_bar.hide()
+        self.status_bar.setObjectName('statusStrip')
+        self.status_bar.setFixedHeight(24)
+        self.status_bar.setSizeGripEnabled(False)
         self.setStatusBar(self.status_bar)
         self.setAcceptDrops(True)
         self._drop_overlay = DropOverlay(self)

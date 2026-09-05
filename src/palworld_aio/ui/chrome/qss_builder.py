@@ -71,6 +71,11 @@ QScrollArea {{
     background: transparent;
     border-radius: {RADIUS['lg']}px;
 }}
+/* Inner scroll containers must not fall back to the light default palette
+   (Breeding results rendered as a white rectangle without this rule). */
+QScrollArea > QWidget > QWidget {{
+    background: transparent;
+}}
 
 /* ---- inputs ---- */
 QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {{
@@ -378,7 +383,9 @@ QStatusBar {{
     background: {p['surface']};
     color: {p['text_secondary']};
     border-top: 1px solid {p['border']};
+    font-size: {TYPE['micro'][0]}px;
 }}
+QStatusBar::item {{ border: none; }}
 QSplitter::handle:horizontal {{
     background: {p['border']};
     width: 2px;

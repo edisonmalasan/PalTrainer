@@ -28,7 +28,7 @@ from palworld_aio import constants
 from palworld_aio.ui.chrome import icons as app_icons
 from palworld_aio.widgets.stats_panel import StatsPanel
 
-_SPIN_FRAMES = '\u25D0\u25D3\u25D1\u25D2'
+_SPIN_STEP_DEG = 90
 
 
 def _txt(key: str, fallback: str) -> str:
@@ -69,8 +69,13 @@ class _StateRow(QPushButton):
         row.addWidget(self._icon_label)
         row.addWidget(self._text_label, 1)
 
-    def set_state(self, icon: str, text: str, state_key: str) -> None:
-        self._icon_label.setText(icon)
+    def set_state(self, icon: str | None, text: str, state_key: str) -> None:
+        if icon:
+            pix = app_icons.get_pixmap(icon, None, 12, dpr=self.devicePixelRatioF())
+            self._icon_label.setText('')
+            self._icon_label.setPixmap(pix)
+        else:
+            self._icon_label.clear()
         self._full_text = text
         self._reelide()
         self._icon_label.setProperty('state', state_key)
@@ -87,8 +92,13 @@ class _StateRow(QPushButton):
     def _reelide(self) -> None:
         _elide_to(self._text_label, self._full_text, self._text_label.width())
 
-    def set_spin(self, frame: str) -> None:
-        self._icon_label.setText(frame)
+    def set_spin(self, angle: int) -> None:
+        pix = app_icons.get_pixmap('spinner', None, 12, dpr=self.devicePixelRatioF())
+        if pix is None:
+            return
+        from PyQt6.QtGui import QTransform
+        rotated = pix.transformed(QTransform().rotate(angle))
+        self._icon_label.setPixmap(rotated)
 
 
 class _SelectionRow(QWidget):
@@ -224,12 +234,12 @@ class InstrumentTray(QWidget):
     expand_requested = pyqtSignal()
 
     _STATE_ICONS = {
-        'no_save': ('', 'no_save'),
-        'loading': (_SPIN_FRAMES[0], 'loading'),
-        'loaded': ('\uf00c', 'loaded'),
-        'dirty': ('\uf071', 'dirty'),
-        'saving': (_SPIN_FRAMES[0], 'saving'),
-        'error': ('\uf00d', 'error'),
+        'no_save': (None, 'no_save'),
+        'loading': ('spinner', 'loading'),
+        'loaded': ('check_circle', 'loaded'),
+        'dirty': ('save_state', 'dirty'),
+        'saving': ('spinner', 'saving'),
+        'error': ('close', 'error'),
     }
     _STATE_TEXT_KEYS = {
         'no_save': ('tray.state.no_save', 'No save'),
@@ -282,7 +292,8 @@ class InstrumentTray(QWidget):
         lay.addWidget(self.stats_header)
         self.metric_row = _MetricRow()
         lay.addWidget(self.metric_row)
-        self.expand_btn = QPushButton(f'{app_icons.get_icon("chevron_up")}  {_txt("sidebar.open", "Expand")}')
+        self.expand_btn = QPushButton(_txt('sidebar.open', 'Expand'))
+        self.expand_btn.setIcon(app_icons.get_qicon('chevron_up', role='text_secondary'))
         self.expand_btn.setObjectName('trayExpandBtn')
         self.expand_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.expand_btn.setFixedHeight(22)
@@ -325,9 +336,9 @@ class InstrumentTray(QWidget):
                 self._apply_state('no_save')
 
     def _tick_spin(self) -> None:
-        self._spin_frame = (self._spin_frame + 1) % 4
+        self._spin_frame = (self._spin_frame + _SPIN_STEP_DEG) % 360
         try:
-            self.state_row.set_spin(_SPIN_FRAMES[self._spin_frame])
+            self.state_row.set_spin(self._spin_frame)
         except RuntimeError:
             self._stop_spin()
 
@@ -371,9 +382,10 @@ class InstrumentTray(QWidget):
 
     def set_expanded(self, expanded: bool) -> None:
         self._expanded = bool(expanded)  # type: ignore[attr-defined]
-        icon = app_icons.get_icon('chevron_up' if expanded else 'chevron_down')
+        icon = app_icons.get_qicon('chevron_up' if expanded else 'chevron_down', role='text_secondary')
         label = _txt('sidebar.close', 'Collapse') if expanded else _txt('sidebar.open', 'Expand')
-        self.expand_btn.setText(f'{icon}  {label}')
+        self.expand_btn.setText(label)
+        self.expand_btn.setIcon(icon)
 
     # ----------------------------------------------------------- labels
     def refresh_labels(self) -> None:
@@ -407,7 +419,8 @@ class TrayDrawer(QFrame):
         title.setObjectName('drawerTitle')
         head.addWidget(title)
         head.addStretch(1)
-        close_btn = QPushButton(app_icons.get_icon('close'))
+        close_btn = QPushButton()
+        close_btn.setIcon(app_icons.get_qicon('close', role='text_secondary'))
         close_btn.setObjectName('drawerCloseBtn')
         close_btn.setFixedSize(26, 26)
         close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))

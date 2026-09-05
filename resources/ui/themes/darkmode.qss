@@ -41,6 +41,11 @@ QScrollArea {
     background: transparent;
     border-radius: 8px;
 }
+/* Inner scroll containers must not fall back to the light default palette
+   (Breeding results rendered as a white rectangle without this rule). */
+QScrollArea > QWidget > QWidget {
+    background: transparent;
+}
 
 /* ---- inputs ---- */
 QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {
@@ -348,7 +353,9 @@ QStatusBar {
     background: #1B1917;
     color: #A69F94;
     border-top: 1px solid rgba(236,231,224,0.1);
+    font-size: 10px;
 }
+QStatusBar::item { border: none; }
 QSplitter::handle:horizontal {
     background: rgba(236,231,224,0.1);
     width: 2px;
@@ -433,7 +440,7 @@ QLabel#dialogKicker {
 QLabel#dialogTitle {
     font-family: 'Hanken Grotesk','Segoe UI';
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
     color: #ECE7E0;
 }
 QMessageBox, QInputDialog {
@@ -505,7 +512,7 @@ QLabel[class="display"] {
     letter-spacing: -0.01em;
 }
 QLabel[class="title"] {
-    font-size: 14px; font-weight: 700; color: #ECE7E0;
+    font-size: 14px; font-weight: 600; color: #ECE7E0;
 }
 QLabel[class="section"] {
     font-size: 12px; font-weight: 600;
@@ -759,7 +766,7 @@ QLabel#drawerTitle {
     color: #ECE7E0;
     font-family: 'Hanken Grotesk','Segoe UI';
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
 }
 QPushButton#drawerCloseBtn {
     background: #1B1917;
@@ -1120,7 +1127,7 @@ QLabel#opsWorldName {
     color: #ECE7E0;
     font-family: 'Hanken Grotesk','Segoe UI';
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
 }
 QLabel#opsWorldName[state="loaded"] { color: #2DD4BF; }
 QLabel#opsStateDot {

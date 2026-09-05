@@ -1,6 +1,5 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QSizePolicy
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
 from palworld_aio import constants
 from palworld_aio.ui.chrome import icons as app_icons
 class EmptyState(QWidget):
@@ -17,11 +16,14 @@ class EmptyState(QWidget):
         layout.setContentsMargins(16, 32, 16, 32)
         layout.setSpacing(8)
         layout.addStretch()
-        if icon_name and app_icons.get_icon(icon_name) != app_icons.UNKNOWN:
-            icon_label = QLabel(app_icons.get_icon(icon_name))
-            icon_label.setFont(QFont(constants.FONT_FAMILY_NERD, constants.ICON_XL))
+        if icon_name and app_icons.has_vector_icon(icon_name):
+            icon_label = QLabel()
+            pix = app_icons.get_pixmap(
+                icon_name, constants.TEXT_DISABLED, constants.ICON_XL)
+            if pix is not None:
+                icon_label.setPixmap(pix)
             icon_label.setAlignment(Qt.AlignCenter)
-            icon_label.setStyleSheet(f'color: {constants.TEXT_DISABLED}; background: transparent;')
+            icon_label.setStyleSheet('background: transparent;')
             layout.addWidget(icon_label)
             layout.addSpacing(4)
         title_label = QLabel(title)

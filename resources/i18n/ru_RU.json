@@ -2121,5 +2121,6 @@
     "sidebar.section.inspect": "Загрузка и обзор",
     "sidebar.section.world": "Данные мира",
     "sidebar.section.editing": "Редактирование",
-    "sidebar.section.reference": "Справка"
+    "sidebar.section.reference": "Справка",
+    "tools.section.world": "Инструменты мира"
 }

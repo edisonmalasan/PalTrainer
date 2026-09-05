@@ -2410,5 +2410,6 @@
     "sidebar.section.inspect": "Carregar e inspecionar",
     "sidebar.section.world": "Dados do mundo",
     "sidebar.section.editing": "Edição",
-    "sidebar.section.reference": "Referência"
+    "sidebar.section.reference": "Referência",
+    "tools.section.world": "Ferramentas do mundo"
 }

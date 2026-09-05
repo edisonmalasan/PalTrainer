@@ -2125,5 +2125,6 @@
     "sidebar.section.inspect": "载入与查看",
     "sidebar.section.world": "世界数据",
     "sidebar.section.editing": "编辑",
-    "sidebar.section.reference": "参考"
+    "sidebar.section.reference": "参考",
+    "tools.section.world": "世界工具"
 }

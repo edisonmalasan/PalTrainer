@@ -109,7 +109,6 @@ class BandItem(QPushButton):
         self._page_id = page_id
         self._label = _nav_label(page_id)
         self._short = _rail_short(page_id)
-        self._icon = app_icons.get_icon(page_id)
         self.setProperty('bandItem', True)
         self.setFixedSize(BAND_W, ITEM_H)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -139,23 +138,24 @@ class BandItem(QPushButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        # icon
-        icon_font = QFont(constants.FONT_FAMILY_NERD, 13)
-        p.setFont(icon_font)
-        p.setPen(self.palette().color(self.foregroundRole()))
-        ifm = QFontMetrics(icon_font)
-        ib = ifm.boundingRect(self._icon)
-        ix = (self.width() - ib.width()) // 2 - ib.x()
-        iy = 13
-        p.drawText(int(ix), int(iy), self._icon)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        # vector icon (SVG factory) centered above the micro label
+        color = app_icons.role_color('text_secondary' if not active else 'accent')
+        pix = app_icons.get_pixmap(self._page_id, color, 16,
+                                   dpr=self.devicePixelRatioF())
+        if pix is not None:
+            ix = (self.width() - pix.width()) // 2
+            iy = 6
+            p.drawPixmap(int(ix), int(iy), pix)
         # micro label: single elided line (never wrapped — wrapping clipped
         # multi-word labels to their shared first word, e.g. "Search" x3)
         label_font = QFont(constants.FONT_FAMILY, 10)
         p.setFont(label_font)
+        p.setPen(self.palette().color(self.foregroundRole()))
         elided = QFontMetrics(label_font).elidedText(
             self._short, Qt.TextElideMode.ElideRight, self.width() - 8)
         flags = int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
-        rect = self.rect().adjusted(4, 20, -4, self.height() - 3)
+        rect = self.rect().adjusted(4, 20, -4, 0)
         p.drawText(rect, flags, elided)
         # active corner notch: amber wedge on the right edge, pointing inward
         if active:
@@ -174,31 +174,16 @@ class BandUtilityBtn(QPushButton):
     """Icon-only utility button (console / guide / warn / about)."""
 
     def __init__(self, glyph: str, tooltip: str, parent=None):
-        super().__init__(glyph, parent)
+        super().__init__(parent)
         self.setProperty('bandUtility', True)
         self.setFixedSize(BAND_W - 16, 26)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setToolTip(tooltip)
         self.setAccessibleName(tooltip)
-
-    def paintEvent(self, event) -> None:
-        sp = QStylePainter(self)
-        opt = QStyleOptionButton()
-        self.initStyleOption(opt)
-        opt.text = ''
-        sp.drawControl(QStyle.ControlElement.CE_PushButton, opt)
-        sp.end()
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
-        p.setFont(self.font())
-        p.setPen(self.palette().color(self.foregroundRole()))
-        fm = QFontMetrics(self.font())
-        br = fm.boundingRect(self.text())
-        x = (self.width() - br.width()) / 2 - br.x()
-        y = (self.height() - br.height()) / 2 - br.y()
-        p.drawText(int(x), int(y), self.text())
-        p.end()
+        # glyph param kept for call-site compatibility; icon comes from the
+        # SVG factory keyed by the same name.
+        self.setIcon(app_icons.get_qicon(glyph, role='text_secondary'))
 
 
 class ZoneRule(QFrame):
@@ -270,7 +255,7 @@ class NexusBand(QWidget):
         mast_row = QHBoxLayout()
         mast_row.setContentsMargins(0, 0, 0, 4)
         mast_row.setSpacing(0)
-        self.masthead_btn = BandUtilityBtn(app_icons.get_icon('tools'), _txt('deletion.title', 'PalTrainer'))
+        self.masthead_btn = BandUtilityBtn('save', _txt('deletion.title', 'PalTrainer'))
         self.masthead_btn.setObjectName('bandMasthead')
         self.masthead_btn.setFixedSize(BAND_W, 30)
         self.masthead_btn.clicked.connect(self.masthead_clicked.emit)
@@ -311,18 +296,18 @@ class NexusBand(QWidget):
         root.addWidget(self._scroll, stretch=1)
 
         # utilities
-        self._console_btn = BandUtilityBtn(app_icons.get_icon('console'), _txt('console.detach', 'Console'))
+        self._console_btn = BandUtilityBtn('console', _txt('console.detach', 'Console'))
         self._console_btn.clicked.connect(self.console_toggled.emit)
         root.addWidget(self._console_btn)
-        self._guide_btn = BandUtilityBtn(app_icons.get_icon('toolbox'), _txt('tab_guide.tooltip', 'Tab Usage Guide'))
+        self._guide_btn = BandUtilityBtn('toolbox', _txt('tab_guide.tooltip', 'Tab Usage Guide'))
         self._guide_btn.clicked.connect(self.guide_clicked.emit)
         root.addWidget(self._guide_btn)
-        self.warn_btn = BandUtilityBtn(app_icons.get_icon('warning'), _txt('warning.title', 'Warnings'))
+        self.warn_btn = BandUtilityBtn('warning', _txt('warning.title', 'Warnings'))
         self.warn_btn.setObjectName('bandWarnBtn')
         self.warn_btn.setVisible(False)
         self.warn_btn.clicked.connect(self._noop_warn)
         root.addWidget(self.warn_btn)
-        self._about_btn = BandUtilityBtn(app_icons.get_icon('info'), _txt('about.title', 'About PalTrainer'))
+        self._about_btn = BandUtilityBtn('info', _txt('about.title', 'About PalTrainer'))
         self._about_btn.clicked.connect(self.about_clicked.emit)
         root.addWidget(self._about_btn)
         self._warn_slot = None

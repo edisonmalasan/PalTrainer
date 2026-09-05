@@ -8,11 +8,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QFontDatabase, QColor, QCursor, QBrush
-try:
-    import nerdfont as nf
-except:
-    class nf:
-        icons = {'nf-fa-chevron_up': '\uf077', 'nf-fa-chevron_down': '\uf078'}
+from palworld_aio.ui.chrome import icons as app_icons
 from i18n import t
 from palworld_aio import constants
 from palsav import json_tools
@@ -112,10 +108,6 @@ class JsonEditorTab(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        head_row = QHBoxLayout()
-        set_content_margins(head_row)
-        head_row.addWidget(self._build_toolbar())
-        layout.addLayout(head_row)
         layout.addWidget(create_page_ribbon(t(f'{_JSON_KEY}.tab') if t else 'JSON Editor', (t('sidebar.section.editing') if t else 'Editing').upper(), self))
 
         search_bar = QHBoxLayout()
@@ -127,18 +119,20 @@ class JsonEditorTab(QWidget):
         self._search_input.textChanged.connect(self._on_search_changed)
         search_bar.addWidget(self._search_input, 1)
 
-        self._search_prev_btn = QPushButton(nf.icons.get('nf-fa-chevron_up', '\uf077'))
+        self._search_prev_btn = QPushButton()
+        self._search_prev_btn.setIcon(
+            app_icons.get_qicon('chevron_up', role='text_secondary'))
         self._search_prev_btn.setObjectName('toolButton')
         self._search_prev_btn.setFixedSize(28, 28)
-        self._search_prev_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 12))
         self._search_prev_btn.setToolTip(t(f'{_JSON_KEY}.search_prev') if t else 'Previous match')
         self._search_prev_btn.clicked.connect(self._search_prev)
         search_bar.addWidget(self._search_prev_btn)
 
-        self._search_next_btn = QPushButton(nf.icons.get('nf-fa-chevron_down', '\uf078'))
+        self._search_next_btn = QPushButton()
+        self._search_next_btn.setIcon(
+            app_icons.get_qicon('chevron_down', role='text_secondary'))
         self._search_next_btn.setObjectName('toolButton')
         self._search_next_btn.setFixedSize(28, 28)
-        self._search_next_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 12))
         self._search_next_btn.setToolTip(t(f'{_JSON_KEY}.search_next') if t else 'Next match')
         self._search_next_btn.clicked.connect(self._search_next)
         search_bar.addWidget(self._search_next_btn)
@@ -191,15 +185,6 @@ class JsonEditorTab(QWidget):
         footer_lay.addWidget(self._status_label)
         layout.addWidget(footer)
         # theme application is global (ThemeManager); per-tab styles removed
-
-    def _build_toolbar(self):
-        # status chip row above the ribbon: read-only badge + save path (mono)
-        row = QWidget()
-        row_lay = QHBoxLayout(row)
-        row_lay.setContentsMargins(0, 0, 0, 0)
-        row_lay.setSpacing(8)
-        row_lay.addStretch(1)
-        return row
 
     def _on_item_expanded(self, item):
         if isinstance(item, LazyJsonItem):

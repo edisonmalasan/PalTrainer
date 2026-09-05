@@ -2245,5 +2245,6 @@
     "inventory.palpedia_selected": "{count} selecionado",
     "inventory.palpedia_save_failed": "Falha ao salvar as alterações da Palpedia",
     "inventory.palpedia_click_register": "Clique para registrar",
-    "inventory.palpedia_click_unregister": "Clique para cancelar o registro"
+    "inventory.palpedia_click_unregister": "Clique para cancelar o registro",
+    "tools.section.world": "Ferramentas do Mundo"
 }

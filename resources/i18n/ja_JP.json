@@ -2123,5 +2123,6 @@
     "sidebar.section.inspect": "読み込みと確認",
     "sidebar.section.world": "ワールドデータ",
     "sidebar.section.editing": "編集",
-    "sidebar.section.reference": "リファレンス"
+    "sidebar.section.reference": "リファレンス",
+    "tools.section.world": "ワールドツール"
 }

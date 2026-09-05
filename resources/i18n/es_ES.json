@@ -2117,5 +2117,6 @@
     "sidebar.section.inspect": "Cargar e inspeccionar",
     "sidebar.section.world": "Datos del mundo",
     "sidebar.section.editing": "Edición",
-    "sidebar.section.reference": "Referencia"
+    "sidebar.section.reference": "Referencia",
+    "tools.section.world": "Herramientas del mundo"
 }

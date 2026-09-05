@@ -7,6 +7,7 @@ from PyQt6.QtGui import QPixmap, QIcon, QFont, QCursor, QDragEnterEvent, QDropEv
 from i18n import t
 from loading_manager import show_critical
 from palworld_aio import constants
+from palworld_aio.ui.chrome import icons as app_icons
 from resource_resolver import resource_path
 from palworld_aio.ui.chrome.styles import ThemeManager
 CONVERTING_TOOL_KEYS = ['tool.convert.saves', 'tool.convert.gamepass.steam', 'tool.convert.steamid', 'tool.restore_map']
@@ -335,11 +336,10 @@ class ToolsTab(QWidget):
         top_row.addStretch(1)
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
-        import nerdfont as nf
-        _nf_font = QFont(constants.FONT_FAMILY_NERD, 11)
         self._load_steam_btn = QPushButton()
         self._load_steam_btn.setObjectName('opsLoadBtn')
-        self._load_steam_btn.setFont(_nf_font)
+        self._load_steam_btn.setIcon(
+            app_icons.get_qicon('steam', role='text_on_accent'))
         self._load_steam_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self._load_steam_btn.setMinimumHeight(36)
         self._load_steam_btn.clicked.connect(self._on_load_save_clicked)
@@ -347,7 +347,8 @@ class ToolsTab(QWidget):
         self._load_xgp_btn = QPushButton()
         self._load_xgp_btn.setObjectName('opsLoadBtn')
         self._load_xgp_btn.setProperty('loadKind', 'secondary')
-        self._load_xgp_btn.setFont(_nf_font)
+        self._load_xgp_btn.setIcon(
+            app_icons.get_qicon('gamepass', role='text_secondary'))
         self._load_xgp_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self._load_xgp_btn.setMinimumHeight(36)
         self._load_xgp_btn.clicked.connect(self._on_load_xgp_clicked)
@@ -629,11 +630,14 @@ class ToolsTab(QWidget):
         self.fade_animation.setEasingCurve(QEasingCurve.OutCubic)
         self.fade_animation.start()
     def _refresh_save_btns(self):
-        import nerdfont as nf
         if hasattr(self, '_load_steam_btn') and self._load_steam_btn:
-            self._load_steam_btn.setText(f"{nf.icons['nf-fa-steam']}  {t('tools.btn_steam')}")
+            self._load_steam_btn.setText(t('tools.btn_steam') or 'Steam')
+            self._load_steam_btn.setIcon(
+                app_icons.get_qicon('steam', role='text_on_accent'))
         if hasattr(self, '_load_xgp_btn') and self._load_xgp_btn:
-            self._load_xgp_btn.setText(f"{nf.icons['nf-fa-xbox']}  {t('tools.btn_gamepass')}")
+            self._load_xgp_btn.setText(t('tools.btn_gamepass') or 'GamePass')
+            self._load_xgp_btn.setIcon(
+                app_icons.get_qicon('gamepass', role='text_secondary'))
     def refresh_labels(self):
         self._refresh_save_btns()
         if hasattr(self, '_load_btn') and self._load_btn:

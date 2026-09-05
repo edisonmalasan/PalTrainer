@@ -2122,5 +2122,6 @@
     "sidebar.section.inspect": "불러오기 및 검사",
     "sidebar.section.world": "월드 데이터",
     "sidebar.section.editing": "편집",
-    "sidebar.section.reference": "참조"
+    "sidebar.section.reference": "참조",
+    "tools.section.world": "월드 도구"
 }

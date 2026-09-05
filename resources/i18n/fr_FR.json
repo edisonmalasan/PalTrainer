@@ -2105,5 +2105,6 @@
     "sidebar.section.inspect": "Charger et inspecter",
     "sidebar.section.world": "Données du monde",
     "sidebar.section.editing": "Édition",
-    "sidebar.section.reference": "Référence"
+    "sidebar.section.reference": "Référence",
+    "tools.section.world": "Outils du monde"
 }

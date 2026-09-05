@@ -18,8 +18,17 @@ from PyQt6.QtGui import QFont, QFontDatabase
 FONT_BODY_STACK = ['Inter 28pt', 'Inter', 'Segoe UI']
 FONT_HEADING_STACK = ['Hanken Grotesk', 'Segoe UI']
 FONT_MONO_STACK = ['Cascadia Mono', 'Consolas']
-FONT_ICON = 'Hack Nerd Font'
+FONT_ICON = 'Hack Nerd Font'  # deprecated: glyph backend only; shell surfaces use the SVG icon factory
 FONT_ICON_STACK = [FONT_ICON]
+
+# Real bundled weights (Regular/Medium/SemiBold files ship in
+# resources/assets/fonts — synthetic bold is banned for primary typography).
+FONT_WEIGHTS = {
+    400: QFont.Weight.Normal,
+    500: QFont.Weight.DemiBold,   # Medium (Qt maps 500 to the nearest heavier face)
+    600: QFont.Weight.DemiBold,   # SemiBold
+    700: QFont.Weight.Bold,
+}
 
 _REGISTERED = False
 
@@ -58,7 +67,9 @@ def _make(stack: list[str], px: int, weight: int) -> QFont:
     font = QFont()
     font.setFamilies(stack)
     font.setPixelSize(px)
-    font.setWeight(QFont.Weight(weight))
+    # Real bundled weights: Medium/SemiBold/Bold TTFs are registered, so Qt
+    # picks the matching face instead of synthesizing bold from Regular.
+    font.setWeight(FONT_WEIGHTS.get(weight, QFont.Weight(weight)))
     return font
 
 

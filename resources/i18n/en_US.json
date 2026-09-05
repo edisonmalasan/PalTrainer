@@ -2410,5 +2410,6 @@
     "inventory.palpedia_selected": "{count} selected",
     "inventory.palpedia_save_failed": "Failed to save Palpedia changes",
     "inventory.palpedia_click_register": "Click to register",
-    "inventory.palpedia_click_unregister": "Click to unregister"
+    "inventory.palpedia_click_unregister": "Click to unregister",
+    "tools.section.world": "World Tools"
 }

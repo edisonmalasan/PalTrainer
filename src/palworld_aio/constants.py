@@ -62,7 +62,9 @@ ICON_MD = 16
 ICON_LG = 20
 ICON_XL = 24
 TREE_ROW_HEIGHT = 28
-FONT_FAMILY = 'Segoe UI'
+# Body UI font: Inter (bundled) with Segoe UI kept as fallback. Legacy
+# `QFont(FONT_FAMILY, ...)` call sites resolve to the bundled body family.
+FONT_FAMILY = 'Inter 28pt'
 FONT_FAMILY_NERD = 'Hack Nerd Font'
 FONT_FAMILY_MONO = 'Consolas'
 FONT_SIZE = 10

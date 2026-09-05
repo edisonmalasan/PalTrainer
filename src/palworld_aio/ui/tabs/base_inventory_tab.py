@@ -18,6 +18,7 @@ import re
 from i18n import t
 from loading_manager import run_with_loading, show_information, show_warning, show_question
 from palworld_aio import constants
+from palworld_aio.ui.chrome import icons as app_icons
 from palworld_aio.inventory.base_inventory_manager import BaseInventoryManager, get_container_image_path, find_item_locations_efficient
 from palworld_aio.widgets import StatsPanel
 from palworld_aio.ui.tabs.inventory_tab import InventoryGridWidget, ItemPickerDialog, InventoryLoadoutDialog, _group_inventory_items, _consolidate_container_slots, SINGLETON_TYPE_A
@@ -1798,7 +1799,9 @@ class BasePalsContentWidget(QFrame):
         self.bulk_delete_btn.setCursor(Qt.PointingHandCursor)
         self.bulk_delete_btn.clicked.connect(self._open_bulk_delete)
         page_row.addWidget(self.bulk_delete_btn)
-        self.prev_page_btn = QPushButton('â—€')
+        self.prev_page_btn = QPushButton()
+        self.prev_page_btn.setIcon(
+            app_icons.get_qicon('chevron_left', role='accent'))
         self.prev_page_btn.setFixedSize(28, 24)
         self.prev_page_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.08); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(245,158,11,0.18); color: #FFFFFF; } QPushButton:disabled { background: rgba(100,100,100,0.1); color: #666; border-color: rgba(255,255,255,0.05); }')
         self.prev_page_btn.clicked.connect(self._prev_page)
@@ -1806,7 +1809,9 @@ class BasePalsContentWidget(QFrame):
         self.page_label = QLabel('Page 1/1')
         self.page_label.setStyleSheet('font-size: 11px; font-weight: 600; color: #F59E0B; padding: 0 4px;')
         page_row.addWidget(self.page_label)
-        self.next_page_btn = QPushButton('â–¶')
+        self.next_page_btn = QPushButton()
+        self.next_page_btn.setIcon(
+            app_icons.get_qicon('chevron_right', role='accent'))
         self.next_page_btn.setFixedSize(28, 24)
         self.next_page_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.08); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(245,158,11,0.18); color: #FFFFFF; } QPushButton:disabled { background: rgba(100,100,100,0.1); color: #666; border-color: rgba(255,255,255,0.05); }')
         self.next_page_btn.clicked.connect(self._next_page)
