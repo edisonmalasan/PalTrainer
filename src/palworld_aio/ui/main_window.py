@@ -314,8 +314,21 @@ class MainWindow(QMainWindow):
     def _setup_ui_v2(self, main_layout):
         from .chrome.nexus_band import NexusBand, BAND_W
         from .chrome.instrument_tray import TrayDrawer
+        from .chrome.app_bar import AppBar
         from .chrome.window_controls import WindowControls
         self._shell_v2 = True
+        # shell v3 top chrome (top-nav-shell 2.1): app bar above the canvas;
+        # the rail stays temporarily until the nav strip lands (task 3.x).
+        self.app_bar = AppBar()
+        self.app_bar.save_clicked.connect(self._save_changes)
+        self.app_bar.console_toggled.connect(self._detach_status)
+        self.app_bar.about_clicked.connect(self._show_about)
+        self.app_bar.guide_clicked.connect(self._show_tab_guide)
+        self.app_bar.masthead_clicked.connect(self._show_menu_popup_v2)
+        main_layout.addWidget(self.app_bar)
+        self.app_bar.connect_warn()
+        self.app_bar.set_warning_slot(self._show_warnings)
+        self.app_bar.show_warning(True)
         body_layout = QHBoxLayout()
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(0)
@@ -339,24 +352,15 @@ class MainWindow(QMainWindow):
         self.nexus_band.warn_btn.clicked.connect(self._show_warnings)
         self.nexus_band.show_warning(True)
         self.nexus_band.set_warning_slot(self._show_warnings)
-        self._window_controls = WindowControls(self)
+        self._window_controls = self.app_bar.window_controls
         self._window_controls.minimize_clicked.connect(self.showMinimized)
         self._window_controls.maximize_clicked.connect(self._toggle_maximize)
         self._window_controls.close_clicked.connect(self.close)
-        self._window_controls.resize(self._window_controls.sizeHint())
-        self._reposition_window_controls()
         body_layout.addWidget(self.stacked_widget, stretch=1)
         body_layout.addWidget(self.nexus_band)
         main_layout.addLayout(body_layout, stretch=1)
-        # loading_manager 'header' mode drives the tray spinner directly
-        constants.header_loading_widget = self.nexus_band.tray
-
-    def _reposition_window_controls(self):
-        if not getattr(self, '_window_controls', None):
-            return
-        self._window_controls.adjustSize()
-        w = self._window_controls.width()
-        self._window_controls.move(self.width() - w - 6, 4)
+        # loading_manager 'header' mode drives the app-bar save chip
+        constants.header_loading_widget = self.app_bar.save_chip
 
     def _show_menu_popup_v2(self):
         from palworld_aio.widgets import MenuPopup
@@ -364,8 +368,16 @@ class MainWindow(QMainWindow):
             self._menu_popup_v2 = MenuPopup(self)
             if getattr(self, '_menu_actions_dict', None):
                 self._menu_popup_v2.set_menu_actions(self._menu_actions_dict)
-        gp = self.nexus_band.mapToGlobal(self.nexus_band.masthead_btn.geometry().topLeft())
-        self._menu_popup_v2.show_at(QPoint(gp.x() - self._menu_popup_v2.width() + self.nexus_band.width(), gp.y() + self.nexus_band.masthead_btn.height() + 4))
+        # anchor under the app-bar brand mark (shell v3); fall back to the
+        # legacy rail masthead until the rail is retired (task 3.x).
+        anchor = getattr(self, 'app_bar', None)
+        if anchor is not None:
+            gp = anchor.mapToGlobal(anchor.brand.geometry().topLeft())
+            self._menu_popup_v2.show_at(QPoint(gp.x(), gp.y() + anchor.brand.height() + 4))
+            return
+        band = self.nexus_band
+        gp = band.mapToGlobal(band.masthead_btn.geometry().topLeft())
+        self._menu_popup_v2.show_at(QPoint(gp.x() - self._menu_popup_v2.width() + band.width(), gp.y() + band.masthead_btn.height() + 4))
 
     def _on_tray_expand_toggled(self, expanded):
         self._set_tray_drawer_visible(expanded)
@@ -650,6 +662,8 @@ class MainWindow(QMainWindow):
     def _set_dirty(self, dirty):
         self.nexus_band.set_dirty(dirty)
         self.nexus_band.tray.set_dirty(dirty)
+        if getattr(self, 'app_bar', None) is not None:
+            self.app_bar.save_chip.set_dirty(dirty)
 
     def _set_menu_actions(self, actions_dict):
         self._menu_actions_dict = actions_dict
@@ -675,12 +689,14 @@ class MainWindow(QMainWindow):
         try:
             from palworld_aio.shell_state import ShellState
             self.nexus_band.tray.set_shell_state(ShellState.LOADING)
+            self.app_bar.save_chip.set_shell_state(ShellState.LOADING)
         except (RuntimeError, AttributeError, ImportError):
             pass
     def _on_shell_saving(self):
         try:
             from palworld_aio.shell_state import ShellState
             self.nexus_band.tray.set_shell_state(ShellState.SAVING)
+            self.app_bar.save_chip.set_shell_state(ShellState.SAVING)
         except (RuntimeError, AttributeError, ImportError):
             pass
     def _create_message_box(self, icon=QMessageBox.Information):
@@ -789,7 +805,9 @@ class MainWindow(QMainWindow):
         self.shell_state.finish_load(success)
         try:
             from palworld_aio.shell_state import ShellState
-            self.nexus_band.tray.set_shell_state(ShellState.LOADED if success else ShellState.ERROR)
+            state = ShellState.LOADED if success else ShellState.ERROR
+            self.nexus_band.tray.set_shell_state(state)
+            self.app_bar.save_chip.set_shell_state(state)
         except (RuntimeError, AttributeError, ImportError):
             pass
         if success:
@@ -804,6 +822,7 @@ class MainWindow(QMainWindow):
             constants.dirty = False
             self._set_dirty(False)
             self.nexus_band.tray.clear_selection()
+            self.app_bar.context.clear_selection()
             self._refresh_stats_all_before()
             self.status_bar.showMessage(t('status.loaded') if t else 'Save loaded successfully', 5000)
         else:
@@ -823,6 +842,7 @@ class MainWindow(QMainWindow):
         try:
             from palworld_aio.shell_state import ShellState
             self.nexus_band.tray.set_shell_state(ShellState.LOADED)
+            self.app_bar.save_chip.set_shell_state(ShellState.LOADED)
         except (RuntimeError, AttributeError, ImportError):
             pass
         self.status_bar.showMessage(f"{(t('status.saved') if t else 'Save completed')}({duration:.2f}s)", 5000)
@@ -941,9 +961,16 @@ class MainWindow(QMainWindow):
         else:
             super().mousePressEvent(event)
     def _hit_window_drag_zone(self, event) -> bool:
-        """Frameless drag zone: top strip of the canvas (ribbon band), but
-        never over interactive children (buttons/inputs)."""
+        """Frameless drag zone: the app bar (shell v3). Empty app-bar space
+        drags the window; interactive children never do."""
         pos = event.position().toPoint()
+        bar = getattr(self, 'app_bar', None)
+        if bar is not None:
+            local = bar.mapFrom(self, pos)
+            if 0 <= local.y() < bar.height() and 0 <= local.x() < bar.width():
+                return bar.hit_drag_zone(local)
+            return False
+        # legacy fallback: top strip of the canvas
         if pos.y() > 52:
             return False
         child = self.childAt(pos)
@@ -1282,9 +1309,12 @@ class MainWindow(QMainWindow):
         if data:
             self.nexus_band.tray.set_player(data[0])
             self.nexus_band.tray.set_guild(data[5])
+            self.app_bar.context.set_player(data[0])
+            self.app_bar.context.set_guild(data[5])
     def _on_guild_selected(self, data):
         if data:
             self.nexus_band.tray.set_guild(data[0])
+            self.app_bar.context.set_guild(data[0])
             self.guild_members_panel.clear()
             members = get_guild_members(data[1])
             for m in members:
@@ -1297,10 +1327,13 @@ class MainWindow(QMainWindow):
         if data:
             name = data[0].replace('[L]', '')
             self.nexus_band.tray.set_player(name)
+            self.app_bar.context.set_player(name)
     def _on_base_selected(self, data):
         if data:
             self.nexus_band.tray.set_base(data[0])
             self.nexus_band.tray.set_guild(data[2])
+            self.app_bar.context.set_base(data[0])
+            self.app_bar.context.set_guild(data[2])
     def closeEvent(self, event: QCloseEvent):
         if constants.dirty and constants.current_save_path:
             self._set_dirty(False)
@@ -1339,7 +1372,6 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         if hasattr(self, '_drop_overlay'):
             self._drop_overlay.setGeometry(self.rect())
-        self._reposition_window_controls()
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             urls = event.mimeData().urls()

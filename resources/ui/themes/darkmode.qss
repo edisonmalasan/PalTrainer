@@ -356,6 +356,82 @@ QStatusBar {
     font-size: 10px;
 }
 QStatusBar::item { border: none; }
+
+/* ---- shell v3 app bar (top-nav-shell 2.1) ---- */
+QFrame#appBar {
+    background: #1B1917;
+    border-bottom: 1px solid rgba(236,231,224,0.1);
+}
+QPushButton#brandMark {
+    background: transparent;
+    border: none;
+    border-radius: 5px;
+    padding: 2px 4px;
+}
+QPushButton#brandMark:hover { background: rgba(245,158,11,0.07); }
+QPushButton#brandMark[pulse="true"] { background: rgba(245,158,11,0.1); }
+QLabel#brandWordmark {
+    color: #ECE7E0;
+    font-family: 'Hanken Grotesk','Segoe UI';
+    font-size: 14px;
+    font-weight: 600;
+    background: transparent;
+}
+QPushButton#saveStateChip {
+    background: #211E1B;
+    color: #A69F94;
+    border: 1px solid rgba(236,231,224,0.1);
+    border-radius: 5px;
+    padding: 3px 6px;
+}
+QPushButton#saveStateChip:hover { border-color: rgba(245,158,11,0.3); color: #ECE7E0; }
+QPushButton#saveStateChip[state="loaded"], QPushButton#saveStateChip[state="dirty"] { color: #ECE7E0; }
+QPushButton#saveStateChip[state="dirty"] { border-color: rgba(232,180,76,0.35); }
+QPushButton#saveStateChip[state="error"] { border-color: rgba(248,113,113,0.35); }
+QPushButton#saveStateChip[pulse="true"] { border-color: #F59E0B; color: #F59E0B; }
+QLabel#saveChipText {
+    color: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    background: transparent;
+}
+QLabel#saveChipDirtyDot {
+    background: #E8B44C;
+    border-radius: 3px;
+}
+QPushButton#contextIndicator {
+    background: transparent;
+    color: #A69F94;
+    border: 1px solid rgba(236,231,224,0.1);
+    border-radius: 5px;
+    padding: 1px 6px;
+}
+QPushButton#contextIndicator:hover { background: rgba(245,158,11,0.07); color: #ECE7E0; }
+QLabel#contextRow {
+    color: #A69F94;
+    font-size: 10px;
+    background: transparent;
+}
+QPushButton#appBarUtility {
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    padding: 3px;
+}
+QPushButton#appBarUtility:hover { background: rgba(245,158,11,0.07); }
+QPushButton#appBarUtility:checked { background: rgba(245,158,11,0.12); }
+QPushButton#appBarWarnBtn {
+    background: rgba(232,180,76,0.12);
+    border: 1px solid rgba(232,180,76,0.35);
+}
+QPushButton#windowControlBtn {
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    padding: 2px;
+}
+QPushButton#windowControlBtn:hover { background: rgba(245,158,11,0.07); }
+QPushButton#windowControlBtn[danger="true"]:hover { background: rgba(248,113,113,0.12); }
 QSplitter::handle:horizontal {
     background: rgba(236,231,224,0.1);
     width: 2px;

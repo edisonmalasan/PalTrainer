@@ -12,11 +12,11 @@
 
 ## 2. Phase 1 — App bar + window controls + branding (reclaims the 170px gutter)
 
-- [ ] 2.1 Create `chrome/app_bar.py`: 44-48px bar with brand mark (circular logo crop + "PalTrainer" wordmark in Hanken 600), save-state chip (ShellState icon+label, spinner, click=save, dirty dot, update pulse), context indicator (PLAYER/GUILD/BASE elided values, placeholder state, click opens StatsPanel popover), utility buttons (console, guide, warnings with badge, about), and the re-hosted `WindowControls`; verify all existing signals (`console_toggled`, `guide_clicked`, `save_clicked`, `masthead_clicked` equivalents, warn slot) connect in `MainWindow` without contract changes
-- [ ] 2.2 Move the frameless drag zone from the 52px canvas strip to the app bar (empty-area drag only; interactive children exempt) and keep Esc/drop-overlay behavior intact; verify drag on empty app bar moves the window and clicks on children never drag
-- [ ] 2.3 Re-point `constants.header_loading_widget` and `shell_state` consumers to the save chip; verify no-save/loading/loaded/dirty/saving/error states render correctly during a real save load and save
-- [ ] 2.4 Remove `CONTROLS_RESERVE_WIDTH` usage from `create_page_ribbon`, `set_content_margins`, and `search_panel.py` so page rows span full width; update QSS builder rules for the new surfaces and regenerate `darkmode.qss` via `scripts/scrs/build_theme.py`; verify ribbon/toolbar/footer alignment at 1200x750 and maximized via screenshots
-- [ ] 2.5 Phase gate: full `uv run pytest -c tests/pytest.ini`, `uv run pyright src`, smoke script pass, and before/after screenshots of the app bar across min/max window sizes
+- [x] 2.1 Create `chrome/app_bar.py`: 44-48px bar with brand mark (circular logo crop + "PalTrainer" wordmark in Hanken 600), save-state chip (ShellState icon+label, spinner, click=save, dirty dot, update pulse), context indicator (PLAYER/GUILD/BASE elided values, placeholder state, click opens StatsPanel popover), utility buttons (console, guide, warnings with badge, about), and the re-hosted `WindowControls`; verify all existing signals (`console_toggled`, `guide_clicked`, `save_clicked`, `masthead_clicked` equivalents, warn slot) connect in `MainWindow` without contract changes
+- [x] 2.2 Move the frameless drag zone from the 52px canvas strip to the app bar (empty-area drag only; interactive children exempt) and keep Esc/drop-overlay behavior intact; verify drag on empty app bar moves the window and clicks on children never drag
+- [x] 2.3 Re-point `constants.header_loading_widget` and `shell_state` consumers to the save chip; verify no-save/loading/loaded/dirty/saving/error states render correctly during a real save load and save
+- [x] 2.4 Remove `CONTROLS_RESERVE_WIDTH` usage from `create_page_ribbon`, `set_content_margins`, and `search_panel.py` so page rows span full width; update QSS builder rules for the new surfaces and regenerate `darkmode.qss` via `scripts/scrs/build_theme.py`; verify ribbon/toolbar/footer alignment at 1200x750 and maximized via screenshots
+- [x] 2.5 Phase gate: full `uv run pytest -c tests/pytest.ini`, `uv run pyright src`, smoke script pass, and before/after screenshots of the app bar across min/max window sizes
 
 ## 3. Phase 2 — Nav strip (replaces the right rail)
 

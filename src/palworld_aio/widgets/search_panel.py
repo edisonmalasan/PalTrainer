@@ -3,7 +3,6 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
 from i18n import t
 from palworld_aio import constants
-from palworld_aio.ui.chrome.window_controls import CONTROLS_RESERVE_WIDTH
 _SORT_ROLE = Qt.UserRole + 1
 class _SortableTreeWidgetItem(QTreeWidgetItem):
     def __lt__(self, other):
@@ -37,10 +36,10 @@ class SearchPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         # filter row: title chip + inline search + result count (ribbon grammar).
-        # Right gutter keeps the shared WindowControls reserve so the filter
-        # row aligns with the ribbon edge above (ui-modernization Phase 2).
+        # Window controls live in the app bar (shell v3), so rows span the
+        # full canvas width — no right reserve needed.
         search_layout = QHBoxLayout()
-        search_layout.setContentsMargins(12, 8, CONTROLS_RESERVE_WIDTH, 8)
+        search_layout.setContentsMargins(12, 8, 12, 8)
         search_layout.setSpacing(8)
         self.search_label = QLabel(t(self.label_key) if t else self.label_key)
         self.search_label.setObjectName('missionZone')

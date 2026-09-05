@@ -386,6 +386,82 @@ QStatusBar {{
     font-size: {TYPE['micro'][0]}px;
 }}
 QStatusBar::item {{ border: none; }}
+
+/* ---- shell v3 app bar (top-nav-shell 2.1) ---- */
+QFrame#appBar {{
+    background: {p['surface']};
+    border-bottom: 1px solid {p['border']};
+}}
+QPushButton#brandMark {{
+    background: transparent;
+    border: none;
+    border-radius: {RADIUS['md']}px;
+    padding: 2px 4px;
+}}
+QPushButton#brandMark:hover {{ background: {p['surface_hover']}; }}
+QPushButton#brandMark[pulse="true"] {{ background: {p['accent_bg']}; }}
+QLabel#brandWordmark {{
+    color: {p['text']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['title'][0]}px;
+    font-weight: 600;
+    background: transparent;
+}}
+QPushButton#saveStateChip {{
+    background: {p['surface_raised']};
+    color: {p['text_secondary']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+    padding: 3px 6px;
+}}
+QPushButton#saveStateChip:hover {{ border-color: {p['accent_border']}; color: {p['text']}; }}
+QPushButton#saveStateChip[state="loaded"], QPushButton#saveStateChip[state="dirty"] {{ color: {p['text']}; }}
+QPushButton#saveStateChip[state="dirty"] {{ border-color: {p['warning_border']}; }}
+QPushButton#saveStateChip[state="error"] {{ border-color: {p['danger_border']}; }}
+QPushButton#saveStateChip[pulse="true"] {{ border-color: {p['accent']}; color: {p['accent']}; }}
+QLabel#saveChipText {{
+    color: inherit;
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 600;
+    background: transparent;
+}}
+QLabel#saveChipDirtyDot {{
+    background: {p['warning']};
+    border-radius: 3px;
+}}
+QPushButton#contextIndicator {{
+    background: transparent;
+    color: {p['text_secondary']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+    padding: 1px 6px;
+}}
+QPushButton#contextIndicator:hover {{ background: {p['surface_hover']}; color: {p['text']}; }}
+QLabel#contextRow {{
+    color: {p['text_secondary']};
+    font-size: {TYPE['micro'][0]}px;
+    background: transparent;
+}}
+QPushButton#appBarUtility {{
+    background: transparent;
+    border: none;
+    border-radius: {RADIUS['sm']}px;
+    padding: 3px;
+}}
+QPushButton#appBarUtility:hover {{ background: {p['surface_hover']}; }}
+QPushButton#appBarUtility:checked {{ background: {p['surface_active']}; }}
+QPushButton#appBarWarnBtn {{
+    background: {p['warning_bg']};
+    border: 1px solid {p['warning_border']};
+}}
+QPushButton#windowControlBtn {{
+    background: transparent;
+    border: none;
+    border-radius: {RADIUS['sm']}px;
+    padding: 2px;
+}}
+QPushButton#windowControlBtn:hover {{ background: {p['surface_hover']}; }}
+QPushButton#windowControlBtn[danger="true"]:hover {{ background: {p['danger_bg']}; }}
 QSplitter::handle:horizontal {{
     background: {p['border']};
     width: 2px;
