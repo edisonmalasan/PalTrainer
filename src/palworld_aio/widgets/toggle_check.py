@@ -27,6 +27,7 @@ class ToggleCheckBtn(QWidget):
         layout.addWidget(self._icon_btn)
         self._label = QLabel(label)
         self._label.setBackgroundRole(self._label.backgroundRole())
+        layout.addWidget(self._label, 1)
         self._update_style()
 
     def _toggle(self, from_btn=False):
