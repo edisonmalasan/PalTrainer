@@ -1,15 +1,15 @@
 import os
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QVBoxLayout, QLabel,
     QFrame, QSplitter, QAbstractItemView, QTreeWidget, QTreeWidgetItem,
-    QSizePolicy, QMenu,
+    QMenu,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from i18n import t
 from palworld_aio import constants
 from palworld_aio.managers.guild_manager import move_player_to_guild, set_member_role
-from palworld_aio.ui.chrome.styles import TREE_WIDGET_QSS
+from palworld_aio.ui.chrome.components import BaseDialog, make_button
 from palworld_aio.widgets.search_panel import SearchPanel
 
 
@@ -28,30 +28,32 @@ class _SortableItem(QTreeWidgetItem):
         return self.text(col).lower() < other.text(col).lower()
 
 
-class GuildAssignDialog(QDialog):
+class GuildAssignDialog(BaseDialog):
+    """Guild assignment on the shared dialog scaffold (022 sheet grammar).
+
+    Reference migration for ui-modernization Phase 4: header + content +
+    footer come from BaseDialog; only the splitter workspace, members pane,
+    and footer slots are dialog-specific. All data/manager logic unchanged.
+    """
+
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(t('guild.assign.title') if t else 'Guild Assignment')
-        self.setMinimumSize(920, 560)
+        title = t('guild.assign.title') if t else 'Guild Assignment'
+        super().__init__(title, parent, min_size=(920, 560))
+        self.setWindowTitle(title)
         self.resize(1040, 640)
-        self.setModal(True)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
         self._setup_ui()
         self._load_data()
 
     def _setup_ui(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(8)
-
         desc = QLabel(
             t('guild.assign.desc') if t else
             'Select players on the left, choose a target guild on the right, then click Assign.'
         )
         desc.setProperty('role', 'secondary')
         desc.setWordWrap(True)
-        root.addWidget(desc)
+        self.content_layout.addWidget(desc)
 
         hsplit = QSplitter(Qt.Horizontal)
         hsplit.setHandleWidth(8)
@@ -89,12 +91,10 @@ class GuildAssignDialog(QDialog):
         hsplit.addWidget(right)
 
         hsplit.setSizes([520, 520])
-        root.addWidget(hsplit, stretch=1)
-        root.addLayout(self._build_bottom_bar())
+        self.content_layout.addWidget(hsplit, stretch=1)
+        self._build_bottom_bar()
 
     def _build_members_pane(self) -> QFrame:
-        from palworld_aio.ui.chrome import tokens as _tokens
-        pal = _tokens.resolve()
         pane = QFrame()
         pane.setObjectName('guildMembersPane')
         lv = QVBoxLayout(pane)
@@ -121,7 +121,6 @@ class GuildAssignDialog(QDialog):
         self.members_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.members_tree.customContextMenuRequested.connect(self._show_member_context_menu)
         self.members_tree.setSortingEnabled(True)
-        self.members_tree.setStyleSheet(TREE_WIDGET_QSS)
         lv.addWidget(self.members_tree)
 
         self.members_lbl = QLabel(
@@ -131,32 +130,25 @@ class GuildAssignDialog(QDialog):
         lv.addWidget(self.members_lbl)
         return pane
 
-    def _build_bottom_bar(self) -> QHBoxLayout:
-        bar = QHBoxLayout()
-        bar.setSpacing(10)
-
+    def _build_bottom_bar(self) -> None:
+        """Status readout + Assign live in the shared BaseDialog footer."""
         self.status_lbl = QLabel(
             t('guild.assign.status_none') if t else 'Select players and a target guild.'
         )
         self.status_lbl.setProperty('role', 'secondary')
         self.status_lbl.setWordWrap(True)
-        bar.addWidget(self.status_lbl, stretch=1)
+        # footer = [danger_slot, stretch, cancel, confirms]: status sits
+        # left of the stretch so actions stay right-aligned.
+        self.footer.insertWidget(1, self.status_lbl, stretch=1)
 
-        self.assign_btn = QPushButton(t('guild.assign.btn') if t else 'Assign to Guild')
-        self.assign_btn.setProperty('class', 'primary')
+        self.assign_btn = make_button(t('guild.assign.btn') if t else 'Assign to Guild', 'primary')
         self.assign_btn.setMinimumHeight(36)
         self.assign_btn.setMinimumWidth(160)
         self.assign_btn.setEnabled(False)
-        self.assign_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.assign_btn.clicked.connect(self._assign)
-        bar.addWidget(self.assign_btn)
+        self.footer.addWidget(self.assign_btn)
 
-        close_btn = QPushButton(t('button.close') if t else 'Close')
-        close_btn.setMinimumHeight(36)
-        close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.clicked.connect(self.accept)
-        bar.addWidget(close_btn)
-        return bar
+        self.cancel_btn.setText(t('button.close') if t else 'Close')
 
     def _load_data(self):
         self._load_players()
