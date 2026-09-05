@@ -2126,5 +2126,10 @@
     "sidebar.section.world": "世界数据",
     "sidebar.section.editing": "编辑",
     "sidebar.section.reference": "参考",
-    "tools.section.world": "世界工具"
+    "tools.section.world": "世界工具",
+    "nav.zone.start": "开始",
+    "nav.zone.world": "世界",
+    "nav.zone.edit": "编辑",
+    "nav.zone.reference": "参考",
+    "nav.overflow": "更多页面"
 }

@@ -2106,5 +2106,10 @@
     "sidebar.section.world": "Données du monde",
     "sidebar.section.editing": "Édition",
     "sidebar.section.reference": "Référence",
-    "tools.section.world": "Outils du monde"
+    "tools.section.world": "Outils du monde",
+    "nav.zone.start": "Démarrer",
+    "nav.zone.world": "Monde",
+    "nav.zone.edit": "Éditer",
+    "nav.zone.reference": "Référence",
+    "nav.overflow": "Plus de pages"
 }

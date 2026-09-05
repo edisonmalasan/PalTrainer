@@ -404,8 +404,11 @@ class ToolsTab(QWidget):
     def _make_nav_release(self, nav_key):
         def _handler(event):
             if event.button() == Qt.LeftButton and hasattr(self, 'parent_window') and self.parent_window:
-                self.parent_window.nexus_band.set_active(nav_key)
-                self.parent_window._on_nav_changed(nav_key)
+                if hasattr(self.parent_window, '_activate_nav'):
+                    self.parent_window._activate_nav(nav_key)
+                else:
+                    self.parent_window.nexus_band.set_active(nav_key)
+                    self.parent_window._on_nav_changed(nav_key)
         return _handler
 
     def _create_campaign_strip(self):

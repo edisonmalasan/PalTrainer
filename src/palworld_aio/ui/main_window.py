@@ -247,6 +247,8 @@ class MainWindow(QMainWindow):
         self._refresh_exclusions()
         self._load_theme()
         self.nexus_band.set_active('tools')
+        if getattr(self, 'nav_strip', None) is not None:
+            self.nav_strip.set_active('tools')
         self._setup_menus()
         self._setup_connections()
         QTimer.singleShot(0, self._check_update)
@@ -315,10 +317,10 @@ class MainWindow(QMainWindow):
         from .chrome.nexus_band import NexusBand, BAND_W
         from .chrome.instrument_tray import TrayDrawer
         from .chrome.app_bar import AppBar
-        from .chrome.window_controls import WindowControls
+        from .chrome.nav_strip import NavStrip
         self._shell_v2 = True
-        # shell v3 top chrome (top-nav-shell 2.1): app bar above the canvas;
-        # the rail stays temporarily until the nav strip lands (task 3.x).
+        # shell v3 top chrome (top-nav-shell 3.1): app bar + nav strip above
+        # the canvas; the rail stays temporarily behind facades until task 5.1
         self.app_bar = AppBar()
         self.app_bar.save_clicked.connect(self._save_changes)
         self.app_bar.console_toggled.connect(self._detach_status)
@@ -329,6 +331,9 @@ class MainWindow(QMainWindow):
         self.app_bar.connect_warn()
         self.app_bar.set_warning_slot(self._show_warnings)
         self.app_bar.show_warning(True)
+        self.nav_strip = NavStrip()
+        self.nav_strip.nav_changed.connect(self._on_nav_changed)
+        main_layout.addWidget(self.nav_strip)
         body_layout = QHBoxLayout()
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(0)
@@ -356,8 +361,12 @@ class MainWindow(QMainWindow):
         self._window_controls.minimize_clicked.connect(self.showMinimized)
         self._window_controls.maximize_clicked.connect(self._toggle_maximize)
         self._window_controls.close_clicked.connect(self.close)
+        # Rail retired from the layout (top-nav-shell 3.4): the NexusBand
+        # instance stays constructed for facade compatibility — legacy call
+        # sites (sidebar/results/header facades, tests, tools deep links)
+        # keep working against it while the nav strip drives navigation.
+        self.nexus_band.setParent(None)
         body_layout.addWidget(self.stacked_widget, stretch=1)
-        body_layout.addWidget(self.nexus_band)
         main_layout.addLayout(body_layout, stretch=1)
         # loading_manager 'header' mode drives the app-bar save chip
         constants.header_loading_widget = self.app_bar.save_chip
@@ -636,7 +645,8 @@ class MainWindow(QMainWindow):
         self._setup_global_shortcuts()
 
     def _setup_global_shortcuts(self):
-        """Plan 024: Ctrl+1..9/0 jump to pages; Esc closes the tray drawer."""
+        """Plan 024 + top-nav-shell 3.3: Ctrl+1..9/0 for the original ten
+        pages, Ctrl+- / Ctrl+= for breeding/docs; Esc closes the tray drawer."""
         from PyQt6.QtGui import QShortcut, QKeySequence
         page_order = ['tools', 'base_inventory', 'player_inventory', 'pal_editor',
                       'players', 'guilds', 'bases', 'map', 'exclusions', 'json_editor']
@@ -644,14 +654,27 @@ class MainWindow(QMainWindow):
             key = idx + 1 if idx < 9 else 0
             shortcut = QShortcut(QKeySequence(f'Ctrl+{key}'), self)
             shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
-            shortcut.activated.connect(lambda pid=page_id: (
-                self.nexus_band.set_active(pid), self._on_nav_changed(pid)))
+            shortcut.activated.connect(lambda pid=page_id: self._activate_nav(pid))
             self._page_shortcuts = getattr(self, '_page_shortcuts', [])
+            self._page_shortcuts.append(shortcut)
+        extra_pages = [('Ctrl+-', 'breeding'), ('Ctrl+=', 'docs')]
+        for seq, page_id in extra_pages:
+            shortcut = QShortcut(QKeySequence(seq), self)
+            shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            shortcut.activated.connect(lambda pid=page_id: self._activate_nav(pid))
             self._page_shortcuts.append(shortcut)
         esc = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
         esc.setContext(Qt.ShortcutContext.ApplicationShortcut)
         esc.activated.connect(self._on_global_escape)
         self._esc_shortcut = esc
+
+    def _activate_nav(self, page_id: str) -> None:
+        """Single keyboard/programmatic nav entry: syncs the strip and rail."""
+        if getattr(self, 'nav_strip', None) is not None:
+            self.nav_strip.set_active(page_id)
+        if getattr(self, 'nexus_band', None) is not None:
+            self.nexus_band.set_active(page_id)
+        self._on_nav_changed(page_id)
 
     def _on_global_escape(self):
         active = QApplication.activeModalWidget()
@@ -732,6 +755,12 @@ class MainWindow(QMainWindow):
             if constants.loaded_level_json:
                 self._refresh_tab(page_index)
         self.stacked_widget.setCurrentIndex(page_index)
+        # keep both nav surfaces in step (nav strip drives; rail stays synced
+        # until it is retired behind facades in task 5.1)
+        if getattr(self, 'nav_strip', None) is not None and self.nav_strip.active_id() != button_id:
+            self.nav_strip.set_active(button_id)
+        if getattr(self, 'nexus_band', None) is not None and self.nexus_band._active_id != button_id:
+            self.nexus_band.set_active(button_id)
     def _load_user_settings(self):
         from boot_paths import CONFIG_DIR, USER_CONFIG_DIR
         user_cfg_path = str(USER_CONFIG_DIR / 'user.cfg')

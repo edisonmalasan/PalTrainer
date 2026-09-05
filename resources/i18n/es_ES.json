@@ -2118,5 +2118,10 @@
     "sidebar.section.world": "Datos del mundo",
     "sidebar.section.editing": "Edición",
     "sidebar.section.reference": "Referencia",
-    "tools.section.world": "Herramientas del mundo"
+    "tools.section.world": "Herramientas del mundo",
+    "nav.zone.start": "Inicio",
+    "nav.zone.world": "Mundo",
+    "nav.zone.edit": "Editar",
+    "nav.zone.reference": "Referencia",
+    "nav.overflow": "Más páginas"
 }

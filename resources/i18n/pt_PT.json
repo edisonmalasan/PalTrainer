@@ -2246,5 +2246,10 @@
     "inventory.palpedia_save_failed": "Falha ao salvar as alterações da Palpedia",
     "inventory.palpedia_click_register": "Clique para registrar",
     "inventory.palpedia_click_unregister": "Clique para cancelar o registro",
-    "tools.section.world": "Ferramentas do Mundo"
+    "tools.section.world": "Ferramentas do Mundo",
+    "nav.zone.start": "Início",
+    "nav.zone.world": "Mundo",
+    "nav.zone.edit": "Editar",
+    "nav.zone.reference": "Referência",
+    "nav.overflow": "Mais páginas"
 }

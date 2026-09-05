@@ -2123,5 +2123,10 @@
     "sidebar.section.world": "월드 데이터",
     "sidebar.section.editing": "편집",
     "sidebar.section.reference": "참조",
-    "tools.section.world": "월드 도구"
+    "tools.section.world": "월드 도구",
+    "nav.zone.start": "시작",
+    "nav.zone.world": "월드",
+    "nav.zone.edit": "편집",
+    "nav.zone.reference": "참조",
+    "nav.overflow": "더 보기"
 }

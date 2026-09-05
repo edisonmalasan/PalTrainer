@@ -20,11 +20,11 @@
 
 ## 3. Phase 2 — Nav strip (replaces the right rail)
 
-- [ ] 3.1 Create `chrome/nav_strip.py`: 38-40px strip with zone-grouped checkable tabs (Start: Tools; World: Map, Bases, Players, Guilds, Exclusions; Edit: Player Inventory, Base Inventory, Pal Editor, JSON Editor; Reference: Breeding, Docs), 1px zone separators, amber-underline active state, hover/focus treatments, tooltips with full i18n labels; verify all 12 nav IDs unchanged and `nav_changed`/`set_active` parity with the old band
-- [ ] 3.2 Add overflow behavior: compact labels (`nav.rail.*` keys reused) below a width threshold, then an overflow `»` menu for least-recently-relevant zones; verify at 1200px min width and with long locales (ru_RU, de_DE, pt_BR)
-- [ ] 3.3 Extend shortcuts: keep `Ctrl+1..0`, add Breeding and Docs shortcuts (`Ctrl+-`, `Ctrl+=`), update the tab guide dialog text to describe the new shell; verify all 12 destinations reachable by keyboard and the guide dialog matches reality
-- [ ] 3.4 Route tray content: selection updates (`set_player/set_guild/set_base`) to the context indicator, metrics to Tools field report + StatsPanel popover, console/warnings/about to app bar utilities; keep `NexusBand`/`InstrumentTray` classes present but unused behind facades; verify dirty-dot, pulse, and detach-state signals still fire through the new surfaces
-- [ ] 3.5 Phase gate: full test suite + `uv run pyright src` + screenshot pass of the shell with the rail hidden/removed and nav strip active; verify zero references to `nexus_band.set_active` outside facades
+- [x] 3.1 Create `chrome/nav_strip.py`: 38-40px strip with zone-grouped checkable tabs (Start: Tools; World: Map, Bases, Players, Guilds, Exclusions; Edit: Player Inventory, Base Inventory, Pal Editor, JSON Editor; Reference: Breeding, Docs), 1px zone separators, amber-underline active state, hover/focus treatments, tooltips with full i18n labels; verify all 12 nav IDs unchanged and `nav_changed`/`set_active` parity with the old band
+- [x] 3.2 Add overflow behavior: compact labels (`nav.rail.*` keys reused) below a width threshold, then an overflow `»` menu for least-recently-relevant zones; verify at 1200px min width and with long locales (ru_RU, de_DE, pt_BR)
+- [x] 3.3 Extend shortcuts: keep `Ctrl+1..0`, add Breeding and Docs shortcuts (`Ctrl+-`, `Ctrl+=`), update the tab guide dialog text to describe the new shell; verify all 12 destinations reachable by keyboard and the guide dialog matches reality
+- [x] 3.4 Route tray content: selection updates (`set_player/set_guild/set_base`) to the context indicator, metrics to Tools field report + StatsPanel popover, console/warnings/about to app bar utilities; keep `NexusBand`/`InstrumentTray` classes present but unused behind facades; verify dirty-dot, pulse, and detach-state signals still fire through the new surfaces
+- [x] 3.5 Phase gate: full test suite + `uv run pyright src` + screenshot pass of the shell with the rail hidden/removed and nav strip active; verify zero references to `nexus_band.set_active` outside facades
 
 ## 4. Phase 3 — Page skeleton adoption
 

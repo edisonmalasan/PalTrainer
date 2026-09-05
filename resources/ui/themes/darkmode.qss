@@ -432,6 +432,56 @@ QPushButton#windowControlBtn {
 }
 QPushButton#windowControlBtn:hover { background: rgba(245,158,11,0.07); }
 QPushButton#windowControlBtn[danger="true"]:hover { background: rgba(248,113,113,0.12); }
+
+/* ---- shell v3 nav strip (top-nav-shell 3.1) ---- */
+QWidget#navStrip {
+    background: #1B1917;
+    border-bottom: 1px solid rgba(236,231,224,0.1);
+}
+QPushButton#navTab {
+    background: transparent;
+    color: #A69F94;
+    border: none;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    padding: 4px 10px 3px 10px;
+    font-family: 'Hanken Grotesk','Segoe UI';
+    font-size: 12px;
+    font-weight: 600;
+}
+QPushButton#navTab:hover {
+    background: rgba(245,158,11,0.07);
+    color: #ECE7E0;
+}
+QPushButton#navTab:checked {
+    color: #F59E0B;
+    border-bottom: 2px solid #F59E0B;
+}
+QPushButton#navTab:focus {
+    outline: none;
+    color: #ECE7E0;
+}
+QLabel#navZoneCaption {
+    color: #5C564E;
+    font-family: 'Hanken Grotesk','Segoe UI';
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+    padding: 0 4px;
+}
+QFrame#navZoneRule {
+    background: rgba(236,231,224,0.1);
+}
+QToolButton#navOverflowBtn {
+    background: transparent;
+    color: #A69F94;
+    border: none;
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-weight: 600;
+}
+QToolButton#navOverflowBtn:hover { background: rgba(245,158,11,0.07); color: #F59E0B; }
 QSplitter::handle:horizontal {
     background: rgba(236,231,224,0.1);
     width: 2px;

@@ -2122,5 +2122,10 @@
     "sidebar.section.world": "Данные мира",
     "sidebar.section.editing": "Редактирование",
     "sidebar.section.reference": "Справка",
-    "tools.section.world": "Инструменты мира"
+    "tools.section.world": "Инструменты мира",
+    "nav.zone.start": "Старт",
+    "nav.zone.world": "Мир",
+    "nav.zone.edit": "Редакт.",
+    "nav.zone.reference": "Справка",
+    "nav.overflow": "Ещё страницы"
 }

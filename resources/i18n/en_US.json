@@ -2411,5 +2411,10 @@
     "inventory.palpedia_save_failed": "Failed to save Palpedia changes",
     "inventory.palpedia_click_register": "Click to register",
     "inventory.palpedia_click_unregister": "Click to unregister",
-    "tools.section.world": "World Tools"
+    "tools.section.world": "World Tools",
+    "nav.zone.start": "Start",
+    "nav.zone.world": "World",
+    "nav.zone.edit": "Edit",
+    "nav.zone.reference": "Reference",
+    "nav.overflow": "More pages"
 }

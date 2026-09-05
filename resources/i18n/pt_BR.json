@@ -2411,5 +2411,10 @@
     "sidebar.section.world": "Dados do mundo",
     "sidebar.section.editing": "Edição",
     "sidebar.section.reference": "Referência",
-    "tools.section.world": "Ferramentas do mundo"
+    "tools.section.world": "Ferramentas do mundo",
+    "nav.zone.start": "Início",
+    "nav.zone.world": "Mundo",
+    "nav.zone.edit": "Editar",
+    "nav.zone.reference": "Referência",
+    "nav.overflow": "Mais páginas"
 }

@@ -100,12 +100,41 @@ try:
     log('drag_empty_area=' + str(w._hit_window_drag_zone(_FakeEvent(empty_pos))))
     log('drag_over_button=' + str(not w._hit_window_drag_zone(_FakeEvent(over_brand))))
 
-    # nav parity: rail still routes 12 ids
+    # nav parity: strip routes all 12 ids and matches the rail
+    log('nav_strip_present=' + str(hasattr(w, 'nav_strip')))
+    log('nav_strip_tabs=' + str(len(w.nav_strip._tabs)))
+    expected_ids = {'tools', 'base_inventory', 'player_inventory', 'pal_editor',
+                    'players', 'guilds', 'bases', 'map', 'exclusions',
+                    'json_editor', 'breeding', 'docs'}
+    log('nav_ids_match=' + str(set(w.nav_strip._tabs.keys()) == expected_ids))
     seen = []
-    w.nexus_band.nav_changed.connect(lambda pid: seen.append(pid))
-    w.nexus_band._on_item_clicked('map')
-    log('nav_emit=' + repr(seen))
-    log('active_after=' + str(w.nexus_band._active_id))
+    w.nav_strip.nav_changed.connect(lambda pid: seen.append(pid))
+    w.nav_strip._on_tab('map')
+    log('strip_nav_emit=' + repr(seen))
+    log('strip_active_after=' + str(w.nav_strip.active_id()))
+    log('rail_active_synced=' + str(w.nexus_band._active_id == 'map'))
+    seen.clear()
+    w.nexus_band._on_item_clicked('players')
+    log('rail_syncs_strip=' + str(w.nav_strip.active_id() == 'players'))
+
+    # overflow behavior: collapse reference+edit and verify reachability
+    w.nav_strip.collapse_zones({'nav.zone.reference', 'nav.zone.edit'})
+    app.processEvents()
+    log('overflow_visible=' + str(w.nav_strip._overflow_btn.isVisible()))
+    log('overflow_actions=' + str(w.nav_strip._overflow_menu.actions().__len__()))
+    log('collapsed_tab_hidden=' + str(w.nav_strip._tabs['breeding'].isHidden()))
+    w.nav_strip.collapse_zones(set())
+    log('restored_visible=' + str(not w.nav_strip._tabs['breeding'].isHidden()))
+
+    # keyboard: 12 shortcuts registered
+    log('shortcuts_registered=' + str(len(getattr(w, '_page_shortcuts', [])) == 12))
+
+    # rail removed from layout in 3.4: attribute remains for facade compat
+    log('rail_off_layout=' + str(w.nexus_band.parent() is None))
+
+    # selection syncs to app bar context (tray routing)
+    w._on_player_selected(['Tester', 'uid', 'gid', '1h', 50, 'Guild A', 'gid', 5])
+    log('context_from_selection=' + str('Tester' in w.app_bar.context.player_label.toolTip()))
 
     # 170px gutter gone: page ribbon right margin < 24px
     players_panel_right = w.players_panel.search_input.width()

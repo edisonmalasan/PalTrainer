@@ -2124,5 +2124,10 @@
     "sidebar.section.world": "ワールドデータ",
     "sidebar.section.editing": "編集",
     "sidebar.section.reference": "リファレンス",
-    "tools.section.world": "ワールドツール"
+    "tools.section.world": "ワールドツール",
+    "nav.zone.start": "スタート",
+    "nav.zone.world": "ワールド",
+    "nav.zone.edit": "編集",
+    "nav.zone.reference": "リファレンス",
+    "nav.overflow": "その他のページ"
 }

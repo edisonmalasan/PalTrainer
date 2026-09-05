@@ -462,6 +462,56 @@ QPushButton#windowControlBtn {{
 }}
 QPushButton#windowControlBtn:hover {{ background: {p['surface_hover']}; }}
 QPushButton#windowControlBtn[danger="true"]:hover {{ background: {p['danger_bg']}; }}
+
+/* ---- shell v3 nav strip (top-nav-shell 3.1) ---- */
+QWidget#navStrip {{
+    background: {p['surface']};
+    border-bottom: 1px solid {p['border']};
+}}
+QPushButton#navTab {{
+    background: transparent;
+    color: {p['text_secondary']};
+    border: none;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    padding: 4px 10px 3px 10px;
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['body'][0]}px;
+    font-weight: 600;
+}}
+QPushButton#navTab:hover {{
+    background: {p['surface_hover']};
+    color: {p['text']};
+}}
+QPushButton#navTab:checked {{
+    color: {p['accent']};
+    border-bottom: 2px solid {p['accent']};
+}}
+QPushButton#navTab:focus {{
+    outline: none;
+    color: {p['text']};
+}}
+QLabel#navZoneCaption {{
+    color: {p['text_disabled']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+    padding: 0 4px;
+}}
+QFrame#navZoneRule {{
+    background: {p['border']};
+}}
+QToolButton#navOverflowBtn {{
+    background: transparent;
+    color: {p['text_secondary']};
+    border: none;
+    border-radius: {RADIUS['sm']}px;
+    padding: 2px 8px;
+    font-weight: 600;
+}}
+QToolButton#navOverflowBtn:hover {{ background: {p['surface_hover']}; color: {p['accent']}; }}
 QSplitter::handle:horizontal {{
     background: {p['border']};
     width: 2px;
