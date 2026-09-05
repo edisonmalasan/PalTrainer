@@ -47,7 +47,9 @@ class PalEditorTab(QWidget):
         self.placeholder_label = EmptyState(
             t('pal_editor.select_player_hint', default='Select a player to edit their pals'),
             icon_name='pal_editor',
+            action_text=t('inventory.select_player', default='Select Player...'),
         )
+        self.placeholder_label.action_clicked.connect(self._open_player_popup)
         layout.addWidget(self.placeholder_label, 1)
         self.pal_editor_widget = PalEditorWidget()
         self.pal_editor_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)

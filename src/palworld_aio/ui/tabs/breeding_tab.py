@@ -236,7 +236,7 @@ class BreedingTab(QWidget):
 
         self._hint_label = QLabel(t('breeding.hint') if t else 'Click the button above to select a pal and view breeding combinations.')
         self._hint_label.setObjectName('bulkHintLabel')
-        self._hint_label.setContentsMargins(16, 4, 170, 4)
+        set_content_margins(self._hint_label, top=4, bottom=4)
         self._hint_label.setWordWrap(True)
         layout.addWidget(self._hint_label)
 
@@ -291,9 +291,14 @@ class BreedingTab(QWidget):
         try:
             if not self._selected_tribe or not self._breeding_data:
                 self._search_filter.hide()
-                empty = QLabel(t('breeding.no_selection') if t else 'Select a pal to see breeding combinations')
-                empty.setObjectName('bulkHintLabel')
-                empty.setAlignment(Qt.AlignCenter)
+                from palworld_aio.widgets.empty_state import EmptyState
+                empty = EmptyState(
+                    t('breeding.no_selection') if t else 'Select a pal to see breeding combinations',
+                    hint=t('breeding.hint') if t else 'Click the button above to select a pal and view breeding combinations.',
+                    icon_name='breeding',
+                    action_text=t('breeding.select_pal') if t else 'Select a Pal...',
+                )
+                empty.action_clicked.connect(self._open_pal_dialog)
                 self._results_layout.addWidget(empty)
                 self._refreshing = False
                 return
