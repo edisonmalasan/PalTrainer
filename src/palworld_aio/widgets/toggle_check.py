@@ -1,14 +1,8 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtGui import QFont, QMouseEvent
-from palworld_aio import constants
-from palworld_aio.ui.chrome.components import NerdBtn
+from PyQt6.QtGui import QMouseEvent
+from palworld_aio.ui.chrome import icons as app_icons
 from palworld_aio.ui.chrome import tokens as _tokens
-try:
-    import nerdfont as nf
-except:
-    class nf:
-        icons = {'nf-fa-check': '\uf00c'}
 
 
 class ToggleCheckBtn(QWidget):
@@ -20,9 +14,10 @@ class ToggleCheckBtn(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
-        self._icon_btn = NerdBtn('')
+        self._icon_btn = QPushButton()
         self._icon_btn.setFixedSize(20, 20)
-        self._icon_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 12))
+        self._icon_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._icon_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._icon_btn.clicked.connect(lambda: self._toggle(True))
         layout.addWidget(self._icon_btn)
         self._label = QLabel(label)
@@ -44,15 +39,15 @@ class ToggleCheckBtn(QWidget):
     def _update_style(self):
         t = _tokens.resolve()
         if self._checked:
-            self._icon_btn.setText(nf.icons.get('nf-fa-check', '\uf00c'))
+            self._icon_btn.setIcon(app_icons.get_qicon('check', role='accent'))
             self._icon_btn.setStyleSheet(
-                f'NerdBtn {{ background: {t["accent_bg_strong"]}; color: {t["accent"]};'
+                f'QPushButton {{ background: {t["accent_bg_strong"]};'
                 f' border: 1px solid {t["accent_border"]}; border-radius: 4px; }}'
             )
         else:
-            self._icon_btn.setText('')
+            self._icon_btn.setIcon(app_icons.get_qicon('check', role='text_disabled'))
             self._icon_btn.setStyleSheet(
-                f'NerdBtn {{ background: {_tokens.SURFACE_FAINT};'
+                f'QPushButton {{ background: {_tokens.SURFACE_FAINT};'
                 f' border: 1px solid {t["border"]}; border-radius: 4px; }}'
             )
 

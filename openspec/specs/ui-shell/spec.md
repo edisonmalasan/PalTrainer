@@ -2,49 +2,43 @@
 
 ## Purpose
 
-Defines the observable behavior of PalTrainer's right-rail application shell: navigation across the 12 pages, the per-page ribbon, the frameless window-controls overlay, the save/selection instrument tray, and application of the dark Deck-Ops theme.
+Defines the observable behavior of PalTrainer's top two-tier application shell: the app bar and nav strip chrome around the full-bleed page canvas, per-page headers, the restored status strip, and application of the dark Deck-Ops theme from one token source.
 
 ## Requirements
 
-### Requirement: Rail navigation reaches every page with a distinct identity
+### Requirement: Typography uses bundled real weights
 
-The system SHALL expose all 12 page destinations (tools, base_inventory, player_inventory, pal_editor, players, guilds, bases, map, exclusions, json_editor, breeding, docs) in the right rail, each with a visually distinct label and icon, grouped by mission zone, with exactly one active destination indicated at a time.
+The system SHALL render all primary UI typography (navigation, labels, headings, buttons, tables, dialogs, technical metadata) from the bundled Hanken Grotesk and Inter families using real bundled weights (Regular/Medium/SemiBold) rather than synthetic bold, and SHALL NOT reference the Hack Nerd Font family anywhere in the interface.
 
-#### Scenario: User identifies each destination
+#### Scenario: No synthetic bold on primary text
 
-- **WHEN** the user looks at the rail with no save loaded
-- **THEN** Players, Guilds, and Bases are distinguishable from each other (no two nav items share the same visible label), Exclusions is fully legible, and the active page shows an active indicator
+- **WHEN** the application renders headings, navigation labels, or emphasized text
+- **THEN** the rendered glyphs use bundled weight files, and no bundled font references target the Hack Nerd Font family
 
-#### Scenario: Navigation preserves page identity
+### Requirement: Page header presents title, zone, and actions without overlay collision
 
-- **WHEN** the user activates any rail destination via click or its `Ctrl+1..0` shortcut
-- **THEN** the canvas shows the corresponding page, the rail marks that destination active, and the same navigation ID is emitted that existing refresh/setup coupling expects
-
-### Requirement: Page ribbon presents title, zone, and actions without overlay collision
-
-The system SHALL render each page's ribbon with a display title, a zone caption, and an action slot, such that ribbon content never underlaps the floating window-controls cluster and drag-to-move still works on the ribbon's empty area but never on interactive controls.
+The system SHALL render each page's header row with a display title, a zone caption, and an action slot, such that header content never requires a reserved window-controls gutter (window controls live in the app bar), and page drag behavior only applies to the app bar, never to page content.
 
 #### Scenario: Ribbon stays clear of window controls
 
 - **WHEN** the main window is shown at minimum size (1200x750) or maximized
-- **THEN** ribbon titles, zone captions, and action buttons are fully visible and clickable, with no text clipped under the minimize/maximize/close cluster
+- **THEN** page header titles, zone captions, and action buttons span the full canvas width with no reserved dead gutter, and no content is clipped under window controls
 
-### Requirement: Instrument tray reports save, selection, and metrics at a glance
+#### Scenario: Page content does not drag the window
 
-The system SHALL show save state (no-save/loading/loaded/saving/error, dirty indicator), current PLAYER/GUILD/BASE selection, and players/guilds/bases/pals counts in the rail tray, with detailed statistics available in the tray drawer overlay.
-
-#### Scenario: Tray reflects empty and loaded states
-
-- **WHEN** no save is loaded
-- **THEN** the tray reports "No save" state with zeroed metrics rather than blank or truncated micro-text
-- **WHEN** a save finishes loading
-- **THEN** the tray updates state, selection placeholders, and all four metrics without requiring a page switch
+- **WHEN** the user presses and drags on a page header or any page content
+- **THEN** no window move occurs; dragging is restricted to the app bar
 
 ### Requirement: Dark Deck-Ops theme applies consistently from one source
 
-The system SHALL render all shell surfaces (canvas, rail, ribbon, tray, tooltips, menus, scrollbars) from the frozen token palette (warm dark surfaces, amber `#F59E0B` accent, teal success) with no residual cyan (`#7DD3FC`) or blue (`#4a90e2`) shell chrome, and theme changes SHALL propagate without per-widget stylesheets overriding the global theme.
+The system SHALL render all shell surfaces (app bar, nav strip, page headers, chips, status strip, tooltips, menus, scrollbars, and scroll-area viewports) from the frozen token palette (warm dark surfaces, amber `#F59E0B` accent, teal success) with no residual cyan (`#7DD3FC`) or blue (`#4a90e2`) shell chrome, and theme changes SHALL propagate without per-widget stylesheets overriding the global theme. Every rendered icon SHALL come from the bundled token-colored vector icon set; no glyph-font icon rendering MAY remain in shell surfaces.
 
 #### Scenario: No parallel shell styling
 
 - **WHEN** the application starts and any page is visited
-- **THEN** rail, ribbon, tray, menus, and tooltips share the same accent/surface treatment, and no shell widget carries an inline color stylesheet that diverges from the token palette
+- **THEN** app bar, nav strip, page headers, chips, status strip, menus, and tooltips share the same accent/surface treatment, and no shell widget carries an inline color stylesheet that diverges from the token palette
+
+#### Scenario: Scroll containers never fall back to a light palette
+
+- **WHEN** any page renders content inside a scroll area (including Breeding results)
+- **THEN** the scroll viewport and inner containers use the dark token palette rather than a default light background

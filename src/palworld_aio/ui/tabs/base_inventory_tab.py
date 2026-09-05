@@ -18,6 +18,7 @@ import re
 from i18n import t
 from loading_manager import run_with_loading, show_information, show_warning, show_question
 from palworld_aio import constants
+from palworld_aio.ui.chrome import icons as app_icons
 from palworld_aio.inventory.base_inventory_manager import BaseInventoryManager, get_container_image_path, find_item_locations_efficient
 from palworld_aio.widgets import StatsPanel
 from palworld_aio.ui.tabs.inventory_tab import InventoryGridWidget, ItemPickerDialog, InventoryLoadoutDialog, _group_inventory_items, _consolidate_container_slots, SINGLETON_TYPE_A
@@ -1798,7 +1799,9 @@ class BasePalsContentWidget(QFrame):
         self.bulk_delete_btn.setCursor(Qt.PointingHandCursor)
         self.bulk_delete_btn.clicked.connect(self._open_bulk_delete)
         page_row.addWidget(self.bulk_delete_btn)
-        self.prev_page_btn = QPushButton('â—€')
+        self.prev_page_btn = QPushButton()
+        self.prev_page_btn.setIcon(
+            app_icons.get_qicon('chevron_left', role='accent'))
         self.prev_page_btn.setFixedSize(28, 24)
         self.prev_page_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.08); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(245,158,11,0.18); color: #FFFFFF; } QPushButton:disabled { background: rgba(100,100,100,0.1); color: #666; border-color: rgba(255,255,255,0.05); }')
         self.prev_page_btn.clicked.connect(self._prev_page)
@@ -1806,7 +1809,9 @@ class BasePalsContentWidget(QFrame):
         self.page_label = QLabel('Page 1/1')
         self.page_label.setStyleSheet('font-size: 11px; font-weight: 600; color: #F59E0B; padding: 0 4px;')
         page_row.addWidget(self.page_label)
-        self.next_page_btn = QPushButton('â–¶')
+        self.next_page_btn = QPushButton()
+        self.next_page_btn.setIcon(
+            app_icons.get_qicon('chevron_right', role='accent'))
         self.next_page_btn.setFixedSize(28, 24)
         self.next_page_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.08); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(245,158,11,0.18); color: #FFFFFF; } QPushButton:disabled { background: rgba(100,100,100,0.1); color: #666; border-color: rgba(255,255,255,0.05); }')
         self.next_page_btn.clicked.connect(self._next_page)
@@ -2860,40 +2865,45 @@ class BaseInventoryTab(QWidget):
             self._restore_container_selection(current_container_id)
         self._update_container_stats()
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon, ribbon_actions_slot, set_content_margins
+        from palworld_aio.ui.chrome.components import create_page_ribbon, set_content_margins
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         ribbon = create_page_ribbon(t('base_inventory.title', default='Base Inventory'), (t('sidebar.section.world') if t else 'World Data').upper(), self)
-        # 009-r02: guild/base selectors + view switch live in the ribbon;
-        # the old centered title bar and per-button inline QSS are retired.
+        layout.addWidget(ribbon)
+        # top-nav-shell 4.4: guild/base selectors + view switch in a standard
+        # toolbar row below the page header.
+        toolbar_row = QHBoxLayout()
+        set_content_margins(toolbar_row, top=6, bottom=6)
+        toolbar_row.setSpacing(6)
         self.guild_button = QPushButton(t('base_inventory.select_guild') if t else 'Select Guild')
         self.guild_button.setObjectName('ghostBtn')
         self.guild_button.setMinimumWidth(140)
         self.guild_button.setCursor(Qt.PointingHandCursor)
         self.guild_button.clicked.connect(self._show_guild_popup)
-        ribbon_actions_slot(ribbon).addWidget(self.guild_button)
+        toolbar_row.addWidget(self.guild_button)
         self.base_button = QPushButton(t('base_inventory.select_base') if t else 'Select Base')
         self.base_button.setObjectName('ghostBtn')
         self.base_button.setMinimumWidth(120)
         self.base_button.setCursor(Qt.PointingHandCursor)
         self.base_button.clicked.connect(self._show_base_popup)
         self.base_button.setEnabled(False)
-        ribbon_actions_slot(ribbon).addWidget(self.base_button)
+        toolbar_row.addWidget(self.base_button)
         self.inv_tab_btn = QPushButton(t('base_inventory.tab_inventory') if t else 'Inventory')
         self.inv_tab_btn.setObjectName('pageSwitchBtn')
         self.inv_tab_btn.setCheckable(True)
         self.inv_tab_btn.setChecked(True)
         self.inv_tab_btn.setCursor(Qt.PointingHandCursor)
         self.inv_tab_btn.clicked.connect(lambda: self._switch_tab(0))
-        ribbon_actions_slot(ribbon).addWidget(self.inv_tab_btn)
+        toolbar_row.addWidget(self.inv_tab_btn)
         self.pals_tab_btn = QPushButton(t('base_inventory.tab_base_pals') if t else 'Base Pals')
         self.pals_tab_btn.setObjectName('pageSwitchBtn')
         self.pals_tab_btn.setCheckable(True)
         self.pals_tab_btn.setCursor(Qt.PointingHandCursor)
         self.pals_tab_btn.clicked.connect(lambda: self._switch_tab(1))
-        ribbon_actions_slot(ribbon).addWidget(self.pals_tab_btn)
-        layout.addWidget(ribbon)
+        toolbar_row.addWidget(self.pals_tab_btn)
+        toolbar_row.addStretch(1)
+        layout.addLayout(toolbar_row)
         # context row: filter + structure actions (inventory view only)
         context_row = QHBoxLayout()
         set_content_margins(context_row)

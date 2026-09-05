@@ -2507,20 +2507,25 @@ class PlayerInventoryTab(QWidget):
         self._context_slot_index = 0
         self._setup_ui()
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon, ribbon_actions_slot
+        from palworld_aio.ui.chrome.components import create_page_ribbon, set_content_margins
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
-        # 011-r02: ribbon owns the player selector; the old centered title
-        # bar and per-button inline QSS are retired.
+        # top-nav-shell 4.4: player picker in a standard toolbar row below
+        # the page header (ribbon keeps title/zone only).
         ribbon = create_page_ribbon(t('inventory.title', default='Player Inventory'), (t('sidebar.section.editing') if t else 'Editing').upper(), self)
+        main_layout.addWidget(ribbon)
+        toolbar_row = QHBoxLayout()
+        set_content_margins(toolbar_row, top=6, bottom=6)
+        toolbar_row.setSpacing(6)
         self.player_select_btn = QPushButton(t('inventory.select_player', default='Select Player...'))
         self.player_select_btn.setObjectName('ghostBtn')
         self.player_select_btn.setMinimumWidth(200)
         self.player_select_btn.setCursor(Qt.PointingHandCursor)
         self.player_select_btn.clicked.connect(self._open_player_popup)
-        ribbon_actions_slot(ribbon).addWidget(self.player_select_btn)
-        main_layout.addWidget(ribbon)
+        toolbar_row.addWidget(self.player_select_btn)
+        toolbar_row.addStretch(1)
+        main_layout.addLayout(toolbar_row)
         self.content_area = QFrame()
         self.content_area.setObjectName('inventoryContent')
         self.content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)

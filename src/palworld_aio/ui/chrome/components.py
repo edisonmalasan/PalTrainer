@@ -26,8 +26,8 @@ from PyQt6.QtWidgets import (
 )
 
 from palworld_aio.ui.chrome import fonts
+from palworld_aio.ui.chrome import icons as app_icons
 from palworld_aio.ui.chrome.tokens import HEIGHT, SPACING, TYPE
-from palworld_aio.ui.chrome.window_controls import CONTROLS_RESERVE_WIDTH
 
 _LEVELS = ('neutral', 'success', 'warning', 'danger', 'info', 'special', 'accent')
 
@@ -120,8 +120,8 @@ def make_button(
     if kind in ('primary', 'danger', 'ghost', 'tool'):
         btn.setProperty('class', kind)
     if icon:
-        btn.setText(f'{icon}  {text}')
-        btn.setFont(fonts.icon_font(13))
+        btn.setIcon(app_icons.get_qicon(icon, role='text_secondary'))
+        btn.setText(text)
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
     btn.setMinimumHeight(HEIGHT['comfortable'])
@@ -132,9 +132,12 @@ def make_button(
 
 
 def make_tool_button(icon: str, tooltip: str = '', parent: Optional[QWidget] = None) -> QPushButton:
-    btn = QPushButton(icon, parent)
+    """Icon-only button; ``icon`` is an SVG registry name (icon factory)."""
+    btn = QPushButton(parent)
     btn.setProperty('class', 'tool')
-    btn.setFont(fonts.icon_font(13))
+    icon_obj = app_icons.get_qicon(icon, role='text_secondary')
+    if icon_obj is not None:
+        btn.setIcon(icon_obj)
     btn.setFixedSize(HEIGHT['comfortable'], HEIGHT['comfortable'])
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     if tooltip:
@@ -188,14 +191,15 @@ def make_search_field(
     on_change: Optional[Callable[[str], None]] = None,
     parent: Optional[QWidget] = None,
 ) -> tuple[QFrame, QLineEdit]:
-    """Bordered search field with a search glyph. Returns (container, line_edit)."""
+    """Bordered search field with a search icon. Returns (container, line_edit)."""
     container = QFrame(parent)
     container.setProperty('class', 'searchField')
     row = QHBoxLayout(container)
     row.setContentsMargins(SPACING['sm'], 2, SPACING['sm'], 2)
     row.setSpacing(SPACING['sm'])
-    glyph = QLabel('\uf002', container)
-    glyph.setFont(fonts.icon_font(11))
+    glyph = QLabel(container)
+    glyph.setPixmap(app_icons.get_pixmap('search', role='text_secondary', size=12))
+    glyph.setFixedSize(12, 12)
     line = QLineEdit(container)
     line.setFrame(False)
     line.setFont(fonts.body_font())
@@ -225,7 +229,7 @@ class ErrorBanner(QFrame):
         row.setSpacing(SPACING['sm'])
         self._label = QLabel('')
         self._label.setWordWrap(True)
-        self._close = make_tool_button('\uf00d')
+        self._close = make_tool_button('close')
         self._close.clicked.connect(self.hide)
         row.addWidget(self._label, 1)
         row.addWidget(self._close)
@@ -242,7 +246,7 @@ class ErrorBanner(QFrame):
 class Toast(QFrame):
     """Ephemeral notification anchored to the parent widget, auto-dismissing."""
 
-    _ICONS = {'success': '\uf00c', 'warning': '\uf071', 'danger': '\uf00d', 'info': '\uf05a'}
+    _ICONS = {'success': 'check', 'warning': 'warning', 'danger': 'close', 'info': 'info'}
 
     def __init__(self, message: str, level: str = 'success',
                  duration_ms: int = 3000, parent: Optional[QWidget] = None):
@@ -253,8 +257,11 @@ class Toast(QFrame):
         row = QHBoxLayout(self)
         row.setContentsMargins(SPACING['md'], SPACING['sm'], SPACING['md'], SPACING['sm'])
         row.setSpacing(SPACING['sm'])
-        glyph = QLabel(self._ICONS.get(level, self._ICONS['info']))
-        glyph.setFont(fonts.icon_font(12))
+        glyph = QLabel()
+        glyph.setPixmap(app_icons.get_pixmap(
+            self._ICONS.get(level, self._ICONS['info']),
+            role=level if level in app_icons.ROLE_COLORS else 'text_secondary', size=12))
+        glyph.setFixedSize(12, 12)
         glyph.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         text = QLabel(message)
         text.setWordWrap(True)
@@ -437,13 +444,13 @@ def create_page_ribbon(title: str, zone: str = '', parent=None) -> QFrame:
     """Page ribbon (plan 020 section 4.4): per-page title header.
 
     Returns a QFrame with a horizontal layout: display title, zone label,
-    stretch, and an action slot the caller can extend. Right padding is
-    reserved for the floating WindowControls overlay.
+    stretch, and an action slot the caller can extend. Window controls live
+    in the app bar (shell v3), so the ribbon spans the full canvas width.
     """
     ribbon = QFrame(parent)
     ribbon.setObjectName('pageRibbon')
     lay = QHBoxLayout(ribbon)
-    lay.setContentsMargins(SPACING['xl'], SPACING['md'], CONTROLS_RESERVE_WIDTH, SPACING['md'])
+    lay.setContentsMargins(SPACING['xl'], SPACING['md'], SPACING['lg'], SPACING['md'])
     lay.setSpacing(SPACING['sm'])
     title_lbl = QLabel(title, ribbon)
     title_lbl.setObjectName('ribbonTitle')
@@ -468,13 +475,44 @@ def ribbon_actions_slot(ribbon: QFrame) -> QHBoxLayout:
 
 def set_content_margins(target, top: int = 0, bottom: int = 0,
                         left: int = SPACING['lg']) -> None:
-    """Apply standard page-row margins, keeping the WindowControls reserve.
+    """Apply standard page-row margins.
 
-    The right gutter is always the shared ``CONTROLS_RESERVE_WIDTH`` so rows
-    never underlap the floating minimize/maximize/close cluster; the left
-    gutter defaults to ``SPACING['lg']``. Accepts any QWidget or QLayout.
+    Rows span the full canvas width (window controls are in the app bar);
+    the left gutter defaults to ``SPACING['lg']``. Accepts any QWidget or
+    QLayout.
     """
-    target.setContentsMargins(left, top, CONTROLS_RESERVE_WIDTH, bottom)
+    target.setContentsMargins(left, top, left, bottom)
+
+
+class PageFooter(QFrame):
+    """Shared page footer (top-nav-shell 4.1): status text left, actions right.
+
+    Page-grammar reference implementation for table pages: Players/Guilds/
+    Bases/Exclusions bulk bars and the JSON editor footer consolidate onto
+    this frame. Exposes ``status_label`` and the trailing ``actions`` layout;
+    callers keep full ownership of their buttons and wiring.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName('tableFooter')
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(SPACING['lg'], 4, SPACING['lg'], 4)
+        lay.setSpacing(SPACING['sm'])
+        self.status_label = QLabel('')
+        self.status_label.setObjectName('bulkHintLabel')
+        lay.addWidget(self.status_label)
+        lay.addSpacing(SPACING['sm'])
+        lay.addStretch(1)
+        self.actions = lay
+
+
+def create_page_footer(status_text: str = '', parent=None) -> PageFooter:
+    """Convenience constructor for the shared page footer."""
+    footer = PageFooter(parent)
+    if status_text:
+        footer.status_label.setText(status_text)
+    return footer
 
 
 class NerdBtn(QPushButton):

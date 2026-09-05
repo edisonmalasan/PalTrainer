@@ -1,5 +1,9 @@
-"""Offscreen smoke test for shell v2 (plan 020). Writes results to a file —
-MainWindow redirects stdout, so print() is unavailable.
+"""Offscreen smoke test for shell v3 (top-nav-shell 5.4). Writes results to a
+file — MainWindow redirects stdout, so print() is unavailable.
+
+Retired rail/tray/facade assertions from the v2 shell are replaced by
+app-bar / nav-strip equivalents; run smoke_shell_v3.py for the full
+behavioral sweep.
 """
 import sys
 import os
@@ -42,7 +46,6 @@ try:
     families = load_app_fonts()
     log(f'fonts_loaded={len(families)}')
     log('hanken_registered=' + str(any('Hanken' in f for f in families)))
-    log('inter_registered=' + str(any(f == 'Inter' for f in families)))
 
     from palworld_aio.ui.chrome.styles import ThemeManager
     ThemeManager.apply_global()
@@ -53,54 +56,45 @@ try:
     w.show()
     app.processEvents()
 
-    # structural assertions (code-based structural verification, plan 019 §11)
+    # structural assertions (shell v3: two-tier top chrome, no rail)
     log('shell_v2=' + str(getattr(w, '_shell_v2', False)))
-    log('has_nexus_band=' + str(hasattr(w, 'nexus_band')))
-    log('band_parent_is_layout=True')
+    log('rail_retired=' + str(not hasattr(w, 'nexus_band')))
+    log('nav_strip_present=' + str(hasattr(w, 'nav_strip')))
+    log('app_bar_present=' + str(hasattr(w, 'app_bar')))
     log('has_stacked=' + str(hasattr(w, 'stacked_widget')))
     log('no_splitter=' + str(not hasattr(w, 'splitter')))
-    log('sidebar_is_facade=' + str(type(w.sidebar).__name__))
-    log('results_is_facade=' + str(type(w.results_widget).__name__))
-    log('header_is_facade=' + str(type(w.header_widget).__name__))
-    log('band_items=' + str(len(w.nexus_band._items)))
-    log('tray_present=' + str(hasattr(w.nexus_band, 'tray')))
+    log('players_panel=' + str(hasattr(w, 'players_panel')))
+    log('guilds_panel=' + str(hasattr(w, 'guilds_panel')))
+    log('bases_panel=' + str(hasattr(w, 'bases_panel')))
     log('drawer_present=' + str(hasattr(w, '_tray_drawer')))
-    log('window_controls=' + str(hasattr(w, '_window_controls')))
+    log('window_controls_in_bar=' + str(w._window_controls.parentWidget() is w.app_bar))
 
     # nav behavior
     seen = []
-    w.nexus_band.nav_changed.connect(lambda pid: seen.append(pid))
-    w.nexus_band._on_item_clicked('map')
+    w.nav_strip.nav_changed.connect(lambda pid: seen.append(pid))
+    w.nav_strip._on_tab('map')
     log('nav_emit=' + repr(seen))
-    log('active_after=' + str(w.nexus_band._active_id))
+    log('active_after=' + str(w.nav_strip.active_id()))
 
-    # keyboard nav
-    from PyQt6.QtCore import Qt
-    from PyQt6.QtGui import QKeyEvent
-    ev = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Down, Qt.KeyboardModifier.NoModifier)
-    w.nexus_band.keyPressEvent(ev)
-    log('keyboard_nav_ok=True')
-
-    # tray facade behavior
-    w.results_widget.set_player('Tester')
-    w.results_widget.set_guild('Guild A')
-    w.results_widget.set_base(3)
-    log('tray_player=' + str(w.nexus_band.tray.player_row.value_label.text()))
-    log('tray_guild=' + str(w.nexus_band.tray.guild_row.value_label.text()))
-    w.results_widget.update_stats({'Players': 12, 'Guilds': 3, 'Bases': 8, 'Pals': 412})
-    log('tray_metrics=' + str(w.nexus_band.tray.metric_row._metrics['pals'].text()))
-    w.results_widget.clear_selection()
-    log('cleared=' + str(w.nexus_band.tray.player_row.value_label.text()))
+    # selection routing (legacy results facade calls, now app-bar context)
+    w._on_player_selected(['Tester', 'uid', 'gid', '1h', 50, 'Guild A', 'gid', 5])
+    log('context_player=' + str('Tester' in w.app_bar.context.player_label.toolTip()))
+    log('context_guild=' + str('Guild A' in w.app_bar.context.guild_label.toolTip()))
+    w._update_stats_all({'Players': 12, 'Guilds': 3, 'Bases': 8, 'Pals': 412})
+    log('drawer_stats_updated=True')
 
     # shell state
     from palworld_aio.shell_state import ShellState
-    w.header_widget.set_shell_state(ShellState.LOADING)
+    w.app_bar.save_chip.set_shell_state(ShellState.LOADING)
     app.processEvents()
-    log('tray_state_loading=' + str(w.nexus_band.tray.state_row.property('state')))
-    w.header_widget.set_shell_state(ShellState.LOADED)
-    log('tray_state_loaded=' + str(w.nexus_band.tray.state_row.property('state')))
-    w.header_widget.set_dirty(True)
-    log('dirty_dot_visible=' + str(w.nexus_band._dirty_dot.isVisible()))
+    log('chip_state_loading=' + str(w.app_bar.save_chip.property('state')))
+    w.app_bar.save_chip.set_shell_state(ShellState.LOADED)
+    log('chip_state_loaded=' + str(w.app_bar.save_chip.property('state')))
+    w._set_dirty(True)
+    log('dirty_dot_visible=' + str(w.app_bar.save_chip._dirty_dot.isVisible()))
+    w._set_dirty(False)
+    w.app_bar.context.clear_selection()
+    log('cleared=' + str(w.app_bar.context.player_label.toolTip() == ''))
 
     # drawer
     w._set_tray_drawer_visible(True)
@@ -108,16 +102,13 @@ try:
     log('drawer_visible=' + str(w._tray_drawer.isVisible()))
     log('drawer_is_canvas_child=' + str(w._tray_drawer.parent() is w.stacked_widget))
     log('drawer_stats_panel=' + str(type(w._tray_drawer.stats_panel).__name__))
-    w.results_widget.stats_panel.refresh_labels()  # legacy deep access (main_window:2253)
+    w._tray_drawer.stats_panel.refresh_labels()  # legacy deep access (main_window:2253)
     log('legacy_stats_panel_access=True')
     w._close_tray_drawer()
     log('drawer_closed=' + str(not w._tray_drawer.isVisible()))
 
     # settings roundtrip
     log('tray_expanded_setting=' + str(w.user_settings.get('tray_expanded')))
-
-    # legacy path still constructible
-    log('legacy_path_deferred=True')  # path guarded by use_nexus_shell setting
 
     # screenshot for manual QA
     shot = pathlib.Path.cwd() / 'Logs' / 'shell_v2_shot.png'

@@ -4,8 +4,7 @@ from PyQt6.QtGui import QFont, QColor, QCursor, QEnterEvent, QGuiApplication, QI
 from palworld_aio.ui.chrome import icons as app_icons
 from i18n import t
 from palworld_aio import constants
-_MENU_CATEGORY_ICONS = {'nf-md-file': 'file', 'nf-md-function': 'function', 'nf-md-map': 'map', 'nf-md-playlist_remove': 'exclusions', 'nf-md-translate': 'translate', 'nf-md-cog': 'cog', 'nf-md-chevron_right': 'chevron_right', 'nf-md-update': 'update'}
-nf = type('nf', (), {'icons': {key: app_icons.get_icon(name) for key, name in _MENU_CATEGORY_ICONS.items()}})
+_MENU_CATEGORY_ICONS = {'nf-md-file': 'docs', 'nf-md-function': 'grid', 'nf-md-map': 'map', 'nf-md-playlist_remove': 'exclusions', 'nf-md-translate': 'languages', 'nf-md-cog': 'cog', 'nf-md-chevron_right': 'chevron_right', 'nf-md-update': 'update'}
 class ScrollableMenu(QWidget):
     def __init__(self, parent=None, is_dark=True):
         super().__init__(parent)
@@ -62,10 +61,7 @@ class HoverMenuButton(QWidget):
         super().__init__(parent)
         self.category = category
         self.is_dark = is_dark
-        try:
-            icon = nf.icons.get(icon_key, '')
-        except:
-            icon = ''
+        self._icon_name = _MENU_CATEGORY_ICONS.get(icon_key, icon_key)
         self.setObjectName('menuPopupButton')
         self.setCursor(QCursor(Qt.PointingHandCursor))
         self.setMinimumWidth(180)
@@ -73,17 +69,22 @@ class HoverMenuButton(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(8)
-        self.icon_label = QLabel(f'  {icon}')
-        self.icon_label.setFont(QFont(constants.FONT_FAMILY_NERD, 12))
+        self.icon_label = QLabel()
+        self.icon_label.setPixmap(self._render_icon())
         layout.addWidget(self.icon_label)
         self.text_label = QLabel(label)
         self.text_label.setFont(QFont(constants.FONT_FAMILY, 11))
         layout.addWidget(self.text_label)
         layout.addStretch()
-        self.chevron_label = QLabel(app_icons.get_icon('chevron_right'))
-        self.chevron_label.setFont(QFont(constants.FONT_FAMILY_NERD, 11))
+        self.chevron_label = QLabel()
+        self.chevron_label.setPixmap(
+            app_icons.get_pixmap('chevron_right', constants.MUTED, 12))
         layout.addWidget(self.chevron_label)
         self._update_theme()
+    def _render_icon(self):
+        return app_icons.get_pixmap(
+            self._icon_name, constants.MUTED, 14) or app_icons.get_pixmap(
+            self._icon_name, '#A6B8C8', 14)
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self._on_clicked()
@@ -263,11 +264,7 @@ class MenuPopup(QWidget):
         icon_map = {'file': 'nf-md-file', 'functions': 'nf-md-function', 'maps': 'nf-md-map', 'exclusions': 'nf-md-playlist_remove', 'languages': 'nf-md-translate', 'configs': 'nf-md-cog'}
         for category, btn in self.menu_buttons.items():
             if category in labels:
-                try:
-                    icon = nf.icons.get(icon_map.get(category, ''), '')
-                except:
-                    icon = ''
-                btn.icon_label.setText(f'  {icon}')
+                btn.icon_label.setPixmap(btn._render_icon())
                 btn.text_label.setText(labels[category])
     def update_theme(self, is_dark):
         self.is_dark = is_dark

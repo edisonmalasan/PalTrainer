@@ -123,10 +123,13 @@ def resolve(theme: str = DEFAULT_THEME) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # Typography scale: token -> (px, weight). Fonts live in chrome/fonts.py.
 # Deck Operations scale (plan 019 §6): Hanken display/heading/nav, Inter body.
+# Weights map to real bundled faces (top-nav-shell task 1.1): Hanken Grotesk
+# and Inter 28pt ship Regular/Medium/SemiBold/Bold TTFs; 500/600 resolve to
+# Medium/SemiBold files rather than synthetic bold.
 # ---------------------------------------------------------------------------
 TYPE: dict[str, tuple[int, int]] = {
     'display': (19, 700),
-    'title': (14, 700),
+    'title': (14, 600),
     'section': (12, 600),
     'body': (12, 400),
     'secondary': (11, 400),

@@ -4,7 +4,6 @@ from PyQt6.QtGui import QFont, QPainter, QFontMetrics
 from i18n import t
 from loading_manager import show_information, show_warning
 from palworld_aio import constants
-from palworld_aio.ui.chrome.components import NerdBtn
 from palworld_aio.ui.chrome import icons as app_icons
 class StatsPanel(QWidget):
     def __init__(self, parent=None):
@@ -20,7 +19,8 @@ class StatsPanel(QWidget):
         self.stat_key_labels = {}
         sections = [('before', 'deletion.stats.before'), ('after', 'deletion.stats.after'), ('result', 'deletion.stats.result')]
         fields = [('guilds', 'deletion.stats.guilds'), ('bases', 'deletion.stats.bases'), ('players', 'deletion.stats.players'), ('pals', 'deletion.stats.pals')]
-        copy_btn = NerdBtn(app_icons.get_icon('copy'))
+        copy_btn = QPushButton()
+        copy_btn.setIcon(app_icons.get_qicon('copy', role='text_secondary'))
         copy_btn.setFixedSize(30, 24)
         copy_btn.setToolTip(t('button.copy_stats') if t else 'Copy stats')
         copy_btn.setObjectName('copyStatsBtn')

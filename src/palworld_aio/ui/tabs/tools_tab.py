@@ -7,6 +7,7 @@ from PyQt6.QtGui import QPixmap, QIcon, QFont, QCursor, QDragEnterEvent, QDropEv
 from i18n import t
 from loading_manager import show_critical
 from palworld_aio import constants
+from palworld_aio.ui.chrome import icons as app_icons
 from resource_resolver import resource_path
 from palworld_aio.ui.chrome.styles import ThemeManager
 CONVERTING_TOOL_KEYS = ['tool.convert.saves', 'tool.convert.gamepass.steam', 'tool.convert.steamid', 'tool.restore_map']
@@ -199,11 +200,10 @@ class DropOverlay(QWidget):
         painter.drawPath(path)
         box_h = inner.height()
         center_y = inner.y() + box_h / 2
-        icon_font = QFont(constants.FONT_FAMILY_NERD, 46, QFont.Bold)
-        painter.setFont(icon_font)
-        painter.setPen(accent)
-        icon_rect = QRectF(inner.x(), center_y - 80, inner.width(), 60)
-        painter.drawText(icon_rect, Qt.AlignHCenter | Qt.AlignBottom, '\uf07b')
+        icon_pix = app_icons.get_pixmap('upload', pal['accent'], 48)
+        if icon_pix is not None:
+            icon_x = int(inner.x() + (inner.width() - 48) / 2)
+            painter.drawPixmap(icon_x, int(center_y - 88), icon_pix)
         font = QFont(constants.FONT_FAMILY, 22, QFont.Bold)
         painter.setFont(font)
         painter.setPen(QColor(255, 255, 255, 255))
@@ -214,41 +214,6 @@ class DropOverlay(QWidget):
         painter.setPen(QColor(pal['text_secondary']))
         hint_rect = QRectF(inner.x(), center_y + 40, inner.width(), 30)
         painter.drawText(hint_rect, Qt.AlignHCenter | Qt.AlignTop, self._drop_hint)
-class StatIconBtn(QPushButton):
-    def __init__(self, icon, parent=None):
-        super().__init__(icon, parent)
-        font_family = self._resolve_nerdfont()
-        self.setFont(QFont(font_family, 11))
-        self.setFixedSize(44, 28)
-        self.setCursor(QCursor(Qt.PointingHandCursor))
-        self.setFocusPolicy(Qt.NoFocus)
-        self.setObjectName('statIconBtn')
-
-    @staticmethod
-    def _resolve_nerdfont():
-        candidates = [constants.FONT_FAMILY_NERD, 'NerdFontsSymbolsOnly', 'Segoe Fluent Icons', 'Segoe UI Symbol', constants.FONT_FAMILY]
-        for name in candidates:
-            if name in QFontDatabase.families():
-                return name
-        return constants.FONT_FAMILY
-
-    def paintEvent(self, event):
-        sp = QStylePainter(self)
-        opt = QStyleOptionButton()
-        self.initStyleOption(opt)
-        opt.text = ''
-        sp.drawControl(QStyle.CE_PushButton, opt)
-        sp.end()
-        p = QPainter(self)
-        p.setRenderHint(QPainter.TextAntialiasing | QPainter.Antialiasing)
-        p.setFont(self.font())
-        p.setPen(self.palette().color(self.foregroundRole()))
-        fm = QFontMetrics(self.font())
-        br = fm.boundingRect(self.text())
-        x = (self.width() - br.width()) / 2 - br.x()
-        y = (self.height() - br.height()) / 2 - br.y()
-        p.drawText(int(x), int(y), self.text())
-        p.end()
 class ToolsTab(QWidget):
     """Start page v2 (plan 021): operations masthead + field report + campaign
     strip + mission columns. All 7 tool entry points and deep-links preserved;
@@ -302,7 +267,6 @@ class ToolsTab(QWidget):
         columns_row.setSpacing(24)
         for zone_key, rows in self.MISSION_ZONES:
             columns_row.addWidget(self._create_mission_column(zone_key, rows), stretch=1)
-        columns_row.addStretch(0)
         body.addLayout(columns_row)
         body.addStretch(1)
         scroll = QScrollArea()
@@ -335,11 +299,10 @@ class ToolsTab(QWidget):
         top_row.addStretch(1)
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
-        import nerdfont as nf
-        _nf_font = QFont(constants.FONT_FAMILY_NERD, 11)
         self._load_steam_btn = QPushButton()
         self._load_steam_btn.setObjectName('opsLoadBtn')
-        self._load_steam_btn.setFont(_nf_font)
+        self._load_steam_btn.setIcon(
+            app_icons.get_qicon('steam', role='text_on_accent'))
         self._load_steam_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self._load_steam_btn.setMinimumHeight(36)
         self._load_steam_btn.clicked.connect(self._on_load_save_clicked)
@@ -347,7 +310,8 @@ class ToolsTab(QWidget):
         self._load_xgp_btn = QPushButton()
         self._load_xgp_btn.setObjectName('opsLoadBtn')
         self._load_xgp_btn.setProperty('loadKind', 'secondary')
-        self._load_xgp_btn.setFont(_nf_font)
+        self._load_xgp_btn.setIcon(
+            app_icons.get_qicon('gamepass', role='text_secondary'))
         self._load_xgp_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self._load_xgp_btn.setMinimumHeight(36)
         self._load_xgp_btn.clicked.connect(self._on_load_xgp_clicked)
@@ -403,8 +367,11 @@ class ToolsTab(QWidget):
     def _make_nav_release(self, nav_key):
         def _handler(event):
             if event.button() == Qt.LeftButton and hasattr(self, 'parent_window') and self.parent_window:
-                self.parent_window.nexus_band.set_active(nav_key)
-                self.parent_window._on_nav_changed(nav_key)
+                if hasattr(self.parent_window, '_activate_nav'):
+                    self.parent_window._activate_nav(nav_key)
+                elif hasattr(self.parent_window, 'nav_strip'):
+                    self.parent_window.nav_strip.set_active(nav_key)
+                    self.parent_window._on_nav_changed(nav_key)
         return _handler
 
     def _create_campaign_strip(self):
@@ -629,11 +596,14 @@ class ToolsTab(QWidget):
         self.fade_animation.setEasingCurve(QEasingCurve.OutCubic)
         self.fade_animation.start()
     def _refresh_save_btns(self):
-        import nerdfont as nf
         if hasattr(self, '_load_steam_btn') and self._load_steam_btn:
-            self._load_steam_btn.setText(f"{nf.icons['nf-fa-steam']}  {t('tools.btn_steam')}")
+            self._load_steam_btn.setText(t('tools.btn_steam') or 'Steam')
+            self._load_steam_btn.setIcon(
+                app_icons.get_qicon('steam', role='text_on_accent'))
         if hasattr(self, '_load_xgp_btn') and self._load_xgp_btn:
-            self._load_xgp_btn.setText(f"{nf.icons['nf-fa-xbox']}  {t('tools.btn_gamepass')}")
+            self._load_xgp_btn.setText(t('tools.btn_gamepass') or 'GamePass')
+            self._load_xgp_btn.setIcon(
+                app_icons.get_qicon('gamepass', role='text_secondary'))
     def refresh_labels(self):
         self._refresh_save_btns()
         if hasattr(self, '_load_btn') and self._load_btn:

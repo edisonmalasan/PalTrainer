@@ -4,7 +4,8 @@ Strategy (plan 019 §6, bundled-font mandate):
 - display/headings/nav: Hanken Grotesk (bundled TTF), Segoe UI fallback
 - body/controls/tables: Inter (bundled TTF), Segoe UI fallback
 - data/mono: Cascadia Mono with Consolas fallback (no ligatures in Mono)
-- icons: bundled Hack Nerd Font (resources/assets/fonts)
+- icons: bundled token-colored SVG set via chrome/icons.py (``get_qicon``);
+  no icon-font dependency
 
 Every TTF/OTF under resources/assets/fonts is registered at startup once;
 per-widget font loading is banned (see design-context §9).
@@ -18,8 +19,15 @@ from PyQt6.QtGui import QFont, QFontDatabase
 FONT_BODY_STACK = ['Inter 28pt', 'Inter', 'Segoe UI']
 FONT_HEADING_STACK = ['Hanken Grotesk', 'Segoe UI']
 FONT_MONO_STACK = ['Cascadia Mono', 'Consolas']
-FONT_ICON = 'Hack Nerd Font'
-FONT_ICON_STACK = [FONT_ICON]
+
+# Real bundled weights (Regular/Medium/SemiBold files ship in
+# resources/assets/fonts — synthetic bold is banned for primary typography).
+FONT_WEIGHTS = {
+    400: QFont.Weight.Normal,
+    500: QFont.Weight.DemiBold,   # Medium (Qt maps 500 to the nearest heavier face)
+    600: QFont.Weight.DemiBold,   # SemiBold
+    700: QFont.Weight.Bold,
+}
 
 _REGISTERED = False
 
@@ -58,7 +66,9 @@ def _make(stack: list[str], px: int, weight: int) -> QFont:
     font = QFont()
     font.setFamilies(stack)
     font.setPixelSize(px)
-    font.setWeight(QFont.Weight(weight))
+    # Real bundled weights: Medium/SemiBold/Bold TTFs are registered, so Qt
+    # picks the matching face instead of synthesizing bold from Regular.
+    font.setWeight(FONT_WEIGHTS.get(weight, QFont.Weight(weight)))
     return font
 
 
@@ -72,7 +82,3 @@ def heading_font(px: int = 14, weight: int = 700) -> QFont:
 
 def mono_font(px: int = 11, weight: int = 400) -> QFont:
     return _make(FONT_MONO_STACK, px, weight)
-
-
-def icon_font(px: int = 14) -> QFont:
-    return _make([FONT_ICON], px, 400)

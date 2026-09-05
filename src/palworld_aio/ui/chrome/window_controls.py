@@ -6,7 +6,7 @@ window's top-right corner above the page canvas (repositioned on resize).
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QCursor, QFont
+from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton
 
 from i18n import t
@@ -16,14 +16,6 @@ from palworld_aio.ui.chrome import icons as app_icons
 
 def _txt(key: str, fallback: str) -> str:
     return t(key, default=fallback) if t else fallback
-
-
-# Right-edge reserve (px) that page content must leave clear for the floating
-# WindowControls cluster (ui-modernization Phase 0). Covers the 3-button
-# cluster plus its right offset and breathing room; value preserved from the
-# legacy per-screen `170` magic so Phase 0 is visual-neutral. Tuned with
-# screenshots in Phase 1 (rail/tray work).
-CONTROLS_RESERVE_WIDTH = 170
 
 
 class WindowControls(QWidget):
@@ -38,26 +30,25 @@ class WindowControls(QWidget):
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(2)
-        font = QFont(constants.FONT_FAMILY_NERD, 12)
-        self.minimize_btn = QPushButton(app_icons.get_icon('minimize'))
+        self.minimize_btn = QPushButton()
+        self.minimize_btn.setIcon(app_icons.get_qicon('minimize', role='text_secondary'))
         self.minimize_btn.setObjectName('windowControlBtn')
         self.minimize_btn.setFixedSize(30, 24)
-        self.minimize_btn.setFont(font)
         self.minimize_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.minimize_btn.setToolTip(_txt('button.minimize', 'Minimize'))
         self.minimize_btn.clicked.connect(self.minimize_clicked.emit)
-        self.maximize_btn = QPushButton(app_icons.get_icon('maximize'))
+        self.maximize_btn = QPushButton()
+        self.maximize_btn.setIcon(app_icons.get_qicon('maximize', role='text_secondary'))
         self.maximize_btn.setObjectName('windowControlBtn')
         self.maximize_btn.setFixedSize(30, 24)
-        self.maximize_btn.setFont(font)
         self.maximize_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.maximize_btn.setToolTip(_txt('button.maximize', 'Maximize'))
         self.maximize_btn.clicked.connect(self.maximize_clicked.emit)
-        self.close_btn = QPushButton(app_icons.get_icon('close'))
+        self.close_btn = QPushButton()
+        self.close_btn.setIcon(app_icons.get_qicon('close', role='danger'))
         self.close_btn.setObjectName('windowControlBtn')
         self.close_btn.setProperty('danger', True)
         self.close_btn.setFixedSize(30, 24)
-        self.close_btn.setFont(font)
         self.close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.close_btn.setToolTip(_txt('button.close', 'Close'))
         self.close_btn.clicked.connect(self.close_clicked.emit)

@@ -49,9 +49,10 @@ def test_type_scale_shape():
         px, weight = spec
         assert px > 0
         assert weight in (400, 500, 600, 700)
-    # Plan 019 type scale: display 19/700, title 14/700.
+    # Plan 019 type scale, top-nav-shell: display 19/700, title 14/600
+    # (real bundled SemiBold, no synthetic bold).
     assert tokens.TYPE['display'] == (19, 700)
-    assert tokens.TYPE['title'] == (14, 700)
+    assert tokens.TYPE['title'] == (14, 600)
 
 
 def test_rgba_helper():

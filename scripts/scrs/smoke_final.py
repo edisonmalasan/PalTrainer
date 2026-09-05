@@ -44,7 +44,7 @@ try:
     loop.exec()
     log('shell_v2=' + str(getattr(w, '_shell_v2', False)))
     log('no_splitter=' + str(not hasattr(w, 'splitter')))
-    log('band_items=' + str(len(w.nexus_band._items)))
+    log('nav_strip_tabs=' + str(len(w.nav_strip._tabs)))
 
     # all 12 pages build + switch
     page_ids = ['tools', 'base_inventory', 'player_inventory', 'pal_editor', 'players',
@@ -52,7 +52,7 @@ try:
     ok_pages = []
     for pid in page_ids:
         try:
-            w.nexus_band.set_active(pid)
+            w._activate_nav(pid)
             w._on_nav_changed(pid)
             app.sendPostedEvents()
             ok_pages.append(pid)
@@ -91,7 +91,8 @@ try:
         try:
             set_language(code)
             load_resources()
-            w.nexus_band.refresh_labels()
+            w.nav_strip.refresh_labels()
+            w.app_bar.refresh_labels()
             w.tools_tab.refresh_labels()
             ok_langs += 1
         except Exception as e:
@@ -107,7 +108,7 @@ try:
 
     shots = pathlib.Path.cwd() / 'Logs'
     for pid in ['tools', 'map', 'pal_editor', 'players', 'exclusions', 'json_editor', 'breeding']:
-        w.nexus_band.set_active(pid)
+        w._activate_nav(pid)
         w._on_nav_changed(pid)
         app.sendPostedEvents()
         loop2 = QEventLoop()

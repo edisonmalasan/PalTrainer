@@ -24,6 +24,25 @@ NEW_TRANSLATIONS = {
     'inventory.palpedia_save_failed': 'Failed to save Palpedia changes',
     'inventory.palpedia_click_register': 'Click to register',
     'inventory.palpedia_click_unregister': 'Click to unregister',
+    # top-nav-shell 5.3: shell v3 compact nav labels + save chip states
+    'nav.rail.tools': 'Tools',
+    'nav.rail.map': 'Map',
+    'nav.rail.base_inventory': 'Base',
+    'nav.rail.players': 'Players',
+    'nav.rail.guilds': 'Guilds',
+    'nav.rail.bases': 'Bases',
+    'nav.rail.exclusions': 'Excl.',
+    'nav.rail.player_inventory': 'Player',
+    'nav.rail.pal_editor': 'Pal',
+    'nav.rail.json_editor': 'JSON',
+    'nav.rail.breeding': 'Breeding',
+    'nav.rail.docs': 'Docs',
+    'tray.state.no_save': 'No save',
+    'tray.state.loading': 'Loading',
+    'tray.state.loaded': 'Loaded',
+    'tray.state.dirty': 'Unsaved',
+    'tray.state.saving': 'Saving',
+    'tray.state.error': 'Error',
 }
 OLD_KEYS = []
 def remove_old_keys_from_all():
