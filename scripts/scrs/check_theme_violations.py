@@ -70,6 +70,11 @@ DIM = lambda s: _c('\033[2m', s)
 RE_HEX_COLOR = re.compile(r'#[0-9A-Fa-f]{6}\b')
 RE_RGBA_COLOR = re.compile(r'rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*[\d.]+\s*\)')
 RE_SET_STYLESHEET = re.compile(r'\.setStyleSheet\s*\(')
+# Retired Deck-Ops palettes — mirror of chrome/tokens.py RETIRED_COLORS
+# (tokens.py is the source of truth; keep in sync). Lowercase for
+# case-insensitive comparison against RE_HEX_COLOR matches.
+RETIRED_HEX = frozenset({'#7dd3fc', '#4a90e2'})
+RE_RETIRED_RGBA = re.compile(r'rgba\(\s*125\s*,\s*211\s*,\s*252\s*,')
 RE_FONT_LITERAL = re.compile(
     r"""['"](?:Segoe UI|Consolas|Arial|Hack Nerd Font|Courier New|Tahoma|Verdana|Helvetica)['"]"""
 )
@@ -124,18 +129,21 @@ ALLOWED_DYNAMIC_PATTERNS = [
 CATEGORY_NAMES: Dict[str, str] = {
     'hardcolor-hex': 'Hardcoded hex color',
     'hardcolor-rgba': 'Hardcoded rgba color',
+    'retired-palette': 'Retired palette color',
     'inline-qss': 'Inline style block',
     'hardcoded-font': 'Hardcoded font name',
 }
 CATEGORY_EMOJI: Dict[str, str] = {
     'hardcolor-hex': '🎨',
     'hardcolor-rgba': '🎨',
+    'retired-palette': '🚫',
     'inline-qss': '📝',
     'hardcoded-font': '🔤',
 }
 CATEGORY_SEVERITY: Dict[str, str] = {
     'hardcolor-hex': 'error',
     'hardcolor-rgba': 'error',
+    'retired-palette': 'error',
     'inline-qss': 'warning',
     'hardcoded-font': 'warning',
 }
@@ -269,6 +277,15 @@ def scan_file(file_path: Path, root: Path, ruthless: bool = False) -> ScanResult
                 result.violations.append(Violation(
                     file_path, lineno, 0, 'hardcolor-rgba', 'error',
                     'Uses rgba() color directly — should come from constants.py',
+                    ln.strip(),
+                ))
+
+            retired_hex = [h for h in hexes if h.lower() in RETIRED_HEX]
+            if retired_hex or RE_RETIRED_RGBA.search(ln):
+                offender = retired_hex[0] if retired_hex else 'rgba(125,211,252,...)'
+                result.violations.append(Violation(
+                    file_path, lineno, 0, 'retired-palette', 'error',
+                    f'Uses retired palette color {offender} — see chrome/tokens.py RETIRED_COLORS',
                     ln.strip(),
                 ))
 
