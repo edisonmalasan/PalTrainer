@@ -1,0 +1,166 @@
+/* Transitional extras — RETAINED BLOCKS ONLY (plan 025 purge).
+   Blocks for retired objects (old sidebar/header/results/tools cards,
+   editPals legacy chrome, etc.) were removed. Remaining blocks style
+   objectNames still present in code awaiting geometry-level r02 passes.
+   Delete this file when the last screen migrates to the builder. */
+/* Transitional extras split from darkmode.qss (UI overhaul plan 002).
+   Contains objectName/property/class-specific rules only; the global
+   element rules now come from the generated QSS builder. Delete this
+   file when plans 004-016 finish migrating every screen. */
+QWidget#central {
+    background-color: #0A0C10;
+}
+QScrollArea#subPopupScroll,
+QScrollArea#contextMenuScroll {
+    background: transparent;
+    border: none;
+    border-radius: 0px;
+}
+QFrame#glass {
+    background: rgba(18,20,24,0.65);
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.04);
+    padding: 10px;
+}
+QFrame#treePanel {
+    background-color: transparent;
+}
+QTabWidget#inventoryTabs::pane {
+    border: 1px solid rgba(125, 211, 252, 0.10);
+    border-radius: 6px;
+    background: transparent;
+}
+QTabWidget#inventoryTabs QTabBar::tab {
+    background: rgba(255, 255, 255, 0.04);
+    color: #A6B8C8;
+    padding: 6px 14px;
+    margin-right: 2px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    font-weight: 600;
+}
+QTabWidget#inventoryTabs QTabBar::tab:selected {
+    background: rgba(125, 211, 252, 0.10);
+    color: #7DD3FC;
+}
+QTabWidget#inventoryTabs QTabBar::tab:hover:!selected {
+    background: rgba(125, 211, 252, 0.05);
+    color: #E6EEF6;
+}
+QTreeWidget#baseTree,
+QTreeWidget#playerTree {
+    border: none;
+    background: transparent;
+}
+QTreeWidget#baseTree::item,
+QTreeWidget#playerTree::item {
+    padding: 2px 4px;
+}
+QTreeWidget#baseTree QHeaderView::section,
+QTreeWidget#playerTree QHeaderView::section {
+    background: rgba(255, 255, 255, 0.05);
+    color: #A6B8C8;
+    padding: 4px;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    text-align: center;
+}
+QSplitter#collapsibleSplitter::handle:horizontal {
+    background: rgba(255,255,255,0.02);
+    width: 16px;
+}
+QFrame#hoverOverlayContainer {
+    background: rgba(18,20,24,0.95);
+    border: 1px solid rgba(125,211,252,0.3);
+    border-radius: 8px;
+}
+QLabel#hoverGuildLabel {
+    color: #7DD3FC;
+    font-weight: bold;
+}
+QLabel#hoverDetailLabel {
+    color: #a0aec0;
+}
+QLineEdit#searchInput {
+    background-color: rgba(18,20,24,0.65);
+    color: #dfeefc;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+QLineEdit#searchInput:focus {
+    border: 1px solid rgba(125,211,252,0.5);
+    background-color: rgba(18,20,24,0.85);
+}
+QTreeWidget#searchTree {
+    background-color: rgba(18,20,24,0.65);
+    color: #dfeefc;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    alternate-background-color: rgba(255,255,255,0.02);
+}
+QTreeWidget#searchTree::item {
+    padding: 6px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+    color: #dfeefc;
+}
+QTreeWidget#searchTree::item:selected {
+    background-color: rgba(125,211,252,0.2);
+    color: #7DD3FC;
+}
+QTreeWidget#searchTree::item:hover {
+    background-color: rgba(37,150,190,0.12);
+}
+QTreeWidget#searchTree QHeaderView::section {
+    background-color: rgba(30,33,40,0.9);
+    color: #7DD3FC;
+    padding: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    font-weight: bold;
+}
+QTreeWidget#searchTree QHeaderView::section:hover {
+    background-color: rgba(37,99,235,0.25);
+    color: #AEE9FF;
+}
+QWidget#editPalsContainer {
+    background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1,
+                stop:0 rgba(12,14,18,0.98), stop:0.5 rgba(10,16,22,0.98), stop:1 rgba(8,12,18,0.98));
+    border: 1px solid rgba(125,211,252,0.2);
+    border-radius: 12px;
+}
+QWidget#editPalsContent {
+    background: transparent;
+}
+QFrame#palIcon {
+    border: 2px solid rgba(255,255,255,0.2);
+    border-radius: 40px;
+    background-color: rgba(30,35,45,0.8);
+}
+QFrame#palIcon:hover {
+    border: 2px solid #7DD3FC;
+    background-color: rgba(40,45,55,0.9);
+}
+QFrame#palCard {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 8px;
+}
+QFrame#palCard:hover {
+    background: rgba(125,211,252,0.08);
+    border-color: rgba(125,211,252,0.2);
+}
+QFrame#palCard[selected="true"] {
+    background: rgba(125,211,252,0.15);
+    border-color: rgba(125,211,252,0.4);
+}
+QSpinBox#editPalsSpin::up-button,
+QSpinBox#editPalsSpin::up-button:hover,
+QDialog[dialogType="skillSelect"] {
+    background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1,
+                stop:0 rgba(12,14,18,0.98), stop:1 rgba(8,12,18,0.98));
+    border: 1px solid rgba(125,211,252,0.2);
+    border-radius: 12px;
+}

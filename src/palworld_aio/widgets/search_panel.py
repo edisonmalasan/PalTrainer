@@ -3,7 +3,6 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
 from i18n import t
 from palworld_aio import constants
-from palworld_aio.ui.chrome.styles import CONTENT_PANEL_STYLE, TREE_WIDGET_QSS
 _SORT_ROLE = Qt.UserRole + 1
 class _SortableTreeWidgetItem(QTreeWidgetItem):
     def __lt__(self, other):
@@ -15,6 +14,13 @@ class _SortableTreeWidgetItem(QTreeWidgetItem):
             return a < b
         return self.text(col) < other.text(col)
 class SearchPanel(QWidget):
+    """Dense full-bleed table workspace (plan 023).
+
+    Public API unchanged (add_item/clear/set_items/get_*/signals); layout is
+    now: filter row + full-bleed dense tree + footer context strip. The old
+    per-panel TREE_WIDGET_QSS application is removed (global table QSS owns
+    presentation).
+    """
     item_selected = pyqtSignal(object)
     item_double_clicked = pyqtSignal(object)
     search_requested = pyqtSignal(str)
@@ -28,37 +34,29 @@ class SearchPanel(QWidget):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setSpacing(0)
+        # filter row: title chip + inline search + result count (ribbon grammar)
         search_layout = QHBoxLayout()
+        search_layout.setContentsMargins(12, 8, 12, 8)
+        search_layout.setSpacing(8)
         self.search_label = QLabel(t(self.label_key) if t else self.label_key)
-        self.search_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
-        self.search_label.setObjectName('sectionHeader')
-        self.search_label.setStyleSheet('QLabel#sectionHeader { margin-left: 0px; padding-left: 10px; }')
-        self.search_label.setAlignment(Qt.AlignCenter)
+        self.search_label.setObjectName('missionZone')
         search_layout.addWidget(self.search_label)
         self.search_input = QLineEdit()
         self.search_input.setObjectName('searchInput')
         self.search_input.setPlaceholderText(t('search.placeholder') if t else 'Type to search...')
-        self.search_input.setStyleSheet(f'''
-            QLineEdit {{
-                background: rgba(18,20,24,0.65);
-                border: 1px solid rgba(125,211,252,0.15);
-                border-radius: 6px;
-                padding: 4px 8px;
-                color: #E2E8F0;
-                font-size: 11px;
-                min-height: 24px;
-            }}
-            QLineEdit:focus {{
-                border-color: rgba(125,211,252,0.4);
-            }}
-            QLineEdit::placeholder {{
-                color: #6B7280;
-            }}
-        ''')
+        self.search_input.setClearButtonEnabled(True)
         self.search_input.textChanged.connect(self._on_search)
         search_layout.addWidget(self.search_input, stretch=1)
+        self.count_label = QLabel('0')
+        self.count_label.setObjectName('searchCount')
+        search_layout.addWidget(self.count_label)
         layout.addLayout(search_layout)
+        hairline = QFrame()
+        hairline.setObjectName('bandZoneRule')
+        hairline.setFixedHeight(1)
+        layout.addWidget(hairline)
+        # full-bleed dense table
         self.tree = QTreeWidget()
         self.tree.setObjectName('searchTree')
         self.columns = [t(k) if k else '' for k in self.column_keys]
@@ -68,17 +66,33 @@ class SearchPanel(QWidget):
         self.tree.setSelectionMode(self._selection_mode)
         self.tree.setSortingEnabled(True)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.tree.setStyleSheet(TREE_WIDGET_QSS)
         header = self.tree.header()
         for i, width in enumerate(self.column_widths):
             if i < len(self.columns):
                 self.tree.setColumnWidth(i, width)
         header.setStretchLastSection(True)
-        header.setDefaultAlignment(Qt.AlignCenter)
+        header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.tree.itemSelectionChanged.connect(self._on_selection_changed)
         self.tree.itemDoubleClicked.connect(self._on_double_click)
         layout.addWidget(self.tree, stretch=1)
+        # footer context strip
+        footer = QFrame()
+        footer.setObjectName('tableFooter')
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(12, 4, 12, 4)
+        footer_layout.setSpacing(8)
+        self.hint_label = QLabel('')
+        self.hint_label.setObjectName('bulkHintLabel')
+        footer_layout.addWidget(self.hint_label)
+        footer_layout.addStretch(1)
+        self.footer_slot = footer_layout
+        layout.addWidget(footer)
+        self._update_count()
         self._all_items = []
+    def _update_count(self):
+        total = self.tree.topLevelItemCount()
+        visible = sum(0 if self.tree.topLevelItem(i).isHidden() else 1 for i in range(total))
+        self.count_label.setText(f'{visible}/{total}' if total != visible else str(total))
     def _on_search(self, text):
         text = text.lower()
         for i in range(self.tree.topLevelItemCount()):
@@ -89,6 +103,7 @@ class SearchPanel(QWidget):
                     match = True
                     break
             item.setHidden(not match)
+        self._update_count()
     def _on_selection_changed(self):
         items = self.tree.selectedItems()
         if items:
@@ -101,6 +116,7 @@ class SearchPanel(QWidget):
     def clear(self):
         self.tree.clear()
         self._all_items = []
+        self._update_count()
     def add_item(self, values, data=None, sort_keys=None):
         item = _SortableTreeWidgetItem([str(v) for v in values])
         if data:
@@ -110,6 +126,7 @@ class SearchPanel(QWidget):
                 item.setData(col, _SORT_ROLE, key)
         self.tree.addTopLevelItem(item)
         self._all_items.append(item)
+        self._update_count()
         return item
     def get_selected_items(self):
         return self.tree.selectedItems()

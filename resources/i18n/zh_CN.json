@@ -2121,5 +2121,9 @@
     "inventory.palpedia_selected": "已选择 {count}",
     "inventory.palpedia_save_failed": "无法保存 Palpedia 更改",
     "inventory.palpedia_click_register": "点击注册",
-    "inventory.palpedia_click_unregister": "点击取消注册"
+    "inventory.palpedia_click_unregister": "点击取消注册",
+    "sidebar.section.inspect": "载入与查看",
+    "sidebar.section.world": "世界数据",
+    "sidebar.section.editing": "编辑",
+    "sidebar.section.reference": "参考"
 }

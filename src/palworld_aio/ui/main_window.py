@@ -12,7 +12,7 @@ import logging
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QMenuBar, QMenu, QStatusBar, QSplitter, QMessageBox, QFileDialog, QInputDialog, QDialog, QComboBox, QApplication, QStackedWidget, QTextEdit, QLineEdit
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QPoint, QPropertyAnimation, QEasingCurve, QByteArray, QThread
 
-from PyQt6.QtGui import QIcon, QFont, QAction, QPixmap, QCloseEvent, QTextCursor
+from PyQt6.QtGui import QIcon, QFont, QAction, QPixmap, QCloseEvent, QTextCursor, QCursor
 from i18n import t, set_language, load_resources, get_native_lang_name
 from common import get_versions, get_current_version, get_display_version, is_standalone
 from import_libs import run_with_loading
@@ -21,7 +21,7 @@ from .tabs.tools_tab import center_on_parent, DropOverlay
 GITHUB_LATEST_ZIP = 'https://github.com/edisonmalasan/PalTrainer/releases/latest'
 from palworld_aio import constants
 from palworld_aio.shell_state import ShellStateModel
-from palworld_aio.ui.chrome.styles import ThemeManager, MENU_STYLE, DIALOG_STYLE as DARK_THEME_STYLE
+from palworld_aio.ui.chrome.styles import ThemeManager
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from palworld_aio.utils import as_uuid
 from palworld_aio.managers.save_manager import save_manager
@@ -86,9 +86,8 @@ class DetachedStatusWindow(QWidget):
         ThemeManager.apply_to_widget(self)
     def setup_status_ui(self):
         head = QHBoxLayout()
-        txt_color = '#dfeefc' if self.is_dark else '#000000'
         self.title_label = QLabel(t('console.title'))
-        self.title_label.setStyleSheet(f'font-weight: bold; font-size: 14px; color: {txt_color};')
+        self.title_label.setObjectName('consoleTitleLabel')
         head.addWidget(self.title_label)
         head.addStretch()
         self.close_btn = QPushButton('✕')
@@ -104,8 +103,6 @@ class DetachedStatusWindow(QWidget):
     def update_theme(self, is_dark):
         self.is_dark = is_dark
         self._load_theme()
-        txt_color = '#dfeefc' if self.is_dark else '#000000'
-        self.title_label.setStyleSheet(f'font-weight: bold; font-size: 14px; color: {txt_color};')
     def refresh_title(self):
         self.title_label.setText(t('console.title'))
     def append_message(self, text):
@@ -249,7 +246,7 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._refresh_exclusions()
         self._load_theme()
-        self.sidebar.set_active('tools')
+        self.nexus_band.set_active('tools')
         self._setup_menus()
         self._setup_connections()
         QTimer.singleShot(0, self._check_update)
@@ -282,7 +279,7 @@ class MainWindow(QMainWindow):
         logging.lastResort = None
         if self.user_settings.get('console_detached', False):
             self.status_stream.detach()
-            self.sidebar.set_console_visible(True)
+            self.nexus_band.set_console_visible(True)
     def _setup_ui(self):
         self.setWindowTitle(t('deletion.title') if t else 'All-in-One Tools')
         self.setMinimumSize(1200, 750)
@@ -299,35 +296,102 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
-        from .chrome.header_widget import HeaderWidget
-        self.header_widget = HeaderWidget()
-        self.header_widget.minimize_clicked.connect(self.showMinimized)
-        self.header_widget.maximize_clicked.connect(self._toggle_maximize)
-        self.header_widget.close_clicked.connect(self.close)
-        self.header_widget.about_clicked.connect(self._show_about)
-        self.header_widget.warn_btn.clicked.connect(self._show_warnings)
-        self.header_widget.toolbox_clicked.connect(self._show_tab_guide)
-        self.header_widget.save_clicked.connect(self._save_changes)
-        self.header_widget.show_warning(True)
-        main_layout.addWidget(self.header_widget)
-        constants.header_loading_widget = self.header_widget
+        # Deck Operations shell v2 (plan 020): full-bleed page canvas + right
+        # NexusBand rail. Legacy sidebar/header/dock path removed (plan 025).
+        self._setup_ui_v2(main_layout)
+        self.status_bar = QStatusBar()
+        self.status_bar.setFixedHeight(0)
+        self.status_bar.hide()
+        self.setStatusBar(self.status_bar)
+        self.setAcceptDrops(True)
+        self._drop_overlay = DropOverlay(self)
+        self._drop_overlay.setVisible(False)
+        self._drop_overlay.setGeometry(self.rect())
+
+    def _setup_ui_v2(self, main_layout):
+        from .chrome.nexus_band import NexusBand, BAND_W
+        from .chrome.instrument_tray import TrayDrawer
+        from .chrome.window_controls import WindowControls
+        self._shell_v2 = True
         body_layout = QHBoxLayout()
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(0)
-        from .chrome.sidebar_widget import SidebarWidget
-        collapsed = self.user_settings.get('sidebar_collapsed', True)
-        self.sidebar = SidebarWidget(collapsed=collapsed)
-        self.sidebar.nav_changed.connect(self._on_nav_changed)
-        self.sidebar.console_toggled.connect(self._detach_status)
-        self.sidebar.right_panel_toggled.connect(self._toggle_dashboard)
-        self.sidebar.collapsed_changed.connect(self._on_sidebar_collapsed_changed)
-        body_layout.addWidget(self.sidebar)
-        self._dashboard_collapsed = False
-        self._dashboard_sizes = [1000, 400]
-        self._init_collapse = not self.user_settings.get('right_panel_visible', True)
-        self.splitter = QSplitter(Qt.Horizontal)
-        self.splitter.setChildrenCollapsible(False)
         self.stacked_widget = QStackedWidget()
+        self._build_pages()
+        # tray drawer overlay: canvas-local frame above the stack (hidden)
+        self._tray_drawer = TrayDrawer(self.stacked_widget)
+        self._tray_drawer.hide()
+        self._tray_drawer.close_requested.connect(self._close_tray_drawer)
+        self._tray_scrim = QWidget(self.stacked_widget)
+        self._tray_scrim.setObjectName('trayScrim')
+        self._tray_scrim.hide()
+        self.nexus_band = NexusBand()
+        self.nexus_band.nav_changed.connect(self._on_nav_changed)
+        self.nexus_band.console_toggled.connect(self._detach_status)
+        self.nexus_band.about_clicked.connect(self._show_about)
+        self.nexus_band.guide_clicked.connect(self._show_tab_guide)
+        self.nexus_band.save_clicked.connect(self._save_changes)
+        self.nexus_band.masthead_clicked.connect(self._show_menu_popup_v2)
+        self.nexus_band.tray_expand_toggled.connect(self._on_tray_expand_toggled)
+        self.nexus_band.warn_btn.clicked.connect(self._show_warnings)
+        self.nexus_band.show_warning(True)
+        self.nexus_band.set_warning_slot(self._show_warnings)
+        self._window_controls = WindowControls(self)
+        self._window_controls.minimize_clicked.connect(self.showMinimized)
+        self._window_controls.maximize_clicked.connect(self._toggle_maximize)
+        self._window_controls.close_clicked.connect(self.close)
+        self._window_controls.resize(self._window_controls.sizeHint())
+        self._reposition_window_controls()
+        body_layout.addWidget(self.stacked_widget, stretch=1)
+        body_layout.addWidget(self.nexus_band)
+        main_layout.addLayout(body_layout, stretch=1)
+        # loading_manager 'header' mode drives the tray spinner directly
+        constants.header_loading_widget = self.nexus_band.tray
+
+    def _reposition_window_controls(self):
+        if not getattr(self, '_window_controls', None):
+            return
+        self._window_controls.adjustSize()
+        w = self._window_controls.width()
+        self._window_controls.move(self.width() - w - 6, 4)
+
+    def _show_menu_popup_v2(self):
+        from palworld_aio.widgets import MenuPopup
+        if getattr(self, '_menu_popup_v2', None) is None:
+            self._menu_popup_v2 = MenuPopup(self)
+            if getattr(self, '_menu_actions_dict', None):
+                self._menu_popup_v2.set_menu_actions(self._menu_actions_dict)
+        gp = self.nexus_band.mapToGlobal(self.nexus_band.masthead_btn.geometry().topLeft())
+        self._menu_popup_v2.show_at(QPoint(gp.x() - self._menu_popup_v2.width() + self.nexus_band.width(), gp.y() + self.nexus_band.masthead_btn.height() + 4))
+
+    def _on_tray_expand_toggled(self, expanded):
+        self._set_tray_drawer_visible(expanded)
+
+    def _set_tray_drawer_visible(self, visible):
+        if not getattr(self, '_shell_v2', False):
+            return
+        drawer = self._tray_drawer
+        if visible:
+            area = self.stacked_widget.geometry()
+            dh = min(drawer.sizeHint().height(), area.height() - 24)
+            drawer.resize(drawer.width(), max(dh, 240))
+            drawer.move(area.width() - drawer.width() - 12, 12)
+            self._tray_scrim.setGeometry(area)
+            self._tray_scrim.raise_()
+            self._tray_scrim.show()
+            drawer.raise_()
+            drawer.show()
+        else:
+            drawer.hide()
+            self._tray_scrim.hide()
+        self.nexus_band.tray.set_expanded(visible)
+        self.user_settings['tray_expanded'] = visible
+        self._save_user_settings()
+
+    def _close_tray_drawer(self):
+        self._set_tray_drawer_visible(False)
+
+    def _build_pages(self):
         self._tab_created = set()
         self._lazy_tab_map = {}
         for idx in range(12):
@@ -344,36 +408,7 @@ class MainWindow(QMainWindow):
         self.stacked_widget.setCurrentIndex(0)
         self.stacked_widget.currentWidget().update()
         self.stacked_widget.repaint()
-        self.splitter.addWidget(self.stacked_widget)
-        from .chrome.results_widget import ResultsWidget
-        self.results_widget = ResultsWidget()
-        self.results_widget.hide_requested.connect(self._toggle_dashboard)
-        self.splitter.addWidget(self.results_widget)
-        saved_sizes = self.user_settings.get('splitter_sizes')
-        if isinstance(saved_sizes, list) and len(saved_sizes) == 2 and all(isinstance(v, int) and v >= 0 for v in saved_sizes):
-            QTimer.singleShot(0, lambda: self.splitter.setSizes(saved_sizes))
-        else:
-            self.splitter.setSizes([1000, 350])
-        self._splitter_save_timer = QTimer(self)
-        self._splitter_save_timer.setSingleShot(True)
-        self._splitter_save_timer.setInterval(400)
-        self._splitter_save_timer.timeout.connect(self._persist_splitter_sizes)
-        self.splitter.splitterMoved.connect(self._on_splitter_moved)
-        body_layout.addWidget(self.splitter, stretch=1)
-        if self._init_collapse:
-            self.results_widget.hide()
-            self._dashboard_collapsed = True
-            if hasattr(self, 'sidebar') and self.sidebar:
-                self.sidebar.set_right_panel_visible(False)
-        main_layout.addLayout(body_layout, stretch=1)
-        self.status_bar = QStatusBar()
-        self.status_bar.setFixedHeight(0)
-        self.status_bar.hide()
-        self.setStatusBar(self.status_bar)
-        self.setAcceptDrops(True)
-        self._drop_overlay = DropOverlay(self)
-        self._drop_overlay.setVisible(False)
-        self._drop_overlay.setGeometry(self.rect())
+
     _TAB_SETUP = {
         0: '_setup_tools_tab',
         1: '_setup_base_inventory_tab',
@@ -404,44 +439,47 @@ class MainWindow(QMainWindow):
             self.stacked_widget.insertWidget(idx, widget)
             self._tab_created.add(index)
     def _setup_players_tab(self):
+        from .chrome.components import create_page_ribbon
         players_tab = QWidget()
         layout = QVBoxLayout(players_tab)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(create_page_ribbon(t('deletion.search_players') if t else 'Search Players', (t('sidebar.section.world') if t else 'World Data').upper(), players_tab))
         self.players_panel = SearchPanel('deletion.search_players', ['deletion.col.player_name', 'deletion.col.last_seen', 'deletion.col.level', 'deletion.col.pals', 'deletion.col.uid', 'deletion.col.guild_name', 'deletion.col.guild_id', 'deletion.col.guild_level'], [140, 120, 60, 60, 150, 180, 180, 60])
         self.players_panel.item_selected.connect(self._on_player_selected)
         self.players_panel.tree.customContextMenuRequested.connect(self._show_player_context_menu)
-        layout.addWidget(self.players_panel)
+        layout.addWidget(self.players_panel, stretch=1)
         bulk_frame = QFrame()
-        bulk_frame.setStyleSheet('QFrame { background-color: rgba(30, 35, 45, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 8px; }')
+        bulk_frame.setObjectName('bulkActionBar')
         bulk_layout = QHBoxLayout(bulk_frame)
         self.bulk_label = QLabel(t('player.bulk_actions') if t else 'Bulk Actions:')
-        self.bulk_label.setStyleSheet('font-weight: bold; color: #e2e8f0;')
+        self.bulk_label.setObjectName('bulkActionLabel')
         bulk_layout.addWidget(self.bulk_label)
         bulk_layout.addSpacing(10)
         self.bulk_item_btn = QPushButton(t('player.bulk_item_management') if t else 'Bulk Item Management')
-        self.bulk_item_btn.setStyleSheet('\n            QPushButton {\n                background: rgba(125, 211, 252, 0.12);\n                color: #7DD3FC;\n                border: 1px solid rgba(125, 211, 252, 0.2);\n                border-radius: 6px;\n                padding: 8px 16px;\n                font-weight: 600;\n            }\n            QPushButton:hover {\n                background: rgba(125, 211, 252, 0.2);\n                border-color: rgba(125, 211, 252, 0.4);\n                color: #FFFFFF;\n            }\n        ')
         self.bulk_item_btn.clicked.connect(self._open_bulk_player_item_dialog)
         bulk_layout.addWidget(self.bulk_item_btn)
         self.bulk_pal_btn = QPushButton(t('player.bulk_pal_management') if t else 'Bulk Pal Management')
-        self.bulk_pal_btn.setStyleSheet('\n            QPushButton {\n                background: rgba(125, 211, 252, 0.12);\n                color: #7DD3FC;\n                border: 1px solid rgba(125, 211, 252, 0.2);\n                border-radius: 6px;\n                padding: 8px 16px;\n                font-weight: 600;\n            }\n            QPushButton:hover {\n                background: rgba(125, 211, 252, 0.2);\n                border-color: rgba(125, 211, 252, 0.4);\n                color: #FFFFFF;\n            }\n        ')
         self.bulk_pal_btn.clicked.connect(self._open_bulk_player_pal_dialog)
         bulk_layout.addWidget(self.bulk_pal_btn)
         self.bulk_tech_btn = QPushButton(t('player.bulk_technology_management') if t else 'Bulk Technology Management')
-        self.bulk_tech_btn.setStyleSheet('\n            QPushButton {\n                background: rgba(125, 211, 252, 0.12);\n                color: #7DD3FC;\n                border: 1px solid rgba(125, 211, 252, 0.2);\n                border-radius: 6px;\n                padding: 8px 16px;\n                font-weight: 600;\n            }\n            QPushButton:hover {\n                background: rgba(125, 211, 252, 0.2);\n                border-color: rgba(125, 211, 252, 0.4);\n                color: #FFFFFF;\n            }\n        ')
         self.bulk_tech_btn.clicked.connect(self._open_bulk_technology_dialog)
         bulk_layout.addWidget(self.bulk_tech_btn)
         self.bulk_guild_btn = QPushButton(t('guild.assign.btn_open') if t else 'Guild Assignments')
-        self.bulk_guild_btn.setStyleSheet('\n            QPushButton {\n                background: rgba(125, 211, 252, 0.12);\n                color: #7DD3FC;\n                border: 1px solid rgba(125, 211, 252, 0.2);\n                border-radius: 6px;\n                padding: 8px 16px;\n                font-weight: 600;\n            }\n            QPushButton:hover {\n                background: rgba(125, 211, 252, 0.2);\n                border-color: rgba(125, 211, 252, 0.4);\n                color: #FFFFFF;\n            }\n        ')
         self.bulk_guild_btn.clicked.connect(self._open_guild_assign_dialog)
         bulk_layout.addWidget(self.bulk_guild_btn)
         bulk_layout.addStretch()
         layout.addWidget(bulk_frame)
         self.stacked_widget.addWidget(players_tab)
     def _setup_guilds_tab(self):
+        from .chrome.components import create_page_ribbon
         guilds_tab = QWidget()
         layout = QVBoxLayout(guilds_tab)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(create_page_ribbon(t('deletion.search_guilds') if t else 'Search Guilds', (t('sidebar.section.world') if t else 'World Data').upper(), guilds_tab))
         splitter = QSplitter(Qt.Vertical)
+        splitter.setContentsMargins(0, 0, 0, 0)
         self.guilds_panel = SearchPanel('deletion.search_guilds', ['deletion.col.guild_name', 'deletion.col.guild_id', 'deletion.col.guild_level', 'deletion.col.members'], [200, 280, 100, 80])
         self.guilds_panel.item_selected.connect(self._on_guild_selected)
         self.guilds_panel.tree.customContextMenuRequested.connect(self._show_guild_context_menu)
@@ -450,16 +488,19 @@ class MainWindow(QMainWindow):
         self.guild_members_panel.item_selected.connect(self._on_guild_member_selected)
         self.guild_members_panel.tree.customContextMenuRequested.connect(self._show_guild_member_context_menu)
         splitter.addWidget(self.guild_members_panel)
-        layout.addWidget(splitter)
+        layout.addWidget(splitter, stretch=1)
         self.stacked_widget.addWidget(guilds_tab)
     def _setup_bases_tab(self):
+        from .chrome.components import create_page_ribbon
         bases_tab = QWidget()
         layout = QVBoxLayout(bases_tab)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(create_page_ribbon(t('deletion.search_bases') if t else 'Search Bases', (t('sidebar.section.world') if t else 'World Data').upper(), bases_tab))
         self.bases_panel = SearchPanel('deletion.search_bases', ['deletion.col.base_id', 'deletion.col.guild_id', 'deletion.col.guild_name', 'deletion.col.guild_level'], [200, 200, 200, 100])
         self.bases_panel.item_selected.connect(self._on_base_selected)
         self.bases_panel.tree.customContextMenuRequested.connect(self._show_base_context_menu)
-        layout.addWidget(self.bases_panel)
+        layout.addWidget(self.bases_panel, stretch=1)
         self.stacked_widget.addWidget(bases_tab)
     def _setup_map_tab(self):
         from .tabs.map_tab import MapTab
@@ -498,23 +539,60 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.breeding_tab)
 
     def _setup_exclusions_tab(self):
+        from .chrome.components import create_page_ribbon
         exclusions_tab = QWidget()
-        layout = QHBoxLayout(exclusions_tab)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
-        self.excl_players_panel = SearchPanel('deletion.exclusions.player_label', ['deletion.excluded_player_uid'], [300])
-        self.excl_players_panel.tree.customContextMenuRequested.connect(lambda pos: self._show_exclusion_context_menu(pos, 'players'))
-        layout.addWidget(self.excl_players_panel)
-        self.excl_guilds_panel = SearchPanel('deletion.exclusions.guild_label', ['deletion.excluded_guild_id'], [300])
-        self.excl_guilds_panel.tree.customContextMenuRequested.connect(lambda pos: self._show_exclusion_context_menu(pos, 'guilds'))
-        layout.addWidget(self.excl_guilds_panel)
-        self.excl_bases_panel = SearchPanel('deletion.exclusions.base_label', ['deletion.excluded_bases'], [300])
-        self.excl_bases_panel.tree.customContextMenuRequested.connect(lambda pos: self._show_exclusion_context_menu(pos, 'bases'))
-        layout.addWidget(self.excl_bases_panel)
+        layout = QVBoxLayout(exclusions_tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(create_page_ribbon(t('deletion.menu.exclusions') if t else 'Exclusions', (t('sidebar.section.world') if t else 'World Data').upper(), exclusions_tab))
+        # segmented control switching one full-bleed table (014-r02)
+        switch_row = QHBoxLayout()
+        switch_row.setContentsMargins(12, 6, 12, 6)
+        switch_row.setSpacing(6)
+        self._excl_views = {}
+        self._excl_btns = {}
+        switch_row.addStretch(1)
+        layout.addLayout(switch_row)
+        self._excl_stack = QStackedWidget()
+        specs = [
+            ('players', 'deletion.exclusions.player_label', ['deletion.excluded_player_uid'], [300]),
+            ('guilds', 'deletion.exclusions.guild_label', ['deletion.excluded_guild_id'], [300]),
+            ('bases', 'deletion.exclusions.base_label', ['deletion.excluded_bases'], [300]),
+        ]
+        for key, label_key, cols, widths in specs:
+            page = QWidget()
+            page_lay = QVBoxLayout(page)
+            page_lay.setContentsMargins(0, 0, 0, 0)
+            panel = SearchPanel(label_key, cols, widths)
+            if key == 'players':
+                self.excl_players_panel = panel
+                panel.tree.customContextMenuRequested.connect(lambda pos: self._show_exclusion_context_menu(pos, 'players'))
+            elif key == 'guilds':
+                self.excl_guilds_panel = panel
+                panel.tree.customContextMenuRequested.connect(lambda pos: self._show_exclusion_context_menu(pos, 'guilds'))
+            else:
+                self.excl_bases_panel = panel
+                panel.tree.customContextMenuRequested.connect(lambda pos: self._show_exclusion_context_menu(pos, 'bases'))
+            page_lay.addWidget(panel)
+            self._excl_stack.addWidget(page)
+            self._excl_views[key] = self._excl_stack.count() - 1
+            btn = QPushButton(t(label_key) if t else key.title())
+            btn.setObjectName('pageSwitchBtn')
+            btn.setCheckable(True)
+            btn.setCursor(QCursor(Qt.PointingHandCursor))
+            btn.clicked.connect(lambda checked, k=key: self._switch_exclusion_view(k))
+            switch_row.insertWidget(switch_row.count() - 1, btn)
+            self._excl_btns[key] = btn
+        self._switch_exclusion_view('players')
+        layout.addWidget(self._excl_stack, stretch=1)
         self.stacked_widget.addWidget(exclusions_tab)
+    def _switch_exclusion_view(self, key):
+        self._excl_stack.setCurrentIndex(self._excl_views[key])
+        for k, btn in self._excl_btns.items():
+            btn.setChecked(k == key)
     def _setup_menus(self):
         menu_actions = {'file': [(t('menu.file.load_save') if t else 'Load Save', self._load_save), (t('menu.file.load_xgp_save') if t else 'Load GamePass Save', self._load_xgp_save), (t('menu.file.load_backup') if t else 'Load from Backup', self._load_backup_save), (t('menu.file.load_gps') if t else 'Load Global Pal Storage', self._load_gps), (t('menu.file.load_worldoption') if t else 'Load WorldOption', self._load_worldoption), (t('menu.file.save_changes') if t else 'Save Changes', self._save_changes), (t('menu.file.rename_world') if t else 'Rename World', self._rename_world), (t('aio.menu.open_data_folder') if t else 'Open Data Folder', self._open_data_folder)], 'functions': [(t('deletion.menu.submenu.delete') if t else 'Delete', [(t('deletion.menu.delete_empty_guilds') if t else 'Delete Empty Guilds', self._delete_empty_guilds), (t('deletion.menu.delete_inactive_bases') if t else 'Delete Inactive Bases', self._delete_inactive_bases), (t('deletion.menu.delete_duplicate_players') if t else 'Delete Duplicate Players', self._delete_duplicate_players), (t('deletion.menu.delete_inactive_players') if t else 'Delete Inactive Players', self._delete_inactive_players), (t('deletion.menu.delete_unreferenced') if t else 'Delete Unreferenced Data', self._delete_unreferenced), (t('deletion.menu.delete_non_base_map_objs') if t else 'Delete Non-Base Map Objects', self._delete_non_base_map_objs), (t('deletion.menu.delete_all_skins') if t else 'Delete All Skins', self._delete_all_skins), (t('deletion.menu.delete_invalid_items') if t else 'Delete Invalid Items', self._remove_invalid_items), (t('deletion.menu.delete_invalid_structures') if t else 'Delete Invalid Structures', self._remove_invalid_structures), (t('deletion.menu.delete_imported_pals') if t else 'Delete Imported Pals', self._delete_imported_pals), (t('deletion.menu.delete_invalid_pals') if t else 'Delete Invalid Pals', self._remove_invalid_pals), (t('deletion.menu.delete_invalid_passives') if t else 'Delete Invalid Passives', self._remove_invalid_passives)]), (t('deletion.menu.submenu.fix') if t else 'Fix', [(t('deletion.menu.fix_structures') if t else 'Fix All Structures', self._repair_structures), (t('deletion.menu.fix_items') if t else 'Fix All Items', self._repair_items), (t('deletion.menu.fix_all_pals') if t else 'Fix All Pals', self._fix_all_pals), (t('deletion.menu.fix_illegal_pals') if t else 'Fix Illegal Pals', self._fix_illegal_pals), (t('deletion.menu.fix_illegal_players') if t else 'Fix Illegal Players', self._fix_illegal_players), (t('deletion.menu.fix_invalid_active_skills') if t else 'Fix Invalid Active Skills', self._fix_invalid_active_skills), (t('deletion.menu.fix_timestamps') if t else 'Fix All Negative Timestamps', self._fix_all_timestamps), (t('deletion.menu.fix_overfilled_inventories') if t else 'Fix Container Sizes', self._trim_overfilled_inventories), (t('deletion.menu.fix_all_guilds') if t else 'Fix All Guilds', self._rebuild_all_guilds)]), (t('deletion.menu.submenu.reset') if t else 'Reset', [(t('deletion.menu.reset_missions') if t else 'Reset Missions', self._reset_missions), (t('deletion.menu.reset_anti_air') if t else 'Reset Anti-Air Turrets', self._reset_anti_air), (t('deletion.menu.reset_oilrig') if t else 'Reset Oil Rigs', self._reset_oilrig), (t('deletion.menu.reset_invader') if t else 'Reset Invaders', self._reset_invader), (t('deletion.menu.reset_supply') if t else 'Reset Supply', self._reset_supply), (t('deletion.menu.reset_dungeons') if t else 'Reset Dungeons', self._reset_dungeons), (t('deletion.menu.reset_lock_gimmick') if t else 'Reset Mini Game Towers', self._reset_lock_gimmick)]), (t('deletion.menu.submenu.misc') if t else 'Misc', [(t('deletion.menu.unlock_private_chests') if t else 'Unlock Private Chests', self._unlock_private_chests), (t('deletion.menu.max_all_pals') if t else 'Max All Pals', self._max_all_pals), (t('deletion.menu.paldefender') if t else 'PalDefender Commands', self._open_paldefender),         (t('base.export_all') if t else 'Export All Bases', self._export_all_bases), (t('modify_container_slots') if t else 'Modify Container Slots', self._modify_container_slots), (t('deletion.menu.modify_all_player_slots') if t else 'Modify All Player Slots', self._modify_all_player_slots), (t('deletion.menu.modify_all_guild_chest_slots') if t else 'Modify All Guild Chest Slots', self._modify_all_guild_chest_slots), (t('gamedays.menu') if t else 'Edit Game Days', self._edit_game_days)])], 'configs': [(t('loading.mode.submenu') if t else 'Loading Screen Configs', [(t('loading.mode.show') if t else 'Show Loading Screen', partial(self._set_loading_screen_mode, 'overlay')), (t('loading.mode.hide') if t else 'Hide Loading Screen', partial(self._set_loading_screen_mode, 'header'))]), (t('pal_name_settings.title') if t else 'Pal Name Settings', self._open_pal_name_settings)], 'maps': [(t('deletion.menu.show_map') if t else 'Show Map', self._show_map), (t('deletion.menu.generate_map') if t else 'Generate Map', self._generate_map)], 'exclusions': [(t('deletion.menu.save_exclusions') if t else 'Save Exclusions', self._save_exclusions)], 'languages': [(get_native_lang_name(code), partial(self._change_language, code), {'en_US': '🇺🇸', 'zh_CN': '🇨🇳', 'ru_RU': '🇷🇺', 'fr_FR': '🇫🇷', 'es_ES': '🇪🇸', 'de_DE': '🇩🇪', 'ja_JP': '🇯🇵', 'ko_KR': '🇰🇷', 'pt_BR': '🇧🇷', 'pt_PT': '🇵🇹'}[code]) for code in ['en_US', 'zh_CN', 'ru_RU', 'fr_FR', 'es_ES', 'de_DE', 'ja_JP', 'ko_KR', 'pt_BR', 'pt_PT']]}
-        self.header_widget.set_menu_actions(menu_actions)
+        self._set_menu_actions(menu_actions)
     def _open_data_folder(self):
         from resource_resolver import get_user_config_dir
         _p = os.path.dirname(get_user_config_dir())
@@ -535,9 +613,73 @@ class MainWindow(QMainWindow):
         return action
     def _setup_connections(self):
         save_manager.load_started.connect(self.shell_state.begin_load)
+        save_manager.load_started.connect(self._on_shell_loading)
         save_manager.load_finished.connect(self._on_load_finished)
         save_manager.save_started.connect(self.shell_state.begin_save)
+        save_manager.save_started.connect(self._on_shell_saving)
         save_manager.save_finished.connect(self._on_save_finished)
+        self._setup_global_shortcuts()
+
+    def _setup_global_shortcuts(self):
+        """Plan 024: Ctrl+1..9/0 jump to pages; Esc closes the tray drawer."""
+        from PyQt6.QtGui import QShortcut, QKeySequence
+        page_order = ['tools', 'base_inventory', 'player_inventory', 'pal_editor',
+                      'players', 'guilds', 'bases', 'map', 'exclusions', 'json_editor']
+        for idx, page_id in enumerate(page_order):
+            key = idx + 1 if idx < 9 else 0
+            shortcut = QShortcut(QKeySequence(f'Ctrl+{key}'), self)
+            shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            shortcut.activated.connect(lambda pid=page_id: (
+                self.nexus_band.set_active(pid), self._on_nav_changed(pid)))
+            self._page_shortcuts = getattr(self, '_page_shortcuts', [])
+            self._page_shortcuts.append(shortcut)
+        esc = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        esc.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        esc.activated.connect(self._on_global_escape)
+        self._esc_shortcut = esc
+
+    def _on_global_escape(self):
+        active = QApplication.activeModalWidget()
+        if active is not None:
+            return
+        if getattr(self, '_shell_v2', False) and self._tray_drawer.isVisible():
+            self._close_tray_drawer()
+    def _set_dirty(self, dirty):
+        self.nexus_band.set_dirty(dirty)
+        self.nexus_band.tray.set_dirty(dirty)
+
+    def _set_menu_actions(self, actions_dict):
+        self._menu_actions_dict = actions_dict
+        if getattr(self, '_menu_popup_v2', None):
+            self._menu_popup_v2.set_menu_actions(actions_dict)
+
+    def _update_stats_all(self, stats):
+        self.nexus_band.tray.update_metrics(stats)
+        self._tray_drawer.stats_panel.update_stats(stats)
+
+    def _refresh_stats_all_before(self):
+        from palworld_aio.managers.save_manager import save_manager
+        stats = save_manager.get_current_stats()
+        self.nexus_band.tray.update_metrics(stats)
+        self._tray_drawer.stats_panel.refresh_stats_before(stats)
+
+    def _refresh_stats_all_after(self):
+        from palworld_aio.managers.save_manager import save_manager
+        stats = save_manager.get_current_stats()
+        self._tray_drawer.stats_panel.refresh_stats_after(stats)
+
+    def _on_shell_loading(self):
+        try:
+            from palworld_aio.shell_state import ShellState
+            self.nexus_band.tray.set_shell_state(ShellState.LOADING)
+        except (RuntimeError, AttributeError, ImportError):
+            pass
+    def _on_shell_saving(self):
+        try:
+            from palworld_aio.shell_state import ShellState
+            self.nexus_band.tray.set_shell_state(ShellState.SAVING)
+        except (RuntimeError, AttributeError, ImportError):
+            pass
     def _create_message_box(self, icon=QMessageBox.Information):
         msg_box = QMessageBox(self)
         msg_box.setWindowFlags(Qt.Dialog | Qt.WindowType.Window | Qt.WindowStaysOnTopHint)
@@ -576,7 +718,7 @@ class MainWindow(QMainWindow):
         user_cfg_path = str(USER_CONFIG_DIR / 'user.cfg')
         if not os.path.exists(user_cfg_path):
             user_cfg_path = os.path.join(str(CONFIG_DIR), 'user.cfg')
-        default_settings = {'language': 'en_US', 'show_icons': True, 'boot_preference': 'menu', 'console_detached': False, 'console_window_geometry': None, 'right_panel_visible': True, 'sidebar_collapsed': False, 'loading_screen_mode': 'overlay'}
+        default_settings = {'language': 'en_US', 'show_icons': True, 'boot_preference': 'menu', 'console_detached': False, 'console_window_geometry': None, 'loading_screen_mode': 'overlay', 'tray_expanded': False}
         if os.path.exists(user_cfg_path):
             try:
                 self.user_settings = json_tools.load(user_cfg_path)
@@ -605,29 +747,6 @@ class MainWindow(QMainWindow):
             print(f'Failed to save user settings: {e}')
     def _load_theme(self):
         ThemeManager.apply_global()
-    def _toggle_dashboard(self):
-        if self._dashboard_collapsed:
-            self.results_widget.show()
-            self.splitter.setSizes(self._dashboard_sizes)
-            self._dashboard_collapsed = False
-        else:
-            self._dashboard_sizes = self.splitter.sizes()
-            self.results_widget.hide()
-            self._dashboard_collapsed = True
-        if hasattr(self, 'sidebar') and self.sidebar:
-            self.sidebar.set_right_panel_visible(not self._dashboard_collapsed)
-        self.user_settings['right_panel_visible'] = not self._dashboard_collapsed
-        self._save_user_settings()
-    def _on_sidebar_collapsed_changed(self, collapsed):
-        self.user_settings['sidebar_collapsed'] = collapsed
-        self._save_user_settings()
-    def _on_splitter_moved(self, pos, index):
-        self._splitter_save_timer.start()
-    def _persist_splitter_sizes(self):
-        sizes = self.splitter.sizes()
-        if len(sizes) == 2 and self.results_widget.isVisible():
-            self.user_settings['splitter_sizes'] = sizes
-            self._save_user_settings()
     def _toggle_maximize(self):
         if self.isMaximized():
             self.showNormal()
@@ -642,7 +761,7 @@ class MainWindow(QMainWindow):
         self.user_settings['console_detached'] = self.status_stream.detached if self.status_stream else False
         self._save_user_settings()
     def _on_detach_state_changed(self, detached):
-        self.sidebar.set_console_visible(detached)
+        self.nexus_band.set_console_visible(detached)
     def _check_update(self):
         self.update_checker = UpdateChecker()
         self.update_checker.update_checked.connect(self._on_update_checked)
@@ -651,12 +770,12 @@ class MainWindow(QMainWindow):
         try:
             if not ok and latest:
                 tools_version = get_display_version()
-                self.header_widget.start_pulse_animation(latest)
-                self.header_widget.update_version_text(tools_version, latest)
+                self.nexus_band.start_pulse_animation(latest)
+                self.nexus_band.update_version_text(tools_version, latest)
                 branch_text = f' ({branch})' if branch else ''
                 self.status_bar.showMessage(f"{(t('update.current') if t else 'Current')}: {tools_version}{branch_text} | {(t('update.latest') if t else 'Latest')}: {latest} - Click version chip to update", 0)
             else:
-                self.header_widget.stop_pulse_animation()
+                self.nexus_band.stop_pulse_animation()
         except Exception as e:
             print(f'Update check callback error: {e}')
     def _lock_ui(self):
@@ -665,6 +784,11 @@ class MainWindow(QMainWindow):
         pass
     def _on_load_finished(self, success):
         self.shell_state.finish_load(success)
+        try:
+            from palworld_aio.shell_state import ShellState
+            self.nexus_band.tray.set_shell_state(ShellState.LOADED if success else ShellState.ERROR)
+        except (RuntimeError, AttributeError, ImportError):
+            pass
         if success:
             if 'inventory_tab' in self.__dict__:
                 self.inventory_tab.clear_player()
@@ -675,9 +799,9 @@ class MainWindow(QMainWindow):
                 self.base_inventory_tab._clear_guild_selection()
             self.refresh_all()
             constants.dirty = False
-            self.header_widget.set_dirty(False)
-            self.results_widget.clear_selection()
-            self.results_widget.refresh_stats_before()
+            self._set_dirty(False)
+            self.nexus_band.tray.clear_selection()
+            self._refresh_stats_all_before()
             self.status_bar.showMessage(t('status.loaded') if t else 'Save loaded successfully', 5000)
         else:
             self.status_bar.showMessage(t('status.load_failed') if t else 'Failed to load save', 5000)
@@ -692,7 +816,12 @@ class MainWindow(QMainWindow):
     def _on_save_finished(self, duration):
         self.shell_state.finish_save(True)
         constants.dirty = False
-        self.header_widget.set_dirty(False)
+        self._set_dirty(False)
+        try:
+            from palworld_aio.shell_state import ShellState
+            self.nexus_band.tray.set_shell_state(ShellState.LOADED)
+        except (RuntimeError, AttributeError, ImportError):
+            pass
         self.status_bar.showMessage(f"{(t('status.saved') if t else 'Save completed')}({duration:.2f}s)", 5000)
         if constants.xgp_loaded:
             return
@@ -732,7 +861,7 @@ class MainWindow(QMainWindow):
         if self._is_refreshing:
             return
         constants.dirty = True
-        self.header_widget.set_dirty(True)
+        self._set_dirty(True)
         self._is_refreshing = True
         try:
             self._refresh_players()
@@ -754,7 +883,7 @@ class MainWindow(QMainWindow):
             self.inventory_tab.refresh()
     def _refresh_stats(self):
         stats = save_manager.get_current_stats()
-        self.results_widget.update_stats(stats)
+        self._update_stats_all(stats)
     def _refresh_players(self):
         self.players_panel.clear()
         players = save_manager.get_players()
@@ -798,7 +927,7 @@ class MainWindow(QMainWindow):
             self.base_inventory_tab.refresh()
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            if hasattr(self, 'header_widget') and self.header_widget.underMouse():
+            if self._hit_window_drag_zone(event):
                 if sys.platform == 'linux':
                     self.windowHandle().startSystemMove()
                 else:
@@ -808,6 +937,20 @@ class MainWindow(QMainWindow):
                 super().mousePressEvent(event)
         else:
             super().mousePressEvent(event)
+    def _hit_window_drag_zone(self, event) -> bool:
+        """Frameless drag zone: top strip of the canvas (ribbon band), but
+        never over interactive children (buttons/inputs)."""
+        pos = event.position().toPoint()
+        if pos.y() > 52:
+            return False
+        child = self.childAt(pos)
+        while child is not None:
+            if isinstance(child, (QPushButton, QComboBox, QLineEdit, QTextEdit)):
+                return False
+            if child is self.stacked_widget or child is getattr(self, 'nexus_band', None):
+                break
+            child = child.parentWidget()
+        return True
     def mouseMoveEvent(self, event):
         if sys.platform != 'linux' and event.buttons() == Qt.LeftButton and hasattr(self, 'drag_position'):
             self.move(event.globalPosition().toPoint() - self.drag_position)
@@ -955,7 +1098,6 @@ class MainWindow(QMainWindow):
             dlg.setIntValue(effigy_qty)
             dlg.setIntRange(1, constants.MAX_QUANTITY)
             dlg.setInputMode(QInputDialog.IntInput)
-            dlg.setStyleSheet(DARK_THEME_STYLE)
             if dlg.exec() == QDialog.Accepted:
                 effigy_qty = dlg.intValue()
                 effigy_accepted = True
@@ -1135,11 +1277,11 @@ class MainWindow(QMainWindow):
         run_with_loading(on_finished, task)
     def _on_player_selected(self, data):
         if data:
-            self.results_widget.set_player(data[0])
-            self.results_widget.set_guild(data[5])
+            self.nexus_band.tray.set_player(data[0])
+            self.nexus_band.tray.set_guild(data[5])
     def _on_guild_selected(self, data):
         if data:
-            self.results_widget.set_guild(data[0])
+            self.nexus_band.tray.set_guild(data[0])
             self.guild_members_panel.clear()
             members = get_guild_members(data[1])
             for m in members:
@@ -1151,14 +1293,14 @@ class MainWindow(QMainWindow):
     def _on_guild_member_selected(self, data):
         if data:
             name = data[0].replace('[L]', '')
-            self.results_widget.set_player(name)
+            self.nexus_band.tray.set_player(name)
     def _on_base_selected(self, data):
         if data:
-            self.results_widget.set_base(data[0])
-            self.results_widget.set_guild(data[2])
+            self.nexus_band.tray.set_base(data[0])
+            self.nexus_band.tray.set_guild(data[2])
     def closeEvent(self, event: QCloseEvent):
         if constants.dirty and constants.current_save_path:
-            self.header_widget.set_dirty(False)
+            self._set_dirty(False)
             msg = QMessageBox(self)
             msg.setWindowTitle(t('error.unsaved_title', default='Unsaved Changes'))
             msg.setText(t('error.unsaved_msg', default='You have unsaved changes. Save before exiting?'))
@@ -1194,6 +1336,7 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         if hasattr(self, '_drop_overlay'):
             self._drop_overlay.setGeometry(self.rect())
+        self._reposition_window_controls()
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             urls = event.mimeData().urls()
@@ -1903,7 +2046,7 @@ class MainWindow(QMainWindow):
             return
         for i in range(self.stacked_widget.count()):
             if self.stacked_widget.widget(i) == self.map_tab:
-                self.sidebar.set_active('map')
+                self.nexus_band.set_active('map')
                 self.stacked_widget.setCurrentIndex(i)
                 return
     def _generate_map(self):
@@ -1941,12 +2084,11 @@ class MainWindow(QMainWindow):
         from palworld_aio.editor.pal_editor.pal_ops import get_name_mode, set_name_mode, set_sync_nickname
         dialog = QDialog(self)
         dialog.setWindowTitle(t('pal_name_settings.title') if t else 'Pal Name Settings')
-        dialog.setStyleSheet(DARK_THEME_STYLE)
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(10)
         mode_label = QLabel(t('pal_name_settings.mode_label') if t else 'Name new pals with:')
-        mode_label.setStyleSheet('font-weight: bold; color: #E2E8F0;')
+        mode_label.setObjectName('bulkActionLabel')
         layout.addWidget(mode_label)
         combo = QComboBox()
         combo.addItem(t('edit_pals.name_mode_new') if t else 'New', 'new')
@@ -1954,10 +2096,9 @@ class MainWindow(QMainWindow):
         combo.addItem(t('edit_pals.name_mode_none') if t else 'No Nickname', 'none')
         cur_mode = get_name_mode()
         combo.setCurrentIndex(list(('new', 'copy', 'none')).index(cur_mode) if cur_mode in ('new', 'copy', 'none') else 0)
-        combo.setStyleSheet('QComboBox { background: rgba(255,255,255,0.06); color: #E2E8F0; border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; padding: 4px 8px; }')
         layout.addWidget(combo)
         hint_label = QLabel(t('pal_name_settings.mode_hint') if t else 'Applies when creating pals (Pal Editor, base pals, Global Pal Storage) and to clones. A typed nickname always overrides it.')
-        hint_label.setStyleSheet('color: #94A3B8; font-size: 11px;')
+        hint_label.setObjectName('bulkHintLabel')
         hint_label.setWordWrap(True)
         layout.addWidget(hint_label)
         nickname_chk = ToggleCheckBtn(t('pal_name_settings.sync_nickname') if t else 'Apply nickname during Bulk Sync')
@@ -1989,15 +2130,15 @@ class MainWindow(QMainWindow):
             if self.status_stream.detach_window:
                 self.status_stream.detach_window.refresh_title()
             self.setWindowTitle(t('deletion.title') if t else 'All-in-One Tools')
-            self.sidebar.refresh_labels()
+            self.nexus_band.refresh_labels()
             self._setup_menus()
             self._refresh_texts()
             self.tools_tab.refresh_labels()
-            self.results_widget.refresh_labels()
-            self.header_widget.refresh_labels()
-            self.sidebar.refresh_labels()
-            if hasattr(self.header_widget, '_menu_popup') and self.header_widget._menu_popup:
-                self.header_widget._menu_popup.refresh_labels()
+            self.nexus_band.refresh_labels()
+            if getattr(self, '_window_controls', None):
+                self._window_controls.refresh_labels()
+            if getattr(self, '_menu_popup_v2', None):
+                self._menu_popup_v2.refresh_labels()
             if 'map_tab' in self.__dict__:
                 self.map_tab.refresh_labels()
             if 'inventory_tab' in self.__dict__:
@@ -2029,9 +2170,8 @@ class MainWindow(QMainWindow):
     def _refresh_texts(self):
         tools_version, _ = get_versions()
         self.setWindowTitle(t('app.title', version=tools_version) + ' - ' + t('tool.deletion'))
-        if hasattr(self, 'results_widget') and self.results_widget:
-            if hasattr(self.results_widget, 'stats_panel'):
-                self.results_widget.stats_panel.refresh_labels()
+        if hasattr(self, '_tray_drawer'):
+            self._tray_drawer.stats_panel.refresh_labels()
         if hasattr(self, 'players_panel'):
             self.players_panel.refresh_labels()
         if hasattr(self, 'guilds_panel'):
@@ -2421,7 +2561,7 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.Accepted:
             QTimer.singleShot(0, self.refresh_all)
     def _edit_player_inventory(self, uid, name):
-        self.sidebar.set_active('player_inventory')
+        self.nexus_band.set_active('player_inventory')
         self.stacked_widget.setCurrentIndex(2)
         if 'inventory_tab' in self.__dict__:
             self.inventory_tab.load_player(uid, name)

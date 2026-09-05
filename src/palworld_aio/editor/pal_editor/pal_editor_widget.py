@@ -107,7 +107,7 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         party_layout.setSpacing(4)
         party_header = QLabel(t('pal_editor.party') if t else 'PARTY')
         self._party_header = party_header
-        party_header.setStyleSheet('font-size: 12px; font-weight: 700; color: #7DD3FC; letter-spacing: 2px; border-bottom: 1px solid rgba(125,211,252,0.12); padding-bottom: 4px;')
+        party_header.setStyleSheet('font-size: 12px; font-weight: 700; color: #F59E0B; letter-spacing: 2px; border-bottom: 1px solid rgba(245,158,11,0.12); padding-bottom: 4px;')
         party_layout.addWidget(party_header)
         self.party_slots = []
         for i in range(5):
@@ -163,13 +163,13 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         mt_layout.setContentsMargins(0, 0, 0, 0)
         mt_layout.setSpacing(4)
         self.multi_count_label = QLabel()
-        self.multi_count_label.setStyleSheet('font-size: 11px; font-weight: 700; color: #38BDF8; background: transparent; border: none; padding: 0 4px;')
-        for btn_cfg in [('multi_max_btn', 'pal_editor.bulk_max_btn', self._on_bulk_max_selected, '#A78BFA', '#A78BFA'),
+        self.multi_count_label.setStyleSheet('font-size: 11px; font-weight: 700; color: #F59E0B; background: transparent; border: none; padding: 0 4px;')
+        for btn_cfg in [('multi_max_btn', 'pal_editor.bulk_max_btn', self._on_bulk_max_selected, '#C084FC', '#C084FC'),
                          ('multi_buff_btn', 'pal_editor.bulk_max_buff_btn', self._on_bulk_max_buff_selected, '#F97316', '#F97316'),
                          ('multi_skills_btn', 'pal_editor.bulk_skills_btn', self._on_bulk_all_skills_selected, '#F59E0B', '#F59E0B'),
-                         ('multi_heal_btn', 'pal_editor.bulk_heal_btn', self._on_bulk_heal_selected, '#4ADE80', '#4ADE80'),
-                         ('multi_rename_btn', 'pal_editor.bulk_rename_btn', self._on_bulk_rename_selected, '#FBBF24', '#FBBF24'),
-                         ('multi_delete_btn', 'pal_editor.bulk_delete_btn', self._on_bulk_delete_selected, '#FB7185', '#FB7185')]:
+                         ('multi_heal_btn', 'pal_editor.bulk_heal_btn', self._on_bulk_heal_selected, '#2DD4BF', '#2DD4BF'),
+                         ('multi_rename_btn', 'pal_editor.bulk_rename_btn', self._on_bulk_rename_selected, '#E8B44C', '#E8B44C'),
+                         ('multi_delete_btn', 'pal_editor.bulk_delete_btn', self._on_bulk_delete_selected, '#F87171', '#F87171')]:
             btn = QPushButton(t(btn_cfg[1]))
             btn.setObjectName(btn_cfg[0])
             btn.setFixedHeight(22)
@@ -181,7 +181,7 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         deselect_btn.setObjectName('multi_deselect_btn')
         deselect_btn.setFixedHeight(22)
         deselect_btn.setCursor(Qt.PointingHandCursor)
-        deselect_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #9CA3AF; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(255,255,255,0.1); color: #FFFFFF; }')
+        deselect_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #9CA3AF; border: 1px solid rgba(236,231,224,0.10); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(236,231,224,0.10); color: #FFFFFF; }')
         deselect_btn.clicked.connect(self._clear_multi_selection)
         mt_layout.addWidget(deselect_btn)
         mt_layout.addWidget(self.multi_count_label)
@@ -192,13 +192,13 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         header_row.addWidget(self.multi_toolbar)
         self.restore_all_btn = QPushButton(t('edit_pals.restore_all'))
         self.restore_all_btn.setFixedHeight(24)
-        self.restore_all_btn.setStyleSheet('QPushButton { background: rgba(16,185,129,0.12); color: #4ADE80; border: 1px solid rgba(16,185,129,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(16,185,129,0.25); border-color: rgba(16,185,129,0.5); color: #FFFFFF; }')
+        self.restore_all_btn.setStyleSheet('QPushButton { background: rgba(45,212,191,0.12); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(45,212,191,0.25); border-color: rgba(45,212,191,0.5); color: #FFFFFF; }')
         self.restore_all_btn.setCursor(Qt.PointingHandCursor)
         self.restore_all_btn.clicked.connect(self._restore_all_pals)
         header_row.addWidget(self.restore_all_btn)
         self.max_all_btn = QPushButton(t('edit_pals.max_all'))
         self.max_all_btn.setFixedHeight(24)
-        self.max_all_btn.setStyleSheet('QPushButton { background: rgba(167,139,250,0.12); color: #A78BFA; border: 1px solid rgba(167,139,250,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(167,139,250,0.25); border-color: rgba(167,139,250,0.5); color: #FFFFFF; }')
+        self.max_all_btn.setStyleSheet('QPushButton { background: rgba(192,132,252,0.12); color: #C084FC; border: 1px solid rgba(192,132,252,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(192,132,252,0.25); border-color: rgba(192,132,252,0.5); color: #FFFFFF; }')
         self.max_all_btn.setCursor(Qt.PointingHandCursor)
         self.max_all_btn.clicked.connect(self._max_all_pals)
         header_row.addWidget(self.max_all_btn)
@@ -218,27 +218,27 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         header_row.addWidget(self.all_skills_all_btn)
         self.sort_btn = QPushButton(t('edit_pals.sort_btn'))
         self.sort_btn.setFixedHeight(24)
-        self.sort_btn.setStyleSheet('QPushButton { background: rgba(148,163,184,0.12); color: #94A3B8; border: 1px solid rgba(148,163,184,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(148,163,184,0.25); border-color: rgba(148,163,184,0.5); color: #FFFFFF; }')
+        self.sort_btn.setStyleSheet('QPushButton { background: rgba(166,159,148,0.12); color: #A69F94; border: 1px solid rgba(166,159,148,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(166,159,148,0.25); border-color: rgba(166,159,148,0.5); color: #FFFFFF; }')
         self.sort_btn.setCursor(Qt.PointingHandCursor)
         self.sort_btn.setToolTip(t('edit_pals.sort_hint'))
         self.sort_btn.clicked.connect(self._on_sort_clicked)
         header_row.addWidget(self.sort_btn)
         self.select_all_btn = QPushButton(t('pal_editor.select_all_btn'))
         self.select_all_btn.setFixedHeight(24)
-        self.select_all_btn.setStyleSheet('QPushButton { background: rgba(56,189,248,0.12); color: #38BDF8; border: 1px solid rgba(56,189,248,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(56,189,248,0.25); border-color: rgba(56,189,248,0.5); color: #FFFFFF; }')
+        self.select_all_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(245,158,11,0.25); border-color: rgba(245,158,11,0.5); color: #FFFFFF; }')
         self.select_all_btn.setCursor(Qt.PointingHandCursor)
         self.select_all_btn.setToolTip(t('pal_editor.select_all_hint'))
         self.select_all_btn.clicked.connect(self._on_select_all)
         header_row.addWidget(self.select_all_btn)
         self.bulk_clone_btn = QPushButton(t('edit_pals.bulk_clone') if t else 'Bulk Clone')
         self.bulk_clone_btn.setFixedHeight(24)
-        self.bulk_clone_btn.setStyleSheet('QPushButton { background: rgba(56,189,248,0.12); color: #38BDF8; border: 1px solid rgba(56,189,248,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(56,189,248,0.25); border-color: rgba(56,189,248,0.5); color: #FFFFFF; }')
+        self.bulk_clone_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(245,158,11,0.25); border-color: rgba(245,158,11,0.5); color: #FFFFFF; }')
         self.bulk_clone_btn.setCursor(Qt.PointingHandCursor)
         self.bulk_clone_btn.clicked.connect(self._open_bulk_clone)
         header_row.addWidget(self.bulk_clone_btn)
         self.bulk_delete_btn = QPushButton(t('edit_pals.bulk_delete') if t else 'Bulk Delete')
         self.bulk_delete_btn.setFixedHeight(24)
-        self.bulk_delete_btn.setStyleSheet('QPushButton { background: rgba(251,113,133,0.12); color: #FB7185; border: 1px solid rgba(251,113,133,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(251,113,133,0.25); border-color: rgba(251,113,133,0.5); color: #FFFFFF; }')
+        self.bulk_delete_btn.setStyleSheet('QPushButton { background: rgba(248,113,113,0.12); color: #F87171; border: 1px solid rgba(248,113,113,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(248,113,113,0.25); border-color: rgba(248,113,113,0.5); color: #FFFFFF; }')
         self.bulk_delete_btn.setCursor(Qt.PointingHandCursor)
         self.bulk_delete_btn.clicked.connect(self._open_bulk_delete)
         header_row.addWidget(self.bulk_delete_btn)
@@ -300,8 +300,8 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
     def _update_mode_buttons(self):
         has_dps = bool(self.dps_file_path and os.path.isfile(self.dps_file_path))
         self.mode_dps_btn.setVisible(has_dps)
-        active = 'QPushButton { background: rgba(125,211,252,0.15); color: #7DD3FC; border: none; padding: 4px 14px; font-size: 10px; font-weight: 600; border-radius: 4px; }'
-        inactive = 'QPushButton { background: rgba(125,211,252,0.06); color: #94A3B8; border: none; padding: 4px 14px; font-size: 10px; font-weight: 600; border-radius: 4px; } QPushButton:hover { background: rgba(125,211,252,0.1); color: #CBD5E1; }'
+        active = 'QPushButton { background: rgba(245,158,11,0.15); color: #F59E0B; border: none; padding: 4px 14px; font-size: 10px; font-weight: 600; border-radius: 4px; }'
+        inactive = 'QPushButton { background: rgba(245,158,11,0.06); color: #A69F94; border: none; padding: 4px 14px; font-size: 10px; font-weight: 600; border-radius: 4px; } QPushButton:hover { background: rgba(245,158,11,0.1); color: #ECE7E0; }'
         self.mode_box_btn.setStyleSheet(active if self._palbox_mode == 'box' else inactive)
         self.mode_dps_btn.setStyleSheet(active if self._palbox_mode == 'dps' else inactive)
     def _mark_dps_modified(self):
@@ -2116,21 +2116,21 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         il.setContentsMargins(12, 8, 12, 12)
         il.setSpacing(8)
         lbl = QLabel(t('pal_editor.bulk_rename_label'))
-        lbl.setStyleSheet('font-size: 12px; font-weight: 600; color: #E2E8F0; background: transparent; border: none;')
+        lbl.setStyleSheet('font-size: 12px; font-weight: 600; color: #ECE7E0; background: transparent; border: none;')
         il.addWidget(lbl)
         rename_edit = QLineEdit()
         rename_edit.setPlaceholderText(t('pal_editor.bulk_rename_placeholder'))
-        rename_edit.setStyleSheet('QLineEdit { background: rgba(0,0,0,0.4); color: #E2E8F0; border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; padding: 8px 10px; font-size: 12px; } QLineEdit:focus { border-color: #7DD3FC; }')
+        rename_edit.setStyleSheet('QLineEdit { background: rgba(0,0,0,0.4); color: #ECE7E0; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 8px 10px; font-size: 12px; } QLineEdit:focus { border-color: #F59E0B; }')
         rename_edit.setFocus()
         il.addWidget(rename_edit)
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         cancel_btn = QPushButton(t('pal_editor.bulk_rename_cancel'))
-        cancel_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #9CA3AF; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 6px 16px; font-size: 12px; font-weight: 600; } QPushButton:hover { background: rgba(255,255,255,0.1); color: #FFFFFF; }')
+        cancel_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #9CA3AF; border: 1px solid rgba(236,231,224,0.10); border-radius: 4px; padding: 6px 16px; font-size: 12px; font-weight: 600; } QPushButton:hover { background: rgba(236,231,224,0.10); color: #FFFFFF; }')
         cancel_btn.clicked.connect(dlg.reject)
         btn_row.addWidget(cancel_btn)
         apply_btn = QPushButton(t('pal_editor.bulk_rename_apply'))
-        apply_btn.setStyleSheet('QPushButton { background: rgba(251,191,36,0.15); color: #FBBF24; border: 1px solid rgba(251,191,36,0.3); border-radius: 4px; padding: 6px 20px; font-size: 12px; font-weight: 700; } QPushButton:hover { background: rgba(251,191,36,0.25); color: #FFFFFF; }')
+        apply_btn.setStyleSheet('QPushButton { background: rgba(232,180,76,0.15); color: #E8B44C; border: 1px solid rgba(232,180,76,0.3); border-radius: 4px; padding: 6px 20px; font-size: 12px; font-weight: 700; } QPushButton:hover { background: rgba(232,180,76,0.25); color: #FFFFFF; }')
         btn_row.addWidget(apply_btn)
         il.addLayout(btn_row)
         dlg.content_layout.addWidget(inner)

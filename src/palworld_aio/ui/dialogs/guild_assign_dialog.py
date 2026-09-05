@@ -9,74 +9,11 @@ from PyQt6.QtGui import QIcon
 from i18n import t
 from palworld_aio import constants
 from palworld_aio.managers.guild_manager import move_player_to_guild, set_member_role
-from palworld_aio.ui.chrome.styles import DIALOG_STYLE as DARK_THEME_STYLE
+from palworld_aio.ui.chrome.styles import TREE_WIDGET_QSS
 from palworld_aio.widgets.search_panel import SearchPanel
 
 
-_DESC_STYLE = f'color: {constants.MUTED}; font-size: 12px;'
-_MUTED_STYLE = 'border: none; background: transparent;'
 _ROLE_LABELS = {1: 'guild.role.guild_master', 2: 'guild.role.submaster', 3: 'guild.role.member', 4: 'guild.role.guest'}
-_TREE_STYLE = '''
-    QTreeWidget {
-        background: rgba(18,20,24,0.65);
-        border: 1px solid rgba(125,211,252,0.15);
-        border-radius: 8px;
-        color: #A6B8C8;
-        font-size: 11px;
-        outline: none;
-    }
-    QTreeWidget::item {
-        padding: 4px 8px;
-        border-radius: 4px;
-    }
-    QTreeWidget::item:hover {
-        background: rgba(125,211,252,0.1);
-        color: #7DD3FC;
-    }
-    QTreeWidget::item:selected {
-        background: rgba(125,211,252,0.15);
-        color: #7DD3FC;
-        border-left: 3px solid #7DD3FC;
-    }
-    QTreeWidget::item:selected:!active {
-        background: rgba(125,211,252,0.1);
-        color: #7DD3FC;
-    }
-    QHeaderView::section {
-        background: rgba(8,10,16,0.9);
-        color: #7DD3FC;
-        padding: 6px 8px;
-        border: none;
-        border-bottom: 1px solid rgba(125,211,252,0.15);
-        font-weight: 600;
-        font-size: 10px;
-        text-align: center;
-    }
-    QHeaderView::section:hover {
-        background: rgba(125,211,252,0.08);
-    }
-'''
-_BTN_ASSIGN = '''
-    QPushButton {{
-        background: rgba(125, 211, 252, 0.15);
-        color: #7DD3FC;
-        border: 1px solid rgba(125, 211, 252, 0.3);
-        border-radius: {r}px;
-        padding: 8px 20px;
-        font-weight: 600;
-        font-size: 13px;
-    }}
-    QPushButton:hover {{
-        background: rgba(125, 211, 252, 0.25);
-        border-color: rgba(125, 211, 252, 0.5);
-        color: #ffffff;
-    }}
-    QPushButton:disabled {{
-        background: rgba(255, 255, 255, 0.04);
-        color: rgba(255, 255, 255, 0.3);
-        border-color: rgba(255, 255, 255, 0.08);
-    }}
-'''
 
 
 class _SortableItem(QTreeWidgetItem):
@@ -100,7 +37,6 @@ class GuildAssignDialog(QDialog):
         self.setModal(True)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
-        self.setStyleSheet(DARK_THEME_STYLE)
         self._setup_ui()
         self._load_data()
 
@@ -113,8 +49,8 @@ class GuildAssignDialog(QDialog):
             t('guild.assign.desc') if t else
             'Select players on the left, choose a target guild on the right, then click Assign.'
         )
+        desc.setProperty('role', 'secondary')
         desc.setWordWrap(True)
-        desc.setStyleSheet(_DESC_STYLE)
         root.addWidget(desc)
 
         hsplit = QSplitter(Qt.Horizontal)
@@ -157,18 +93,16 @@ class GuildAssignDialog(QDialog):
         root.addLayout(self._build_bottom_bar())
 
     def _build_members_pane(self) -> QFrame:
-        panel_style = (
-            'QFrame {{ background: {glass}; border: 1px solid {border};'
-            ' border-radius: {r}px; }}'
-        ).format(glass=constants.GLASS, border=constants.BORDER, r=constants.CORNER_RADIUS)
+        from palworld_aio.ui.chrome import tokens as _tokens
+        pal = _tokens.resolve()
         pane = QFrame()
-        pane.setStyleSheet(panel_style)
+        pane.setObjectName('guildMembersPane')
         lv = QVBoxLayout(pane)
         lv.setContentsMargins(8, 8, 8, 8)
         lv.setSpacing(6)
 
         hdr = QLabel(t('guild.assign.members_label') if t else 'Current Members')
-        hdr.setStyleSheet('font-weight: 600; font-size: 13px; color: #e2e8f0; border: none; background: transparent;')
+        hdr.setObjectName('sectionHeader')
         lv.addWidget(hdr)
 
         self.members_tree = QTreeWidget()
@@ -187,13 +121,13 @@ class GuildAssignDialog(QDialog):
         self.members_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.members_tree.customContextMenuRequested.connect(self._show_member_context_menu)
         self.members_tree.setSortingEnabled(True)
-        self.members_tree.setStyleSheet(_TREE_STYLE)
+        self.members_tree.setStyleSheet(TREE_WIDGET_QSS)
         lv.addWidget(self.members_tree)
 
         self.members_lbl = QLabel(
             t('guild.assign.members_empty') if t else 'Select a guild to see its members.'
         )
-        self.members_lbl.setStyleSheet(f'color: {constants.MUTED}; font-size: 11px; {_MUTED_STYLE}')
+        self.members_lbl.setObjectName('bulkHintLabel')
         lv.addWidget(self.members_lbl)
         return pane
 
@@ -204,16 +138,16 @@ class GuildAssignDialog(QDialog):
         self.status_lbl = QLabel(
             t('guild.assign.status_none') if t else 'Select players and a target guild.'
         )
-        self.status_lbl.setStyleSheet(_DESC_STYLE)
+        self.status_lbl.setProperty('role', 'secondary')
         self.status_lbl.setWordWrap(True)
         bar.addWidget(self.status_lbl, stretch=1)
 
         self.assign_btn = QPushButton(t('guild.assign.btn') if t else 'Assign to Guild')
+        self.assign_btn.setProperty('class', 'primary')
         self.assign_btn.setMinimumHeight(36)
         self.assign_btn.setMinimumWidth(160)
         self.assign_btn.setEnabled(False)
-        self.assign_btn.setCursor(Qt.PointingHandCursor)
-        self.assign_btn.setStyleSheet(_BTN_ASSIGN.format(r=constants.CORNER_RADIUS))
+        self.assign_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.assign_btn.clicked.connect(self._assign)
         bar.addWidget(self.assign_btn)
 
@@ -321,24 +255,6 @@ class GuildAssignDialog(QDialog):
             return
         current_role = item.data(2, _SortableItem._SORT_ROLE) or 3
         menu = QMenu(self)
-        menu.setStyleSheet('''
-            QMenu {
-                background: rgba(18,20,24,0.95);
-                border: 1px solid rgba(125,211,252,0.2);
-                border-radius: 6px;
-                padding: 4px;
-                color: #E2E8F0;
-                font-size: 12px;
-            }
-            QMenu::item {
-                padding: 6px 20px 6px 10px;
-                border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background: rgba(125,211,252,0.15);
-                color: #7DD3FC;
-            }
-        ''')
         for rv, rl in [(1, 'guild_master'), (2, 'submaster'), (3, 'member'), (4, 'guest')]:
             rkey = f'guild.role.{rl}'
             label = t(rkey) if t else rl.replace('_', ' ').title()
@@ -403,8 +319,10 @@ class GuildAssignDialog(QDialog):
                 t('guild.assign.done', count=ok, guild=guild_name) if t else
                 f'Moved {ok} player(s) to {guild_name}.'
             )
-            self.status_lbl.setStyleSheet('color: #4ade80; font-size: 12px;')
+            self.status_lbl.setProperty('role', 'success')
         else:
             msg = f'Moved {ok} player(s), {fail} failed \u2014 target guild may not exist.'
-            self.status_lbl.setStyleSheet('color: #fb923c; font-size: 12px;')
+            self.status_lbl.setProperty('role', 'warning')
+        self.status_lbl.style().unpolish(self.status_lbl)
+        self.status_lbl.style().polish(self.status_lbl)
         self.status_lbl.setText(msg)

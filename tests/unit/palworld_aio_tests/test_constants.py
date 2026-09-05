@@ -7,14 +7,15 @@ constants = import_from('palworld_aio.constants')
 
 
 def test_constants_exist():
-    assert constants.BG == '#0A0B0E'
-    assert constants.ACCENT == '#7DD3FC'
-    assert constants.TEXT == '#E6EEF6'
-    assert constants.SUCCESS == '#4ADE80'
-    assert constants.WARNING == '#FBBF24'
-    assert constants.DANGER == '#FB7185'
-    assert constants.TEXT_MUTED == '#94A3B8'
-    assert constants.TEXT_DISABLED == '#475569'
+    # Plan 019 palette v2 (Deck Operations): warm dark + amber accent.
+    assert constants.BG == '#141312'
+    assert constants.ACCENT == '#F59E0B'
+    assert constants.TEXT == '#ECE7E0'
+    assert constants.SUCCESS == '#2DD4BF'
+    assert constants.WARNING == '#E8B44C'
+    assert constants.DANGER == '#F87171'
+    assert constants.TEXT_MUTED == '#A69F94'
+    assert constants.TEXT_DISABLED == '#5C564E'
     assert isinstance(constants.FONT_SIZE, int)
     assert isinstance(constants.SPACE_MEDIUM, int)
     assert isinstance(constants.CORNER_RADIUS, int)

@@ -12,7 +12,7 @@ from palworld_aio import constants
 from resource_resolver import resource_path
 from palworld_aio.utils import extract_value, safe_nested_get, calculate_max_hp, calculate_shot_attack, calculate_defense, calculate_work_speed, resolve_name, _hp_breakdown, _atk_breakdown, _def_breakdown, _ws_breakdown, stat_breakdown_tooltip
 from palworld_aio.ui.chrome.styles import slot_full, slot_selected, TOOLTIP_STYLE
-from palworld_aio.ui.chrome.sidebar_widget import NerdBtn
+from palworld_aio.ui.chrome.components import NerdBtn
 from palworld_aio.ui.dialogs.skill_picker import SkillPicker
 from . import data as _data
 from . import icons as _icons

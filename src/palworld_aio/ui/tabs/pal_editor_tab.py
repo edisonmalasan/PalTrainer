@@ -19,26 +19,20 @@ class PalEditorTab(QWidget):
         self._syncing = False
         self._setup_ui()
     def _setup_ui(self):
+        from palworld_aio.ui.chrome.components import create_page_ribbon
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
-        header = QHBoxLayout()
-        header.setContentsMargins(0, 0, 0, 0)
-        self.title_label = QLabel(t('pal_editor.title'))
-        self.title_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
-        self.title_label.setObjectName('sectionHeader')
-        self.title_label.setStyleSheet('QLabel#sectionHeader { margin-left: 0px; padding-left: 10px; }')
-        self.title_label.setAlignment(Qt.AlignCenter)
-        header.addWidget(self.title_label)
-        header.addStretch()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        # 010-r02: ribbon owns the player selector; the old centered title
+        # bar and inline QSS are retired.
+        ribbon = create_page_ribbon(t('pal_editor.title'), (t('sidebar.section.editing') if t else 'Editing').upper(), self)
         self.player_select_btn = QPushButton(t('inventory.select_player', default='Select Player...'))
-        self.player_select_btn.setMinimumWidth(220)
-        self.player_select_btn.setMaximumHeight(28)
-        self.player_select_btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.12); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.2); border-radius: 6px; padding: 4px 12px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(125,211,252,0.2); border-color: rgba(125,211,252,0.4); color: #FFFFFF; }')
+        self.player_select_btn.setObjectName('ghostBtn')
+        self.player_select_btn.setMinimumWidth(200)
         self.player_select_btn.setCursor(Qt.PointingHandCursor)
         self.player_select_btn.clicked.connect(self._open_player_popup)
-        header.addWidget(self.player_select_btn)
-        main_layout.addLayout(header)
+        ribbon._ribbon_actions_slot.addWidget(self.player_select_btn)
+        main_layout.addWidget(ribbon)
         self.content_area = self._create_content_area()
         main_layout.addWidget(self.content_area)
     def _create_content_area(self):
@@ -205,8 +199,6 @@ class PalEditorTab(QWidget):
         self.pal_editor_widget.apply_player_ui()
 
     def refresh_labels(self):
-        if hasattr(self, 'title_label'):
-            self.title_label.setText(t('pal_editor.title'))
         if hasattr(self, 'player_select_btn') and (not self.current_player_uid):
             self.player_select_btn.setText(t('inventory.select_player', default='Select Player...'))
         if hasattr(self, 'placeholder_label'):

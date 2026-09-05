@@ -233,6 +233,8 @@ def run_aio():
     if app is None:
         app = QApplication(sys.argv)
     app.setStyle('Fusion')
+    from palworld_aio.ui.chrome.fonts import load_app_fonts
+    load_app_fonts()
     from palworld_aio.ui.chrome.styles import ThemeManager
     ThemeManager.apply_global()
     if os.path.exists(constants.ICON_PATH):
