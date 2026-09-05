@@ -106,20 +106,20 @@ class JsonEditorTab(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon
+        from palworld_aio.ui.chrome.components import create_page_ribbon, set_content_margins
         from palworld_aio.ui.chrome.styles import ThemeManager
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
         head_row = QHBoxLayout()
-        head_row.setContentsMargins(16, 0, 170, 0)
+        set_content_margins(head_row)
         head_row.addWidget(self._build_toolbar())
         layout.addLayout(head_row)
         layout.addWidget(create_page_ribbon(t(f'{_JSON_KEY}.tab') if t else 'JSON Editor', (t('sidebar.section.editing') if t else 'Editing').upper(), self))
 
         search_bar = QHBoxLayout()
-        search_bar.setContentsMargins(16, 8, 170, 8)
+        set_content_margins(search_bar, top=8, bottom=8)
         search_bar.setSpacing(6)
         self._search_input = QLineEdit()
         self._search_input.setObjectName('searchInput')
@@ -171,7 +171,7 @@ class JsonEditorTab(QWidget):
         footer = QFrame()
         footer.setObjectName('tableFooter')
         footer_lay = QHBoxLayout(footer)
-        footer_lay.setContentsMargins(16, 6, 170, 6)
+        set_content_margins(footer_lay, top=6, bottom=6)
         footer_lay.setSpacing(8)
         self._refresh_btn = QPushButton(t(f'{_JSON_KEY}.refresh') if t else 'Refresh from Save')
         self._refresh_btn.setObjectName('ghostBtn')

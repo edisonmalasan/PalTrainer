@@ -195,7 +195,7 @@ class BreedingTab(QWidget):
         self._load_data()
 
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon
+        from palworld_aio.ui.chrome.components import create_page_ribbon, set_content_margins
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -203,7 +203,7 @@ class BreedingTab(QWidget):
         layout.addWidget(create_page_ribbon(t('breeding.tab') if t else 'Breeding', (t('sidebar.section.reference') if t else 'Reference').upper(), self))
 
         sub_bar = QHBoxLayout()
-        sub_bar.setContentsMargins(16, 6, 170, 6)
+        set_content_margins(sub_bar, top=6, bottom=6)
         sub_bar.setSpacing(6)
         self._sub_btns = {}
         for sid, skey in [('parents', 'Parents'), ('children', 'Children')]:
@@ -219,7 +219,7 @@ class BreedingTab(QWidget):
         layout.addLayout(sub_bar)
 
         select_row = QHBoxLayout()
-        select_row.setContentsMargins(16, 0, 170, 0)
+        set_content_margins(select_row)
         select_row.setSpacing(10)
         self._select_btn = QPushButton(f'{EGG}  {t("breeding.select_pal") if t else "Select a Pal..."}')
         self._select_btn.setObjectName('opsLoadBtn')
@@ -247,7 +247,7 @@ class BreedingTab(QWidget):
         self._search_filter.textChanged.connect(self._on_filter_changed)
         self._search_filter.hide()
         filter_row = QHBoxLayout()
-        filter_row.setContentsMargins(16, 6, 170, 6)
+        set_content_margins(filter_row, top=6, bottom=6)
         filter_row.addWidget(self._search_filter, 1)
         layout.addLayout(filter_row)
 
@@ -257,7 +257,7 @@ class BreedingTab(QWidget):
         self._results_container = QWidget()
         self._results_layout = QVBoxLayout(self._results_container)
         self._results_layout.setSpacing(6)
-        self._results_layout.setContentsMargins(16, 8, 170, 16)
+        set_content_margins(self._results_layout, top=8, bottom=16)
         self._scroll.setWidget(self._results_container)
         layout.addWidget(self._scroll, 1)
 

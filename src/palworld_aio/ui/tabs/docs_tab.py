@@ -16,7 +16,7 @@ class DocsTab(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon
+        from palworld_aio.ui.chrome.components import create_page_ribbon, set_content_margins
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -24,7 +24,7 @@ class DocsTab(QWidget):
         layout.addWidget(create_page_ribbon(t('docs.tab') if t else 'Docs', (t('sidebar.section.reference') if t else 'Reference').upper(), self))
 
         sub_tab_bar = QHBoxLayout()
-        sub_tab_bar.setContentsMargins(16, 6, 170, 6)
+        set_content_margins(sub_tab_bar, top=6, bottom=6)
         sub_tab_bar.setSpacing(6)
 
         self._sub_btns = {}

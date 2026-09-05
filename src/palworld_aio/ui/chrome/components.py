@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 
 from palworld_aio.ui.chrome import fonts
 from palworld_aio.ui.chrome.tokens import HEIGHT, SPACING, TYPE
+from palworld_aio.ui.chrome.window_controls import CONTROLS_RESERVE_WIDTH
 
 _LEVELS = ('neutral', 'success', 'warning', 'danger', 'info', 'special', 'accent')
 
@@ -442,7 +443,7 @@ def create_page_ribbon(title: str, zone: str = '', parent=None) -> QFrame:
     ribbon = QFrame(parent)
     ribbon.setObjectName('pageRibbon')
     lay = QHBoxLayout(ribbon)
-    lay.setContentsMargins(SPACING['xl'], SPACING['md'], 170, SPACING['md'])
+    lay.setContentsMargins(SPACING['xl'], SPACING['md'], CONTROLS_RESERVE_WIDTH, SPACING['md'])
     lay.setSpacing(SPACING['sm'])
     title_lbl = QLabel(title, ribbon)
     title_lbl.setObjectName('ribbonTitle')
@@ -454,6 +455,26 @@ def create_page_ribbon(title: str, zone: str = '', parent=None) -> QFrame:
     lay.addStretch(1)
     ribbon._ribbon_actions_slot = lay
     return ribbon
+
+
+def ribbon_actions_slot(ribbon: QFrame) -> QHBoxLayout:
+    """Public accessor for a page ribbon's trailing action slot.
+
+    Wraps the private ``_ribbon_actions_slot`` so screens never reach into
+    ribbon internals directly (ui-modernization Phase 0).
+    """
+    return ribbon._ribbon_actions_slot
+
+
+def set_content_margins(target, top: int = 0, bottom: int = 0,
+                        left: int = SPACING['lg']) -> None:
+    """Apply standard page-row margins, keeping the WindowControls reserve.
+
+    The right gutter is always the shared ``CONTROLS_RESERVE_WIDTH`` so rows
+    never underlap the floating minimize/maximize/close cluster; the left
+    gutter defaults to ``SPACING['lg']``. Accepts any QWidget or QLayout.
+    """
+    target.setContentsMargins(left, top, CONTROLS_RESERVE_WIDTH, bottom)
 
 
 class NerdBtn(QPushButton):

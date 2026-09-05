@@ -15,7 +15,15 @@ from palworld_aio.ui.chrome import icons as app_icons
 
 
 def _txt(key: str, fallback: str) -> str:
-    return t(key) if t else fallback
+    return t(key, default=fallback) if t else fallback
+
+
+# Right-edge reserve (px) that page content must leave clear for the floating
+# WindowControls cluster (ui-modernization Phase 0). Covers the 3-button
+# cluster plus its right offset and breathing room; value preserved from the
+# legacy per-screen `170` magic so Phase 0 is visual-neutral. Tuned with
+# screenshots in Phase 1 (rail/tray work).
+CONTROLS_RESERVE_WIDTH = 170
 
 
 class WindowControls(QWidget):
