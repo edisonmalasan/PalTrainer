@@ -636,6 +636,15 @@ QFrame#bandZoneRule {{
     border: none;
     margin: 3px 10px;
 }}
+QLabel#bandZoneCaption {{
+    color: {p['text_disabled']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+    padding: 4px 2px 1px 2px;
+}}
 QPushButton[bandItem="true"] {{
     background: transparent;
     color: {p['text_secondary']};

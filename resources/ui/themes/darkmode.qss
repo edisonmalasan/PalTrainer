@@ -606,6 +606,15 @@ QFrame#bandZoneRule {
     border: none;
     margin: 3px 10px;
 }
+QLabel#bandZoneCaption {
+    color: #5C564E;
+    font-family: 'Hanken Grotesk','Segoe UI';
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+    padding: 4px 2px 1px 2px;
+}
 QPushButton[bandItem="true"] {
     background: transparent;
     color: #A69F94;
