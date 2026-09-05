@@ -165,11 +165,14 @@ class MapTab(QWidget):
         self.player_icon_pixmap = None
     def _setup_ui(self):
         from palworld_aio.ui.chrome.components import create_page_ribbon
+        # Single installed root layout: ribbon on top, canvas body below.
+        # (Was two competing `*_Layout(self)` installs; the second orphaned
+        # the canvas, leaving the ribbon floating mid-page.)
         root_v = QVBoxLayout(self)
         root_v.setContentsMargins(0, 0, 0, 0)
         root_v.setSpacing(0)
         root_v.addWidget(create_page_ribbon(t('map.viewer') if t else 'Map', (t('sidebar.section.inspect') if t else 'Load & Inspect').upper(), self))
-        layout = QHBoxLayout(self)
+        layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         self._map_widget = QWidget()
         self._map_widget.setMinimumSize(0, 0)
@@ -381,6 +384,7 @@ class MapTab(QWidget):
         # canvas-first: the map takes the full page; the legend card floats
         body_layout.addWidget(self._map_widget, stretch=1)
         layout.addLayout(body_layout)
+        root_v.addLayout(layout, stretch=1)
         self._sidebar_widget.setParent(self.view)
         self._sidebar_widget.move(10, 44)
         self._sidebar_widget.raise_()
