@@ -28,12 +28,12 @@
 
 ## 4. Phase 3 — Page skeleton adoption
 
-- [ ] 4.1 Add `create_page_footer` helper (status text left, actions right) and page-header grammar documentation in `chrome/components.py`; verify Players/JSON footers consolidate onto it with unchanged button wiring
-- [ ] 4.2 Migrate table pages (Players, Guilds, Bases, Exclusions) to the shared grammar: page header, toolbar with search+count, full-width table, footer; add shared empty states (no save / no results) to all four; verify context menus, bulk dialogs, and selection syncing unchanged
-- [ ] 4.3 Migrate JSON Editor toolbar/footer onto the grammar with token-colored search highlight and a no-save empty state; verify lazy-tree search, refresh, export/import round-trips still pass tests
-- [ ] 4.4 Move picker/switch rows (Base Inventory guild/base pickers, Pal Editor player picker, Breeding switches) from ribbon action slots into standard toolbar rows; verify pickers, view switches, and cross-tab selection sync unchanged
-- [ ] 4.5 Specialized-page alignment only: Map overlay toggles/legend insets respect the new chrome geometry (no app-bar/nav collision at min size), Tools columns stretch to fill and field report stays the single stats surface, Docs drops the single-item sub-tab bar; verify map interactions (markers, zones, calibration) unchanged
-- [ ] 4.6 Phase gate: full test suite, `uv run pyright src`, and full-page screenshot set (all 12 pages, empty + populated where feasible)
+- [x] 4.1 Add `create_page_footer` helper (status text left, actions right) and page-header grammar documentation in `chrome/components.py`; verify Players/JSON footers consolidate onto it with unchanged button wiring
+- [x] 4.2 Migrate table pages (Players, Guilds, Bases, Exclusions) to the shared grammar: page header, toolbar with search+count, full-width table, footer; add shared empty states (no save / no results) to all four; verify context menus, bulk dialogs, and selection syncing unchanged
+- [x] 4.3 Migrate JSON Editor toolbar/footer onto the grammar with token-colored search highlight and a no-save empty state; verify lazy-tree search, refresh, export/import round-trips still pass tests
+- [x] 4.4 Move picker/switch rows (Base Inventory guild/base pickers, Pal Editor player picker, Breeding switches) from ribbon action slots into standard toolbar rows; verify pickers, view switches, and cross-tab selection sync unchanged
+- [x] 4.5 Specialized-page alignment only: Map overlay toggles/legend insets respect the new chrome geometry (no app-bar/nav collision at min size), Tools columns stretch to fill and field report stays the single stats surface, Docs drops the single-item sub-tab bar; verify map interactions (markers, zones, calibration) unchanged
+- [x] 4.6 Phase gate: full test suite, `uv run pyright src`, and full-page screenshot set (all 12 pages, empty + populated where feasible)
 
 ## 5. Phase 4 — Cleanup and retirement
 

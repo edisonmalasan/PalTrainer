@@ -476,6 +476,37 @@ def set_content_margins(target, top: int = 0, bottom: int = 0,
     target.setContentsMargins(left, top, left, bottom)
 
 
+class PageFooter(QFrame):
+    """Shared page footer (top-nav-shell 4.1): status text left, actions right.
+
+    Page-grammar reference implementation for table pages: Players/Guilds/
+    Bases/Exclusions bulk bars and the JSON editor footer consolidate onto
+    this frame. Exposes ``status_label`` and the trailing ``actions`` layout;
+    callers keep full ownership of their buttons and wiring.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName('tableFooter')
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(SPACING['lg'], 4, SPACING['lg'], 4)
+        lay.setSpacing(SPACING['sm'])
+        self.status_label = QLabel('')
+        self.status_label.setObjectName('bulkHintLabel')
+        lay.addWidget(self.status_label)
+        lay.addSpacing(SPACING['sm'])
+        lay.addStretch(1)
+        self.actions = lay
+
+
+def create_page_footer(status_text: str = '', parent=None) -> PageFooter:
+    """Convenience constructor for the shared page footer."""
+    footer = PageFooter(parent)
+    if status_text:
+        footer.status_label.setText(status_text)
+    return footer
+
+
 class NerdBtn(QPushButton):
     """Icon-font button: paints the glyph without QPushButton text mangling.
     (Moved here from the retired sidebar_widget — plan 025.)"""

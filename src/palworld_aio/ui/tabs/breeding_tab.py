@@ -5,22 +5,12 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLab
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QCursor, QPixmap, QIcon
 from palworld_aio import constants
+from palworld_aio.ui.chrome import icons as app_icons
 from resource_resolver import resource_path
 from i18n import t
 from palworld_aio.editor.pal_editor import PalFrame, PalCreateDialog, _get_pal_icon_path, _get_cached_pixmap, _BOSS_PREFIXES
-try:
-    import nerdfont as nf
-    ARROW_RIGHT = nf.icons.get('nf-fa-arrow_right', '\u2192')
-    PLUS = nf.icons.get('nf-fa-plus', '+')
-    EGG = nf.icons.get('nf-fa-egg', '\u2B55')
-    CHEVRON_LEFT = nf.icons.get('nf-fa-chevron_left', '<')
-    CHEVRON_RIGHT = nf.icons.get('nf-fa-chevron_right', '>')
-except Exception:
-    ARROW_RIGHT = '\u2192'
-    PLUS = '+'
-    EGG = '\u2B55'
-    CHEVRON_LEFT = '<'
-    CHEVRON_RIGHT = '>'
+ARROW_RIGHT = '\u2192'
+PLUS = '+'
 
 _BTN_STYLE = None  # retired: tokenized pageSwitchBtn grammar (012-r02)
 _CARD_STYLE = 'QFrame { background: transparent; border: none; }'
@@ -221,7 +211,8 @@ class BreedingTab(QWidget):
         select_row = QHBoxLayout()
         set_content_margins(select_row)
         select_row.setSpacing(10)
-        self._select_btn = QPushButton(f'{EGG}  {t("breeding.select_pal") if t else "Select a Pal..."}')
+        self._select_btn = QPushButton(t("breeding.select_pal") if t else "Select a Pal...")
+        self._select_btn.setIcon(app_icons.get_qicon('breeding', role='text_secondary'))
         self._select_btn.setObjectName('opsLoadBtn')
         self._select_btn.setProperty('loadKind', 'secondary')
         self._select_btn.setCursor(QCursor(Qt.PointingHandCursor))
@@ -475,8 +466,8 @@ class BreedingTab(QWidget):
         nav = QHBoxLayout()
         nav.setSpacing(6)
         total_pages = max(1, (total + _MAX_COMBOS - 1) // _MAX_COMBOS)
-        prev_btn = QPushButton(CHEVRON_LEFT)
-        prev_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 14))
+        prev_btn = QPushButton()
+        prev_btn.setIcon(app_icons.get_qicon('chevron_left', role='text_secondary'))
         prev_btn.setFixedSize(28, 28)
         prev_btn.setEnabled(self._page > 0)
         prev_btn.clicked.connect(self._prev_page)
@@ -484,8 +475,8 @@ class BreedingTab(QWidget):
         page_lbl = QLabel(f'<span style="color:#A69F94;font-size:12px;">{(t("breeding.page_of") if t else "Page {n} of {total}").replace("{n}", str(self._page + 1)).replace("{total}", str(total_pages))}</span>')
         page_lbl.setTextFormat(Qt.RichText)
         nav.addWidget(page_lbl)
-        next_btn = QPushButton(CHEVRON_RIGHT)
-        next_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 14))
+        next_btn = QPushButton()
+        next_btn.setIcon(app_icons.get_qicon('chevron_right', role='text_secondary'))
         next_btn.setFixedSize(28, 28)
         next_btn.setObjectName('toolButton')
         next_btn.setEnabled(end < total)
@@ -517,14 +508,14 @@ class BreedingTab(QWidget):
         grid.setSpacing(0)
         self._add_pal_unit(grid, parent_a, pal_info_map, 1)
         sep1 = QLabel(PLUS)
-        sep1.setFont(QFont(constants.FONT_FAMILY_NERD, 18))
+        sep1.setFont(QFont(constants.FONT_FAMILY, 16))
         sep1.setStyleSheet('color: #A69F94; padding: 0 4px;')
         sep1.setAlignment(Qt.AlignCenter)
         sep1.setFixedWidth(36)
         grid.addWidget(sep1)
         self._add_pal_unit(grid, parent_b, pal_info_map, 1)
         sep2 = QLabel(ARROW_RIGHT)
-        sep2.setFont(QFont(constants.FONT_FAMILY_NERD, 18))
+        sep2.setFont(QFont(constants.FONT_FAMILY, 16))
         sep2.setStyleSheet('color: #F59E0B; padding: 0 4px;')
         sep2.setAlignment(Qt.AlignCenter)
         sep2.setFixedWidth(36)
@@ -540,14 +531,14 @@ class BreedingTab(QWidget):
         grid.setSpacing(0)
         self._add_pal_unit(grid, parent, pal_info_map, 1)
         sep1 = QLabel(PLUS)
-        sep1.setFont(QFont(constants.FONT_FAMILY_NERD, 18))
+        sep1.setFont(QFont(constants.FONT_FAMILY, 16))
         sep1.setStyleSheet('color: #A69F94; padding: 0 4px;')
         sep1.setAlignment(Qt.AlignCenter)
         sep1.setFixedWidth(36)
         grid.addWidget(sep1)
         self._add_pal_unit(grid, partner, pal_info_map, 1)
         sep2 = QLabel(ARROW_RIGHT)
-        sep2.setFont(QFont(constants.FONT_FAMILY_NERD, 18))
+        sep2.setFont(QFont(constants.FONT_FAMILY, 16))
         sep2.setStyleSheet('color: #F59E0B; padding: 0 4px;')
         sep2.setAlignment(Qt.AlignCenter)
         sep2.setFixedWidth(36)
@@ -591,7 +582,8 @@ class BreedingTab(QWidget):
         for sid, skey in [('parents', 'Parents'), ('children', 'Children')]:
             if sid in self._sub_btns:
                 self._sub_btns[sid].setText(t(f'breeding.mode.{sid}') if t else skey)
-        self._select_btn.setText(f'{EGG}  {(t("breeding.select_pal") if t else "Select a Pal...")}')
+        self._select_btn.setText(t("breeding.select_pal") if t else "Select a Pal...")
+        self._select_btn.setIcon(app_icons.get_qicon('breeding', role='text_secondary'))
         self._hint_label.setText(t('breeding.hint') if t else 'Click the button above to select a pal and view breeding combinations.')
         self._search_filter.setPlaceholderText(t('breeding.filter') if t else 'Filter results...')
         self._update_results()

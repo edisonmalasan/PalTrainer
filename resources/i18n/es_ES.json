@@ -2123,5 +2123,7 @@
     "nav.zone.world": "Mundo",
     "nav.zone.edit": "Editar",
     "nav.zone.reference": "Referencia",
-    "nav.overflow": "Más páginas"
+    "nav.overflow": "Más páginas",
+    "status.no_save_data": "Sin datos — carga primero una partida.",
+    "search.no_matches": "Sin coincidencias"
 }

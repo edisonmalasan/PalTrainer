@@ -102,7 +102,7 @@ class JsonEditorTab(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon, set_content_margins
+        from palworld_aio.ui.chrome.components import create_page_ribbon, create_page_footer, set_content_margins
         from palworld_aio.ui.chrome.styles import ThemeManager
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -160,13 +160,21 @@ class JsonEditorTab(QWidget):
         mono.setPointSize(10)
         self._tree.setFont(mono)
         self._tree.itemExpanded.connect(self._on_item_expanded)
+        self._tree.setWordWrap(False)
+        # no-save empty state (top-nav-shell 4.3): overlay hint on the tree
+        hint_text = t(f'{_JSON_KEY}.no_save') if t else 'No save loaded'
+        self._empty_hint = QLabel(hint_text)
+        self._empty_hint.setObjectName('tableEmptyHint')
+        self._empty_hint.setAlignment(Qt.AlignCenter)
+        self._empty_hint.setAttribute(Qt.WA_TransparentForMouseEvents)
         layout.addWidget(self._tree, 1)
+        self._empty_hint.setParent(self._tree.viewport())
+        self._empty_hint.setGeometry(self._tree.viewport().rect())
+        self._tree.resizeEvent = self._tree_resized  # type: ignore[method-assign]
 
-        footer = QFrame()
-        footer.setObjectName('tableFooter')
-        footer_lay = QHBoxLayout(footer)
-        set_content_margins(footer_lay, top=6, bottom=6)
-        footer_lay.setSpacing(8)
+        # shared page footer (top-nav-shell 4.1): actions left, status right
+        footer = create_page_footer()
+        footer_lay = footer.actions
         self._refresh_btn = QPushButton(t(f'{_JSON_KEY}.refresh') if t else 'Refresh from Save')
         self._refresh_btn.setObjectName('ghostBtn')
         self._refresh_btn.clicked.connect(self._load_from_save)
@@ -179,12 +187,17 @@ class JsonEditorTab(QWidget):
         self._import_btn.setObjectName('ghostBtn')
         self._import_btn.clicked.connect(self._import_json)
         footer_lay.addWidget(self._import_btn)
-        footer_lay.addStretch()
-        self._status_label = QLabel(t(f'{_JSON_KEY}.no_save') if t else 'No save loaded')
-        self._status_label.setObjectName('bulkHintLabel')
-        footer_lay.addWidget(self._status_label)
+        self._status_label = footer.status_label
+        self._status_label.setText(t(f'{_JSON_KEY}.no_save') if t else 'No save loaded')
         layout.addWidget(footer)
         # theme application is global (ThemeManager); per-tab styles removed
+
+    def _tree_resized(self, event):
+        QTreeWidget.resizeEvent(self._tree, event)
+        self._empty_hint.setGeometry(self._tree.viewport().rect())
+
+    def _set_empty_hint(self, show: bool) -> None:
+        self._empty_hint.setVisible(show)
 
     def _on_item_expanded(self, item):
         if isinstance(item, LazyJsonItem):
@@ -223,10 +236,14 @@ class JsonEditorTab(QWidget):
             )
 
     def _highlight_item(self, item, on):
+        # token amber tint (top-nav-shell 4.3): replaced the raw yellow QColor
         if on:
-            item.setBackground(0, QColor(255, 235, 59, 50))
-            item.setBackground(1, QColor(255, 235, 59, 50))
-            item.setBackground(2, QColor(255, 235, 59, 50))
+            from palworld_aio.ui.chrome.tokens import resolve as _resolve
+            tint = QColor(_resolve()['accent'])
+            tint.setAlpha(50)
+            item.setBackground(0, tint)
+            item.setBackground(1, tint)
+            item.setBackground(2, tint)
         else:
             item.setBackground(0, QBrush())
             item.setBackground(1, QBrush())
@@ -274,9 +291,11 @@ class JsonEditorTab(QWidget):
         data = self._get_gvas_dict()
         if data is None:
             self._status_label.setText(t(f'{_JSON_KEY}.no_save') if t else 'No save loaded')
+            self._set_empty_hint(True)
             return
         try:
             self._populate_tree(data)
+            self._set_empty_hint(False)
             self._status_label.setText(
                 t(f'{_JSON_KEY}.loaded') if t else 'JSON loaded from save'
             )

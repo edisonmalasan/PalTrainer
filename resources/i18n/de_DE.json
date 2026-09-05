@@ -2153,5 +2153,7 @@
     "nav.zone.world": "Welt",
     "nav.zone.edit": "Bearbeiten",
     "nav.zone.reference": "Referenz",
-    "nav.overflow": "Weitere Seiten"
+    "nav.overflow": "Weitere Seiten",
+    "status.no_save_data": "Keine Daten — zuerst einen Spielstand laden.",
+    "search.no_matches": "Keine Treffer"
 }

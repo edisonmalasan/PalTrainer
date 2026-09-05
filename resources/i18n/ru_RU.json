@@ -2127,5 +2127,7 @@
     "nav.zone.world": "Мир",
     "nav.zone.edit": "Редакт.",
     "nav.zone.reference": "Справка",
-    "nav.overflow": "Ещё страницы"
+    "nav.overflow": "Ещё страницы",
+    "status.no_save_data": "Нет данных — сначала загрузите сохранение.",
+    "search.no_matches": "Совпадений нет"
 }

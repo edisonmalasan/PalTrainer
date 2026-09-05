@@ -2416,5 +2416,7 @@
     "nav.zone.world": "World",
     "nav.zone.edit": "Edit",
     "nav.zone.reference": "Reference",
-    "nav.overflow": "More pages"
+    "nav.overflow": "More pages",
+    "status.no_save_data": "No data — load a save first.",
+    "search.no_matches": "No matches"
 }

@@ -512,6 +512,11 @@ QToolButton#navOverflowBtn {{
     font-weight: 600;
 }}
 QToolButton#navOverflowBtn:hover {{ background: {p['surface_hover']}; color: {p['accent']}; }}
+QLabel#tableEmptyHint {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['body'][0]}px;
+    background: transparent;
+}}
 QSplitter::handle:horizontal {{
     background: {p['border']};
     width: 2px;

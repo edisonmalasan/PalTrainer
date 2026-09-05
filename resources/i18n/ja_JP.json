@@ -2129,5 +2129,7 @@
     "nav.zone.world": "ワールド",
     "nav.zone.edit": "編集",
     "nav.zone.reference": "リファレンス",
-    "nav.overflow": "その他のページ"
+    "nav.overflow": "その他のページ",
+    "status.no_save_data": "データなし — まずセーブを読み込んでください。",
+    "search.no_matches": "該当なし"
 }

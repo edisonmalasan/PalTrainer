@@ -473,13 +473,15 @@ class MainWindow(QMainWindow):
         self.players_panel.item_selected.connect(self._on_player_selected)
         self.players_panel.tree.customContextMenuRequested.connect(self._show_player_context_menu)
         layout.addWidget(self.players_panel, stretch=1)
-        bulk_frame = QFrame()
-        bulk_frame.setObjectName('bulkActionBar')
-        bulk_layout = QHBoxLayout(bulk_frame)
+        # shared page footer (top-nav-shell 4.1): bulk actions live in the
+        # trailing actions slot; wiring unchanged
+        from .chrome.components import create_page_footer
+        bulk_frame = create_page_footer()
+        bulk_layout = bulk_frame.actions
         self.bulk_label = QLabel(t('player.bulk_actions') if t else 'Bulk Actions:')
         self.bulk_label.setObjectName('bulkActionLabel')
+        bulk_frame.status_label.hide()
         bulk_layout.addWidget(self.bulk_label)
-        bulk_layout.addSpacing(10)
         self.bulk_item_btn = QPushButton(t('player.bulk_item_management') if t else 'Bulk Item Management')
         self.bulk_item_btn.clicked.connect(self._open_bulk_player_item_dialog)
         bulk_layout.addWidget(self.bulk_item_btn)
@@ -492,7 +494,6 @@ class MainWindow(QMainWindow):
         self.bulk_guild_btn = QPushButton(t('guild.assign.btn_open') if t else 'Guild Assignments')
         self.bulk_guild_btn.clicked.connect(self._open_guild_assign_dialog)
         bulk_layout.addWidget(self.bulk_guild_btn)
-        bulk_layout.addStretch()
         layout.addWidget(bulk_frame)
         self.stacked_widget.addWidget(players_tab)
     def _setup_guilds_tab(self):

@@ -2128,5 +2128,7 @@
     "nav.zone.world": "월드",
     "nav.zone.edit": "편집",
     "nav.zone.reference": "참조",
-    "nav.overflow": "더 보기"
+    "nav.overflow": "더 보기",
+    "status.no_save_data": "데이터 없음 — 먼저 세이브를 로드하세요.",
+    "search.no_matches": "검색 결과 없음"
 }

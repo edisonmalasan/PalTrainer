@@ -77,6 +77,22 @@ class SearchPanel(QWidget):
         self.tree.itemSelectionChanged.connect(self._on_selection_changed)
         self.tree.itemDoubleClicked.connect(self._on_double_click)
         layout.addWidget(self.tree, stretch=1)
+        # empty-state overlay (top-nav-shell 4.2): no-save / no-results hints
+        self._empty_label = QLabel('')
+        self._empty_label.setObjectName('tableEmptyHint')
+        self._empty_label.setAlignment(Qt.AlignCenter)
+        self._empty_label.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._empty_label.hide()
+        self._empty_label.setParent(self.tree.viewport())
+        self._empty_label.setGeometry(self.tree.viewport().rect())
+        tree_resize = self.tree.resizeEvent
+
+        def _tree_resized(event, _tree=self.tree, _label=self._empty_label, _orig=tree_resize):
+            QTreeWidget.resizeEvent(_tree, event)
+            _label.setGeometry(_tree.viewport().rect())
+            if _orig:
+                _orig(event)
+        self.tree.resizeEvent = _tree_resized  # type: ignore[method-assign]
         # footer context strip
         footer = QFrame()
         footer.setObjectName('tableFooter')
@@ -91,10 +107,39 @@ class SearchPanel(QWidget):
         layout.addWidget(footer)
         self._update_count()
         self._all_items = []
+        self.set_empty_state(t('status.no_save_data') if t else 'No data — load a save first.')
+
+    def set_empty_state(self, message: str) -> None:
+        """Show a centered hint over the table when it has no rows."""
+        if not message:
+            self._empty_label.hide()
+            return
+        self._empty_label.setText(message)
+        self._empty_label.setGeometry(self.tree.viewport().rect())
+        self._empty_label.show()
+
+    def _refresh_empty_state(self) -> None:
+        visible = sum(0 if self.tree.topLevelItem(i).isHidden() else 1
+                      for i in range(self.tree.topLevelItemCount()))
+        if visible == 0:
+            searched = self.search_input.text().strip()
+            if searched and self.tree.topLevelItemCount() > 0:
+                message = t('search.no_matches') if t else 'No matches'
+            elif self.tree.topLevelItemCount() == 0:
+                message = t('status.no_save_data') if t else 'No data — load a save first.'
+            else:
+                message = t('search.no_matches') if t else 'No matches'
+            self._empty_label.setText(message)
+            self._empty_label.setGeometry(self.tree.viewport().rect())
+            self._empty_label.show()
+        else:
+            self._empty_label.hide()
     def _update_count(self):
         total = self.tree.topLevelItemCount()
         visible = sum(0 if self.tree.topLevelItem(i).isHidden() else 1 for i in range(total))
         self.count_label.setText(f'{visible}/{total}' if total != visible else str(total))
+        if hasattr(self, '_empty_label'):
+            self._refresh_empty_state()
     def _on_search(self, text):
         text = text.lower()
         for i in range(self.tree.topLevelItemCount()):

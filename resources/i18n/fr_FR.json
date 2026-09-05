@@ -2111,5 +2111,7 @@
     "nav.zone.world": "Monde",
     "nav.zone.edit": "Éditer",
     "nav.zone.reference": "Référence",
-    "nav.overflow": "Plus de pages"
+    "nav.overflow": "Plus de pages",
+    "status.no_save_data": "Aucune donnée — chargez d’abord une sauvegarde.",
+    "search.no_matches": "Aucun résultat"
 }

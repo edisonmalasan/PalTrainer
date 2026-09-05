@@ -303,7 +303,6 @@ class ToolsTab(QWidget):
         columns_row.setSpacing(24)
         for zone_key, rows in self.MISSION_ZONES:
             columns_row.addWidget(self._create_mission_column(zone_key, rows), stretch=1)
-        columns_row.addStretch(0)
         body.addLayout(columns_row)
         body.addStretch(1)
         scroll = QScrollArea()

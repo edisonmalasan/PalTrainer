@@ -2131,5 +2131,7 @@
     "nav.zone.world": "世界",
     "nav.zone.edit": "编辑",
     "nav.zone.reference": "参考",
-    "nav.overflow": "更多页面"
+    "nav.overflow": "更多页面",
+    "status.no_save_data": "暂无数据 — 请先加载存档。",
+    "search.no_matches": "无匹配项"
 }

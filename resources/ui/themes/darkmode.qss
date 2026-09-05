@@ -482,6 +482,11 @@ QToolButton#navOverflowBtn {
     font-weight: 600;
 }
 QToolButton#navOverflowBtn:hover { background: rgba(245,158,11,0.07); color: #F59E0B; }
+QLabel#tableEmptyHint {
+    color: #5C564E;
+    font-size: 12px;
+    background: transparent;
+}
 QSplitter::handle:horizontal {
     background: rgba(236,231,224,0.1);
     width: 2px;
