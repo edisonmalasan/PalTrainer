@@ -1340,4 +1340,27 @@ QFrame[tech_selected="true"] {{
     border: 1px solid {p['accent_border_strong']};
     border-radius: {RADIUS['md']}px;
 }}
+/* fix-illegal cards/rows: property-driven selection (Phase 4) */
+QFrame[playerCard="true"] {{
+    background: {p['surface']};
+    border: 1px solid transparent;
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame[playerCard="true"]:hover {{
+    background: {p['surface_hover']};
+    border-color: {p['accent_border']};
+}}
+QFrame[playerCard="true"][selected="true"] {{
+    background: {p['accent_bg_strong']};
+    border: 1px solid {p['accent_border_strong']};
+}}
+QFrame[playerCard="true"][selected="true"]:hover {{
+    background: {p['accent_bg_strong']};
+    border-color: {p['accent']};
+}}
+QFrame[palRow="true"] {{
+    background: {p['surface']};
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame[palRow="true"]:hover {{ background: {p['surface_hover']}; }}
 """

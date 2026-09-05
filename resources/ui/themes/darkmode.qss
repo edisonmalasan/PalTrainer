@@ -1310,6 +1310,29 @@ QFrame[tech_selected="true"] {
     border: 1px solid rgba(245,158,11,0.5);
     border-radius: 5px;
 }
+/* fix-illegal cards/rows: property-driven selection (Phase 4) */
+QFrame[playerCard="true"] {
+    background: #1B1917;
+    border: 1px solid transparent;
+    border-radius: 5px;
+}
+QFrame[playerCard="true"]:hover {
+    background: rgba(245,158,11,0.07);
+    border-color: rgba(245,158,11,0.3);
+}
+QFrame[playerCard="true"][selected="true"] {
+    background: rgba(245,158,11,0.18);
+    border: 1px solid rgba(245,158,11,0.5);
+}
+QFrame[playerCard="true"][selected="true"]:hover {
+    background: rgba(245,158,11,0.18);
+    border-color: #F59E0B;
+}
+QFrame[palRow="true"] {
+    background: #1B1917;
+    border-radius: 5px;
+}
+QFrame[palRow="true"]:hover { background: rgba(245,158,11,0.07); }
 
 /* Transitional extras — RETAINED BLOCKS ONLY (plan 025 purge).
    Blocks for retired objects (old sidebar/header/results/tools cards,
