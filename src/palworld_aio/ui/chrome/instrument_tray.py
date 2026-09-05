@@ -17,9 +17,9 @@ deltas, copy button) — behavior preserved, geometry replaced.
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QCursor, QColor
+from PyQt6.QtGui import QFont, QFontMetrics, QCursor, QColor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton, QFrame,
     QGraphicsDropShadowEffect,
 )
 
@@ -32,7 +32,16 @@ _SPIN_FRAMES = '\u25D0\u25D3\u25D1\u25D2'
 
 
 def _txt(key: str, fallback: str) -> str:
-    return t(key) if t else fallback
+    return t(key, default=fallback) if t else fallback
+
+
+def _elide_to(label: QLabel, text: str, avail_px: int) -> None:
+    """Set single-line elided text (QLabel clips without ellipsis by itself)."""
+    if avail_px > 0:
+        label.setText(QFontMetrics(label.font()).elidedText(
+            text, Qt.TextElideMode.ElideRight, avail_px))
+    else:
+        label.setText(text)
 
 
 class _StateRow(QPushButton):
@@ -44,18 +53,26 @@ class _StateRow(QPushButton):
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setFixedHeight(30)
+        self._full_text = ''
+        row = QHBoxLayout(self)
+        row.setContentsMargins(6, 3, 6, 3)
+        row.setSpacing(4)
         self._icon_label = QLabel(self)
         self._icon_label.setObjectName('trayStateIcon')
         self._icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._icon_label.setGeometry(4, 3, 22, 24)
+        self._icon_label.setFixedWidth(16)
         self._text_label = QLabel(self)
         self._text_label.setObjectName('trayStateText')
-        self._text_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self._text_label.setGeometry(28, 3, 44, 24)
+        self._text_label.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self._text_label.setWordWrap(False)
+        row.addWidget(self._icon_label)
+        row.addWidget(self._text_label, 1)
 
     def set_state(self, icon: str, text: str, state_key: str) -> None:
         self._icon_label.setText(icon)
-        self._text_label.setText(text)
+        self._full_text = text
+        self._reelide()
         self._icon_label.setProperty('state', state_key)
         self.setProperty('state', state_key)
         for w in (self._icon_label, self._text_label, self):
@@ -63,52 +80,75 @@ class _StateRow(QPushButton):
             w.style().polish(w)
             w.update()
 
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._reelide()
+
+    def _reelide(self) -> None:
+        _elide_to(self._text_label, self._full_text, self._text_label.width())
+
     def set_spin(self, frame: str) -> None:
         self._icon_label.setText(frame)
 
 
 class _SelectionRow(QWidget):
+    """Selection altitude: caption above an elided value (76px rail).
+
+    Values are player/guild names or raw UUIDs — always elided to the
+    available width with the full text in the tooltip.
+    """
+
     def __init__(self, label_key: str, fallback: str, parent=None):
         super().__init__(parent)
-        lay = QHBoxLayout(self)
+        lay = QVBoxLayout(self)
         lay.setContentsMargins(6, 1, 6, 1)
-        lay.setSpacing(2)
+        lay.setSpacing(0)
         self.name_label = QLabel(_txt(label_key, fallback))
         self.name_label.setObjectName('trayLabel')
         self.value_label = QLabel('—')
         self.value_label.setObjectName('trayValue')
         self.value_label.setProperty('placeholder', 'true')
-        self.value_label.setWordWrap(True)
+        self.value_label.setWordWrap(False)
         lay.addWidget(self.name_label)
-        lay.addStretch(1)
         lay.addWidget(self.value_label)
+        self._full_value = ''
 
     def set_value(self, name) -> None:
         if name:
-            self.value_label.setText(str(name))
+            self._full_value = str(name)
             self.value_label.setProperty('placeholder', 'false')
             self.value_label.setToolTip(str(name))
         else:
-            self.value_label.setText('—')
+            self._full_value = ''
             self.value_label.setProperty('placeholder', 'true')
             self.value_label.setToolTip('')
+        self._reelide()
         self.value_label.style().unpolish(self.value_label)
         self.value_label.style().polish(self.value_label)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._reelide()
+
+    def _reelide(self) -> None:
+        text = self._full_value if self._full_value else '—'
+        _elide_to(self.value_label, text, self.value_label.width())
 
     def refresh_label(self, label_key: str, fallback: str) -> None:
         self.name_label.setText(_txt(label_key, fallback))
 
 
 class _MetricRow(QWidget):
-    """Field report: four mono counts in a 2x2 micro grid."""
+    """Field report: four mono counts in a 2x2 grid, value over label."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName('trayMetrics')
-        grid = QVBoxLayout(self)
+        grid = QGridLayout(self)
         grid.setContentsMargins(4, 2, 4, 2)
-        grid.setSpacing(0)
-        self._metrics = {}
+        grid.setHorizontalSpacing(4)
+        grid.setVerticalSpacing(2)
+        self._metrics: dict[str, dict] = {}
         pairs = [
             ('players', 'deletion.stats.players', 'Players'),
             ('guilds', 'deletion.stats.guilds', 'Guilds'),
@@ -116,36 +156,54 @@ class _MetricRow(QWidget):
             ('pals', 'deletion.stats.pals', 'Pals'),
         ]
         for idx, (key, label_key, fallback) in enumerate(pairs):
-            row = QWidget()
-            rl = QHBoxLayout(row)
-            rl.setContentsMargins(2, 0, 2, 0)
-            rl.setSpacing(2)
-            name = QLabel(_txt(label_key, fallback))
-            name.setObjectName('trayLabel')
+            cell = QWidget()
+            col = QVBoxLayout(cell)
+            col.setContentsMargins(0, 0, 0, 0)
+            col.setSpacing(0)
             value = QLabel('—')
             value.setObjectName('trayMetricValue')
             value.setProperty('placeholder', 'true')
-            rl.addWidget(name)
-            rl.addStretch(1)
-            rl.addWidget(value)
-            grid.addWidget(row)
-            self._metrics[key] = value
+            value.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            name = QLabel(_txt(label_key, fallback))
+            name.setObjectName('trayLabel')
+            name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            name.setWordWrap(False)
+            col.addWidget(value)
+            col.addWidget(name)
+            grid.addWidget(cell, idx // 2, idx % 2)
+            self._metrics[key] = {
+                'value': value, 'name': name,
+                'label_key': label_key, 'fallback': fallback,
+                'full_name': _txt(label_key, fallback),
+            }
+            name.setToolTip(self._metrics[key]['full_name'])
 
     def set_metrics(self, stats: dict) -> None:
-        for key, label in self._metrics.items():
+        for key, entry in self._metrics.items():
             raw = stats.get(key.title(), stats.get(key, 0)) if stats else 0
             try:
                 value = int(str(raw))
             except (TypeError, ValueError):
                 value = 0
+            label = entry['value']
             label.setText(str(value) if value else '—')
             label.setProperty('placeholder', 'false' if value else 'true')
             label.style().unpolish(label)
             label.style().polish(label)
 
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._reelide_names()
+
+    def _reelide_names(self) -> None:
+        for entry in self._metrics.values():
+            _elide_to(entry['name'], entry['full_name'], entry['name'].width())
+
     def refresh_labels(self) -> None:
-        # labels are rebuilt on language switch via refresh_all; keep simple
-        pass
+        for entry in self._metrics.values():
+            entry['full_name'] = _txt(entry['label_key'], entry['fallback'])
+            entry['name'].setToolTip(entry['full_name'])
+        self._reelide_names()
 
 
 class _SectionHeader(QLabel):
@@ -173,13 +231,13 @@ class InstrumentTray(QWidget):
         'saving': (_SPIN_FRAMES[0], 'saving'),
         'error': ('\uf00d', 'error'),
     }
-    _STATE_TEXT = {
-        'no_save': 'No save',
-        'loading': 'Loading',
-        'loaded': 'Loaded',
-        'dirty': 'Unsaved',
-        'saving': 'Saving',
-        'error': 'Error',
+    _STATE_TEXT_KEYS = {
+        'no_save': ('tray.state.no_save', 'No save'),
+        'loading': ('tray.state.loading', 'Loading'),
+        'loaded': ('tray.state.loaded', 'Loaded'),
+        'dirty': ('tray.state.dirty', 'Unsaved'),
+        'saving': ('tray.state.saving', 'Saving'),
+        'error': ('tray.state.error', 'Error'),
     }
 
     def __init__(self, parent=None):
@@ -236,7 +294,9 @@ class InstrumentTray(QWidget):
     # ------------------------------------------------------------ state
     def _apply_state(self, key: str) -> None:
         icon, state_key = self._STATE_ICONS.get(key, ('', 'no_save'))
-        self.state_row.set_state(icon, self._STATE_TEXT.get(key, key), state_key)
+        text_key, fallback = self._STATE_TEXT_KEYS.get(
+            key, self._STATE_TEXT_KEYS['no_save'])
+        self.state_row.set_state(icon, _txt(text_key, fallback), state_key)
 
     def set_shell_state(self, state) -> None:
         """Reflect ShellStateModel lifecycle (same enum values as old header)."""
@@ -319,11 +379,14 @@ class InstrumentTray(QWidget):
     def refresh_labels(self) -> None:
         self.state_row.setToolTip(_txt('menu.file.save_changes', 'Save Changes'))
         self.state_row.setAccessibleName(_txt('menu.file.save_changes', 'Save Changes'))
+        self._apply_state(self._shell_state)
         self.sel_header.refresh()
         self.stats_header.refresh()
         self.player_row.refresh_label('deletion.selected_player_label', 'Player')
         self.guild_row.refresh_label('deletion.selected_guild_label', 'Guild')
         self.base_row.refresh_label('deletion.selected_base_label', 'Base')
+        self.metric_row.refresh_labels()
+        self.set_expanded(self.is_expanded())
 
 
 class TrayDrawer(QFrame):

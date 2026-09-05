@@ -636,6 +636,15 @@ QFrame#bandZoneRule {{
     border: none;
     margin: 3px 10px;
 }}
+QLabel#bandZoneCaption {{
+    color: {p['text_disabled']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+    padding: 4px 2px 1px 2px;
+}}
 QPushButton[bandItem="true"] {{
     background: transparent;
     color: {p['text_secondary']};
@@ -1271,4 +1280,93 @@ QLabel#statsValue {{ color: {p['text']}; }}
 QLabel#statsHeader {{ color: {p['text_secondary']}; font-size: {TYPE['micro'][0]}px; font-weight: 600; letter-spacing: 1px; }}
 QLabel#sectionHeader {{ color: {p['text_secondary']}; font-size: {TYPE['micro'][0]}px; font-weight: 600; letter-spacing: 1px; }}
 QFrame#glassPanel {{ background: {p['surface']}; border: 1px solid {p['border']}; border-radius: {RADIUS['lg']}px; }}
+
+/* ---- ui-modernization Phase 0: promoted selectors (were inline or missing).
+   Token/property selectors only. Dialogs that still carry inline copies of
+   these rules keep rendering from their inline copy until their Phase 4
+   migration; the builder copy is the target state. ---- */
+QWidget#windowControls {{ background: transparent; border: none; }}
+QPushButton#windowControlBtn {{
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: {RADIUS['sm']}px;
+    color: {p['text_secondary']};
+    padding: 0px;
+}}
+QPushButton#windowControlBtn:hover {{
+    background: {p['surface_hover']};
+    color: {p['text']};
+}}
+QPushButton#windowControlBtn:pressed {{ background: {p['surface_active']}; }}
+QPushButton#windowControlBtn:focus {{ border: 1px solid {p['accent_border']}; }}
+QPushButton#windowControlBtn:disabled {{ color: {p['text_disabled']}; background: transparent; }}
+QPushButton#windowControlBtn[danger="true"]:hover {{
+    background: {p['danger_bg']};
+    border-color: {p['danger_border']};
+    color: {p['danger']};
+}}
+QPushButton#navBtn {{
+    background: {p['accent_bg']};
+    color: {p['accent']};
+    border: 1px solid {p['accent_border']};
+    border-radius: {RADIUS['md']}px;
+    padding: {SPACING['sm'] - 2}px {SPACING['md'] - 2}px;
+    font-weight: 600;
+}}
+QPushButton#navBtn:hover {{
+    background: {p['accent_bg_strong']};
+    border-color: {p['accent_border_strong']};
+    color: {p['text']};
+}}
+QPushButton#navBtn:pressed {{ background: {p['accent_border']}; }}
+QPushButton#navBtn:focus {{ border: 1px solid {p['text']}; }}
+QPushButton#navBtn:disabled {{ color: {p['text_disabled']}; background: {p['surface']}; border-color: {p['border']}; }}
+QFrame#passiveCard {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame[tech_selected="false"] {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame[tech_selected="false"]:hover {{
+    background: {p['surface_hover']};
+    border-color: {p['accent_border']};
+}}
+QFrame[tech_selected="true"] {{
+    background: {p['accent_bg_strong']};
+    border: 1px solid {p['accent_border_strong']};
+    border-radius: {RADIUS['md']}px;
+}}
+/* fix-illegal cards/rows: property-driven selection (Phase 4) */
+QFrame[playerCard="true"] {{
+    background: {p['surface']};
+    border: 1px solid transparent;
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame[playerCard="true"]:hover {{
+    background: {p['surface_hover']};
+    border-color: {p['accent_border']};
+}}
+QFrame[playerCard="true"][selected="true"] {{
+    background: {p['accent_bg_strong']};
+    border: 1px solid {p['accent_border_strong']};
+}}
+QFrame[playerCard="true"][selected="true"]:hover {{
+    background: {p['accent_bg_strong']};
+    border-color: {p['accent']};
+}}
+QFrame[palRow="true"] {{
+    background: {p['surface']};
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame[palRow="true"]:hover {{ background: {p['surface_hover']}; }}
+/* transient skill-picker popup (Phase 4): floating card, global input/list rules inside */
+QWidget#skillPicker {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['lg']}px;
+}}
 """

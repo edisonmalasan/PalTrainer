@@ -1,7 +1,7 @@
 import os
 import re
 from palsav import json_tools
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QGroupBox, QMessageBox, QAbstractItemView, QListView, QTabWidget, QWidget, QStyledItemDelegate, QFrame, QSizePolicy
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QGroupBox, QMessageBox, QAbstractItemView, QListView, QTabWidget, QWidget, QStyledItemDelegate, QFrame, QSizePolicy
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer, QPoint
 from PyQt6.QtGui import QPixmap, QIcon, QPainter, QColor, QCursor, QFont, QFontMetrics
 from i18n import t
@@ -10,8 +10,8 @@ from palworld_aio.editor.edit_pals import PalFrame, _get_boss_alpha_pixmap, _com
 from palworld_aio.editor.pal_editor.widgets import PassiveEffectOverlay
 from palworld_aio.editor.pal_editor import data as _pedata
 from palworld_aio.ui.dialogs.skill_picker import SkillPicker
-from palworld_aio.ui.chrome.styles import DIALOG_STYLE as DARK_THEME_STYLE, PICKER_BG_STYLE, PICKER_SEARCH_STYLE, PICKER_LIST_STYLE
-from palworld_aio.ui.chrome.components import NerdBtn
+from palworld_aio.ui.chrome.components import BaseDialog, NerdBtn, make_button
+from palworld_aio.ui.chrome import tokens as ui_tokens
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 try:
     import nerdfont as nf
@@ -19,6 +19,20 @@ except:
     class nf:
         icons = {'nf-fa-times': '\uf00d'}
 from resource_resolver import resource_path
+
+
+def _polish(widget) -> None:
+    widget.style().unpolish(widget)
+    widget.style().polish(widget)
+    widget.update()
+
+
+def _danger_tool_style(pal: dict) -> str:
+    return (
+        f'QPushButton {{ background: {pal["danger_bg"]}; color: {pal["danger"]}; '
+        f'border: 1px solid {pal["danger_border"]}; border-radius: 11px; }} '
+        f'QPushButton:hover {{ background: {pal["danger_border"]}; }}'
+    )
 
 class PalSlotDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
@@ -54,12 +68,18 @@ class PalSlotDelegate(QStyledItemDelegate):
                 if ep and (not ep.isNull()):
                     painter.drawPixmap(ix, iy, ep)
                     iy += 14
-class PlayerPalActionDialog(QDialog):
+class PlayerPalActionDialog(BaseDialog):
+    """Bulk pal picker on the shared dialog scaffold (Phase 4).
+
+    Passive-card rank colors stay dynamic: they are game data
+    (PalFrame._RANK_COLORS), not theme colors. Everything else moves to
+    token roles/properties. All data/mutation logic unchanged.
+    """
     pal_action_selected = pyqtSignal(str, str, list)
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(t('player_pal.title') if t else 'Bulk Pal Management')
-        self.setMinimumSize(900, 650)
+        title = t('player_pal.title') if t else 'Bulk Pal Management'
+        super().__init__(title, parent, min_size=(900, 650))
+        self.setWindowTitle(title)
         self.selected_pal_id = None
         self.selected_pal_name = None
         self.selected_active_skill_id = None
@@ -70,9 +90,7 @@ class PlayerPalActionDialog(QDialog):
         self._setup_ui()
         self._load_data()
     def _setup_ui(self):
-        self.setStyleSheet(DARK_THEME_STYLE)
-        layout = QVBoxLayout(self)
-        layout.setSpacing(10)
+        layout = self.content_layout
         self.tab_widget = QTabWidget()
         self.delete_pal_tab = self._create_delete_pal_tab()
         self.tab_widget.addTab(self.delete_pal_tab, t('player_pal.delete_pal_tab') if t else 'Delete Pal')
@@ -80,14 +98,9 @@ class PlayerPalActionDialog(QDialog):
         self.tab_widget.addTab(self.remove_skills_tab, t('player_pal.remove_skills_tab') if t else 'Remove Skills')
         layout.addWidget(self.tab_widget)
         self.status_label = QLabel('')
-        self.status_label.setStyleSheet('color: #4ade80; font-weight: bold; padding: 5px;')
-        layout.addWidget(self.status_label)
-        close_layout = QHBoxLayout()
-        close_layout.addStretch()
-        close_btn = QPushButton(t('button.close') if t else 'Close')
-        close_btn.clicked.connect(self.reject)
-        close_layout.addWidget(close_btn)
-        layout.addLayout(close_layout)
+        self.status_label.setProperty('role', 'success')
+        self.footer.insertWidget(1, self.status_label, stretch=1)
+        self.cancel_btn.setText(t('button.close') if t else 'Close')
     def _create_delete_pal_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -134,12 +147,12 @@ class PlayerPalActionDialog(QDialog):
         self.pal_list.itemDoubleClicked.connect(self._on_delete_pal_direct)
         search_layout.addWidget(self.pal_list)
         self.pal_info_label = QLabel(t('player_pal.select_pal') if t else 'Select a pal to delete from everywhere')
-        self.pal_info_label.setStyleSheet('color: #888; font-style: italic; padding: 5px;')
+        self.pal_info_label.setProperty('role', 'secondary')
         search_layout.addWidget(self.pal_info_label)
         search_group.setLayout(search_layout)
         layout.addWidget(search_group)
         action_layout = QHBoxLayout()
-        self.delete_pal_btn = QPushButton(t('player_pal.delete_pal') if t else 'Delete All Selected Pal')
+        self.delete_pal_btn = make_button(t('player_pal.delete_pal') if t else 'Delete All Selected Pal', 'danger')
         self.delete_pal_btn.clicked.connect(self._on_delete_pal)
         self.delete_pal_btn.setEnabled(False)
         action_layout.addWidget(self.delete_pal_btn)
@@ -156,14 +169,14 @@ class PlayerPalActionDialog(QDialog):
         self.active_skill_btn.clicked.connect(self._on_active_skill_pick)
         active_layout.addWidget(self.active_skill_btn)
         self.active_skill_label = QLabel(t('player_pal.no_active_selected') if t else 'No active skill selected')
-        self.active_skill_label.setStyleSheet('color: #888; padding: 5px;')
+        self.active_skill_label.setProperty('role', 'secondary')
         self.active_skill_label.setWordWrap(True)
         active_layout.addWidget(self.active_skill_label, 1)
         active_layout.addStretch()
         self.active_clear_btn = NerdBtn(nf.icons.get('nf-fa-times', '\uf00d'))
         self.active_clear_btn.setFixedSize(22, 22)
         self.active_clear_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 10))
-        self.active_clear_btn.setStyleSheet(f'QPushButton {{ font-family: "{constants.FONT_FAMILY_NERD}"; background: rgba(239,68,68,0.12); color: #EF4444; border: 1px solid rgba(239,68,68,0.2); border-radius: 11px; }} QPushButton:hover {{ background: rgba(239,68,68,0.25); }}')
+        self.active_clear_btn.setStyleSheet(_danger_tool_style(ui_tokens.resolve()))
         self.active_clear_btn.clicked.connect(self._clear_active_skill)
         self.active_clear_btn.setVisible(False)
         active_layout.addWidget(self.active_clear_btn)
@@ -202,7 +215,7 @@ class PlayerPalActionDialog(QDialog):
         self.passive_clear_btn = NerdBtn(nf.icons.get('nf-fa-times', '\uf00d'))
         self.passive_clear_btn.setFixedSize(22, 22)
         self.passive_clear_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 10))
-        self.passive_clear_btn.setStyleSheet(f'QPushButton {{ font-family: "{constants.FONT_FAMILY_NERD}"; background: rgba(239,68,68,0.12); color: #EF4444; border: 1px solid rgba(239,68,68,0.2); border-radius: 11px; }} QPushButton:hover {{ background: rgba(239,68,68,0.25); }}')
+        self.passive_clear_btn.setStyleSheet(_danger_tool_style(ui_tokens.resolve()))
         self.passive_clear_btn.clicked.connect(self._clear_passive_skill)
         self.passive_clear_btn.setVisible(False)
         passive_layout.addWidget(self.passive_clear_btn)
@@ -222,11 +235,11 @@ class PlayerPalActionDialog(QDialog):
         scope_group.setLayout(scope_layout)
         layout.addWidget(scope_group)
         self.skills_info_label = QLabel(t('player_pal.select_skill_info') if t else 'Select active and/or passive skills to remove from ALL pals everywhere.')
-        self.skills_info_label.setStyleSheet('color: #888; font-style: italic; padding: 5px;')
+        self.skills_info_label.setProperty('role', 'secondary')
         self.skills_info_label.setWordWrap(True)
         layout.addWidget(self.skills_info_label)
         action_layout = QHBoxLayout()
-        self.remove_skills_btn = QPushButton(t('player_pal.remove_skills') if t else 'Remove Selected Skills from All Pals')
+        self.remove_skills_btn = make_button(t('player_pal.remove_skills') if t else 'Remove Selected Skills from All Pals', 'danger')
         self.remove_skills_btn.clicked.connect(self._on_remove_skills)
         self.remove_skills_btn.setEnabled(False)
         action_layout.addWidget(self.remove_skills_btn)
@@ -344,7 +357,8 @@ class PlayerPalActionDialog(QDialog):
         self.selected_pal_id = item.data(Qt.UserRole)
         self.selected_pal_name = item.text()
         self.pal_info_label.setText(f'{self.selected_pal_name}: {self.selected_pal_id}')
-        self.pal_info_label.setStyleSheet('color: #4ade80; font-weight: bold; padding: 5px;')
+        self.pal_info_label.setProperty('role', 'success')
+        _polish(self.pal_info_label)
         self.delete_pal_btn.setEnabled(True)
     def _on_active_skill_pick(self):
         picker = SkillPicker(self)
@@ -358,7 +372,8 @@ class PlayerPalActionDialog(QDialog):
         self.selected_active_skill_id = result
         self.selected_active_skill_name = PalFrame._SKILLMAP.get(result, result)
         self.active_skill_label.setText(f'Active: {self.selected_active_skill_name}')
-        self.active_skill_label.setStyleSheet('color: #7DD3FC; font-weight: bold; padding: 5px;')
+        self.active_skill_label.setProperty('role', 'accent')
+        _polish(self.active_skill_label)
         self.active_clear_btn.setVisible(True)
         self._update_remove_button()
     def _on_passive_skill_pick(self):
@@ -433,7 +448,8 @@ class PlayerPalActionDialog(QDialog):
         self.selected_active_skill_id = None
         self.selected_active_skill_name = None
         self.active_skill_label.setText(t('player_pal.no_active_selected') if t else 'No active skill selected')
-        self.active_skill_label.setStyleSheet('color: #888; padding: 5px;')
+        self.active_skill_label.setProperty('role', 'secondary')
+        _polish(self.active_skill_label)
         self.active_clear_btn.setVisible(False)
         self._update_remove_button()
     def _clear_passive_skill(self):
@@ -505,10 +521,13 @@ class PlayerPalActionDialog(QDialog):
             self._refresh_after_action()
     def _refresh_after_action(self):
         self.status_label.setText(t('player_pal.action_complete').format(item_name='Operation') if t else 'Operation completed successfully!')
-        self.status_label.setStyleSheet('color: #4ade80; font-weight: bold; padding: 5px;')
+        self.status_label.setProperty('role', 'success')
+        _polish(self.status_label)
         QTimer.singleShot(3000, lambda s=self: s.status_label.setText('') if hasattr(s, 'status_label') else None)
     def refresh_labels(self):
-        self.setWindowTitle(t('player_pal.title') if t else 'Bulk Pal Management')
+        title = t('player_pal.title') if t else 'Bulk Pal Management'
+        self.setWindowTitle(title)
+        self.title_label.setText(title)
         self.tab_widget.setTabText(0, t('player_pal.delete_pal_tab') if t else 'Delete Pal')
         self.tab_widget.setTabText(1, t('player_pal.remove_skills_tab') if t else 'Remove Skills')
         for group in self.findChildren(QGroupBox):

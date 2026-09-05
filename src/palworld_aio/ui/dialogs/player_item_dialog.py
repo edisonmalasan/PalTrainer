@@ -1,5 +1,5 @@
 import os
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QGroupBox, QCheckBox, QMessageBox, QSpinBox, QFrame, QAbstractItemView, QListView, QTabWidget, QWidget, QInputDialog
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QGroupBox, QCheckBox, QMessageBox, QSpinBox, QFrame, QAbstractItemView, QListView, QTabWidget, QWidget, QInputDialog
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer
 from PyQt6.QtGui import QPixmap, QIcon, QColor, QPainter, QPen, QIntValidator
 from PyQt6.QtWidgets import QStyledItemDelegate, QSplitter
@@ -9,9 +9,17 @@ from palworld_aio.inventory.inventory_manager import ItemData
 from palworld_aio.managers.data_manager import get_guilds, get_guild_members
 from palworld_aio.utils import sav_to_gvasfile, gvasfile_to_sav
 
-from palworld_aio.ui.chrome.styles import DIALOG_STYLE as DARK_THEME_STYLE, wrap_tooltip_text
+from palworld_aio.ui.chrome.components import BaseDialog, make_button
+from palworld_aio.ui.chrome import tokens as ui_tokens
+from palworld_aio.ui.chrome.styles import wrap_tooltip_text
 from palworld_aio.editor.edit_pals import _clean_desc_for_tooltip
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
+
+
+def _polish(widget) -> None:
+    widget.style().unpolish(widget)
+    widget.style().polish(widget)
+    widget.update()
 SINGLETON_TYPE_A = {'EPalItemTypeA::Weapon', 'EPalItemTypeA::MonsterEquipWeapon', 'EPalItemTypeA::Armor', 'EPalItemTypeA::Accessory', 'EPalItemTypeA::Glider', 'EPalItemTypeA::CaptureItemModifier'}
 class RarityBorderDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
@@ -35,7 +43,12 @@ class RarityBorderDelegate(QStyledItemDelegate):
         rect = option.rect.adjusted(4, 4, -4, -4)
         painter.drawRoundedRect(rect, 4, 4)
         painter.restore()
-class PlayerItemActionDialog(QDialog):
+class PlayerItemActionDialog(BaseDialog):
+    """Bulk item picker on the shared dialog scaffold (Phase 4).
+
+    Header/footer from BaseDialog; Add is primary, Remove is isolated
+    footer-left danger. All item/player/ability logic unchanged.
+    """
     item_action_selected = pyqtSignal(str, str, list)
     add_all_key_items_requested = pyqtSignal(list)
     add_all_effigies_requested = pyqtSignal(list)
@@ -43,9 +56,9 @@ class PlayerItemActionDialog(QDialog):
     edit_abilities_requested = pyqtSignal(list, object)
     modify_slots_requested = pyqtSignal(list, int)
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(t('player_item.title') if t else 'Bulk Player Item Management')
-        self.setMinimumSize(900, 650)
+        title = t('player_item.title') if t else 'Bulk Player Item Management'
+        super().__init__(title, parent, min_size=(900, 650))
+        self.setWindowTitle(title)
         self.selected_item_id = None
         self.selected_item_name = None
         self.players_data = []
@@ -57,9 +70,8 @@ class PlayerItemActionDialog(QDialog):
         self._load_players()
         self.item_tabs.currentChanged.connect(self._on_tab_changed)
     def _setup_ui(self):
-        self.setStyleSheet(DARK_THEME_STYLE)
-        layout = QVBoxLayout(self)
-        layout.setSpacing(10)
+        pal = ui_tokens.resolve()
+        layout = self.content_layout
         search_bar_layout = QHBoxLayout()
         search_label = QLabel(t('common.search') if t else 'Search:')
         self.search_input = QLineEdit()
@@ -96,22 +108,38 @@ class PlayerItemActionDialog(QDialog):
         add_all_layout = QHBoxLayout(add_all_frame)
         add_all_layout.setContentsMargins(0, 0, 0, 0)
         self.add_all_effigies_btn = QPushButton(t('inventory.max_all_abilities', default='Max All Abilities'))
-        self.add_all_effigies_btn.setStyleSheet('QPushButton { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(251,191,36,0.25); border-color: rgba(251,191,36,0.5); color: #FFFFFF; }')
+        self.add_all_effigies_btn.setStyleSheet(
+            f'QPushButton {{ background: {pal["warning_bg"]}; color: {pal["warning"]}; '
+            f'border: 1px solid {pal["warning_border"]}; border-radius: 6px; '
+            'padding: 4px 8px; font-weight: 600; font-size: 11px; }} '
+            f'QPushButton:hover {{ background: {pal["warning_border"]}; color: {pal["text"]}; }}')
         self.add_all_effigies_btn.setCursor(Qt.PointingHandCursor)
         self.add_all_effigies_btn.clicked.connect(lambda: self._on_add_all_clicked(True))
         add_all_layout.addWidget(self.add_all_effigies_btn)
         self.add_all_key_items_btn = QPushButton(t('inventory.add_all_key_items', default='Add All Key Items'))
-        self.add_all_key_items_btn.setStyleSheet('QPushButton { background: rgba(168,85,247,0.15); color: #a855f7; border: 1px solid rgba(168,85,247,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(168,85,247,0.25); border-color: rgba(168,85,247,0.5); color: #FFFFFF; }')
+        self.add_all_key_items_btn.setStyleSheet(
+            f'QPushButton {{ background: {pal["special_bg"]}; color: {pal["special"]}; '
+            f'border: 1px solid {pal["special_border"]}; border-radius: 6px; '
+            'padding: 4px 8px; font-weight: 600; font-size: 11px; }} '
+            f'QPushButton:hover {{ background: {pal["special_border"]}; color: {pal["text"]}; }}')
         self.add_all_key_items_btn.setCursor(Qt.PointingHandCursor)
         self.add_all_key_items_btn.clicked.connect(lambda: self._on_add_all_clicked(False))
         add_all_layout.addWidget(self.add_all_key_items_btn)
         self.unlock_all_map_btn = QPushButton(t('inventory.unlock_all_map', default='Unlock All Map + Fast Travel'))
-        self.unlock_all_map_btn.setStyleSheet('QPushButton { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(74,222,128,0.25); border-color: rgba(74,222,128,0.5); color: #FFFFFF; }')
+        self.unlock_all_map_btn.setStyleSheet(
+            f'QPushButton {{ background: {pal["success_bg"]}; color: {pal["success"]}; '
+            f'border: 1px solid {pal["success_border"]}; border-radius: 6px; '
+            'padding: 4px 8px; font-weight: 600; font-size: 11px; }} '
+            f'QPushButton:hover {{ background: {pal["success_border"]}; color: {pal["text"]}; }}')
         self.unlock_all_map_btn.setCursor(Qt.PointingHandCursor)
         self.unlock_all_map_btn.clicked.connect(lambda: self._on_unlock_all_map_clicked())
         add_all_layout.addWidget(self.unlock_all_map_btn)
         self.modify_slots_btn = QPushButton(t('player_item.modify_slots_btn') if t else 'Modify Slots')
-        self.modify_slots_btn.setStyleSheet('QPushButton { background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(56,189,248,0.25); border-color: rgba(56,189,248,0.5); color: #FFFFFF; }')
+        self.modify_slots_btn.setStyleSheet(
+            f'QPushButton {{ background: {pal["info_bg"]}; color: {pal["info"]}; '
+            f'border: 1px solid {pal["info_border"]}; border-radius: 6px; '
+            'padding: 4px 8px; font-weight: 600; font-size: 11px; }} '
+            f'QPushButton:hover {{ background: {pal["info_border"]}; color: {pal["text"]}; }}')
         self.modify_slots_btn.setCursor(Qt.PointingHandCursor)
         self.modify_slots_btn.clicked.connect(self._on_modify_slots_clicked)
         add_all_layout.addWidget(self.modify_slots_btn)
@@ -125,35 +153,30 @@ class PlayerItemActionDialog(QDialog):
         self.item_tabs.addTab(self._abilities_tab, t('inventory.edit_abilities', default='Edit Abilities'))
         layout.addWidget(self.item_tabs)
         self.item_info_label = QLabel(t('player_item.select_item') if t else 'Select an item to perform actions')
-        self.item_info_label.setStyleSheet('color: #888; font-style: italic; padding: 5px;')
+        self.item_info_label.setProperty('role', 'secondary')
         layout.addWidget(self.item_info_label)
         self.item_desc_label = QLabel('')
-        self.item_desc_label.setStyleSheet('color: #94a3b8; font-size: 11px; padding: 2px 5px;')
+        self.item_desc_label.setProperty('role', 'muted')
         self.item_desc_label.setWordWrap(True)
         self.item_desc_label.setVisible(False)
         layout.addWidget(self.item_desc_label)
-        action_layout = QHBoxLayout()
-        self.add_btn = QPushButton(t('player_item.add_item') if t else 'Add Item')
-        self.add_btn.clicked.connect(self._on_add_item)
-        self.add_btn.setEnabled(False)
-        action_layout.addWidget(self.add_btn)
-        self.remove_btn = QPushButton(t('player_item.remove_item') if t else 'Remove Item')
-        self.remove_btn.clicked.connect(self._on_remove_item)
-        self.remove_btn.setEnabled(False)
-        action_layout.addWidget(self.remove_btn)
         self.qty_input = QLineEdit('1')
         self.qty_input.setValidator(QIntValidator(1, constants.MAX_QUANTITY))
         self.qty_input.setFixedWidth(70)
         self.qty_input.setVisible(False)
-        action_layout.addWidget(self.qty_input)
-        action_layout.addStretch()
-        close_btn = QPushButton(t('button.close') if t else 'Close')
-        close_btn.clicked.connect(self.reject)
-        action_layout.addWidget(close_btn)
-        layout.addLayout(action_layout)
         self.status_label = QLabel('')
-        self.status_label.setStyleSheet('color: #4ade80; font-weight: bold; padding: 5px;')
-        layout.addWidget(self.status_label)
+        self.status_label.setProperty('role', 'success')
+        self.footer.insertWidget(1, self.status_label, stretch=1)
+        self.add_btn = make_button(t('player_item.add_item') if t else 'Add Item', 'primary')
+        self.add_btn.clicked.connect(self._on_add_item)
+        self.add_btn.setEnabled(False)
+        self.remove_btn = self.add_danger_button(
+            t('player_item.remove_item') if t else 'Remove Item',
+            self._on_remove_item)
+        self.remove_btn.setEnabled(False)
+        self.footer.addWidget(self.qty_input)
+        self.footer.addWidget(self.add_btn)
+        self.cancel_btn.setText(t('button.close') if t else 'Close')
     def _make_item_grid(self):
         grid = QListWidget()
         grid.setViewMode(QListView.IconMode)
@@ -229,7 +252,8 @@ class PlayerItemActionDialog(QDialog):
         type_b = item.data(Qt.UserRole + 5) or ''
         item_desc = item.data(Qt.UserRole + 4) or ''
         self.item_info_label.setText(f'{self.selected_item_name}: {self.selected_item_id}')
-        self.item_info_label.setStyleSheet('color: #4ade80; font-weight: bold; padding: 5px;')
+        self.item_info_label.setProperty('role', 'success')
+        _polish(self.item_info_label)
         if item_desc:
             self.item_desc_label.setText(_clean_desc_for_tooltip(item_desc))
             self.item_desc_label.setVisible(True)
@@ -426,7 +450,8 @@ class PlayerItemActionDialog(QDialog):
     def _refresh_after_action(self):
         item_name = self.selected_item_name or 'Item'
         self.status_label.setText(t('player_item.action_complete').format(item_name=item_name) if t else f'{item_name} action completed successfully!')
-        self.status_label.setStyleSheet('color: #4ade80; font-weight: bold; padding: 5px;')
+        self.status_label.setProperty('role', 'success')
+        _polish(self.status_label)
         QTimer.singleShot(3000, lambda s=self: s.status_label.setText('') if hasattr(s, 'status_label') else None)
         if self.selected_item_id:
             self._load_players()
@@ -460,6 +485,7 @@ class PlayerItemActionDialog(QDialog):
             self.player_list.addItem(item)
             self.player_list.setItemWidget(item, checkbox)
     def _make_abilities_tab(self):
+        pal = ui_tokens.resolve()
         from palworld_aio.managers.player_manager import RELIC_TO_STATUS_NAME, RELIC_CUMULATIVE_MAX
         from palworld_aio.inventory.inventory_manager import ASSET_TO_RELIC_TYPE, RELIC_TYPE_TO_EFFIGY, ItemData
         tab = QWidget()
@@ -496,7 +522,7 @@ class PlayerItemActionDialog(QDialog):
         ability_btn_row.addStretch()
         right_layout.addLayout(ability_btn_row)
         self.ability_playing_as = QLabel('')
-        self.ability_playing_as.setStyleSheet('color: #7dd3fc; font-weight: 600; font-size: 11px; padding: 2px 4px;')
+        self.ability_playing_as.setProperty('role', 'accent')
         right_layout.addWidget(self.ability_playing_as)
         self.ability_scroll = QListWidget()
         self.ability_scroll.setSelectionMode(QAbstractItemView.NoSelection)
@@ -525,7 +551,7 @@ class PlayerItemActionDialog(QDialog):
                     icon_label.setPixmap(pixmap)
             row_layout.addWidget(icon_label)
             cur_label = QLabel('0')
-            cur_label.setStyleSheet('color: #94a3b8; font-size: 11px; min-width: 30px;')
+            cur_label.setProperty('role', 'muted')
             cur_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             row_layout.addWidget(cur_label)
             spinner = QSpinBox()
@@ -554,14 +580,18 @@ class PlayerItemActionDialog(QDialog):
         layout.addLayout(columns)
         apply_row = QHBoxLayout()
         self.ability_apply_btn = QPushButton(t('inventory.edit_abilities_apply', default='Apply Ability Changes'))
-        self.ability_apply_btn.setStyleSheet('QPushButton { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); border-radius: 6px; padding: 6px 16px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(74,222,128,0.25); border-color: rgba(74,222,128,0.5); color: #FFFFFF; }')
+        self.ability_apply_btn.setStyleSheet(
+            f'QPushButton {{ background: {pal["success_bg"]}; color: {pal["success"]}; '
+            f'border: 1px solid {pal["success_border"]}; border-radius: 6px; '
+            'padding: 6px 16px; font-weight: 600; font-size: 12px; }} '
+            f'QPushButton:hover {{ background: {pal["success_border"]}; color: {pal["text"]}; }}')
         self.ability_apply_btn.setCursor(Qt.PointingHandCursor)
         self.ability_apply_btn.clicked.connect(self._on_apply_abilities)
         apply_row.addWidget(self.ability_apply_btn)
         apply_row.addStretch()
         layout.addLayout(apply_row)
         self.ability_status = QLabel('')
-        self.ability_status.setStyleSheet('color: #4ade80; font-weight: bold; padding: 5px;')
+        self.ability_status.setProperty('role', 'success')
         layout.addWidget(self.ability_status)
         return tab
     def _populate_ability_player_list(self):
@@ -627,7 +657,8 @@ class PlayerItemActionDialog(QDialog):
                 w['cur_label'].setText('0')
                 w['spinner'].setValue(w['cumulative_max'])
             self.ability_playing_as.setText(t('inventory.edit_abilities_no_player', default='No player selected'))
-            self.ability_playing_as.setStyleSheet('color: #fbbf24; font-weight: 600; font-size: 11px; padding: 2px 4px;')
+            self.ability_playing_as.setProperty('role', 'warning')
+            _polish(self.ability_playing_as)
             self.ability_status.setText('')
             return
         load_uid = self._last_ability_player_uid or uids[0]
@@ -640,7 +671,8 @@ class PlayerItemActionDialog(QDialog):
                 pname = f"{p.get('name', 'Unknown')} ({uid})"
                 break
         self.ability_playing_as.setText(f'Showing: {pname}')
-        self.ability_playing_as.setStyleSheet('color: #7dd3fc; font-weight: 600; font-size: 11px; padding: 2px 4px;')
+        self.ability_playing_as.setProperty('role', 'accent')
+        _polish(self.ability_playing_as)
         try:
             import os
             uid_clean = str(uid).replace('-', '').upper()
@@ -681,7 +713,8 @@ class PlayerItemActionDialog(QDialog):
         if reply == QMessageBox.Yes:
             self.edit_abilities_requested.emit(uids, ability_values)
             self.ability_status.setText(t('inventory.edit_abilities_done', default='Abilities updated successfully.'))
-            self.ability_status.setStyleSheet('color: #4ade80; font-weight: bold; padding: 5px;')
+            self.ability_status.setProperty('role', 'success')
+            _polish(self.ability_status)
     def _on_tab_changed(self, idx):
         if idx == 2 and self.player_list.count() == 0:
             self._load_all_players()

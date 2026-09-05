@@ -1,6 +1,6 @@
 ﻿import os
 from palsav import json_tools
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QScrollArea, QGroupBox, QMessageBox, QAbstractItemView, QListView, QWidget, QFrame
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QScrollArea, QGroupBox, QMessageBox, QAbstractItemView, QListView, QWidget, QFrame
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QEvent
 from PyQt6.QtGui import QShowEvent
@@ -10,13 +10,30 @@ from palworld_aio import constants
 from palworld_aio.utils import sav_to_gvasfile, gvasfile_to_sav
 from palworld_aio.managers.data_manager import get_guilds, get_guild_members
 from palworld_aio.editor.edit_pals import _clean_desc_for_tooltip
-from palworld_aio.ui.chrome.styles import DIALOG_STYLE as DARK_THEME_STYLE, wrap_tooltip_text
+from palworld_aio.ui.chrome.components import BaseDialog, make_button
+from palworld_aio.ui.chrome import tokens as ui_tokens
+from palworld_aio.ui.chrome.styles import wrap_tooltip_text
 from resource_resolver import resource_path
-class PlayerTechnologyActionDialog(QDialog):
+
+
+def _polish(widget) -> None:
+    widget.style().unpolish(widget)
+    widget.style().polish(widget)
+    widget.update()
+
+
+class PlayerTechnologyActionDialog(BaseDialog):
+    """Bulk technology picker on the shared dialog scaffold.
+
+    ui-modernization Phase 4: header/footer from BaseDialog, tech selection
+    via the themeable `tech_selected` property (see qss_builder). All
+    data loading and .sav mutation logic unchanged.
+    """
+
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(t('player_technology.title') if t else 'Bulk Technology Management')
-        self.setMinimumSize(1120, 650)
+        title = t('player_technology.title') if t else 'Bulk Technology Management'
+        super().__init__(title, parent, min_size=(1120, 650))
+        self.setWindowTitle(title)
         self._selected_techs = {}
         self.tech_data = []
         self.players_data = []
@@ -26,9 +43,7 @@ class PlayerTechnologyActionDialog(QDialog):
         super().showEvent(event)
         self._load_players()
     def _setup_ui(self):
-        self.setStyleSheet(DARK_THEME_STYLE)
-        layout = QVBoxLayout(self)
-        layout.setSpacing(10)
+        layout = self.content_layout
         search_group = QGroupBox(t('player_technology.select_tech') if t else 'Select Technology')
         search_layout = QVBoxLayout()
         search_bar_layout = QHBoxLayout()
@@ -42,7 +57,6 @@ class PlayerTechnologyActionDialog(QDialog):
         self._tech_scroll = QScrollArea()
         self._tech_scroll.setWidgetResizable(True)
         self._tech_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._tech_scroll.setStyleSheet('QScrollArea { border: 1px solid rgba(125,211,252,0.12); border-radius: 4px; background: transparent; }')
         self._tech_ct = QWidget()
         self._tech_layout = QVBoxLayout(self._tech_ct)
         self._tech_layout.setContentsMargins(4, 4, 4, 4); self._tech_layout.setSpacing(4)
@@ -50,7 +64,7 @@ class PlayerTechnologyActionDialog(QDialog):
         self._tech_scroll.setWidget(self._tech_ct)
         search_layout.addWidget(self._tech_scroll, 1)
         self.tech_info_label = QLabel(t('player_technology.select_tech_prompt') if t else 'Select a technology to perform actions')
-        self.tech_info_label.setStyleSheet('color: #888; font-style: italic; padding: 5px;')
+        self.tech_info_label.setProperty('role', 'secondary')
         search_layout.addWidget(self.tech_info_label)
         search_group.setLayout(search_layout)
         hsplit = QHBoxLayout()
@@ -76,23 +90,20 @@ class PlayerTechnologyActionDialog(QDialog):
         self.players_group.setLayout(players_layout)
         hsplit.addWidget(self.players_group)
         layout.addLayout(hsplit, 1)
-        action_layout = QHBoxLayout()
-        self.add_btn = QPushButton(t('player_technology.add_tech') if t else 'Add Technology')
+        self.status_lbl = QLabel('')
+        self.status_lbl.setProperty('role', 'secondary')
+        self.status_lbl.setWordWrap(True)
+        self.footer.insertWidget(1, self.status_lbl, stretch=1)
+        self.add_btn = make_button(
+            t('player_technology.add_tech') if t else 'Add Technology', 'primary')
         self.add_btn.clicked.connect(self._on_add_technology)
         self.add_btn.setEnabled(False)
-        action_layout.addWidget(self.add_btn)
-        self.remove_btn = QPushButton(t('player_technology.remove_tech') if t else 'Remove Technology')
-        self.remove_btn.clicked.connect(self._on_remove_technology)
+        self.footer.addWidget(self.add_btn)
+        self.remove_btn = self.add_danger_button(
+            t('player_technology.remove_tech') if t else 'Remove Technology',
+            self._on_remove_technology)
         self.remove_btn.setEnabled(False)
-        action_layout.addWidget(self.remove_btn)
-        action_layout.addStretch()
-        self.close_btn = QPushButton(t('button.close') if t else 'Close')
-        self.close_btn.clicked.connect(self.reject)
-        action_layout.addWidget(self.close_btn)
-        layout.addLayout(action_layout)
-        self.status_label = QLabel('')
-        self.status_label.setStyleSheet('color: #4ade80; font-weight: bold; padding: 5px;')
-        layout.addWidget(self.status_label)
+        self.cancel_btn.setText(t('button.close') if t else 'Close')
     def _load_technologies(self):
         try:
             base_dir = constants.get_base_path()
@@ -115,6 +126,7 @@ class PlayerTechnologyActionDialog(QDialog):
                 groups[lc]['regular'].append(t)
         return dict(sorted(groups.items()))
     def _display_technologies(self, technologies):
+        pal = ui_tokens.resolve()
         for i in reversed(range(self._tech_layout.count())):
             w = self._tech_layout.itemAt(i).widget()
             if w:
@@ -128,7 +140,10 @@ class PlayerTechnologyActionDialog(QDialog):
             badge = QLabel(str(lc))
             badge.setFixedSize(36, 76)
             badge.setAlignment(Qt.AlignCenter)
-            badge.setStyleSheet('font-size: 13px; font-weight: 700; color: #fbbf24; border: 2px solid rgba(251,191,36,0.3); border-radius: 6px; background: rgba(251,191,36,0.06);')
+            badge.setStyleSheet(
+                f'font-size: 13px; font-weight: 700; color: {pal["warning"]}; '
+                f'border: 2px solid {pal["warning_border"]}; border-radius: 6px; '
+                f'background: {pal["warning_bg"]};')
             rl.addWidget(badge)
             for tech in g['regular']:
                 rl.addWidget(self._make_tech_frame(tech))
@@ -136,14 +151,16 @@ class PlayerTechnologyActionDialog(QDialog):
                 ph = QWidget(); ph.setFixedSize(76, 76); rl.addWidget(ph)
             div = QFrame()
             div.setFrameShape(QFrame.VLine)
-            div.setStyleSheet('background: rgba(167,139,250,0.3); max-width: 1px;')
+            div.setStyleSheet(f'background: {pal["special_border"]}; max-width: 1px;')
             div.setFixedWidth(1)
             rl.addWidget(div)
             if g['ancient']:
                 rl.addWidget(self._make_tech_frame(g['ancient']))
             else:
                 ph = QWidget(); ph.setFixedSize(76, 76)
-                ph.setStyleSheet('background: rgba(167,139,250,0.04); border: 1px dashed rgba(167,139,250,0.1); border-radius: 4px;')
+                ph.setStyleSheet(
+                    f'background: {pal["special_bg"]}; '
+                    f'border: 1px dashed {pal["special_border"]}; border-radius: 4px;')
                 rl.addWidget(ph)
             rl.addStretch()
             self._tech_layout.addWidget(row_w)
@@ -192,8 +209,8 @@ class PlayerTechnologyActionDialog(QDialog):
         frame.setCursor(Qt.PointingHandCursor)
         frame._tech_asset = asset
         frame._tech_name = name
+        frame.setProperty('tech_selected', False)
         frame.installEventFilter(self)
-        frame.setStyleSheet('QFrame { background: rgba(125,211,252,0.06); border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; } QFrame:hover { background: rgba(125,211,252,0.12); }')
         vl = QVBoxLayout(frame); vl.setContentsMargins(2, 2, 2, 2); vl.setSpacing(0)
         icon = tech.get('icon', '')
         if icon:
@@ -207,7 +224,6 @@ class PlayerTechnologyActionDialog(QDialog):
                 vl.addWidget(il, 1)
         nl = QLabel(tech.get('name', ''))
         nl.setAlignment(Qt.AlignCenter)
-        nl.setStyleSheet('font-size: 11px; color: #e2e8f0; background: transparent;')
         vl.addWidget(nl)
         a2 = tech.get('asset', '')
         tip = f'<b>{name}</b><br>({a2})'
@@ -224,32 +240,30 @@ class PlayerTechnologyActionDialog(QDialog):
             if asset:
                 if asset in self._selected_techs:
                     del self._selected_techs[asset]
-                    obj.setStyleSheet('QFrame { background: rgba(125,211,252,0.06); border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; } QFrame:hover { background: rgba(125,211,252,0.12); }')
+                    obj.setProperty('tech_selected', False)
                 else:
                     self._selected_techs[asset] = name
-                    obj.setStyleSheet('QFrame { background: rgba(125,211,252,0.15); border: 1px solid rgba(125,211,252,0.5); border-radius: 4px; }')
+                    obj.setProperty('tech_selected', True)
+                _polish(obj)
                 count = len(self._selected_techs)
                 if count:
                     if count == 1:
                         self.tech_info_label.setText(f'Selected: {name} ({asset})')
                     else:
                         self.tech_info_label.setText(f'Selected {count} technologies')
-                    self.tech_info_label.setStyleSheet('color: #4ade80; font-weight: bold; padding: 5px;')
+                    self.tech_info_label.setProperty('role', 'success')
                     self.select_all_btn.setEnabled(True)
                     self.deselect_all_btn.setEnabled(True)
                     self.add_btn.setEnabled(True)
                     self.remove_btn.setEnabled(True)
                 else:
                     self.tech_info_label.setText(t('player_technology.select_tech_prompt') if t else 'Select a technology to perform actions')
-                    self.tech_info_label.setStyleSheet('color: #888; font-style: italic; padding: 5px;')
+                    self.tech_info_label.setProperty('role', 'secondary')
                     self.add_btn.setEnabled(False)
                     self.remove_btn.setEnabled(False)
+                _polish(self.tech_info_label)
                 return True
         return super().eventFilter(obj, event)
-
-    def _clear_frame_style(self, w):
-        if isinstance(w, QFrame) and w.property('tech_asset'):
-            w.setStyleSheet('QFrame { background: rgba(125,211,252,0.06); border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; } QFrame:hover { background: rgba(125,211,252,0.12); }')
     def _load_players(self):
         self.player_list.clear()
         self.players_data = []
@@ -383,13 +397,15 @@ class PlayerTechnologyActionDialog(QDialog):
             if hasattr(self.parent(), 'refresh_all'):
                 self.parent().refresh_all()
     def refresh_labels(self):
-        self.setWindowTitle(t('player_technology.title') if t else 'Bulk Technology Management')
+        title = t('player_technology.title') if t else 'Bulk Technology Management'
+        self.setWindowTitle(title)
+        self.title_label.setText(title)
         self.search_input.setPlaceholderText(t('player_technology.search_placeholder') if t else 'Type to search technologies...')
         self.tech_info_label.setText(t('player_technology.select_tech_prompt') if t else 'Select a technology to perform actions')
         self.select_all_btn.setText(t('player_technology.select_all') if t else 'Select All')
         self.deselect_all_btn.setText(t('player_technology.deselect_all') if t else 'Deselect All')
         self.add_btn.setText(t('player_technology.add_tech') if t else 'Add Technology')
         self.remove_btn.setText(t('player_technology.remove_tech') if t else 'Remove Technology')
-        self.close_btn.setText(t('button.close') if t else 'Close')
+        self.cancel_btn.setText(t('button.close') if t else 'Close')
         self._load_technologies()
         self._load_players()

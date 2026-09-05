@@ -539,7 +539,7 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.breeding_tab)
 
     def _setup_exclusions_tab(self):
-        from .chrome.components import create_page_ribbon
+        from .chrome.components import create_page_ribbon, set_content_margins
         exclusions_tab = QWidget()
         layout = QVBoxLayout(exclusions_tab)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -547,7 +547,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(create_page_ribbon(t('deletion.menu.exclusions') if t else 'Exclusions', (t('sidebar.section.world') if t else 'World Data').upper(), exclusions_tab))
         # segmented control switching one full-bleed table (014-r02)
         switch_row = QHBoxLayout()
-        switch_row.setContentsMargins(12, 6, 12, 6)
+        set_content_margins(switch_row, top=6, bottom=6, left=12)
         switch_row.setSpacing(6)
         self._excl_views = {}
         self._excl_btns = {}

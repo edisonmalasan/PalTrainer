@@ -606,6 +606,15 @@ QFrame#bandZoneRule {
     border: none;
     margin: 3px 10px;
 }
+QLabel#bandZoneCaption {
+    color: #5C564E;
+    font-family: 'Hanken Grotesk','Segoe UI';
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+    padding: 4px 2px 1px 2px;
+}
 QPushButton[bandItem="true"] {
     background: transparent;
     color: #A69F94;
@@ -1241,6 +1250,95 @@ QLabel#statsValue { color: #ECE7E0; }
 QLabel#statsHeader { color: #A69F94; font-size: 10px; font-weight: 600; letter-spacing: 1px; }
 QLabel#sectionHeader { color: #A69F94; font-size: 10px; font-weight: 600; letter-spacing: 1px; }
 QFrame#glassPanel { background: #1B1917; border: 1px solid rgba(236,231,224,0.1); border-radius: 8px; }
+
+/* ---- ui-modernization Phase 0: promoted selectors (were inline or missing).
+   Token/property selectors only. Dialogs that still carry inline copies of
+   these rules keep rendering from their inline copy until their Phase 4
+   migration; the builder copy is the target state. ---- */
+QWidget#windowControls { background: transparent; border: none; }
+QPushButton#windowControlBtn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: #A69F94;
+    padding: 0px;
+}
+QPushButton#windowControlBtn:hover {
+    background: rgba(245,158,11,0.07);
+    color: #ECE7E0;
+}
+QPushButton#windowControlBtn:pressed { background: rgba(245,158,11,0.12); }
+QPushButton#windowControlBtn:focus { border: 1px solid rgba(245,158,11,0.3); }
+QPushButton#windowControlBtn:disabled { color: #5C564E; background: transparent; }
+QPushButton#windowControlBtn[danger="true"]:hover {
+    background: rgba(248,113,113,0.12);
+    border-color: rgba(248,113,113,0.35);
+    color: #F87171;
+}
+QPushButton#navBtn {
+    background: rgba(245,158,11,0.1);
+    color: #F59E0B;
+    border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 5px;
+    padding: 6px 10px;
+    font-weight: 600;
+}
+QPushButton#navBtn:hover {
+    background: rgba(245,158,11,0.18);
+    border-color: rgba(245,158,11,0.5);
+    color: #ECE7E0;
+}
+QPushButton#navBtn:pressed { background: rgba(245,158,11,0.3); }
+QPushButton#navBtn:focus { border: 1px solid #ECE7E0; }
+QPushButton#navBtn:disabled { color: #5C564E; background: #1B1917; border-color: rgba(236,231,224,0.1); }
+QFrame#passiveCard {
+    background: #1B1917;
+    border: 1px solid rgba(236,231,224,0.1);
+    border-radius: 5px;
+}
+QFrame[tech_selected="false"] {
+    background: #1B1917;
+    border: 1px solid rgba(236,231,224,0.1);
+    border-radius: 5px;
+}
+QFrame[tech_selected="false"]:hover {
+    background: rgba(245,158,11,0.07);
+    border-color: rgba(245,158,11,0.3);
+}
+QFrame[tech_selected="true"] {
+    background: rgba(245,158,11,0.18);
+    border: 1px solid rgba(245,158,11,0.5);
+    border-radius: 5px;
+}
+/* fix-illegal cards/rows: property-driven selection (Phase 4) */
+QFrame[playerCard="true"] {
+    background: #1B1917;
+    border: 1px solid transparent;
+    border-radius: 5px;
+}
+QFrame[playerCard="true"]:hover {
+    background: rgba(245,158,11,0.07);
+    border-color: rgba(245,158,11,0.3);
+}
+QFrame[playerCard="true"][selected="true"] {
+    background: rgba(245,158,11,0.18);
+    border: 1px solid rgba(245,158,11,0.5);
+}
+QFrame[playerCard="true"][selected="true"]:hover {
+    background: rgba(245,158,11,0.18);
+    border-color: #F59E0B;
+}
+QFrame[palRow="true"] {
+    background: #1B1917;
+    border-radius: 5px;
+}
+QFrame[palRow="true"]:hover { background: rgba(245,158,11,0.07); }
+/* transient skill-picker popup (Phase 4): floating card, global input/list rules inside */
+QWidget#skillPicker {
+    background: #211E1B;
+    border: 1px solid rgba(236,231,224,0.18);
+    border-radius: 8px;
+}
 
 
 /* Transitional extras — RETAINED BLOCKS ONLY (plan 025 purge).

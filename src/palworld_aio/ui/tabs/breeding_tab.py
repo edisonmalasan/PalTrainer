@@ -195,7 +195,7 @@ class BreedingTab(QWidget):
         self._load_data()
 
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon
+        from palworld_aio.ui.chrome.components import create_page_ribbon, set_content_margins
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -203,7 +203,7 @@ class BreedingTab(QWidget):
         layout.addWidget(create_page_ribbon(t('breeding.tab') if t else 'Breeding', (t('sidebar.section.reference') if t else 'Reference').upper(), self))
 
         sub_bar = QHBoxLayout()
-        sub_bar.setContentsMargins(16, 6, 170, 6)
+        set_content_margins(sub_bar, top=6, bottom=6)
         sub_bar.setSpacing(6)
         self._sub_btns = {}
         for sid, skey in [('parents', 'Parents'), ('children', 'Children')]:
@@ -219,7 +219,7 @@ class BreedingTab(QWidget):
         layout.addLayout(sub_bar)
 
         select_row = QHBoxLayout()
-        select_row.setContentsMargins(16, 0, 170, 0)
+        set_content_margins(select_row)
         select_row.setSpacing(10)
         self._select_btn = QPushButton(f'{EGG}  {t("breeding.select_pal") if t else "Select a Pal..."}')
         self._select_btn.setObjectName('opsLoadBtn')
@@ -236,7 +236,7 @@ class BreedingTab(QWidget):
 
         self._hint_label = QLabel(t('breeding.hint') if t else 'Click the button above to select a pal and view breeding combinations.')
         self._hint_label.setObjectName('bulkHintLabel')
-        self._hint_label.setContentsMargins(16, 4, 170, 4)
+        set_content_margins(self._hint_label, top=4, bottom=4)
         self._hint_label.setWordWrap(True)
         layout.addWidget(self._hint_label)
 
@@ -247,7 +247,7 @@ class BreedingTab(QWidget):
         self._search_filter.textChanged.connect(self._on_filter_changed)
         self._search_filter.hide()
         filter_row = QHBoxLayout()
-        filter_row.setContentsMargins(16, 6, 170, 6)
+        set_content_margins(filter_row, top=6, bottom=6)
         filter_row.addWidget(self._search_filter, 1)
         layout.addLayout(filter_row)
 
@@ -257,7 +257,7 @@ class BreedingTab(QWidget):
         self._results_container = QWidget()
         self._results_layout = QVBoxLayout(self._results_container)
         self._results_layout.setSpacing(6)
-        self._results_layout.setContentsMargins(16, 8, 170, 16)
+        set_content_margins(self._results_layout, top=8, bottom=16)
         self._scroll.setWidget(self._results_container)
         layout.addWidget(self._scroll, 1)
 
@@ -291,9 +291,14 @@ class BreedingTab(QWidget):
         try:
             if not self._selected_tribe or not self._breeding_data:
                 self._search_filter.hide()
-                empty = QLabel(t('breeding.no_selection') if t else 'Select a pal to see breeding combinations')
-                empty.setObjectName('bulkHintLabel')
-                empty.setAlignment(Qt.AlignCenter)
+                from palworld_aio.widgets.empty_state import EmptyState
+                empty = EmptyState(
+                    t('breeding.no_selection') if t else 'Select a pal to see breeding combinations',
+                    hint=t('breeding.hint') if t else 'Click the button above to select a pal and view breeding combinations.',
+                    icon_name='breeding',
+                    action_text=t('breeding.select_pal') if t else 'Select a Pal...',
+                )
+                empty.action_clicked.connect(self._open_pal_dialog)
                 self._results_layout.addWidget(empty)
                 self._refreshing = False
                 return

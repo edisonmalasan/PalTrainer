@@ -1,29 +1,32 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget, QListWidgetItem, QAbstractItemView, QFrame
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QListWidget, QListWidgetItem, QAbstractItemView, QFrame
+from PyQt6.QtCore import pyqtSignal, QSize
 from i18n import t
 from palworld_aio import constants
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
-from palworld_aio.ui.chrome.styles import DIALOG_STYLE as DARK_THEME_STYLE
+from palworld_aio.ui.chrome.components import BaseDialog, make_button
 
-class FixIllegalPlayerDialog(QDialog):
+class FixIllegalPlayerDialog(BaseDialog):
+    """Illegal-player fix list on the shared dialog scaffold (Phase 4).
+
+    Fix is the primary confirm (accepts, then emits); Close cancels.
+    Selection/status styling is property-driven. Logic unchanged.
+    """
     fix_requested = pyqtSignal(list)
     def __init__(self, scan_data, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(t('fix_illegal_player.title') if t else 'Fix Illegal Players')
-        self.setMinimumSize(700, 450)
+        title = t('fix_illegal_player.title') if t else 'Fix Illegal Players'
+        super().__init__(title, parent, min_size=(700, 450))
+        self.setWindowTitle(title)
         self.scan_data = scan_data
         self._setup_ui()
         self._populate_players()
     def _setup_ui(self):
-        self.setStyleSheet(DARK_THEME_STYLE)
-        layout = QVBoxLayout(self)
-        layout.setSpacing(10)
+        layout = self.content_layout
         self._header = QLabel(t('fix_illegal_player.description') if t else 'Select players with illegal stats to fix:')
-        self._header.setStyleSheet('color: #e2e8f0; font-size: 13px; font-weight: 600; padding: 4px 0;')
+        self._header.setProperty('role', 'secondary')
         self._header.setWordWrap(True)
         layout.addWidget(self._header)
         self.summary_label = QLabel('')
-        self.summary_label.setStyleSheet('color: #fbbf24; font-size: 12px; padding: 2px 0;')
+        self.summary_label.setProperty('role', 'warning')
         layout.addWidget(self.summary_label)
         btn_row = QHBoxLayout()
         self.select_all_btn = QPushButton(t('player_item.select_all') if t else 'Select All')
@@ -40,32 +43,27 @@ class FixIllegalPlayerDialog(QDialog):
         self.player_list.setSelectionMode(QAbstractItemView.NoSelection)
         layout.addWidget(self.player_list)
         sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setStyleSheet('color: rgba(255,255,255,0.1);')
+        sep.setProperty('class', 'divider')
+        sep.setFrameShape(QFrame.Shape.NoFrame)
+        sep.setFixedHeight(1)
         layout.addWidget(sep)
-        action_row = QHBoxLayout()
-        self.fix_btn = QPushButton(t('fix_illegal_player.fix_selected') if t else 'Fix Selected')
-        self.fix_btn.setStyleSheet('QPushButton { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); border-radius: 6px; padding: 8px 24px; font-weight: 600; font-size: 13px; } QPushButton:hover { background: rgba(251,191,36,0.25); border-color: rgba(251,191,36,0.5); color: #FFFFFF; } QPushButton:disabled { background: rgba(100,100,100,0.1); color: #666; border-color: rgba(100,100,100,0.2); }')
-        self.fix_btn.setCursor(Qt.PointingHandCursor)
+        self.fix_btn = make_button(t('fix_illegal_player.fix_selected') if t else 'Fix Selected', 'primary')
         self.fix_btn.clicked.connect(self._on_fix)
         self.fix_btn.setEnabled(False)
-        action_row.addWidget(self.fix_btn)
-        action_row.addStretch()
-        self._close_btn = QPushButton(t('button.close') if t else 'Close')
-        self._close_btn.setStyleSheet('QPushButton { background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; padding: 8px 24px; } QPushButton:hover { background: rgba(239,68,68,0.2); }')
-        self._close_btn.clicked.connect(self.reject)
-        action_row.addWidget(self._close_btn)
-        layout.addLayout(action_row)
+        self.footer.addWidget(self.fix_btn)
         self.status_label = QLabel('')
-        self.status_label.setStyleSheet('color: #4ade80; font-weight: bold; padding: 5px;')
-        layout.addWidget(self.status_label)
+        self.status_label.setProperty('role', 'success')
+        self.footer.insertWidget(1, self.status_label, stretch=1)
+        self.cancel_btn.setText(t('button.close') if t else 'Close')
     def refresh_labels(self):
-        self.setWindowTitle(t('fix_illegal_player.title') if t else 'Fix Illegal Players')
+        title = t('fix_illegal_player.title') if t else 'Fix Illegal Players'
+        self.setWindowTitle(title)
+        self.title_label.setText(title)
         self._header.setText(t('fix_illegal_player.description') if t else 'Select players with illegal stats to fix:')
         self.select_all_btn.setText(t('player_item.select_all') if t else 'Select All')
         self.deselect_all_btn.setText(t('player_item.deselect_all') if t else 'Deselect All')
         self.fix_btn.setText(t('fix_illegal_player.fix_selected') if t else 'Fix Selected')
-        self._close_btn.setText(t('button.close') if t else 'Close')
+        self.cancel_btn.setText(t('button.close') if t else 'Close')
         self._update_summary()
     def _update_summary(self):
         total_players = sum(1 for d in self.scan_data.values() if d['stat_count'] > 0)
@@ -119,7 +117,9 @@ class FixIllegalPlayerDialog(QDialog):
         uids = self._get_selected_uids()
         if not uids:
             self.status_label.setText(t('fix_illegal_player.no_selection') if t else 'No players selected.')
-            self.status_label.setStyleSheet('color: #ef4444; font-weight: bold; padding: 5px;')
+            self.status_label.setProperty('role', 'danger')
+            self.status_label.style().unpolish(self.status_label)
+            self.status_label.style().polish(self.status_label)
             return
         self.accept()
         self.fix_requested.emit(uids)

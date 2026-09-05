@@ -19,7 +19,7 @@ class PalEditorTab(QWidget):
         self._syncing = False
         self._setup_ui()
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon
+        from palworld_aio.ui.chrome.components import create_page_ribbon, ribbon_actions_slot
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
@@ -31,7 +31,7 @@ class PalEditorTab(QWidget):
         self.player_select_btn.setMinimumWidth(200)
         self.player_select_btn.setCursor(Qt.PointingHandCursor)
         self.player_select_btn.clicked.connect(self._open_player_popup)
-        ribbon._ribbon_actions_slot.addWidget(self.player_select_btn)
+        ribbon_actions_slot(ribbon).addWidget(self.player_select_btn)
         main_layout.addWidget(ribbon)
         self.content_area = self._create_content_area()
         main_layout.addWidget(self.content_area)
@@ -47,7 +47,9 @@ class PalEditorTab(QWidget):
         self.placeholder_label = EmptyState(
             t('pal_editor.select_player_hint', default='Select a player to edit their pals'),
             icon_name='pal_editor',
+            action_text=t('inventory.select_player', default='Select Player...'),
         )
+        self.placeholder_label.action_clicked.connect(self._open_player_popup)
         layout.addWidget(self.placeholder_label, 1)
         self.pal_editor_widget = PalEditorWidget()
         self.pal_editor_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)

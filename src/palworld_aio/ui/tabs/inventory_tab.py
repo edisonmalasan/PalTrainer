@@ -2507,7 +2507,7 @@ class PlayerInventoryTab(QWidget):
         self._context_slot_index = 0
         self._setup_ui()
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon
+        from palworld_aio.ui.chrome.components import create_page_ribbon, ribbon_actions_slot
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
@@ -2519,7 +2519,7 @@ class PlayerInventoryTab(QWidget):
         self.player_select_btn.setMinimumWidth(200)
         self.player_select_btn.setCursor(Qt.PointingHandCursor)
         self.player_select_btn.clicked.connect(self._open_player_popup)
-        ribbon._ribbon_actions_slot.addWidget(self.player_select_btn)
+        ribbon_actions_slot(ribbon).addWidget(self.player_select_btn)
         main_layout.addWidget(ribbon)
         self.content_area = QFrame()
         self.content_area.setObjectName('inventoryContent')

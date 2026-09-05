@@ -4,6 +4,12 @@ The palette is a plain dict per theme; QSS and Python widgets resolve tokens
 from here. Game-data colors (rarity/element/rank) are a data contract and are
 imported from constants rather than redefined.
 
+FROZEN by the ui-modernization change (Phase 0): do not add parallel
+palettes, ad-hoc hex colors, or per-screen color constants. New surfaces
+derive from ``PALETTES`` via ``resolve()``; new themes add a dict entry.
+Retired colors are listed in ``RETIRED_COLORS`` below and must not be used
+in new or migrated UI.
+
 Scanner note: this module is whitelisted by scripts/scrs/check_theme_violations.py
 because it *is* the theme system.
 """
@@ -90,6 +96,21 @@ PALETTES: dict[str, dict[str, str]] = {
 }
 
 DEFAULT_THEME = 'dark'
+
+
+# ---------------------------------------------------------------------------
+# Retired palettes (ui-modernization Phase 0: frozen).
+# These colors MUST NOT be used in new or migrated UI. The theme scanner
+# (scripts/scrs/check_theme_violations.py) flags them as `retired-palette`
+# errors. Remaining occurrences elsewhere in the codebase are migration debt
+# tracked by the ui-modernization change (Phase 4), not a pattern to copy.
+# ---------------------------------------------------------------------------
+RETIRED_COLORS: tuple[str, ...] = (
+    '#7DD3FC',  # retired cyan accent (pre-Deck-Ops); use accent #F59E0B
+    '#4A90E2',  # retired info blue (tab-guide only); use info #93B7DD
+)
+# Retired cyan in rgba() form, e.g. rgba(125,211,252,0.3).
+RETIRED_RGBA_PREFIX = 'rgba(125,211,252'
 
 
 def resolve(theme: str = DEFAULT_THEME) -> dict[str, str]:

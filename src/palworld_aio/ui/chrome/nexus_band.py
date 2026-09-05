@@ -57,8 +57,35 @@ def _nav_label(page_id: str) -> str:
     return t(key) if t else page_id.replace('_', ' ').title()
 
 
+# Rail micro-labels (ui-modernization Phase 1): one short word per
+# destination so the 76px rail never clips to a shared first word
+# ("Search" x3). Resolved via `nav.rail.<page_id>` so translators can
+# override; English ships as code defaults. The full `_nav_label` stays
+# as tooltip + accessible name.
+_RAIL_SHORT_ENGLISH: dict[str, str] = {
+    'tools': 'Tools',
+    'map': 'Map',
+    'base_inventory': 'Base',
+    'players': 'Players',
+    'guilds': 'Guilds',
+    'bases': 'Bases',
+    'exclusions': 'Excl.',
+    'player_inventory': 'Player',
+    'pal_editor': 'Pal',
+    'json_editor': 'JSON',
+    'breeding': 'Breeding',
+    'docs': 'Docs',
+}
+
+
+def _rail_short(page_id: str) -> str:
+    fallback = _RAIL_SHORT_ENGLISH.get(page_id, page_id.replace('_', ' ').title())
+    text = t(f'nav.rail.{page_id}', default=fallback) if t else fallback
+    return text
+
+
 def _txt(key: str, fallback: str) -> str:
-    return t(key) if t else fallback
+    return t(key, default=fallback) if t else fallback
 
 
 class _TrayScroll(QScrollArea):
@@ -81,6 +108,7 @@ class BandItem(QPushButton):
         super().__init__(parent)
         self._page_id = page_id
         self._label = _nav_label(page_id)
+        self._short = _rail_short(page_id)
         self._icon = app_icons.get_icon(page_id)
         self.setProperty('bandItem', True)
         self.setFixedSize(BAND_W, ITEM_H)
@@ -91,6 +119,10 @@ class BandItem(QPushButton):
         self.clicked.connect(lambda: self.clicked_with_id.emit(self._page_id))
 
     def set_label(self, text: str) -> None:
+        self.set_labels(self._short, text)
+
+    def set_labels(self, short: str, text: str) -> None:
+        self._short = short
         self._label = text
         self.setToolTip(text)
         self.setAccessibleName(text)
@@ -116,12 +148,15 @@ class BandItem(QPushButton):
         ix = (self.width() - ib.width()) // 2 - ib.x()
         iy = 13
         p.drawText(int(ix), int(iy), self._icon)
-        # micro label (2 lines max, wrap)
+        # micro label: single elided line (never wrapped — wrapping clipped
+        # multi-word labels to their shared first word, e.g. "Search" x3)
         label_font = QFont(constants.FONT_FAMILY, 10)
         p.setFont(label_font)
-        flags = int(Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextWordWrap)
-        rect = self.rect().adjusted(2, 20, -2, self.height() - 3)
-        p.drawText(rect, flags, self._label)
+        elided = QFontMetrics(label_font).elidedText(
+            self._short, Qt.TextElideMode.ElideRight, self.width() - 8)
+        flags = int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+        rect = self.rect().adjusted(4, 20, -4, self.height() - 3)
+        p.drawText(rect, flags, elided)
         # active corner notch: amber wedge on the right edge, pointing inward
         if active:
             p.setPen(Qt.PenStyle.NoPen)
@@ -171,6 +206,37 @@ class ZoneRule(QFrame):
         super().__init__(parent)
         self.setObjectName('bandZoneRule')
         self.setFixedHeight(1)
+
+
+class ZoneCaption(QLabel):
+    """Mission-zone caption above a rail nav group (ui-modernization Phase 1).
+
+    Paints a short tag (INSPECT/WORLD/EDIT/REF) rather than the full zone
+    name, which can never fit 76px. Full zone name stays in the tooltip.
+    """
+
+    SHORT_ENGLISH: dict[str, str] = {
+        'inspect': 'INSPECT',
+        'world': 'WORLD',
+        'editing': 'EDIT',
+        'reference': 'REF',
+    }
+
+    def __init__(self, zone_key: str, parent=None):
+        super().__init__(parent)
+        self._zone_key = zone_key
+        self._suffix = zone_key.split('.')[-1]
+        self.setObjectName('bandZoneCaption')
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setWordWrap(False)
+        self.setToolTip(_txt(zone_key, zone_key))
+        self.refresh()
+
+    def refresh(self) -> None:
+        fallback = self.SHORT_ENGLISH.get(self._suffix, self._suffix.upper())
+        short = t(f'nav.rail.zone.{self._suffix}', default=fallback) if t else fallback
+        self.setText(short)
+        self.setToolTip(_txt(self._zone_key, self._zone_key))
 
 
 class NexusBand(QWidget):
@@ -224,7 +290,11 @@ class NexusBand(QWidget):
         mid_layout = QVBoxLayout(middle)
         mid_layout.setContentsMargins(0, 2, 0, 2)
         mid_layout.setSpacing(0)
+        self._zone_captions: list[ZoneCaption] = []
         for zone_key, page_ids in ZONES:
+            caption = ZoneCaption(zone_key)
+            self._zone_captions.append(caption)
+            mid_layout.addWidget(caption)
             for page_id in page_ids:
                 item = BandItem(page_id)
                 item.clicked_with_id.connect(self._on_item_clicked)
@@ -333,7 +403,9 @@ class NexusBand(QWidget):
     # ------------------------------------------------------------ labels
     def refresh_labels(self) -> None:
         for pid, item in self._items.items():
-            item.set_label(_nav_label(pid))
+            item.set_labels(_rail_short(pid), _nav_label(pid))
+        for caption in self._zone_captions:
+            caption.refresh()
         self._console_btn.setToolTip(_txt('console.detach', 'Console'))
         self._guide_btn.setToolTip(_txt('tab_guide.tooltip', 'Tab Usage Guide'))
         self.warn_btn.setToolTip(_txt('warning.title', 'Warnings'))
