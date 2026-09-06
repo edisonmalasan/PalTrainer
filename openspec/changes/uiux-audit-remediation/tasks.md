@@ -40,9 +40,9 @@
 
 ## 6. Base Inventory + Player Inventory
 
-- [ ] 6.1 Base Inventory ribbon caption → `sidebar.section.editing` ("EDITING").
-- [ ] 6.2 Split context selector chips (guild/base; player on Player Inventory) from view tabs (Inventory / Base Pals) per design D10.
-- [ ] 6.3 Group container list: storage first, dropped-items debris in a muted separated group; all containers remain selectable.
+- [x] 6.1 Base Inventory ribbon caption → `sidebar.section.editing` ("EDITING").
+- [x] 6.2 Split context selector chips (guild/base; player on Player Inventory) from view tabs (Inventory / Base Pals) per design D10.
+- [x] 6.3 Group container list: storage first, dropped-items debris in a muted separated group; all containers remain selectable.
 - [ ] 6.4 Player Inventory: apply the same chip/tab distinction; verify zone caption already "EDITING".
 - [ ] 6.5 Verify: focused pytest run, compileall; confirm container operations (move/delete) unchanged.
 

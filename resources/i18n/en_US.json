@@ -500,6 +500,7 @@
     "deletion.exclusions.add_prompt_players": "Enter the Player UID to exclude:",
     "deletion.exclusions.add_prompt_guilds": "Enter the Guild ID to exclude:",
     "deletion.exclusions.add_prompt_bases": "Enter the Base ID to exclude:",
+    "base_inventory.dropped_items": "Dropped Items",
     "deletion.illegal_pals_fixed": "Fixed {count} illegal pals to legal maximums.",
     "deletion.illegal_pals_removed": "Removed {count} illegal pals from the save.",
     "deletion.illegal_pals_reset": "Reset {count} illegal pals to level 1 with random IVs.",

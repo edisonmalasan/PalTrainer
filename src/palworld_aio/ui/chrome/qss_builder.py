@@ -1154,6 +1154,55 @@ QPushButton#pageSwitchBtn:checked {{
     font-weight: 600;
 }}
 QPushButton#pageSwitchBtn:focus {{ border-color: {p['accent_border_strong']}; }}
+/* uiux-audit-remediation 8.2 (design D10): context selectors render as
+   bordered dropdown chips (chevron icon set in code); the picker-selected
+   accent state mirrors the retired ghostBtn[pickerSelected] treatment. */
+QPushButton#selectorChip {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['pill']}px;
+    color: {p['text_secondary']};
+    padding: {SPACING['xs'] + 1}px {SPACING['md']}px;
+    font-weight: 600;
+}}
+QPushButton#selectorChip:hover {{
+    border-color: {p['accent_border']};
+    color: {p['text']};
+}}
+QPushButton#selectorChip:disabled {{ color: {p['text_disabled']}; border-color: {p['border']}; }}
+QPushButton#selectorChip[pickerSelected="true"] {{
+    border-color: {p['accent_border_strong']};
+    color: {p['accent']};
+}}
+/* uiux-audit-remediation 8.2 (design D10): view modes render as underlined
+   tabs — transparent body, active = accent text + bottom underline. */
+QPushButton#viewTabBtn {{
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: {p['text_secondary']};
+    padding: {SPACING['xs']}px {SPACING['md']}px;
+    font-weight: 600;
+}}
+QPushButton#viewTabBtn:hover {{
+    color: {p['text']};
+}}
+QPushButton#viewTabBtn:checked {{
+    color: {p['accent']};
+    border-bottom: 2px solid {p['accent']};
+}}
+QPushButton#viewTabBtn:focus {{ outline: none; color: {p['text']}; }}
+QPushButton#viewTabBtn:checked:focus {{ color: {p['accent']}; }}
+/* uiux-audit-remediation 8.3: muted section label separating dropped-item
+   debris from meaningful storage in the container list. */
+QLabel#containerGroupLabel {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+}}
 QPushButton#ghostBtn, QPushButton#toolButton {{
     background: transparent;
     border: 1px solid {p['border']};

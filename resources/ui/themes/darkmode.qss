@@ -1124,6 +1124,55 @@ QPushButton#pageSwitchBtn:checked {
     font-weight: 600;
 }
 QPushButton#pageSwitchBtn:focus { border-color: rgba(245,158,11,0.5); }
+/* uiux-audit-remediation 8.2 (design D10): context selectors render as
+   bordered dropdown chips (chevron icon set in code); the picker-selected
+   accent state mirrors the retired ghostBtn[pickerSelected] treatment. */
+QPushButton#selectorChip {
+    background: #211E1B;
+    border: 1px solid rgba(236,231,224,0.18);
+    border-radius: 9999px;
+    color: #A69F94;
+    padding: 5px 12px;
+    font-weight: 600;
+}
+QPushButton#selectorChip:hover {
+    border-color: rgba(245,158,11,0.3);
+    color: #ECE7E0;
+}
+QPushButton#selectorChip:disabled { color: #5C564E; border-color: rgba(236,231,224,0.1); }
+QPushButton#selectorChip[pickerSelected="true"] {
+    border-color: rgba(245,158,11,0.5);
+    color: #F59E0B;
+}
+/* uiux-audit-remediation 8.2 (design D10): view modes render as underlined
+   tabs — transparent body, active = accent text + bottom underline. */
+QPushButton#viewTabBtn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: #A69F94;
+    padding: 4px 12px;
+    font-weight: 600;
+}
+QPushButton#viewTabBtn:hover {
+    color: #ECE7E0;
+}
+QPushButton#viewTabBtn:checked {
+    color: #F59E0B;
+    border-bottom: 2px solid #F59E0B;
+}
+QPushButton#viewTabBtn:focus { outline: none; color: #ECE7E0; }
+QPushButton#viewTabBtn:checked:focus { color: #F59E0B; }
+/* uiux-audit-remediation 8.3: muted section label separating dropped-item
+   debris from meaningful storage in the container list. */
+QLabel#containerGroupLabel {
+    color: #5C564E;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+}
 QPushButton#ghostBtn, QPushButton#toolButton {
     background: transparent;
     border: 1px solid rgba(236,231,224,0.1);
