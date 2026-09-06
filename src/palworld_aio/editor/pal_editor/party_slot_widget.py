@@ -3,6 +3,8 @@ from PyQt6.QtCore import QMimeData, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag
 from i18n import t
 from palworld_aio.ui.chrome.styles import slot_full, slot_selected, slot_multi_selected
+from palworld_aio.ui.chrome import tokens as _chrome_tokens
+_P = _chrome_tokens.resolve()
 from palworld_aio.utils import calculate_max_hp, extract_value, resolve_name, safe_nested_get, _hp_breakdown, stat_breakdown_tooltip
 
 from .data import _ensure_friendship_thresholds, get_pal_base_data
@@ -376,7 +378,7 @@ class PartySlotWidget(QFrame):
             # Drain the layout so it no longer references child widgets.
             # Without this, the temp owner's deleteLater deletes the layout
             # which tries to access widgets already freed by the child loop
-            # below — causing a C++ use-after-free crash.
+            # below - causing a C++ use-after-free crash.
             _drain_layout(old_layout)
             # Transfer the empty layout shell to a temporary Qt owner so
             # that this widget can accept a new layout without Qt's
@@ -542,7 +544,7 @@ class PartySlotWidget(QFrame):
 
         lvl_overlay.setAlignment(Qt.AlignCenter)
 
-        lvl_overlay.setStyleSheet('color: #7DD3FC; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(125,211,252,0.25); border-radius: 3px;')
+        lvl_overlay.setStyleSheet(f'color: {_P["info"]}; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid {_P["info_border"]}; border-radius: 3px;')
 
         lvl_overlay.move(8, self.height() - 14)
 
@@ -562,7 +564,7 @@ class PartySlotWidget(QFrame):
 
         name_lbl = QLabel(f'Lv.{level} {pal_name}')
 
-        name_lbl.setStyleSheet('color: #E2E8F0; font-size: 12px; font-weight: 600; background: transparent;')
+        name_lbl.setStyleSheet(f'color: {_P["text"]}; font-size: 12px; font-weight: 600; background: transparent;')
 
         name_row.addWidget(name_lbl)
 
@@ -580,15 +582,26 @@ class PartySlotWidget(QFrame):
 
         self.hp_bar.setValue(hp_pct)
 
-        self.hp_bar.setTextVisible(True)
+        # modernize-tab-ui 4.5: HP text moved to a dark pill below the bar so
+        # it never overlaps the fill; named bar treatment via qss_builder.
+        self.hp_bar.setTextVisible(False)
 
-        self.hp_bar.setFormat(f'{int(hp_val) // 1000} / {int(max_hp) // 1000}')
+        self.hp_bar.setObjectName('palStatBar')
 
-        self.hp_bar.setStyleSheet('QProgressBar { background: rgba(55,65,81,0.5); border: 1px solid rgba(16,185,129,0.15); border-radius: 3px; text-align: center; font-size: 11px; font-weight: 700; color: #FFFFFF; } QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #10B981,stop:1 #34D399); border-radius: 2px; } QToolTip { background: rgba(18,20,24,0.98); color: #E2E8F0; border: 1px solid rgba(125,211,252,0.25); border-radius: 6px; padding: 6px 10px; font-size: 11px; }')
+        self.hp_bar.setProperty('barTier', 'success')
+
         if bd_hp:
             self.hp_bar.setToolTip(stat_breakdown_tooltip('HP', bd_hp))
 
         info.addWidget(self.hp_bar)
+
+        self.hp_pill = QLabel(f'{int(hp_val) // 1000} / {int(max_hp) // 1000}')
+
+        self.hp_pill.setObjectName('palHpPill')
+
+        self.hp_pill.setAlignment(Qt.AlignCenter)
+
+        info.addWidget(self.hp_pill)
 
         exp_bar = QFrame()
 
@@ -606,7 +619,7 @@ class PartySlotWidget(QFrame):
 
         exp_fill.move(1, 1)
 
-        exp_fill.setStyleSheet('background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #6366F1,stop:1 #818CF8); border-radius: 1px;')
+        exp_fill.setStyleSheet(f'background: {_P["special"]}; border-radius: 1px;')
 
         info.addWidget(exp_bar)
 
@@ -642,7 +655,7 @@ class PartySlotWidget(QFrame):
 
             else:
 
-                fav_badge = QLabel('ðŸ”’', self)
+                fav_badge = QLabel('L', self)
 
                 fav_badge.setStyleSheet('font-size: 11px; color: rgba(255,255,255,0.65); background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;')
 
@@ -678,7 +691,7 @@ class PartySlotWidget(QFrame):
 
             else:
 
-                dna_icon = QLabel('ðŸ§¬', self)
+                dna_icon = QLabel('D', self)
 
                 dna_icon.setFixedSize(14, 14)
 
@@ -714,7 +727,7 @@ class PartySlotWidget(QFrame):
 
             else:
 
-                awake_badge = QLabel('ðŸ”¥', self)
+                awake_badge = QLabel('Aw', self)
 
                 awake_badge.setStyleSheet('font-size: 11px; background: transparent;')
 
@@ -788,12 +801,12 @@ class PartySlotWidget(QFrame):
             pred_badge = QLabel(self)
             pred_badge.setFixedSize(14, 14)
             pred_badge.setAlignment(Qt.AlignCenter)
-            pred_badge.setStyleSheet('background: transparent; border: none; font-size: 11px; font-weight: bold; color: #EF4444;')
+            pred_badge.setStyleSheet('background: transparent; border: none; font-size: 11px; font-weight: bold; color: #F87171;')
             try:
                 import nerdfont as _nf
-                pred_badge.setText(_nf.icons.get('nf-fa-paw', 'ðŸ¾'))
+                pred_badge.setText('P')
             except Exception:
-                pred_badge.setText('ðŸ¾')
+                pred_badge.setText('P')
             pred_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
             pred_badge.move(badge_x - 14, badge_y)
             pred_badge.show()

@@ -4,8 +4,64 @@ from palsav import json_tools
 
 from palworld_aio import constants
 from resource_resolver import resource_path
+from palworld_aio.ui.chrome import tokens as _chrome_tokens
 
-_PAL_STYLESHEET = '\nQWidget#palRoot {\n    background: qlineargradient(spread:pad,x1:0,y1:0,x2:1,y2:1,\n        stop:0 rgba(20,19,18,0.98),stop:0.5 rgba(20,19,18,0.98),stop:1 rgba(20,19,18,0.98));\n}\nQWidget#partyPanel {\n    background: rgba(20,19,18,0.95);\n    border: 1px solid rgba(245,158,11,0.12);\n    border-radius: 6px;\n}\nQWidget#partyPanel QLabel {\n    color: #C8D8E8;\n}\nQWidget#palboxPanel {\n    background: rgba(20,19,18,0.95);\n    border: 1px solid rgba(245,158,11,0.12);\n    border-radius: 6px;\n}\nQWidget#palboxPanel QLabel {\n    color: #C8D8E8;\n}\nQWidget#palInfoPanel QLabel {\n    color: #C8D8E8;\n}\nQLabel#boxHeader {\\n    font-size: 12px;\n    font-weight: 700;\n    color: #F59E0B;\n    padding: 4px 8px;\n    background: rgba(245,158,11,0.06);\n    border-radius: 4px;\n    min-width: 80px;\n    qproperty-alignment: AlignCenter;\n}\nQPushButton#navBtn {\n    background: rgba(245,158,11,0.08);\n    color: #F59E0B;\n    border: 1px solid rgba(245,158,11,0.2);\n    border-radius: 6px;\n    padding: 6px 14px;\n    font-size: 14px;\n    font-weight: 600;\n    min-width: 32px;\n}\nQPushButton#navBtn:hover {\n    background: rgba(245,158,11,0.18);\n    border-color: rgba(245,158,11,0.4);\n    color: #FFFFFF;\n}\nQPushButton#navBtn:pressed {\n    background: rgba(245,158,11,0.1);\n}\n'
+# modernize-tab-ui 4.2: token-derived panel chrome (was hardcoded hexes with a
+# decorative gradient). Accent surfaces derive from the shared dark palette.
+_T = _chrome_tokens.resolve()
+_rgba = _chrome_tokens.rgba
+_PAL_STYLESHEET = f'''
+QWidget#palRoot {{
+    background: {_T['canvas']};
+}}
+QWidget#partyPanel {{
+    background: {_rgba(_T['canvas'], 0.95)};
+    border: 1px solid {_rgba(_T['accent'], 0.12)};
+    border-radius: 6px;
+}}
+QWidget#partyPanel QLabel {{
+    color: {_T['text']};
+}}
+QWidget#palboxPanel {{
+    background: {_rgba(_T['canvas'], 0.95)};
+    border: 1px solid {_rgba(_T['accent'], 0.12)};
+    border-radius: 6px;
+}}
+QWidget#palboxPanel QLabel {{
+    color: {_T['text']};
+}}
+QWidget#palInfoPanel QLabel {{
+    color: {_T['text']};
+}}
+QLabel#boxHeader {{
+    font-size: 12px;
+    font-weight: 700;
+    color: {_T['accent']};
+    padding: 4px 8px;
+    background: {_rgba(_T['accent'], 0.06)};
+    border-radius: 4px;
+    min-width: 80px;
+    qproperty-alignment: AlignCenter;
+}}
+QPushButton#navBtn {{
+    background: {_rgba(_T['accent'], 0.08)};
+    color: {_T['accent']};
+    border: 1px solid {_rgba(_T['accent'], 0.2)};
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    min-width: 32px;
+}}
+QPushButton#navBtn:hover {{
+    background: {_rgba(_T['accent'], 0.18)};
+    border-color: {_rgba(_T['accent'], 0.4)};
+    color: #FFFFFF;
+}}
+QPushButton#navBtn:pressed {{
+    background: {_rgba(_T['accent'], 0.1)};
+}}
+'''
 
 _BOSS_PREFIXES = ('BOSS_', 'PREDATOR_', 'GYM_', 'RAID_')
 _PREFIX_LABELS = (' (Boss)', ' (Predator)', ' (Gym)', ' (Raid)', ' (Police)', ' (Summon)')

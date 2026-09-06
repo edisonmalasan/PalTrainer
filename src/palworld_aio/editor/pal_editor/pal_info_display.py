@@ -1,4 +1,4 @@
-﻿import os
+import os
 import math
 import re
 from functools import partial
@@ -10,6 +10,8 @@ import nerdfont as nf
 from loading_manager import show_information, show_warning, show_question
 from palworld_aio import constants
 from resource_resolver import resource_path
+from palworld_aio.ui.chrome import tokens as _chrome_tokens
+_P = _chrome_tokens.resolve()
 from palworld_aio.utils import extract_value, safe_nested_get, calculate_max_hp, calculate_shot_attack, calculate_defense, calculate_work_speed, resolve_name, _hp_breakdown, _atk_breakdown, _def_breakdown, _ws_breakdown, stat_breakdown_tooltip
 from palworld_aio.ui.chrome.styles import slot_full, slot_selected, TOOLTIP_STYLE
 from palworld_aio.ui.chrome.components import NerdBtn
@@ -24,7 +26,8 @@ from .legacy_frame import PalFrame
 
 
 class PalInfoDisplayMixin:
-    _ELEMENT_MAP = {'Normal': ('âšª', '#9CA3AF'), 'Fire': ('ðŸ”¥', '#EF4444'), 'Water': ('ðŸ’§', '#3B82F6'), 'Leaf': ('ðŸŒ¿', '#4ADE80'), 'Grass': ('ðŸŒ¿', '#4ADE80'), 'Electricity': ('âš¡', '#FBBF24'), 'Electric': ('âš¡', '#FBBF24'), 'Ice': ('â„ï¸', '#67E8F9'), 'Earth': ('ðŸª¨', '#A78BFA'), 'Ground': ('ðŸª¨', '#A78BFA'), 'Dark': ('ðŸŒ‘', '#6B21A8'), 'Dragon': ('ðŸ‰', '#818CF8'), 'None': ('â—‹', '#6B7280')}
+    # modernize-tab-ui 4.1: clean text fallback badges (mojibake glyphs retired).
+    _ELEMENT_MAP = {'Normal': ('N', '#9CA3AF'), 'Fire': ('F', '#EF4444'), 'Water': ('W', '#3B82F6'), 'Leaf': ('L', '#4ADE80'), 'Grass': ('L', '#4ADE80'), 'Electricity': ('E', '#FBBF24'), 'Electric': ('E', '#FBBF24'), 'Ice': ('I', '#67E8F9'), 'Earth': ('Ea', '#A78BFA'), 'Ground': ('Ea', '#A78BFA'), 'Dark': ('Da', '#6B21A8'), 'Dragon': ('Dr', '#818CF8'), 'None': ('??', '#6B7280')}
     _ELEMENT_COLORS = {'Normal': '#9CA3AF', 'Fire': '#EF4444', 'Water': '#3B82F6', 'Leaf': '#4ADE80', 'Grass': '#4ADE80', 'Electricity': '#FBBF24', 'Electric': '#FBBF24', 'Ice': '#67E8F9', 'Earth': '#A78BFA', 'Ground': '#A78BFA', 'Dark': '#6B21A8', 'Dragon': '#818CF8', 'None': '#6B7280'}
 
     def _update_display(self, pal_data):
@@ -61,7 +64,7 @@ class PalInfoDisplayMixin:
                 gender = 'EPalGenderType::Female'
             is_male = 'Male' in gender
             gender_key = 'gender_male' if is_male else 'gender_female'
-            gender_color = '#7DD3FC' if is_male else '#FB7185'
+            gender_color = _P['info'] if is_male else _P['danger']
             gender_pix = _icons._get_ui_icon_pixmap(gender_key, 18)
             if gender_pix:
                 self.gender_icon.setIcon(QIcon(gender_pix))
@@ -78,7 +81,7 @@ class PalInfoDisplayMixin:
                 if elements:
                     for elem_name in elements:
                         elem_pix = _icons._get_element_pixmap(elem_name, 'small', 16)
-                        elem_color = self._ELEMENT_MAP.get(elem_name, ('â˜†', '#A78BFA'))[1]
+                        elem_color = self._ELEMENT_MAP.get(elem_name, ('?', '#A78BFA'))[1]
                         if elem_pix:
                             badge = QLabel()
                             badge.setFixedSize(16, 16)
@@ -87,7 +90,7 @@ class PalInfoDisplayMixin:
                             badge.setStyleSheet(f'background: transparent; border: 1px solid {elem_color}40; border-radius: 8px;')
                             badge.setAttribute(Qt.WA_TranslucentBackground)
                         else:
-                            elem_data = self._ELEMENT_MAP.get(elem_name, ('â˜†', '#A78BFA'))
+                            elem_data = self._ELEMENT_MAP.get(elem_name, ('?', '#A78BFA'))
                             badge = QLabel(elem_data[0])
                             badge.setFixedSize(16, 16)
                             badge.setAlignment(Qt.AlignCenter)
@@ -216,8 +219,8 @@ class PalInfoDisplayMixin:
                     if isinstance(eff, QGraphicsOpacityEffect):
                         eff.setOpacity(1.0)
                     val_lbl.setText(str(ws_level))
-                    val_lbl.setStyleSheet('font-size: 11px; font-weight: 700; color: #4ADE80; background: transparent; border: none;')
-                    val_badge.setStyleSheet('background: rgba(0,0,0,0.45); border: 1px solid rgba(74,222,128,0.2); border-radius: 2px;')
+                    val_lbl.setStyleSheet('font-size: 11px; font-weight: 700; color: #2DD4BF; background: transparent; border: none;')
+                    val_badge.setStyleSheet('background: rgba(0,0,0,0.45); border: 1px solid rgba(45,212,191,0.30); border-radius: 2px;')
                     icon_lbl._ws_key = ws_key
                     icon_lbl.setCursor(Qt.PointingHandCursor)
                     val_lbl._ws_key = ws_key
@@ -353,11 +356,11 @@ class PalInfoDisplayMixin:
                 self.info_fav_btn.setText('')
             else:
                 self.info_fav_btn.setIcon(QIcon())
-                self.info_fav_btn.setText('â˜…' * fav_idx_val if fav_idx_val else 'â˜…')
+                self.info_fav_btn.setText('★' * fav_idx_val if fav_idx_val else '★')
             if fav_idx_val >= 1 and fav_idx_val <= 3:
-                self.info_fav_btn.setStyleSheet('QPushButton { background: rgba(251,191,36,0.15); border: 1px solid #FBBF24; border-radius: 4px; } QPushButton:hover { background: rgba(251,191,36,0.25); } QToolTip { background: rgba(18,20,24,0.98); color: #E2E8F0; border: 1px solid rgba(125,211,252,0.25); border-radius: 6px; padding: 6px 10px; font-size: 11px; }')
+                self.info_fav_btn.setStyleSheet(f'QPushButton {{ background: {_P["warning_bg"]}; border: 1px solid {_P["warning"]}; border-radius: 4px; }} QPushButton:hover {{ background: rgba(251,191,36,0.25); }}')
             else:
-                self.info_fav_btn.setStyleSheet('QPushButton { background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; } QPushButton:hover { background: rgba(255,255,255,0.08); } QToolTip { background: rgba(18,20,24,0.98); color: #E2E8F0; border: 1px solid rgba(125,211,252,0.25); border-radius: 6px; padding: 6px 10px; font-size: 11px; }')
+                self.info_fav_btn.setStyleSheet('QPushButton { background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; } QPushButton:hover { background: rgba(255,255,255,0.08); }')
             soul_total = sum((int(x) for x in (rank_hp_val, rank_atk_val, rank_def_val, rank_craft_val) if str(x).isdigit()))
             self.stat_plus_lbl.setText(f'+{soul_total}')
             bp = _icons._get_ui_icon_pixmap('buildup', 14)
@@ -438,7 +441,7 @@ class PalInfoDisplayMixin:
                     skill_power = 0
                     elem_color = '#4A4A50'
                 slot = SkillSlotFrame()
-                slot.setStyleSheet('QFrame { background: rgba(0,0,0,0); border: 1px solid rgba(125,211,252,0.08); border-radius: 3px; }')
+                slot.setStyleSheet(f'QFrame {{ background: rgba(0,0,0,0); border: 1px solid {_P["info_border"]}; border-radius: 3px; }}')
                 slot.setFixedHeight(26)
                 slot.setCursor(Qt.PointingHandCursor)
                 slot.installEventFilter(self)
@@ -448,7 +451,7 @@ class PalInfoDisplayMixin:
                 slot_layout.setSpacing(4)
                 slot_layout.setAlignment(Qt.AlignVCenter)
                 name_lbl = QLabel(move_name)
-                name_lbl.setStyleSheet('font-size: 10px; font-weight: 600; color: #E2E8F0; background: transparent; border: none;')
+                name_lbl.setStyleSheet('font-size: 10px; font-weight: 600; color: #ECE7E0; background: transparent; border: none;')
                 slot._name_lbl = name_lbl
                 slot_layout.addWidget(name_lbl, 1)
                 elem_badge = QLabel()
@@ -498,9 +501,9 @@ class PalInfoDisplayMixin:
             ps_start = self._ps_page * ps_pp
             for i in range(ps_start, min(ps_start + ps_pp, ps_total)):
                 display_name = '--'
-                tc = 'rgba(255,255,255,0.3)'
-                bg = 'rgba(255,255,255,0.03)'
-                bd = 'rgba(255,255,255,0.06)'
+                tc = _P['text_disabled']
+                bg = 'transparent'
+                bd = _P['border']
                 anim_mode = None
                 p_val = None
                 p_clean = ''
@@ -513,8 +516,12 @@ class PalInfoDisplayMixin:
                     else:
                         p_clean = str(p_val) if p_val else ''
                     display_name = PalFrame._PASSMAP.get(p_clean, str(p_val))
-                    bg, bd, tc = PalFrame._passive_rank_color(p_clean)
+                    # modernize-tab-ui 4.3: flat token surface + tier border
+                    # (special tier for strong passives); gradients retired.
                     rank = PalFrame._PASSRANK.get(p_clean, 1)
+                    bg = _P['surface_raised']
+                    bd = _P['special_border'] if rank >= 4 or rank < 0 else _P['border_strong']
+                    tc = _P['text']
                     if rank >= 5:
                         anim_mode = 'world_tree'
                     elif rank >= 4:
@@ -524,10 +531,9 @@ class PalInfoDisplayMixin:
                 self.passive_slots[si].setStyleSheet(f'font-size: 10px; font-weight: 700; color: {tc}; background: transparent; border: none;')
                 parent_frame = self.passive_slots[si].parentWidget()
                 if parent_frame and parent_frame.objectName() == 'passiveCard':
-                    parent_frame.setStyleSheet(f'QFrame#passiveCard {{ background: {bg}; border: 1.5px solid {bd}; border-radius: 4px; padding: 3px 6px; }}')
+                    parent_frame.setStyleSheet(f'QFrame#passiveCard {{ background: {bg}; border: 1px solid {bd}; border-radius: 4px; padding: 3px 6px; }}')
                 if si < len(self.passive_cards):
                     self._set_passive_overlay(si, anim_mode)
-                parent_frame.setStyleSheet(parent_frame.styleSheet() + '\nQToolTip { background: rgba(18,20,24,0.98); color: #E2E8F0; border: 1px solid rgba(125,211,252,0.25); border-radius: 6px; padding: 6px 10px; font-size: 11px; }')
                 if p_clean:
                     p_info = _data._PASSIVE_DATA.get(p_clean, {}) if isinstance(_data._PASSIVE_DATA, dict) else {}
                     icon_path = p_info.get('icon', '') if isinstance(p_info, dict) else ''
@@ -577,10 +583,14 @@ class PalInfoDisplayMixin:
             instance_id = ''
             if 'key' in pal_data:
                 instance_id = safe_nested_get(pal_data, ['key', 'InstanceId', 'value'], '')
+            # modernize-tab-ui 4.4: GUID kept in tooltip, not printed in the
+            # identity header; click-to-copy behavior preserved.
             if instance_id:
-                self.instance_id_lbl.setText(str(instance_id))
+                self.instance_id_lbl._instance_id = str(instance_id)
+                self.instance_id_lbl.setToolTip(f'{instance_id}\n{t("pal_editor.click_copy_id") if t else "Click to copy ID"}')
             else:
-                self.instance_id_lbl.setText('')
+                self.instance_id_lbl._instance_id = ''
+                self.instance_id_lbl.setToolTip('')
             QTimer.singleShot(0, self._fit_labels)
         except Exception:
             import traceback

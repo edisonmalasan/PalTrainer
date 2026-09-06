@@ -11,6 +11,7 @@ from i18n import t
 from loading_manager import show_information, show_warning, show_question
 from palworld_aio import constants
 from palworld_aio.ui.chrome.styles import TOOLTIP_STYLE
+from palworld_aio.ui.chrome.components import set_picker_selected
 from palworld_aio.utils import extract_value, safe_nested_get, calculate_max_hp, resolve_name, sav_to_gvasfile, gvasfile_to_sav
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from .widgets import FramelessDialog, FlowLayout
@@ -130,21 +131,23 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         mode_bar.setSpacing(4)
         mode_bar.setContentsMargins(0, 0, 0, 0)
         self.mode_box_btn = QPushButton(t('pal_editor.box_tab') if t else 'Box')
+        self.mode_box_btn.setObjectName('ghostBtn')
         self.mode_box_btn.setFixedHeight(22)
         self.mode_box_btn.setCursor(Qt.PointingHandCursor)
         self.mode_box_btn.clicked.connect(lambda: self._set_palbox_mode('box'))
         self.mode_dps_btn = QPushButton(t('pal_editor.dps') if t else 'DPS')
+        self.mode_dps_btn.setObjectName('ghostBtn')
         self.mode_dps_btn.setFixedHeight(22)
         self.mode_dps_btn.setCursor(Qt.PointingHandCursor)
         self.mode_dps_btn.clicked.connect(lambda: self._set_palbox_mode('dps'))
         mode_bar.addWidget(self.mode_box_btn)
         mode_bar.addWidget(self.mode_dps_btn)
         mode_bar.addStretch()
-        self.prev_box_btn = QPushButton('◀')
+        self.prev_box_btn = QPushButton('<')
         self.prev_box_btn.setObjectName('navBtn')
         self.prev_box_btn.setFixedSize(32, 28)
         self.prev_box_btn.clicked.connect(self._prev_box)
-        self.next_box_btn = QPushButton('▶')
+        self.next_box_btn = QPushButton('>')
         self.next_box_btn.setObjectName('navBtn')
         self.next_box_btn.setFixedSize(32, 28)
         self.next_box_btn.clicked.connect(self._next_box)
@@ -181,64 +184,67 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         deselect_btn.setObjectName('multi_deselect_btn')
         deselect_btn.setFixedHeight(22)
         deselect_btn.setCursor(Qt.PointingHandCursor)
-        deselect_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #9CA3AF; border: 1px solid rgba(236,231,224,0.10); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(236,231,224,0.10); color: #FFFFFF; }')
+        deselect_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #A69F94; border: 1px solid rgba(236,231,224,0.10); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(236,231,224,0.10); color: #FFFFFF; }')
         deselect_btn.clicked.connect(self._clear_multi_selection)
         mt_layout.addWidget(deselect_btn)
         mt_layout.addWidget(self.multi_count_label)
         palbox_layout.addLayout(mode_bar)
         self._update_mode_buttons()
-        header_row = FlowLayout()
+        header_row = FlowLayout(h_spacing=4)
         header_row.setSpacing(6)
         header_row.addWidget(self.multi_toolbar)
         self.restore_all_btn = QPushButton(t('edit_pals.restore_all'))
+        # modernize-tab-ui 4.6: tiered toolbar (warning tier = bulk mutations).
+        self.restore_all_btn.setObjectName('warnActionBtn')
         self.restore_all_btn.setFixedHeight(24)
-        self.restore_all_btn.setStyleSheet('QPushButton { background: rgba(45,212,191,0.12); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(45,212,191,0.25); border-color: rgba(45,212,191,0.5); color: #FFFFFF; }')
         self.restore_all_btn.setCursor(Qt.PointingHandCursor)
         self.restore_all_btn.clicked.connect(self._restore_all_pals)
         header_row.addWidget(self.restore_all_btn)
         self.max_all_btn = QPushButton(t('edit_pals.max_all'))
+        self.max_all_btn.setObjectName('warnActionBtn')
         self.max_all_btn.setFixedHeight(24)
-        self.max_all_btn.setStyleSheet('QPushButton { background: rgba(192,132,252,0.12); color: #C084FC; border: 1px solid rgba(192,132,252,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(192,132,252,0.25); border-color: rgba(192,132,252,0.5); color: #FFFFFF; }')
         self.max_all_btn.setCursor(Qt.PointingHandCursor)
         self.max_all_btn.clicked.connect(self._max_all_pals)
         header_row.addWidget(self.max_all_btn)
         self.max_buff_all_btn = QPushButton(t('edit_pals.max_buff_all'))
+        self.max_buff_all_btn.setObjectName('warnActionBtn')
         self.max_buff_all_btn.setFixedHeight(24)
-        self.max_buff_all_btn.setStyleSheet('QPushButton { background: rgba(249,115,22,0.12); color: #FB923C; border: 1px solid rgba(249,115,22,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(249,115,22,0.25); border-color: rgba(249,115,22,0.5); color: #FFFFFF; }')
         self.max_buff_all_btn.setCursor(Qt.PointingHandCursor)
         self.max_buff_all_btn.setToolTip(t('edit_pals.tooltip.max_buff'))
         self.max_buff_all_btn.clicked.connect(self._max_buff_all_pals)
         header_row.addWidget(self.max_buff_all_btn)
         self.all_skills_all_btn = QPushButton(t('edit_pals.all_skills_all'))
+        self.all_skills_all_btn.setObjectName('warnActionBtn')
         self.all_skills_all_btn.setFixedHeight(24)
-        self.all_skills_all_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(245,158,11,0.25); border-color: rgba(245,158,11,0.5); color: #FFFFFF; }')
         self.all_skills_all_btn.setCursor(Qt.PointingHandCursor)
         self.all_skills_all_btn.setToolTip(t('edit_pals.all_skills_all_hint'))
         self.all_skills_all_btn.clicked.connect(self._all_skills_all_pals)
         header_row.addWidget(self.all_skills_all_btn)
         self.sort_btn = QPushButton(t('edit_pals.sort_btn'))
+        # modernize-tab-ui 4.6: neutral utility tier.
+        self.sort_btn.setObjectName('ghostBtn')
         self.sort_btn.setFixedHeight(24)
-        self.sort_btn.setStyleSheet('QPushButton { background: rgba(166,159,148,0.12); color: #A69F94; border: 1px solid rgba(166,159,148,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(166,159,148,0.25); border-color: rgba(166,159,148,0.5); color: #FFFFFF; }')
         self.sort_btn.setCursor(Qt.PointingHandCursor)
         self.sort_btn.setToolTip(t('edit_pals.sort_hint'))
         self.sort_btn.clicked.connect(self._on_sort_clicked)
         header_row.addWidget(self.sort_btn)
         self.select_all_btn = QPushButton(t('pal_editor.select_all_btn'))
+        self.select_all_btn.setObjectName('ghostBtn')
         self.select_all_btn.setFixedHeight(24)
-        self.select_all_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(245,158,11,0.25); border-color: rgba(245,158,11,0.5); color: #FFFFFF; }')
         self.select_all_btn.setCursor(Qt.PointingHandCursor)
         self.select_all_btn.setToolTip(t('pal_editor.select_all_hint'))
         self.select_all_btn.clicked.connect(self._on_select_all)
         header_row.addWidget(self.select_all_btn)
         self.bulk_clone_btn = QPushButton(t('edit_pals.bulk_clone') if t else 'Bulk Clone')
+        self.bulk_clone_btn.setObjectName('warnActionBtn')
         self.bulk_clone_btn.setFixedHeight(24)
-        self.bulk_clone_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(245,158,11,0.25); border-color: rgba(245,158,11,0.5); color: #FFFFFF; }')
         self.bulk_clone_btn.setCursor(Qt.PointingHandCursor)
         self.bulk_clone_btn.clicked.connect(self._open_bulk_clone)
         header_row.addWidget(self.bulk_clone_btn)
         self.bulk_delete_btn = QPushButton(t('edit_pals.bulk_delete') if t else 'Bulk Delete')
+        # modernize-tab-ui 4.6: destructive tier (make_danger_button equivalent).
+        self.bulk_delete_btn.setProperty('class', 'danger')
         self.bulk_delete_btn.setFixedHeight(24)
-        self.bulk_delete_btn.setStyleSheet('QPushButton { background: rgba(248,113,113,0.12); color: #F87171; border: 1px solid rgba(248,113,113,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(248,113,113,0.25); border-color: rgba(248,113,113,0.5); color: #FFFFFF; }')
         self.bulk_delete_btn.setCursor(Qt.PointingHandCursor)
         self.bulk_delete_btn.clicked.connect(self._open_bulk_delete)
         header_row.addWidget(self.bulk_delete_btn)
@@ -300,10 +306,11 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
     def _update_mode_buttons(self):
         has_dps = bool(self.dps_file_path and os.path.isfile(self.dps_file_path))
         self.mode_dps_btn.setVisible(has_dps)
-        active = 'QPushButton { background: rgba(245,158,11,0.15); color: #F59E0B; border: none; padding: 4px 14px; font-size: 10px; font-weight: 600; border-radius: 4px; }'
-        inactive = 'QPushButton { background: rgba(245,158,11,0.06); color: #A69F94; border: none; padding: 4px 14px; font-size: 10px; font-weight: 600; border-radius: 4px; } QPushButton:hover { background: rgba(245,158,11,0.1); color: #ECE7E0; }'
-        self.mode_box_btn.setStyleSheet(active if self._palbox_mode == 'box' else inactive)
-        self.mode_dps_btn.setStyleSheet(active if self._palbox_mode == 'dps' else inactive)
+        # modernize-tab-ui 4.6: Box/DPS toggle rides the shared ghostBtn tier;
+        # the active mode gets the picker-selected accent border (inline color
+        # overrides removed so the token rule applies).
+        set_picker_selected(self.mode_box_btn, self._palbox_mode == 'box')
+        set_picker_selected(self.mode_dps_btn, has_dps and self._palbox_mode == 'dps')
     def _mark_dps_modified(self):
         if self._palbox_mode != 'dps' or not self.dps_file_path:
             return
@@ -2126,7 +2133,7 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         cancel_btn = QPushButton(t('pal_editor.bulk_rename_cancel'))
-        cancel_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #9CA3AF; border: 1px solid rgba(236,231,224,0.10); border-radius: 4px; padding: 6px 16px; font-size: 12px; font-weight: 600; } QPushButton:hover { background: rgba(236,231,224,0.10); color: #FFFFFF; }')
+        cancel_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #A69F94; border: 1px solid rgba(236,231,224,0.10); border-radius: 4px; padding: 6px 16px; font-size: 12px; font-weight: 600; } QPushButton:hover { background: rgba(236,231,224,0.10); color: #FFFFFF; }')
         cancel_btn.clicked.connect(dlg.reject)
         btn_row.addWidget(cancel_btn)
         apply_btn = QPushButton(t('pal_editor.bulk_rename_apply'))
@@ -2167,7 +2174,7 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
     def set_player(self, player_uid, player_name):
         """Load all data for one player. Safe on worker threads: touches no
         widgets (multi-selection reset happens in apply_player_ui on the GUI
-        thread) — setStyleSheet on 990 slots from a worker corrupted the heap.
+        thread) - setStyleSheet on 990 slots from a worker corrupted the heap.
         Serialized: two overlapping selections must not interleave writes to
         the shared pal dicts; last caller wins, earlier results are dropped.
         """

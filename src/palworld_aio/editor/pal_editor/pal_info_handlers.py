@@ -11,6 +11,8 @@ from palworld_aio import constants
 from resource_resolver import resource_path
 from palworld_aio.utils import extract_value, safe_nested_get, calculate_max_hp
 from palworld_aio.ui.chrome.styles import slot_full, slot_selected, TOOLTIP_STYLE, INPUT_DIALOG_STYLE
+from palworld_aio.ui.chrome import tokens as _chrome_tokens
+_P = _chrome_tokens.resolve()
 from palworld_aio.ui.dialogs.skill_picker import SkillPicker
 from palsav import json_tools
 from . import data as _data
@@ -516,21 +518,21 @@ class PalInfoHandlerMixin:
         il.setContentsMargins(8, 4, 8, 8)
         il.setSpacing(6)
         list_lbl = QLabel(t('edit_pals.loadouts_saved'))
-        list_lbl.setStyleSheet('font-size: 10px; font-weight: 600; color: #7DD3FC; background: transparent; border: none;')
+        list_lbl.setStyleSheet(f'font-size: 10px; font-weight: 600; color: {_P["info"]}; background: transparent; border: none;')
         il.addWidget(list_lbl)
         list_widget = QListWidget()
         list_widget.setMouseTracking(True)
-        list_widget.setStyleSheet('QListWidget { background: rgba(10,14,20,0.95); border: 1px solid rgba(125,211,252,0.15); border-radius: 4px; color: #E2E8F0; font-size: 10px; } QListWidget::item { padding: 6px 8px; } QListWidget::item:hover { background: rgba(125,211,252,0.08); } QListWidget::item:selected { background: rgba(125,211,252,0.15); color: #7DD3FC; }')
+        list_widget.setStyleSheet(f'QListWidget {{ background: rgba(10,14,20,0.95); border: 1px solid {_P["info_border"]}; border-radius: 4px; color: {_P["text"]}; font-size: 10px; }} QListWidget::item {{ padding: 6px 8px; }} QListWidget::item:hover {{ background: {_P["info_bg"]}; }} QListWidget::item:selected {{ background: {_P["info_bg"]}; color: {_P["info"]}; }}')
         for name in sorted(loadouts.keys()):
             item = QListWidgetItem(name)
             item.setData(Qt.UserRole, name)
             list_widget.addItem(item)
         il.addWidget(list_widget, 1)
         preview_lbl = QLabel(t('edit_pals.loadouts_preview') if t else 'Preview')
-        preview_lbl.setStyleSheet('font-size: 10px; font-weight: 600; color: #7DD3FC; background: transparent; border: none;')
+        preview_lbl.setStyleSheet(f'font-size: 10px; font-weight: 600; color: {_P["info"]}; background: transparent; border: none;')
         il.addWidget(preview_lbl)
         preview_frame = QWidget()
-        preview_frame.setStyleSheet('QWidget { background: rgba(10,14,20,0.8); border: 1px solid rgba(125,211,252,0.12); border-radius: 4px; }')
+        preview_frame.setStyleSheet(f'QWidget {{ background: rgba(10,14,20,0.8); border: 1px solid {_P["info_border"]}; border-radius: 4px; }}')
         pf_layout = QVBoxLayout(preview_frame)
         pf_layout.setContentsMargins(6, 4, 6, 4)
         pf_layout.setSpacing(3)
@@ -576,17 +578,17 @@ class PalInfoHandlerMixin:
         btn_row = QHBoxLayout()
         btn_row.setSpacing(4)
         save_btn = QPushButton(t('edit_pals.loadouts_save'))
-        save_btn.setStyleSheet('QPushButton { background: rgba(16,185,129,0.12); color: #4ADE80; border: 1px solid rgba(16,185,129,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(16,185,129,0.22); color: #FFFFFF; }')
+        save_btn.setStyleSheet(f'QPushButton {{ background: {_P["success_bg"]}; color: {_P["success"]}; border: 1px solid {_P["success_border"]}; border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; }} QPushButton:hover {{ background: rgba(16,185,129,0.22); color: #FFFFFF; }}')
         btn_row.addWidget(save_btn)
         load_btn = QPushButton(t('edit_pals.loadouts_apply'))
-        load_btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.12); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(125,211,252,0.22); color: #FFFFFF; }')
+        load_btn.setStyleSheet(f'QPushButton {{ background: {_P["info_bg"]}; color: {_P["info"]}; border: 1px solid {_P["info_border"]}; border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; }} QPushButton:hover {{ background: {_P["info_border"]}; color: #FFFFFF; }}')
         btn_row.addWidget(load_btn)
         delete_btn = QPushButton(t('edit_pals.loadouts_delete_btn'))
-        delete_btn.setStyleSheet('QPushButton { background: rgba(251,113,133,0.12); color: #FB7185; border: 1px solid rgba(251,113,133,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(251,113,133,0.22); color: #FFFFFF; }')
+        delete_btn.setStyleSheet(f'QPushButton {{ background: {_P["danger_bg"]}; color: {_P["danger"]}; border: 1px solid {_P["danger_border"]}; border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; }} QPushButton:hover {{ background: rgba(251,113,133,0.22); color: #FFFFFF; }}')
         btn_row.addWidget(delete_btn)
         btn_row.addStretch()
         close_btn = QPushButton(t('edit_pals.loadouts_close'))
-        close_btn.setStyleSheet('QPushButton { background: rgba(125,211,252,0.08); color: #7DD3FC; border: 1px solid rgba(125,211,252,0.2); border-radius: 4px; padding: 6px 20px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(125,211,252,0.16); color: #FFFFFF; }')
+        close_btn.setStyleSheet(f'QPushButton {{ background: {_P["info_bg"]}; color: {_P["info"]}; border: 1px solid {_P["info_border"]}; border-radius: 4px; padding: 6px 20px; font-size: 10px; font-weight: 600; }} QPushButton:hover {{ background: {_P["info_border"]}; color: #FFFFFF; }}')
         btn_row.addWidget(close_btn)
         il.addLayout(btn_row)
         def _do_save():
