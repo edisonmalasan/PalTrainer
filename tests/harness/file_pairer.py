@@ -31,6 +31,7 @@ _TEST_STEM_ALIASES: dict[str, str] = {
     'tools_tab': 'palworld_aio/ui/tabs/tools_tab',
     'table_inspector': 'palworld_aio/ui/main_window',
     'base_inventory_chips': 'palworld_aio/ui/tabs/base_inventory_tab',
+    'inventory_chip': 'palworld_aio/ui/tabs/inventory_tab',
     'domain_stats': 'stats',
     'palworld_coord': 'palworld_coord/__init__',
     'xgp_import': 'palworld_xgp_import/__init__',

@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt, QSize, pyqtSignal, QPoint, QTimer, QThread, QEvent
 from PyQt6.QtGui import QPixmap, QIcon, QFont, QCursor, QColor, QPainter, QPen, QIntValidator, QFontMetrics
 from PyQt6.QtWidgets import QStyledItemDelegate
 from i18n import t
+from palworld_aio.ui.chrome import icons as app_icons
 from palworld_aio.ui.chrome.components import set_picker_selected
 from palworld_aio.ui.chrome.styles import DIALOG_STYLE as DARK_THEME_STYLE, STATS_PANEL_STYLE, MENU_STYLE, PICKER_BG_STYLE, PICKER_SEARCH_STYLE, PICKER_LIST_STYLE, wrap_tooltip_text, slot_full, slot_rarity, slot_selected, slot_multi_selected, CONTENT_PANEL_STYLE, SLOT_EMPTY_STYLE, SLOT_HOVER_STYLE, INPUT_DIALOG_STYLE
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
@@ -2547,9 +2548,15 @@ class PlayerInventoryTab(QWidget):
         set_content_margins(toolbar_row, top=6, bottom=6)
         toolbar_row.setSpacing(6)
         self.player_select_btn = QPushButton(t('inventory.select_player', default='Select Player...'))
-        self.player_select_btn.setObjectName('ghostBtn')
+        # uiux-audit-remediation 6.4: selector chip parity with Base
+        # Inventory — bordered dropdown chip + chevron; the picker-selected
+        # accent state (set_picker_selected) is covered by the
+        # selectorChip[pickerSelected="true"] rule.
+        self.player_select_btn.setObjectName('selectorChip')
         self.player_select_btn.setMinimumWidth(200)
         self.player_select_btn.setCursor(Qt.PointingHandCursor)
+        self.player_select_btn.setIcon(
+            app_icons.get_qicon('chevron_down', role='text_secondary'))
         self.player_select_btn.clicked.connect(self._open_player_popup)
         toolbar_row.addWidget(self.player_select_btn)
         toolbar_row.addStretch(1)
