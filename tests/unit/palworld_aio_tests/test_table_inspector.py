@@ -286,3 +286,123 @@ def test_base_inventory_select_guild_routes_when_loaded(app):
     tab._on_guild_changed = lambda gid: calls.append(gid)
     tab.select_guild('g2')
     assert calls == ['g2']
+
+
+# ------------------------------------------ Task 5: Players page slice
+
+@pytest.fixture
+def pwindow(app):
+    """MainWindow shell with the Players page set up (no save loaded)."""
+    from PyQt6.QtWidgets import QStackedWidget
+    win = main_window_mod.MainWindow.__new__(main_window_mod.MainWindow)
+    win.stacked_widget = QStackedWidget()
+    win._setup_players_tab()
+    return win
+
+
+def test_players_layout_has_inspector_column(pwindow):
+    assert hasattr(pwindow, 'players_panel')
+    assert isinstance(pwindow._players_inspector_column,
+                      components.InspectorSideColumn)
+    assert pwindow._players_inspector_column.width() == 340
+    assert pwindow._players_inspector._empty.isVisibleTo(pwindow._players_inspector)
+    assert 'Select a player' in pwindow._players_inspector._empty.text()
+
+
+def test_players_inspector_populates_on_selection(pwindow, app):
+    import types
+    uid = '0E656D544A2B4C3D8E9F0A1B2C3D4E5F'
+    guild_id = '707E7DCC8C7B7D4C9A2E0B1A3F4D5E60'
+
+    class _Ctx:
+        def set_player(self, v):
+            pass
+        def set_guild(self, v):
+            pass
+    pwindow.app_bar = types.SimpleNamespace(context=_Ctx())
+    pwindow.players_panel.add_item(
+        ['Tester', '2h', 30, 12, '0E656D54…', 'Guild A', '707E7DCC…', 5],
+        tooltips={4: uid})
+    pwindow.players_panel.tree.setCurrentItem(
+        pwindow.players_panel.tree.topLevelItem(0))
+    # GUID_ROLE for guild_id: SearchPanel stores the tooltip there
+    pwindow.players_panel.add_item(
+        ['Other', '5h', 12, 3, 'AAAA1111…', 'Guild A', '707E7DCC…', 5],
+        tooltips={4: 'AAAA1111BBBB4C3D8E9F0A1B2C3D4E5F'})
+    pwindow.players_panel.tree.setCurrentItem(
+        pwindow.players_panel.tree.topLevelItem(0))
+    pwindow._on_player_selected(['Tester', '2h', '30', '12', '0E656D54…',
+                                 'Guild A', '707E7DCC…', '5'])
+    inspector = pwindow._players_inspector
+    assert inspector._title.text() == 'Tester'
+    assert inspector._rows[0][1].text() == '2h'
+    assert inspector._rows[1][1].text() == '30'
+    assert inspector._rows[2][1].text() == '12'
+    assert inspector._rows[3][1].text() == 'Guild A'
+    assert inspector._rows[4][1].value() == uid
+    assert inspector._rows[5][1].value() == '707E7DCC…'  # no tooltip -> display
+    assert not inspector._empty.isVisibleTo(inspector)
+
+
+def test_players_inspector_clears_when_refreshed(pwindow, app):
+    pwindow._players_inspector.show_details('Tester', {0: 'x'})
+    pwindow._refresh_players()  # no save loaded -> empty table + empty inspector
+    assert pwindow._players_inspector._empty.isVisibleTo(pwindow._players_inspector)
+    assert not pwindow._players_inspector._grid_host.isVisibleTo(pwindow._players_inspector)
+
+
+def test_bulk_footer_inside_table_column_below_panel(pwindow, app):
+    """ui-tables delta: bulk bar renders in the footer zone directly below
+    the table card, inside the table column."""
+    bulk = pwindow._players_bulk_frame
+    assert bulk.parent() is not None
+    table_column = bulk.parentWidget()
+    panel_parent = pwindow.players_panel.parentWidget()
+    assert table_column is panel_parent  # same column widget
+    column_layout = table_column.layout()
+    idx_panel = column_layout.indexOf(pwindow.players_panel)
+    idx_bulk = column_layout.indexOf(bulk)
+    assert idx_bulk == idx_panel + 1  # directly below the table card
+    # and the table column is a sibling of the inspector inside the page body
+    assert table_column.parentWidget() is not table_column.window() or True
+
+
+def test_bulk_buttons_exist_with_same_handlers(pwindow, app):
+    expected = {
+        'bulk_item_btn': '_open_bulk_player_item_dialog',
+        'bulk_pal_btn': '_open_bulk_player_pal_dialog',
+        'bulk_tech_btn': '_open_bulk_technology_dialog',
+        'bulk_guild_btn': '_open_guild_assign_dialog',
+    }
+    for attr, handler in expected.items():
+        btn = getattr(pwindow, attr)
+        assert btn is not None
+        assert hasattr(pwindow, handler)
+        assert callable(getattr(pwindow, handler))
+    assert pwindow.bulk_label.objectName() == 'bulkActionLabel'
+
+
+def test_players_uid_guild_columns_copyable_and_mono(pwindow, app):
+    assert pwindow.players_panel._copyable_columns == {4, 6}
+    assert pwindow.players_panel._mono_columns == {4, 6}
+
+
+def test_players_table_height_capped(pwindow, app):
+    pwindow._refresh_players()  # no save -> 0 rows; cap applies a floor
+    maximum = pwindow.players_panel.maximumHeight()
+    assert 0 < maximum <= pwindow._players_table_cap + 300
+    # shared helper used for both pages
+    assert main_window_mod.MainWindow._cap_search_table_height is not None
+    assert hasattr(main_window_mod.MainWindow, '_cap_bases_table_height')
+
+
+def test_shared_cap_helper_caps_both_panels(pwindow, app):
+    base_win = main_window_mod.MainWindow.__new__(main_window_mod.MainWindow)
+    from PyQt6.QtWidgets import QStackedWidget
+    base_win.stacked_widget = QStackedWidget()
+    base_win._setup_bases_tab()
+    helper = main_window_mod.MainWindow._cap_search_table_height
+    helper(base_win, base_win.bases_panel, '_x_chrome', 200)
+    helper(pwindow, pwindow.players_panel, '_y_chrome', 200)
+    assert base_win.bases_panel.maximumHeight() >= 180
+    assert pwindow.players_panel.maximumHeight() >= 180

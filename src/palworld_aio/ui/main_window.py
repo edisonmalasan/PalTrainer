@@ -48,6 +48,9 @@ def _item_value(item, col):
     """modernize-tab-ui 5.2: full column value (GUID role) with text fallback."""
     value = item.data(col, SearchPanel.GUID_ROLE)
     return value if value not in (None, '') else item.text(col)
+# uiux-audit-remediation 5.1: role used by _populate_players_inspector to
+# read the full Guild ID from the players table (search_panel.GUID_ROLE).
+from palworld_aio.widgets.search_panel import GUID_ROLE as _PLAYER_GUILD_ID_ROLE
 class DetachedStatusWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__()
@@ -490,19 +493,37 @@ class MainWindow(QMainWindow):
             self.stacked_widget.insertWidget(idx, widget)
             self._tab_created.add(index)
     def _setup_players_tab(self):
-        from .chrome.components import create_page_ribbon
+        from .chrome.components import (
+            InspectorSideColumn, create_page_footer, create_page_ribbon,
+        )
+        from .chrome import icons as app_icons
         players_tab = QWidget()
         layout = QVBoxLayout(players_tab)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(create_page_ribbon(t('deletion.search_players') if t else 'Search Players', (t('sidebar.section.world') if t else 'World Data').upper(), players_tab))
+        # uiux-audit-remediation 5.1/5.2 (design D7): table column (bulk
+        # footer hugging the capped table card) + inspector side column.
+        self._players_table_cap = 420
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+        table_column = QWidget()
+        table_layout = QVBoxLayout(table_column)
+        table_layout.setContentsMargins(0, 0, 0, 0)
+        table_layout.setSpacing(0)
         self.players_panel = SearchPanel('deletion.search_players', ['deletion.col.player_name', 'deletion.col.last_seen', 'deletion.col.level', 'deletion.col.pals', 'deletion.col.uid', 'deletion.col.guild_name', 'deletion.col.guild_id', 'deletion.col.guild_level'], [140, 120, 60, 60, 150, 180, 180, 60])
         self.players_panel.item_selected.connect(self._on_player_selected)
         self.players_panel.tree.customContextMenuRequested.connect(self._show_player_context_menu)
-        layout.addWidget(self.players_panel, stretch=1)
+        # uiux-audit-remediation 5.3: Player UID (index 4) / Guild ID
+        # (index 6) columns get the mono + full-value Ctrl+C copy treatment.
+        self.players_panel.set_copyable_columns({4, 6})
+        self.players_panel.set_mono_columns({4, 6})
+        table_layout.addWidget(self.players_panel, stretch=1)
         # shared page footer (top-nav-shell 4.1): bulk actions live in the
-        # trailing actions slot; wiring unchanged
-        from .chrome.components import create_page_footer
+        # trailing actions slot; wiring unchanged. uiux-audit-remediation
+        # 5.2: the footer sits directly beneath the capped table card inside
+        # the table column instead of the stretched page bottom.
         bulk_frame = create_page_footer()
         bulk_layout = bulk_frame.actions
         self.bulk_label = QLabel(t('player.bulk_actions') if t else 'Bulk Actions:')
@@ -521,7 +542,22 @@ class MainWindow(QMainWindow):
         self.bulk_guild_btn = QPushButton(t('guild.assign.btn_open') if t else 'Guild Assignments')
         self.bulk_guild_btn.clicked.connect(self._open_guild_assign_dialog)
         bulk_layout.addWidget(self.bulk_guild_btn)
-        layout.addWidget(bulk_frame)
+        table_layout.addWidget(bulk_frame)
+        self._players_bulk_frame = bulk_frame
+        table_layout.addStretch(1)
+        body.addWidget(table_column, stretch=1)
+        self._players_inspector_column = InspectorSideColumn(340)
+        self._players_inspector = self._players_inspector_column.panel
+        self._players_inspector.add_row(t('deletion.col.last_seen') if t else 'Last Seen')
+        self._players_inspector.add_row(t('deletion.col.level') if t else 'Level')
+        self._players_inspector.add_row(t('deletion.col.pals') if t else 'Pals')
+        self._players_inspector.add_row(t('deletion.col.guild_name') if t else 'Guild')
+        self._players_inspector.add_row('Player UID', monospace=True)
+        self._players_inspector.add_row('Guild ID', monospace=True)
+        self._players_inspector.show_empty(
+            t('players.inspector_empty') if t else 'Select a player to view their details')
+        body.addWidget(self._players_inspector_column)
+        layout.addLayout(body, stretch=1)
         self.stacked_widget.addWidget(players_tab)
     def _setup_guilds_tab(self):
         from .chrome.components import create_page_ribbon
@@ -1038,6 +1074,17 @@ class MainWindow(QMainWindow):
             # full GUID in a tooltip; data/sort keys unchanged.
             tooltips = {4: str(uid)}
             self.players_panel.add_item([display_name, lastseen, level, pals, _short_guid(uid), gname, gid, glevel], sort_keys=sort_keys, tooltips=tooltips)
+        # uiux-audit-remediation 5.1 (additive): the refreshed table has no
+        # selection, so the inspector returns to its empty presentation.
+        try:
+            inspector = self._players_inspector
+        except (AttributeError, RuntimeError):
+            inspector = None
+        if inspector is not None:
+            inspector.show_empty(
+                t('players.inspector_empty') if t else 'Select a player to view their details')
+        self._cap_search_table_height(
+            self.players_panel, '_players_panel_chrome', self._players_table_cap)
     def _refresh_guilds(self):
         self.guilds_panel.clear()
         self.guild_members_panel.clear()
@@ -1075,35 +1122,43 @@ class MainWindow(QMainWindow):
                 t('bases.inspector_empty') if t else 'Select a base to view its details')
         self._cap_bases_table_height()
 
-    def _cap_bases_table_height(self):
-        """uiux-audit-remediation 4.2: bound the bases table container to its
-        content height up to ``_bases_table_cap`` (rows scroll internally
-        beyond the cap) instead of stretching to the full canvas."""
-        tree = self.bases_panel.tree
+    def _cap_search_table_height(self, panel, chrome_attr: str, content_cap: int,
+                                 max_rows: int = 10, min_height: int = 180):
+        """uiux-audit-remediation 5.2 (design D7): shared content-height cap
+        for World-Data table cards (Bases, Players). The card sizes to its
+        rows up to ``content_cap`` (rows scroll internally beyond it) so the
+        bulk footer hugs the table and the inspector fills the side."""
+        tree = panel.tree
         row_h = 26
         if tree.topLevelItemCount():
             measured = tree.visualItemRect(tree.topLevelItem(0)).height()
             if measured > 0:
                 row_h = measured
         header_h = tree.header().height() or 28
-        visible = min(tree.topLevelItemCount(), 10)
+        visible = min(tree.topLevelItemCount(), max_rows)
         tree_needed = header_h + visible * row_h + 2
         # non-tree chrome of the SearchPanel (search row + hairline + footer),
         # measured once from a laid-out widget (falls back to the QSS sum)
         try:
-            chrome = self._bases_panel_chrome
+            chrome = getattr(self, chrome_attr)
         except (AttributeError, RuntimeError):
             chrome = 0
-        if not chrome and self.bases_panel.height() > 200:
-            measured = self.bases_panel.height() - tree.height()
+        if not chrome and panel.height() > 200:
+            measured = panel.height() - tree.height()
             if measured >= 48:
-                self._bases_panel_chrome = measured
+                setattr(self, chrome_attr, measured)
                 chrome = measured
         if not chrome:
             from palworld_aio.ui.chrome.tokens import HEIGHT
             chrome = (HEIGHT['default'] + 18) + 1 + (HEIGHT['compact'] + 8)
-        cap = min(tree_needed + chrome, max(self._bases_table_cap + chrome, 200))
-        self.bases_panel.setMaximumHeight(max(cap, 180))
+        cap = min(tree_needed + chrome, max(content_cap + chrome, 200))
+        panel.setMaximumHeight(max(cap, min_height))
+
+    def _cap_bases_table_height(self):
+        """uiux-audit-remediation 4.2: bound the bases table container to its
+        content height (see _cap_search_table_height)."""
+        self._cap_search_table_height(
+            self.bases_panel, '_bases_panel_chrome', self._bases_table_cap)
     def _refresh_map(self):
         if 'map_tab' in self.__dict__:
             self.map_tab.refresh()
@@ -1504,6 +1559,30 @@ class MainWindow(QMainWindow):
         if data:
             self.app_bar.context.set_player(data[0])
             self.app_bar.context.set_guild(data[5])
+            self._populate_players_inspector(data)
+
+    def _populate_players_inspector(self, data):
+        """uiux-audit-remediation 5.1: mirror the selected player row into
+        the inspector (context wiring and data logic unchanged)."""
+        inspector = getattr(self, '_players_inspector', None)
+        if inspector is None:
+            return
+        if not data:
+            inspector.show_empty(
+                t('players.inspector_empty') if t else 'Select a player to view their details')
+            return
+        item = self.players_panel.get_selected_item()
+        uid = str(item.toolTip(4)) if item is not None and item.toolTip(4) else str(data[4])
+        guild_id = str(item.data(6, _PLAYER_GUILD_ID_ROLE)) if item is not None and item.data(6, _PLAYER_GUILD_ID_ROLE) else str(data[6])
+        title = str(data[0])
+        inspector.show_details(title, {
+            0: str(data[1]),
+            1: str(data[2]),
+            2: str(data[3]),
+            3: str(data[5]),
+            4: uid,
+            5: guild_id,
+        })
     def _on_guild_selected(self, data):
         if data:
             self.app_bar.context.set_guild(data[0])

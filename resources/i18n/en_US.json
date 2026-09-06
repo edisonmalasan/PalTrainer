@@ -2439,6 +2439,7 @@
     "bases.open_in_inventory": "Open in Base Inventory",
     "bases.inspector_title": "Base",
     "inspector.no_selection": "Nothing selected",
+    "players.inspector_empty": "Select a player to view their details",
     "nav.rail.tools": "Tools",
     "nav.rail.map": "Map",
     "nav.rail.base_inventory": "Base",
