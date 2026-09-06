@@ -29,7 +29,7 @@
 - [ ] 4.1 Add shared inspector panel component (Docs detail pattern) per design D7; wire Bases, Players, Guilds to table-column + inspector layouts with capped content-height tables.
 - [ ] 4.2 Identifier cells (Player UID, Guild ID, Base ID): monospace + shortened display + full-value tooltip + click-to-copy.
 - [ ] 4.3 Move Players bulk action bar into the footer directly under the table; handlers unchanged.
-- [ ] 4.4 Pagination indicator: "Page N of M" label; hide on single page (Bases/Players/Guilds).
+- [ ] 4.4 SearchPanel result count: labeled text (e.g. "1 result" / "12 of 40") instead of a bare numeral (audit's "pagination" reading was actually the result count; no pagination exists).
 - [ ] 4.5 Guilds member pane empty-state copy → row-level wording (i18n key add/update).
 - [ ] 4.6 Verify: focused pytest run, compileall; confirm selection signals still drive member/detail data.
 

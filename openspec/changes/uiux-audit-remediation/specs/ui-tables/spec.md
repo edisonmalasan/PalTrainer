@@ -34,15 +34,19 @@ The Players page bulk action bar (Bulk Item Management, Bulk Pal Management, Bul
 - **WHEN** the Players page renders with a save loaded
 - **THEN** the bulk action bar appears directly below the table card within the table column, remains visible without scrolling at default window size, and triggers the same operations as before
 
-### Requirement: Pagination indicator is labeled
+### Requirement: Result count is labeled, never a bare numeral
 
-Table pages with pagination SHALL label the page indicator as "Page N of M" (localized), and SHALL hide the indicator entirely when the table has exactly one page.
+Table toolbars SHALL render the result count as labeled text (for example "1 result" / "12 of 40", localized) instead of a bare numeral, so the number's meaning is unambiguous; the count SHALL continue to update live with filtering and match the visible row count.
 
-#### Scenario: Single page hides indicator
+#### Scenario: Small table shows a labeled count
 
-- **WHEN** a table's filtered content fits in one page
-- **THEN** no bare numeral indicator renders; **WHEN** content spans multiple pages
-- **THEN** the indicator reads "Page N of M"
+- **WHEN** a table page shows a single row
+- **THEN** the toolbar reads a labeled count (for example "1 result") rather than a bare "1"
+
+#### Scenario: Filtered count stays labeled and live
+
+- **WHEN** the user applies a search filter matching a subset of rows
+- **THEN** the labeled count updates to reflect visible-versus-total rows
 
 ## MODIFIED Requirements
 

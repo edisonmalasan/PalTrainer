@@ -45,7 +45,7 @@ The audit verdict: keep the foundation, fix structure and interactions. Every de
 - Inspector selection follows existing row-selection signals; no data-layer changes. Identifier values in inspector and ID columns use D5 monospace + tooltip + copy.
 - Players bulk bar moves into the footer directly under the table card (handlers unchanged) per ui-tables delta.
 - Guilds member pane: the member list itself is the detail area — inspector-style wording fixes apply; member pane keeps its position but gains the row-level copy ("Click a guild row to view its members").
-- Pagination: label "Page N of M" via i18n key; hide when single page.
+- Pagination: audit's "Page 1 of 1" reading turned out to be SearchPanel's result count (`search_panel.py` count_label). Task 4.4 relabels it to a labeled count (e.g. "1 result") instead of adding pagination, which the app does not have.
 
 ### D8 — Segmented platform toggle (Tools)
 
