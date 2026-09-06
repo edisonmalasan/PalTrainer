@@ -20,9 +20,9 @@
 
 ## 3. Tools page
 
-- [ ] 3.1 Convert Steam/GamePass buttons into one segmented platform control with bundled artwork per design D8; preserve both load flows.
-- [ ] 3.2 Add live activity log panel below tool groups per design D9 (bounded height, auto-scroll, clear button).
-- [ ] 3.3 Verify: focused pytest run, compileall; confirm metric chips and tool rows still navigate/trigger.
+- [x] 3.1 Convert Steam/GamePass buttons into one segmented platform control with bundled artwork per design D8; preserve both load flows.
+- [x] 3.2 Add live activity log panel below tool groups per design D9 (bounded height, auto-scroll, clear button).
+- [x] 3.3 Verify: focused pytest run, compileall; confirm metric chips and tool rows still navigate/trigger.
 
 ## 4. Table pages: Bases, Players, Guilds
 

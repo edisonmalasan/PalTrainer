@@ -1623,6 +1623,8 @@
     "tools.no_save_loaded": "No save loaded",
     "tools.copy_path": "Copy save path",
     "tools.path_copied": "Copied",
+    "tools.log_title": "ACTIVITY",
+    "tools.log_clear": "Clear log",
     "pal_editor.party": "Party",
     "pal_editor.box": "Box {n}",
     "pal_editor.level": "Level",

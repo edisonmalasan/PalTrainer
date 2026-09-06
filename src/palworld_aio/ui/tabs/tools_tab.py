@@ -1,9 +1,9 @@
 import os
 import sys
 import traceback
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QScrollArea, QSizePolicy, QSpacerItem, QGridLayout, QApplication, QDialog, QStylePainter, QStyleOptionButton, QStyle
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QScrollArea, QSizePolicy, QSpacerItem, QGridLayout, QApplication, QDialog, QStylePainter, QStyleOptionButton, QStyle, QTextEdit
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QPropertyAnimation, QEasingCurve, QRectF, QObject, QEvent, QTimer
-from PyQt6.QtGui import QPixmap, QIcon, QFont, QCursor, QDragEnterEvent, QDropEvent, QDragLeaveEvent, QPainter, QColor, QPen, QPainterPath, QFontMetrics, QFontDatabase, QGuiApplication
+from PyQt6.QtGui import QPixmap, QIcon, QFont, QCursor, QDragEnterEvent, QDropEvent, QDragLeaveEvent, QPainter, QColor, QPen, QPainterPath, QFontMetrics, QFontDatabase, QGuiApplication, QTextCursor
 from i18n import t
 from loading_manager import show_critical
 from palworld_aio import constants
@@ -24,6 +24,142 @@ class _RestoreOnCloseFilter(QObject):
         if event.type() in (QEvent.Close, QEvent.Hide):
             self._callback()
         return super().eventFilter(watched, event)
+
+
+class PlatformSegmentedControl(QWidget):
+    """Steam/GamePass segmented control (uiux-audit-remediation 3.1 / design
+    D8): one connected control, exactly one platform selected at a time.
+    Each segment exposes a per-platform activation callback; clicking an
+    already-selected segment re-fires its load flow (matching the previous
+    standalone buttons, which always started their flow)."""
+
+    def __init__(self, on_steam, on_gamepass, parent=None):
+        super().__init__(parent)
+        self.setObjectName('platformSegment')
+        self._handlers = {'steam': on_steam, 'gamepass': on_gamepass}
+        self._segments: dict[str, QPushButton] = {}
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        for order, (platform, icon_name, label_key, fallback) in enumerate((
+                ('steam', 'steam', 'tools.btn_steam', 'Steam'),
+                ('gamepass', 'gamepass', 'tools.btn_gamepass', 'GamePass'),
+        )):
+            btn = QPushButton()
+            btn.setObjectName('platformSegmentBtn')
+            btn.setProperty('segmentRole', 'start' if order == 0 else 'end')
+            btn.setCheckable(True)
+            btn.setCursor(QCursor(Qt.PointingHandCursor))
+            btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            btn.setIcon(app_icons.get_qicon(icon_name, role='text_secondary'))
+            btn.setAccessibleName(t(label_key) if t else fallback)
+            btn.setToolTip(t(label_key) if t else fallback)
+            btn.clicked.connect(
+                lambda checked=False, p=platform: self._on_segment(p))
+            lay.addWidget(btn)
+            self._segments[platform] = btn
+        self.select('steam')
+        self.refresh_labels()
+
+    def _on_segment(self, platform: str) -> None:
+        self.select(platform)
+        self._handlers[platform]()
+
+    def select(self, platform: str) -> None:
+        if platform not in self._segments:
+            return
+        for key, btn in self._segments.items():
+            btn.setChecked(key == platform)
+            btn.setIcon(app_icons.get_qicon(
+                'steam' if key == 'steam' else 'gamepass',
+                role='text_on_accent' if key == platform else 'text_secondary'))
+
+    def selected(self) -> str:
+        for key, btn in self._segments.items():
+            if btn.isChecked():
+                return key
+        return 'steam'
+
+    def refresh_labels(self) -> None:
+        for platform, btn in self._segments.items():
+            label = t('tools.btn_steam' if platform == 'steam'
+                      else 'tools.btn_gamepass') or platform.title()
+            btn.setText(label)
+            btn.setAccessibleName(label)
+            btn.setToolTip(label)
+
+
+class ActivityLogPanel(QWidget):
+    """Live log panel mirroring the streamed operational messages the status
+    strip consumes (uiux-audit-remediation 3.2 / design D9). Subscribe via
+    ``entry_appended``-style connect: ``stream.text_written.connect(panel.append_entry)``.
+    Bounded height, auto-scroll, clear empties only this panel."""
+
+    MAX_ENTRIES = 200
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName('activityLogPanel')
+        self.setFixedHeight(200)
+        self._entries = 0
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        head = QHBoxLayout()
+        head.setSpacing(6)
+        self._title = QLabel(t('tools.log_title') if t else 'Activity')
+        self._title.setObjectName('activityLogTitle')
+        head.addWidget(self._title)
+        head.addStretch(1)
+        self._clear_btn = QPushButton()
+        self._clear_btn.setObjectName('activityLogClearBtn')
+        self._clear_btn.setIcon(app_icons.get_qicon('trash', role='text_secondary'))
+        self._clear_btn.setFixedSize(26, 22)
+        self._clear_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        self._clear_btn.setToolTip(t('tools.log_clear') if t else 'Clear log')
+        self._clear_btn.setAccessibleName(t('tools.log_clear') if t else 'Clear log')
+        self._clear_btn.clicked.connect(self.clear)
+        head.addWidget(self._clear_btn)
+        lay.addLayout(head)
+        self._view = QTextEdit()
+        self._view.setObjectName('activityLogView')
+        self._view.setReadOnly(True)
+        self._view.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        lay.addWidget(self._view)
+
+    def append_entry(self, text: str) -> None:
+        message = (text or '').strip()
+        if not message:
+            return
+        # one line per streamed chunk, consistent with the console's plain
+        # message styling
+        self._entries += 1
+        self._view.append(message)
+        document = self._view.document()
+        if document.blockCount() > ActivityLogPanel.MAX_ENTRIES:
+            cursor = self._view.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.Start)
+            cursor.movePosition(QTextCursor.MoveOperation.Down,
+                                QTextCursor.MoveMode.KeepAnchor,
+                                document.blockCount() - ActivityLogPanel.MAX_ENTRIES)
+            cursor.removeSelectedText()
+        scrollbar = self._view.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+
+    def clear(self) -> None:
+        """Empties only this panel — the underlying stream/console keeps
+        its history."""
+        self._entries = 0
+        self._view.clear()
+
+    def entry_count(self) -> int:
+        """Visible entries (older ones are trimmed at MAX_ENTRIES)."""
+        return min(self._entries, ActivityLogPanel.MAX_ENTRIES)
+
+    def refresh_labels(self) -> None:
+        self._title.setText(t('tools.log_title') if t else 'Activity')
+        self._clear_btn.setToolTip(t('tools.log_clear') if t else 'Clear log')
+        self._clear_btn.setAccessibleName(t('tools.log_clear') if t else 'Clear log')
 
 
 def center_window(win):
@@ -268,8 +404,12 @@ class ToolsTab(QWidget):
         for zone_key, rows in self.MISSION_ZONES:
             columns_row.addWidget(self._create_mission_column(zone_key, rows), stretch=1)
         body.addLayout(columns_row)
+        # uiux-audit-remediation 3.2 (design D9): live log panel fills the
+        # lower canvas instead of dead space; entries mirror the stream the
+        # status strip consumes (subscription in _setup_log_stream).
+        self._activity_log = ActivityLogPanel()
+        body.addWidget(self._activity_log)
         body.addWidget(self._create_footer_guidance())
-        body.addStretch(1)
         scroll = QScrollArea()
         scroll.setObjectName('startScroll')
         scroll.setWidgetResizable(True)
@@ -277,6 +417,20 @@ class ToolsTab(QWidget):
         scroll.setWidget(canvas)
         root.addWidget(scroll, stretch=1)
         self._setup_save_manager_connection()
+        self._setup_log_stream()
+
+    def _setup_log_stream(self):
+        """Mirror the status strip's stream (StatusBarStream.text_written)
+        into the activity log. Read-only subscription: the stream keeps its
+        strip/console routing, and the detached console is untouched."""
+        stream = getattr(self.parent_window, 'status_stream', None)
+        if stream is None or not hasattr(self, '_activity_log'):
+            return
+        try:
+            stream.text_written.disconnect(self._activity_log.append_entry)
+        except (TypeError, RuntimeError):
+            pass
+        stream.text_written.connect(self._activity_log.append_entry)
 
     # ------------------------------------------------------------- masthead
     def _create_ops_masthead(self):
@@ -295,26 +449,15 @@ class ToolsTab(QWidget):
         self._save_state_dot.setFixedSize(10, 10)
         top_row.addWidget(self._save_state_dot)
         top_row.addStretch(1)
+        # uiux-audit-remediation 3.1 (design D8): one segmented control —
+        # reads as 'pick one of two platforms' — replacing the two
+        # independent-weight load buttons. Handler mapping preserved:
+        # Steam → _on_load_save_clicked, GamePass → _on_load_xgp_clicked.
+        self._platform_segment = PlatformSegmentedControl(
+            self._on_load_save_clicked, self._on_load_xgp_clicked)
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
-        self._load_steam_btn = QPushButton()
-        self._load_steam_btn.setObjectName('opsLoadBtn')
-        self._load_steam_btn.setIcon(
-            app_icons.get_qicon('steam', role='text_on_accent'))
-        self._load_steam_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self._load_steam_btn.setMinimumHeight(36)
-        self._load_steam_btn.clicked.connect(self._on_load_save_clicked)
-        btn_row.addWidget(self._load_steam_btn)
-        self._load_xgp_btn = QPushButton()
-        self._load_xgp_btn.setObjectName('opsLoadBtn')
-        self._load_xgp_btn.setProperty('loadKind', 'secondary')
-        self._load_xgp_btn.setIcon(
-            app_icons.get_qicon('gamepass', role='text_secondary'))
-        self._load_xgp_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self._load_xgp_btn.setMinimumHeight(36)
-        self._load_xgp_btn.clicked.connect(self._on_load_xgp_clicked)
-        btn_row.addWidget(self._load_xgp_btn)
-        self._refresh_save_btns()
+        btn_row.addWidget(self._platform_segment)
         top_row.addLayout(btn_row)
         lay.addLayout(top_row)
         # uiux-audit-remediation 2.3 (design D6): truncated monospace path
@@ -678,14 +821,8 @@ class ToolsTab(QWidget):
         self.fade_animation.setEasingCurve(QEasingCurve.OutCubic)
         self.fade_animation.start()
     def _refresh_save_btns(self):
-        if hasattr(self, '_load_steam_btn') and self._load_steam_btn:
-            self._load_steam_btn.setText(t('tools.btn_steam') or 'Steam')
-            self._load_steam_btn.setIcon(
-                app_icons.get_qicon('steam', role='text_on_accent'))
-        if hasattr(self, '_load_xgp_btn') and self._load_xgp_btn:
-            self._load_xgp_btn.setText(t('tools.btn_gamepass') or 'GamePass')
-            self._load_xgp_btn.setIcon(
-                app_icons.get_qicon('gamepass', role='text_secondary'))
+        if hasattr(self, '_platform_segment') and self._platform_segment:
+            self._platform_segment.refresh_labels()
     def refresh_labels(self):
         self._refresh_save_btns()
         if hasattr(self, '_load_btn') and self._load_btn:
@@ -712,5 +849,7 @@ class ToolsTab(QWidget):
         if hasattr(self, '_stat_label_refs'):
             for key, lbl in self._stat_label_refs.items():
                 lbl.setText(t('dashboard.stat_' + key) if t else key)
+        if hasattr(self, '_activity_log') and self._activity_log:
+            self._activity_log.refresh_labels()
     def refresh(self):
         self._update_stats()

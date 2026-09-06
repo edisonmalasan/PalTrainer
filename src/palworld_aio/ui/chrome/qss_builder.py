@@ -1350,7 +1350,48 @@ QPushButton#opsSavePath {{
     font-family: {font_family_qss(FONT_MONO_STACK)};
 }}
 QPushButton#opsSavePath:hover {{ color: {p['accent']}; }}
-/* uiux-audit-remediation 2.3: click-to-copy affordance beside the path */
+/* uiux-audit-remediation 3.1 (design D8): segmented platform control — two
+   exclusive segments rendered as one connected control; the selected
+   segment takes the primary accent treatment. */
+QWidget#platformSegment {{ background: transparent; }}
+QPushButton#platformSegmentBtn {{
+    background: {p['surface_raised']};
+    color: {p['text_secondary']};
+    border: 1px solid {p['border_strong']};
+    border-radius: 0;
+    padding: {SPACING['sm'] - 2}px {SPACING['lg'] - 2}px;
+    min-height: 26px;
+    font-weight: 600;
+}}
+QPushButton#platformSegmentBtn[segmentRole="start"] {{
+    border-top-left-radius: {RADIUS['md']}px;
+    border-bottom-left-radius: {RADIUS['md']}px;
+    border-right: none;
+}}
+QPushButton#platformSegmentBtn[segmentRole="end"] {{
+    border-top-right-radius: {RADIUS['md']}px;
+    border-bottom-right-radius: {RADIUS['md']}px;
+    border-left: none;
+}}
+QPushButton#platformSegmentBtn:hover {{
+    background: {p['surface_hover']};
+    color: {p['text']};
+}}
+QPushButton#platformSegmentBtn:checked {{
+    background: {p['accent']};
+    color: {p['text_on_accent']};
+    border-color: {p['accent']};
+}}
+QPushButton#platformSegmentBtn:checked:hover {{
+    background: {p['accent_hover']};
+    border-color: {p['accent_hover']};
+}}
+QPushButton#platformSegmentBtn:focus {{
+    outline: none;
+    border-color: {p['accent_border_strong']};
+}}
+QPushButton#platformSegmentBtn:checked:focus {{ border-color: {p['accent']}; }}
+/* uiux-audit-remediation 3.3: click-to-copy affordance beside the path */
 QPushButton#opsCopyPathBtn {{
     background: transparent;
     border: none;
@@ -1358,6 +1399,35 @@ QPushButton#opsCopyPathBtn {{
     padding: 2px;
 }}
 QPushButton#opsCopyPathBtn:hover {{ background: {p['surface_hover']}; }}
+/* uiux-audit-remediation 3.2 (design D9): live activity log panel —
+   bounded height, console-like dark surface, muted header row. */
+QWidget#activityLogPanel {{ background: transparent; }}
+QLabel#activityLogTitle {{
+    color: {p['text_disabled']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+}}
+QPushButton#activityLogClearBtn {{
+    background: transparent;
+    border: none;
+    border-radius: {RADIUS['sm']}px;
+    padding: 2px;
+}}
+QPushButton#activityLogClearBtn:hover {{ background: {p['surface_hover']}; }}
+QTextEdit#activityLogView {{
+    background: {p['canvas']};
+    color: {p['text_secondary']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+    padding: {SPACING['sm']}px;
+    selection-background-color: {p['accent_bg_strong']};
+    selection-color: {p['text']};
+    font-family: {fonts.font_family_qss(fonts.FONT_MONO_STACK)};
+    font-size: {TYPE['secondary'][0]}px;
+}}
 QLabel#opsDropHint {{ color: {p['text_disabled']}; font-size: {TYPE['micro'][0]}px; }}
 QLabel#toolsFooterHint {{ color: {p['text_disabled']}; font-size: {TYPE['micro'][0]}px; }}
 QWidget#metricRow {{ background: transparent; }}

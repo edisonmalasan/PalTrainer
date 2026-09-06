@@ -1320,7 +1320,48 @@ QPushButton#opsSavePath {
     font-family: 'Cascadia Mono','Consolas';
 }
 QPushButton#opsSavePath:hover { color: #F59E0B; }
-/* uiux-audit-remediation 2.3: click-to-copy affordance beside the path */
+/* uiux-audit-remediation 3.1 (design D8): segmented platform control — two
+   exclusive segments rendered as one connected control; the selected
+   segment takes the primary accent treatment. */
+QWidget#platformSegment { background: transparent; }
+QPushButton#platformSegmentBtn {
+    background: #211E1B;
+    color: #A69F94;
+    border: 1px solid rgba(236,231,224,0.18);
+    border-radius: 0;
+    padding: 6px 14px;
+    min-height: 26px;
+    font-weight: 600;
+}
+QPushButton#platformSegmentBtn[segmentRole="start"] {
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-right: none;
+}
+QPushButton#platformSegmentBtn[segmentRole="end"] {
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+    border-left: none;
+}
+QPushButton#platformSegmentBtn:hover {
+    background: rgba(245,158,11,0.07);
+    color: #ECE7E0;
+}
+QPushButton#platformSegmentBtn:checked {
+    background: #F59E0B;
+    color: #1C1206;
+    border-color: #F59E0B;
+}
+QPushButton#platformSegmentBtn:checked:hover {
+    background: #F7B03A;
+    border-color: #F7B03A;
+}
+QPushButton#platformSegmentBtn:focus {
+    outline: none;
+    border-color: rgba(245,158,11,0.5);
+}
+QPushButton#platformSegmentBtn:checked:focus { border-color: #F59E0B; }
+/* uiux-audit-remediation 3.3: click-to-copy affordance beside the path */
 QPushButton#opsCopyPathBtn {
     background: transparent;
     border: none;
@@ -1328,6 +1369,35 @@ QPushButton#opsCopyPathBtn {
     padding: 2px;
 }
 QPushButton#opsCopyPathBtn:hover { background: rgba(245,158,11,0.07); }
+/* uiux-audit-remediation 3.2 (design D9): live activity log panel —
+   bounded height, console-like dark surface, muted header row. */
+QWidget#activityLogPanel { background: transparent; }
+QLabel#activityLogTitle {
+    color: #5C564E;
+    font-family: 'Hanken Grotesk','Segoe UI';
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+}
+QPushButton#activityLogClearBtn {
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    padding: 2px;
+}
+QPushButton#activityLogClearBtn:hover { background: rgba(245,158,11,0.07); }
+QTextEdit#activityLogView {
+    background: #141312;
+    color: #A69F94;
+    border: 1px solid rgba(236,231,224,0.1);
+    border-radius: 5px;
+    padding: 8px;
+    selection-background-color: rgba(245,158,11,0.18);
+    selection-color: #ECE7E0;
+    font-family: 'Cascadia Mono','Consolas';
+    font-size: 11px;
+}
 QLabel#opsDropHint { color: #5C564E; font-size: 10px; }
 QLabel#toolsFooterHint { color: #5C564E; font-size: 10px; }
 QWidget#metricRow { background: transparent; }
