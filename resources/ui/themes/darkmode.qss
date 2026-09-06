@@ -1471,6 +1471,47 @@ QLabel#statsHeader { color: #A69F94; font-size: 10px; font-weight: 600; letter-s
 QLabel#sectionHeader { color: #A69F94; font-size: 10px; font-weight: 600; letter-spacing: 1px; }
 QFrame#glassPanel { background: #1B1917; border: 1px solid rgba(236,231,224,0.1); border-radius: 8px; }
 
+/* ---- inspector panel (uiux-audit-remediation 4.1 / design D7) ---- */
+QFrame#inspectorPanel {
+    background: #1B1917;
+    border: 1px solid rgba(236,231,224,0.1);
+    border-radius: 8px;
+}
+QFrame#inspectorSideColumn { background: transparent; }
+QLabel#inspectorTitle {
+    color: #ECE7E0;
+    font-family: 'Hanken Grotesk','Segoe UI';
+    font-size: 12px;
+    font-weight: 600;
+}
+QLabel#inspectorRowLabel {
+    color: #5C564E;
+    font-size: 10px;
+    letter-spacing: 1px;
+    font-weight: 600;
+}
+QLabel#inspectorRowValue {
+    color: #ECE7E0;
+    font-size: 12px;
+}
+QLabel#inspectorEmpty {
+    color: #5C564E;
+    font-size: 12px;
+    background: transparent;
+    padding: 16px;
+}
+QPushButton#inspectorCopyValue {
+    background: transparent;
+    color: #ECE7E0;
+    border: none;
+    border-radius: 3px;
+    padding: 1px 2px;
+    text-align: left;
+    font-family: 'Cascadia Mono','Consolas';
+    font-size: 11px;
+}
+QPushButton#inspectorCopyValue:hover { background: rgba(245,158,11,0.07); color: #F59E0B; }
+
 /* ---- ui-modernization Phase 0: promoted selectors (were inline or missing).
    Token/property selectors only. Dialogs that still carry inline copies of
    these rules keep rendering from their inline copy until their Phase 4

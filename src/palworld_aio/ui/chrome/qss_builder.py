@@ -1501,6 +1501,47 @@ QLabel#statsHeader {{ color: {p['text_secondary']}; font-size: {TYPE['micro'][0]
 QLabel#sectionHeader {{ color: {p['text_secondary']}; font-size: {TYPE['micro'][0]}px; font-weight: 600; letter-spacing: 1px; }}
 QFrame#glassPanel {{ background: {p['surface']}; border: 1px solid {p['border']}; border-radius: {RADIUS['lg']}px; }}
 
+/* ---- inspector panel (uiux-audit-remediation 4.1 / design D7) ---- */
+QFrame#inspectorPanel {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QFrame#inspectorSideColumn {{ background: transparent; }}
+QLabel#inspectorTitle {{
+    color: {p['text']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['section'][0]}px;
+    font-weight: {TYPE['section'][1]};
+}}
+QLabel#inspectorRowLabel {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['micro'][0]}px;
+    letter-spacing: 1px;
+    font-weight: 600;
+}}
+QLabel#inspectorRowValue {{
+    color: {p['text']};
+    font-size: {TYPE['body'][0]}px;
+}}
+QLabel#inspectorEmpty {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['body'][0]}px;
+    background: transparent;
+    padding: {SPACING['lg']}px;
+}}
+QPushButton#inspectorCopyValue {{
+    background: transparent;
+    color: {p['text']};
+    border: none;
+    border-radius: {RADIUS['sm']}px;
+    padding: 1px 2px;
+    text-align: left;
+    font-family: {fonts.font_family_qss(fonts.FONT_MONO_STACK)};
+    font-size: {TYPE['secondary'][0]}px;
+}}
+QPushButton#inspectorCopyValue:hover {{ background: {p['surface_hover']}; color: {p['accent']}; }}
+
 /* ---- ui-modernization Phase 0: promoted selectors (were inline or missing).
    Token/property selectors only. Dialogs that still carry inline copies of
    these rules keep rendering from their inline copy until their Phase 4

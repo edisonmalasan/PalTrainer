@@ -29,6 +29,7 @@ _TEST_STEM_ALIASES: dict[str, str] = {
     'shell_v3_chrome': 'palworld_aio/ui/main_window',
     'shell_status_chrome': 'palworld_aio/ui/main_window',
     'tools_tab': 'palworld_aio/ui/tabs/tools_tab',
+    'table_inspector': 'palworld_aio/ui/main_window',
     'domain_stats': 'stats',
     'palworld_coord': 'palworld_coord/__init__',
     'xgp_import': 'palworld_xgp_import/__init__',

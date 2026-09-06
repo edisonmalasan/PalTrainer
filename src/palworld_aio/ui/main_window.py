@@ -551,16 +551,58 @@ class MainWindow(QMainWindow):
         layout.addWidget(splitter, stretch=1)
         self.stacked_widget.addWidget(guilds_tab)
     def _setup_bases_tab(self):
-        from .chrome.components import create_page_ribbon
+        from .chrome.components import (
+            InspectorSideColumn, create_page_ribbon,
+        )
+        from .chrome import icons as app_icons
         bases_tab = QWidget()
         layout = QVBoxLayout(bases_tab)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(create_page_ribbon(t('deletion.search_bases') if t else 'Search Bases', (t('sidebar.section.world') if t else 'World Data').upper(), bases_tab))
+        # uiux-audit-remediation 4.2 (design D7): table column + inspector
+        # side column; the inspector absorbs the freed canvas instead of the
+        # table forcing a full-height fill.
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+        table_column = QWidget()
+        table_layout = QVBoxLayout(table_column)
+        table_layout.setContentsMargins(0, 0, 0, 0)
+        table_layout.setSpacing(0)
+        # uiux-audit-remediation 4.2: the table sizes to its content up to a
+        # cap (internal scroll beyond) instead of forcing a full-height fill;
+        # the inspector side column occupies the freed canvas.
+        self._bases_table_cap = 420
         self.bases_panel = SearchPanel('deletion.search_bases', ['deletion.col.base_id', 'deletion.col.guild_id', 'deletion.col.guild_name', 'deletion.col.guild_level'], [200, 200, 200, 100])
+        self.bases_panel.tree.setMinimumHeight(160)
         self.bases_panel.item_selected.connect(self._on_base_selected)
         self.bases_panel.tree.customContextMenuRequested.connect(self._show_base_context_menu)
-        layout.addWidget(self.bases_panel, stretch=1)
+        # uiux-audit-remediation 4.3: Base ID / Guild ID columns get the
+        # mono + full-value Ctrl+C copy treatment (display stays shortened)
+        self.bases_panel.set_copyable_columns({0, 1})
+        self.bases_panel.set_mono_columns({0, 1})
+        table_layout.addWidget(self.bases_panel, stretch=1)
+        table_layout.addStretch(1)
+        body.addWidget(table_column, stretch=1)
+        self._bases_inspector_column = InspectorSideColumn(340)
+        self._bases_inspector = self._bases_inspector_column.panel
+        self._bases_inspector.add_row(t('deletion.col.guild_name') if t else 'Guild')
+        self._bases_inspector.add_row(t('deletion.col.guild_level') if t else 'Guild Level')
+        self._bases_inspector.add_row('Base ID', monospace=True)
+        self._bases_inspector.add_row('Guild ID', monospace=True)
+        self._bases_open_inventory_btn = QPushButton(
+            t('bases.open_in_inventory') if t else 'Open in Base Inventory')
+        self._bases_open_inventory_btn.setProperty('class', 'ghost')
+        self._bases_open_inventory_btn.setIcon(
+            app_icons.get_qicon('base_inventory', role='text_secondary'))
+        self._bases_open_inventory_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self._bases_open_inventory_btn.clicked.connect(self._open_base_in_inventory)
+        self._bases_inspector.add_action(self._bases_open_inventory_btn)
+        self._bases_inspector.show_empty(
+            t('bases.inspector_empty') if t else 'Select a base to view its details')
+        body.addWidget(self._bases_inspector_column)
+        layout.addLayout(body, stretch=1)
         self.stacked_widget.addWidget(bases_tab)
     def _setup_map_tab(self):
         from .tabs.map_tab import MapTab
@@ -1022,6 +1064,46 @@ class MainWindow(QMainWindow):
             # modernize-tab-ui 5.2: Base ID / Guild ID short form + full tooltip.
             tooltips = {0: str(b['id']), 1: str(b['guild_id'])}
             self.bases_panel.add_item([_short_guid(b['id']), _short_guid(b['guild_id']), b['guild_name'], glevel], sort_keys=sort_keys, tooltips=tooltips)
+        # uiux-audit-remediation 4.2 (additive): the refreshed table has no
+        # selection, so the inspector returns to its empty presentation.
+        try:
+            inspector = self._bases_inspector
+        except (AttributeError, RuntimeError):
+            inspector = None
+        if inspector is not None:
+            inspector.show_empty(
+                t('bases.inspector_empty') if t else 'Select a base to view its details')
+        self._cap_bases_table_height()
+
+    def _cap_bases_table_height(self):
+        """uiux-audit-remediation 4.2: bound the bases table container to its
+        content height up to ``_bases_table_cap`` (rows scroll internally
+        beyond the cap) instead of stretching to the full canvas."""
+        tree = self.bases_panel.tree
+        row_h = 26
+        if tree.topLevelItemCount():
+            measured = tree.visualItemRect(tree.topLevelItem(0)).height()
+            if measured > 0:
+                row_h = measured
+        header_h = tree.header().height() or 28
+        visible = min(tree.topLevelItemCount(), 10)
+        tree_needed = header_h + visible * row_h + 2
+        # non-tree chrome of the SearchPanel (search row + hairline + footer),
+        # measured once from a laid-out widget (falls back to the QSS sum)
+        try:
+            chrome = self._bases_panel_chrome
+        except (AttributeError, RuntimeError):
+            chrome = 0
+        if not chrome and self.bases_panel.height() > 200:
+            measured = self.bases_panel.height() - tree.height()
+            if measured >= 48:
+                self._bases_panel_chrome = measured
+                chrome = measured
+        if not chrome:
+            from palworld_aio.ui.chrome.tokens import HEIGHT
+            chrome = (HEIGHT['default'] + 18) + 1 + (HEIGHT['compact'] + 8)
+        cap = min(tree_needed + chrome, max(self._bases_table_cap + chrome, 200))
+        self.bases_panel.setMaximumHeight(max(cap, 180))
     def _refresh_map(self):
         if 'map_tab' in self.__dict__:
             self.map_tab.refresh()
@@ -1441,6 +1523,53 @@ class MainWindow(QMainWindow):
         if data:
             self.app_bar.context.set_base(data[0])
             self.app_bar.context.set_guild(data[2])
+            self._populate_bases_inspector(data)
+
+    def _populate_bases_inspector(self, data):
+        """uiux-audit-remediation 4.2: mirror the selected base row into the
+        inspector (selection wiring and data logic unchanged)."""
+        inspector = getattr(self, '_bases_inspector', None)
+        if inspector is None:
+            return
+        if not data:
+            inspector.show_empty(
+                t('bases.inspector_empty') if t else 'Select a base to view its details')
+            return
+        item = self.bases_panel.get_selected_item()
+        base_id = str(item.toolTip(0)) if item is not None and item.toolTip(0) else str(data[0])
+        guild_id = str(item.toolTip(1)) if item is not None and item.toolTip(1) else str(data[1])
+        # 1-based position of the base within its guild, from get_bases() order
+        base_number = 0
+        try:
+            guild_bases = [b for b in get_bases() if str(b['guild_id']) == guild_id]
+            base_number = next(
+                (i + 1 for i, b in enumerate(guild_bases) if str(b['id']) == base_id), 0)
+        except (TypeError, ValueError, KeyError):
+            base_number = 0
+        title = f'Base {base_number}' if base_number else (t('bases.inspector_title') if t else 'Base')
+        inspector.show_details(title, {
+            0: str(data[2]),
+            1: str(data[3]),
+            2: base_id,
+            3: guild_id,
+        })
+
+    def _open_base_in_inventory(self):
+        """uiux-audit-remediation 4.5: navigate to the Base Inventory page
+        and target the selected base's guild there (guild-level targeting —
+        the Base Inventory component's selection scope)."""
+        if not getattr(self, '_bases_inspector', None):
+            return
+        item = self.bases_panel.get_selected_item() if hasattr(self, 'bases_panel') else None
+        if item is None:
+            return
+        guild_id = item.toolTip(1) or item.text(1)
+        if not guild_id:
+            return
+        self._activate_nav('base_inventory')
+        tab = getattr(self, 'base_inventory_tab', None)
+        if tab is not None and hasattr(tab, 'select_guild'):
+            tab.select_guild(guild_id)
     def closeEvent(self, event: QCloseEvent):
         if constants.dirty and constants.current_save_path:
             self._set_dirty(False)

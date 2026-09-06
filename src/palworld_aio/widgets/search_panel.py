@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTreeWidget, QTreeWidgetItem, QHeaderView, QFrame, QAbstractItemView
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTreeWidget, QTreeWidgetItem, QHeaderView, QFrame, QAbstractItemView, QApplication
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtGui import QFont, QColor, QCursor, QKeySequence
 from i18n import t
 from palworld_aio import constants
 _SORT_ROLE = Qt.UserRole + 1
@@ -8,6 +8,38 @@ _SORT_ROLE = Qt.UserRole + 1
 # shortened; selection signals, context-menu readers, search and sort resolve
 # this role so behavior matches the pre-shortening text exactly.
 GUID_ROLE = Qt.UserRole + 2
+# uiux-audit-remediation 4.3: per-column copyable identifiers — set with
+# ``panel.set_copyable_columns({0, 1})``; the display stays the shortened
+# text, Ctrl+C copies the full GUID from GUID_ROLE, and the tree font goes
+# monospace when every copyable column is covered (Bases: ID columns only).
+COPY_ROLE = Qt.UserRole + 3
+
+
+class _CopyableTree(QTreeWidget):
+    """QTreeWidget + Ctrl+C copies the full value of copyable columns
+    (GUID_ROLE when set, else display text). Selection/context menus are
+    the parent policy's — this only adds a keyboard copy."""
+
+    def __init__(self, panel, parent=None):
+        super().__init__(parent)
+        self._panel = panel
+
+    def keyPressEvent(self, event):
+        if event.matches(QKeySequence.StandardKey.Copy):
+            copied = False
+            for item in self.selectedItems():
+                values = []
+                for col in range(item.columnCount()):
+                    if col in self._panel._copyable_columns:
+                        values.append(str(item.data(col, GUID_ROLE)
+                                          or _display_value(item, col)))
+                if values:
+                    QApplication.clipboard().setText('\t'.join(values))
+                    copied = True
+            if copied:
+                event.accept()
+                return
+        super().keyPressEvent(event)
 def _display_value(item, col):
     value = item.data(col, GUID_ROLE)
     return str(value) if value not in (None, '') else item.text(col)
@@ -37,6 +69,8 @@ class SearchPanel(QWidget):
         self.column_keys = column_keys
         self.column_widths = column_widths or []
         self._selection_mode = selection_mode
+        self._copyable_columns: set[int] = set()
+        self._mono_columns: set[int] = set()
         self._setup_ui()
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -66,7 +100,7 @@ class SearchPanel(QWidget):
         hairline.setFixedHeight(1)
         layout.addWidget(hairline)
         # full-bleed dense table
-        self.tree = QTreeWidget()
+        self.tree = _CopyableTree(self)
         self.tree.setObjectName('searchTree')
         self.columns = [t(k) if k else '' for k in self.column_keys]
         self.tree.setHeaderLabels(self.columns)
@@ -131,6 +165,27 @@ class SearchPanel(QWidget):
         self._empty_label.setGeometry(self.tree.viewport().rect())
         self._empty_label.show()
 
+    def set_copyable_columns(self, columns: set[int]) -> None:
+        """uiux-audit-remediation 4.3: mark identifier columns copyable —
+        Ctrl+C copies the full GUID (GUID_ROLE) of the selected rows for
+        these columns."""
+        self._copyable_columns = set(columns)
+
+    def set_mono_columns(self, columns: set[int]) -> None:
+        """uiux-audit-remedination 4.3: render these columns' values in the
+        mono token family (identifier cells); per-column via item fonts, so
+        prose columns keep the proportional family."""
+        self._mono_columns = set(columns)
+        for item in self._all_items:
+            self._apply_mono_fonts(item)
+
+    def _apply_mono_fonts(self, item) -> None:
+        from palworld_aio.ui.chrome import fonts as _chrome_fonts
+        for col in getattr(self, '_mono_columns', ()):  # type: ignore[attr-defined]
+            if col < item.columnCount():
+                item.setFont(col, _chrome_fonts.mono_font(
+                    px=constants.FONT_SIZE_PX_BODY))
+
     def set_empty_state_widget(self, widget) -> None:
         """modernize-tab-ui 5.3: rich EmptyState overlay replacing the plain
         hint for this panel's no-rows state (e.g. Guilds members pane).
@@ -179,7 +234,17 @@ class SearchPanel(QWidget):
     def _update_count(self):
         total = self.tree.topLevelItemCount()
         visible = sum(0 if self.tree.topLevelItem(i).isHidden() else 1 for i in range(total))
-        self.count_label.setText(f'{visible}/{total}' if total != visible else str(total))
+        # uiux-audit-remediation 4.4: labeled result count, never a bare
+        # numeral — filtered subsets show "X of Y results".
+        if total != visible:
+            text = (t('search.results_filtered', x=visible, y=total)
+                    if t else f'{visible} of {total} results')
+        elif total == 1:
+            text = t('search.results_one') if t else '1 result'
+        else:
+            text = (t('search.results_many', n=total)
+                    if t else f'{total} results')
+        self.count_label.setText(text)
         if hasattr(self, '_empty_label'):
             self._refresh_empty_state()
     def _on_search(self, text):
@@ -222,6 +287,7 @@ class SearchPanel(QWidget):
                     item.setToolTip(col, str(tip))
                     if str(tip) != item.text(col):
                         item.setData(col, GUID_ROLE, str(tip))
+        self._apply_mono_fonts(item)
         self.tree.addTopLevelItem(item)
         self._all_items.append(item)
         self._update_count()

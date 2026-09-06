@@ -2796,6 +2796,7 @@ class BaseInventoryTab(QWidget):
         self._current_base_name = ''
         self._guilds_data = []
         self._bases_data = []
+        self._pending_guild_selection = None
         self._setup_ui()
         self._setup_connections()
         self._auto_save_timer = QTimer(self)
@@ -3081,6 +3082,19 @@ class BaseInventoryTab(QWidget):
         self.refresh_labels()
         if hasattr(self._main_window, 'parent') and hasattr(self._main_window.parent, 'results_widget'):
             pass
+    def select_guild(self, guild_id):
+        """Public targeting hook (uiux-audit-remediation 4.5): select a guild
+        programmatically by routing through the existing _on_guild_changed
+        flow. Before guild data has loaded the request is queued and applied
+        when _load_guilds finishes."""
+        if guild_id is None:
+            return
+        guilds = getattr(self, '_guilds_data', None)
+        if guilds:
+            if any(str(g['id']) == str(guild_id) for g in guilds):
+                self._on_guild_changed(guild_id)
+            return
+        self._pending_guild_selection = guild_id
     def _show_guild_popup(self):
         popup = QWidget()
         popup.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
@@ -3245,6 +3259,11 @@ class BaseInventoryTab(QWidget):
                 self.guild_button.setEnabled(True)
                 self.base_button.setEnabled(True)
                 self._clear_display()
+                pending = getattr(self, '_pending_guild_selection', None)
+                if pending is not None:
+                    self._pending_guild_selection = None
+                    if any(str(g['id']) == str(pending) for g in self._guilds_data):
+                        self._on_guild_changed(pending)
         run_with_loading(on_finished, task)
     def _on_guild_changed(self, guild_id):
         if guild_id is None:
