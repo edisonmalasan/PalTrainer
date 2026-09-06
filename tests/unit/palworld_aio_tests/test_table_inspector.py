@@ -492,3 +492,78 @@ def test_guilds_table_capped_members_splitter_untouched(gwindow, app):
     assert gwindow.guild_members_panel.maximumHeight() == 16777215
     splitter = gwindow.guilds_panel.parentWidget()
     assert splitter is gwindow.guild_members_panel.parentWidget()
+
+
+# ------------------------------------------ Task 7: Exclusions add affordance
+
+class _FakeInputDialog:
+    result = ('', False)
+
+    def __init__(self, result):
+        _FakeInputDialog.result = result
+
+    @staticmethod
+    def getText(parent, title, label):
+        return _FakeInputDialog.result
+
+
+@pytest.fixture
+def ewindow(app):
+    """MainWindow shell with the Exclusions page set up."""
+    from PyQt6.QtWidgets import QStackedWidget
+    win = main_window_mod.MainWindow.__new__(main_window_mod.MainWindow)
+    win.stacked_widget = QStackedWidget()
+    win._setup_exclusions_tab()
+    return win
+
+
+def test_each_panel_has_add_affordance(ewindow, app):
+    panels = {
+        'players': ewindow.excl_players_panel,
+        'guilds': ewindow.excl_guilds_panel,
+        'bases': ewindow.excl_bases_panel,
+    }
+    for key, panel in panels.items():
+        btn = ewindow._excl_add_buttons[key]
+        assert btn.parent() is not None
+        assert panel.footer_slot.indexOf(btn) >= 0  # lives in the panel footer
+        assert '+ Add Exclusion' in btn.text()
+
+
+def test_add_button_visible_in_empty_state_condition(ewindow, app):
+    """The affordance lives in the panel footer, outside the empty-state
+    overlay covering the tree viewport."""
+    panel = ewindow.excl_players_panel
+    btn = ewindow._excl_add_buttons['players']
+    overlay = panel._empty_label
+    assert overlay.parent() is panel.tree.viewport()
+    assert btn.parentWidget() is not panel.tree.viewport()
+
+
+def test_add_flow_routes_into_add_exclusion(ewindow, app, monkeypatch):
+    calls = []
+    monkeypatch.setattr(ewindow, '_add_exclusion',
+                        lambda excl_type, value: calls.append((excl_type, value)))
+    for key, value in (('players', 'UID-123'), ('guilds', 'GID-456'),
+                       ('bases', 'BID-789')):
+        calls.clear()
+        monkeypatch.setattr(main_window_mod, 'QInputDialog',
+                            _FakeInputDialog((f'  {value}  ', True)))
+        ewindow._add_exclusion_via_prompt(key)
+        assert calls == [(key, value)]  # trimmed value, correct excl_type
+
+
+def test_add_flow_rejects_empty_and_cancel(ewindow, app, monkeypatch):
+    calls = []
+    monkeypatch.setattr(ewindow, '_add_exclusion',
+                        lambda excl_type, value: calls.append((excl_type, value)))
+    monkeypatch.setattr(main_window_mod, 'QInputDialog',
+                        _FakeInputDialog(('   ', True)))
+    ewindow._add_exclusion_via_prompt('players')
+    monkeypatch.setattr(main_window_mod, 'QInputDialog',
+                        _FakeInputDialog(('UID-1', False)))
+    ewindow._add_exclusion_via_prompt('players')
+    monkeypatch.setattr(main_window_mod, 'QInputDialog',
+                        _FakeInputDialog(('', True)))
+    ewindow._add_exclusion_via_prompt('players')
+    assert calls == []  # empty/whitespace/cancelled input never adds

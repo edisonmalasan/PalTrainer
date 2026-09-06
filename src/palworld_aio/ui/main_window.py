@@ -715,6 +715,7 @@ class MainWindow(QMainWindow):
         self._excl_views = {}
         self._excl_btns = {}
         self._excl_empty_states = {}
+        self._excl_add_buttons = {}
         switch_row.addStretch(1)
         layout.addLayout(switch_row)
         self._excl_stack = QStackedWidget()
@@ -747,6 +748,19 @@ class MainWindow(QMainWindow):
             )
             panel.set_empty_state_widget(empty)
             self._excl_empty_states[key] = empty
+            # uiux-audit-remediation 7.1: persistent visible '+ Add Exclusion'
+            # affordance in the panel footer (outside the empty-state overlay,
+            # so it stays usable when the list is empty) routing into the
+            # existing _add_exclusion flow.
+            add_btn = QPushButton(t('deletion.exclusions.add') if t else '+ Add Exclusion')
+            add_btn.setObjectName('exclAddBtn')
+            add_btn.setProperty('class', 'ghost')
+            add_btn.setCursor(QCursor(Qt.PointingHandCursor))
+            add_btn.setToolTip(t('deletion.exclusions.add') if t else '+ Add Exclusion')
+            add_btn.setAccessibleName(t('deletion.exclusions.add') if t else '+ Add Exclusion')
+            add_btn.clicked.connect(lambda checked=False, k=key: self._add_exclusion_via_prompt(k))
+            panel.footer_slot.addWidget(add_btn)
+            self._excl_add_buttons[key] = add_btn
             page_lay.addWidget(panel)
             self._excl_stack.addWidget(page)
             self._excl_views[key] = self._excl_stack.count() - 1
@@ -765,6 +779,27 @@ class MainWindow(QMainWindow):
         self._excl_stack.setCurrentIndex(self._excl_views[key])
         for k, btn in self._excl_btns.items():
             btn.setChecked(k == key)
+    def _add_exclusion_via_prompt(self, excl_type):
+        """uiux-audit-remediation 7.1: visible '+ Add Exclusion' affordance —
+        prompts for the identifier and routes into the existing
+        _add_exclusion flow (storage/save/refresh untouched). Empty or
+        cancelled input does nothing."""
+        prompts = {
+            'players': ('deletion.exclusions.add_prompt_players', 'Enter the Player UID to exclude:'),
+            'guilds': ('deletion.exclusions.add_prompt_guilds', 'Enter the Guild ID to exclude:'),
+            'bases': ('deletion.exclusions.add_prompt_bases', 'Enter the Base ID to exclude:'),
+        }
+        prompt_key, prompt_fallback = prompts[excl_type]
+        text, ok = QInputDialog.getText(
+            self,
+            t('deletion.exclusions.add_title') if t else 'Add Exclusion',
+            t(prompt_key) if t else prompt_fallback)
+        if not ok:
+            return
+        value = text.strip()
+        if not value:
+            return
+        self._add_exclusion(excl_type, value)
     def _setup_menus(self):
         menu_actions = {'file': [(t('menu.file.load_save') if t else 'Load Save', self._load_save), (t('menu.file.load_xgp_save') if t else 'Load GamePass Save', self._load_xgp_save), (t('menu.file.load_backup') if t else 'Load from Backup', self._load_backup_save), (t('menu.file.load_gps') if t else 'Load Global Pal Storage', self._load_gps), (t('menu.file.load_worldoption') if t else 'Load WorldOption', self._load_worldoption), (t('menu.file.save_changes') if t else 'Save Changes', self._save_changes), (t('menu.file.rename_world') if t else 'Rename World', self._rename_world), (t('aio.menu.open_data_folder') if t else 'Open Data Folder', self._open_data_folder)], 'functions': [(t('deletion.menu.submenu.delete') if t else 'Delete', [(t('deletion.menu.delete_empty_guilds') if t else 'Delete Empty Guilds', self._delete_empty_guilds), (t('deletion.menu.delete_inactive_bases') if t else 'Delete Inactive Bases', self._delete_inactive_bases), (t('deletion.menu.delete_duplicate_players') if t else 'Delete Duplicate Players', self._delete_duplicate_players), (t('deletion.menu.delete_inactive_players') if t else 'Delete Inactive Players', self._delete_inactive_players), (t('deletion.menu.delete_unreferenced') if t else 'Delete Unreferenced Data', self._delete_unreferenced), (t('deletion.menu.delete_non_base_map_objs') if t else 'Delete Non-Base Map Objects', self._delete_non_base_map_objs), (t('deletion.menu.delete_all_skins') if t else 'Delete All Skins', self._delete_all_skins), (t('deletion.menu.delete_invalid_items') if t else 'Delete Invalid Items', self._remove_invalid_items), (t('deletion.menu.delete_invalid_structures') if t else 'Delete Invalid Structures', self._remove_invalid_structures), (t('deletion.menu.delete_imported_pals') if t else 'Delete Imported Pals', self._delete_imported_pals), (t('deletion.menu.delete_invalid_pals') if t else 'Delete Invalid Pals', self._remove_invalid_pals), (t('deletion.menu.delete_invalid_passives') if t else 'Delete Invalid Passives', self._remove_invalid_passives)]), (t('deletion.menu.submenu.fix') if t else 'Fix', [(t('deletion.menu.fix_structures') if t else 'Fix All Structures', self._repair_structures), (t('deletion.menu.fix_items') if t else 'Fix All Items', self._repair_items), (t('deletion.menu.fix_all_pals') if t else 'Fix All Pals', self._fix_all_pals), (t('deletion.menu.fix_illegal_pals') if t else 'Fix Illegal Pals', self._fix_illegal_pals), (t('deletion.menu.fix_illegal_players') if t else 'Fix Illegal Players', self._fix_illegal_players), (t('deletion.menu.fix_invalid_active_skills') if t else 'Fix Invalid Active Skills', self._fix_invalid_active_skills), (t('deletion.menu.fix_timestamps') if t else 'Fix All Negative Timestamps', self._fix_all_timestamps), (t('deletion.menu.fix_overfilled_inventories') if t else 'Fix Container Sizes', self._trim_overfilled_inventories), (t('deletion.menu.fix_all_guilds') if t else 'Fix All Guilds', self._rebuild_all_guilds)]), (t('deletion.menu.submenu.reset') if t else 'Reset', [(t('deletion.menu.reset_missions') if t else 'Reset Missions', self._reset_missions), (t('deletion.menu.reset_anti_air') if t else 'Reset Anti-Air Turrets', self._reset_anti_air), (t('deletion.menu.reset_oilrig') if t else 'Reset Oil Rigs', self._reset_oilrig), (t('deletion.menu.reset_invader') if t else 'Reset Invaders', self._reset_invader), (t('deletion.menu.reset_supply') if t else 'Reset Supply', self._reset_supply), (t('deletion.menu.reset_dungeons') if t else 'Reset Dungeons', self._reset_dungeons), (t('deletion.menu.reset_lock_gimmick') if t else 'Reset Mini Game Towers', self._reset_lock_gimmick)]), (t('deletion.menu.submenu.misc') if t else 'Misc', [(t('deletion.menu.unlock_private_chests') if t else 'Unlock Private Chests', self._unlock_private_chests), (t('deletion.menu.max_all_pals') if t else 'Max All Pals', self._max_all_pals), (t('deletion.menu.paldefender') if t else 'PalDefender Commands', self._open_paldefender),         (t('base.export_all') if t else 'Export All Bases', self._export_all_bases), (t('modify_container_slots') if t else 'Modify Container Slots', self._modify_container_slots), (t('deletion.menu.modify_all_player_slots') if t else 'Modify All Player Slots', self._modify_all_player_slots), (t('deletion.menu.modify_all_guild_chest_slots') if t else 'Modify All Guild Chest Slots', self._modify_all_guild_chest_slots), (t('gamedays.menu') if t else 'Edit Game Days', self._edit_game_days)])], 'configs': [(t('loading.mode.submenu') if t else 'Loading Screen Configs', [(t('loading.mode.show') if t else 'Show Loading Screen', partial(self._set_loading_screen_mode, 'overlay')), (t('loading.mode.hide') if t else 'Hide Loading Screen', partial(self._set_loading_screen_mode, 'header'))]), (t('pal_name_settings.title') if t else 'Pal Name Settings', self._open_pal_name_settings)], 'maps': [(t('deletion.menu.show_map') if t else 'Show Map', self._show_map), (t('deletion.menu.generate_map') if t else 'Generate Map', self._generate_map)], 'exclusions': [(t('deletion.menu.save_exclusions') if t else 'Save Exclusions', self._save_exclusions)], 'languages': [(get_native_lang_name(code), partial(self._change_language, code), {'en_US': '🇺🇸', 'zh_CN': '🇨🇳', 'ru_RU': '🇷🇺', 'fr_FR': '🇫🇷', 'es_ES': '🇪🇸', 'de_DE': '🇩🇪', 'ja_JP': '🇯🇵', 'ko_KR': '🇰🇷', 'pt_BR': '🇧🇷', 'pt_PT': '🇵🇹'}[code]) for code in ['en_US', 'zh_CN', 'ru_RU', 'fr_FR', 'es_ES', 'de_DE', 'ja_JP', 'ko_KR', 'pt_BR', 'pt_PT']]}
         self._set_menu_actions(menu_actions)
