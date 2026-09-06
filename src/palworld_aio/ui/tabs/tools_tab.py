@@ -317,12 +317,32 @@ class ToolsTab(QWidget):
         self._refresh_save_btns()
         top_row.addLayout(btn_row)
         lay.addLayout(top_row)
+        # uiux-audit-remediation 2.3 (design D6): truncated monospace path
+        # with full-value tooltip and a click-to-copy affordance; the click
+        # previously opened Explorer, which stays on the copy icon.
+        path_row = QHBoxLayout()
+        path_row.setSpacing(6)
         self._save_path_label = QPushButton(t('tools.no_save_loaded') if t else 'No save loaded')
         self._save_path_label.setObjectName('opsSavePath')
         self._save_path_label.setFlat(True)
         self._save_path_label.setCursor(QCursor(Qt.PointingHandCursor))
         self._save_path_label.clicked.connect(lambda: self._on_save_path_label_clicked())
-        lay.addWidget(self._save_path_label)
+        path_row.addWidget(self._save_path_label, 1)
+        self._copy_path_btn = QPushButton()
+        self._copy_path_btn.setObjectName('opsCopyPathBtn')
+        self._copy_path_btn.setFlat(True)
+        self._copy_path_btn.setCursor(QCursor(Qt.PointingHandCursor))
+        self._copy_path_btn.setIcon(
+            app_icons.get_qicon('copy', role='text_secondary'))
+        self._copy_path_btn.setFixedSize(26, 24)
+        self._copy_path_btn.setToolTip(
+            t('tools.copy_path') if t else 'Copy save path')
+        self._copy_path_btn.setAccessibleName(
+            t('tools.copy_path') if t else 'Copy save path')
+        self._copy_path_btn.clicked.connect(self._on_copy_path_clicked)
+        self._copy_path_btn.setVisible(False)
+        path_row.addWidget(self._copy_path_btn)
+        lay.addLayout(path_row)
         self._drag_hint_label = QLabel(t('tools.drag_hint') if t else 'or drag & drop a Level.sav file here')
         self._drag_hint_label.setObjectName('opsDropHint')
         lay.addWidget(self._drag_hint_label)
@@ -447,6 +467,51 @@ class ToolsTab(QWidget):
         if constants.current_save_path:
             import subprocess
             subprocess.Popen(['explorer', '/select,', os.path.join(constants.current_save_path, 'Level.sav')])
+
+    _COPY_FEEDBACK_MS = 2000
+
+    def _display_save_path(self) -> str:
+        """Middle-elided monospace display for the loaded save directory."""
+        path = constants.current_save_path or ''
+        if not path:
+            return ''
+        width = max(self._save_path_label.width() - 16, 120)
+        fm = self._save_path_label.fontMetrics()
+        return fm.elidedText(path, Qt.TextElideMode.ElideMiddle, width)
+
+    def _apply_save_path_display(self) -> None:
+        if not hasattr(self, '_save_path_label'):
+            return
+        if constants.current_save_path:
+            self._save_path_label.setText(self._display_save_path())
+            self._save_path_label.setToolTip(constants.current_save_path)
+            self._save_path_label.setAccessibleName(constants.current_save_path)
+            if hasattr(self, '_copy_path_btn'):
+                self._copy_path_btn.setVisible(True)
+        else:
+            self._save_path_label.setText(t('tools.no_save_loaded') if t else 'No save loaded')
+            self._save_path_label.setToolTip('')
+            self._save_path_label.setAccessibleName(
+                t('tools.no_save_loaded') if t else 'No save loaded')
+            if hasattr(self, '_copy_path_btn'):
+                self._copy_path_btn.setVisible(False)
+
+    def _on_copy_path_clicked(self):
+        if not constants.current_save_path or not hasattr(self, '_copy_path_btn'):
+            return
+        clipboard = QApplication.clipboard()
+        clipboard.setText(constants.current_save_path)
+        btn = self._copy_path_btn
+        btn.setIcon(app_icons.get_qicon('check', role='success'))
+        btn.setToolTip(t('tools.path_copied') if t else 'Copied')
+        QTimer.singleShot(self._COPY_FEEDBACK_MS, lambda: self._reset_copy_feedback())
+
+    def _reset_copy_feedback(self):
+        if hasattr(self, '_copy_path_btn'):
+            self._copy_path_btn.setIcon(
+                app_icons.get_qicon('copy', role='text_secondary'))
+            self._copy_path_btn.setToolTip(
+                t('tools.copy_path') if t else 'Copy save path')
     def _setup_save_manager_connection(self):
         from palworld_aio.managers.save_manager import save_manager
         import warnings
@@ -466,7 +531,7 @@ class ToolsTab(QWidget):
     def _on_save_load_finished(self, success):
         if success:
             if hasattr(self, '_save_path_label') and hasattr(constants, 'current_save_path') and constants.current_save_path:
-                self._save_path_label.setText(constants.current_save_path)
+                self._apply_save_path_display()
                 self._set_save_status('loaded')
             self.refresh()
 
@@ -527,7 +592,7 @@ class ToolsTab(QWidget):
         save_manager._reset_state()
         constants.invalidate_container_lookup()
         self._set_save_status('no_save')
-        self._save_path_label.setText(t('tools.no_save_loaded') if t else 'No save loaded')
+        self._apply_save_path_display()
         for key in self._stat_cards:
             self._stat_cards[key].setText('—')
     def _run_converting_tool(self, index):
@@ -627,9 +692,10 @@ class ToolsTab(QWidget):
             self._load_btn.setText(t('menu.file.load_save') if t else 'Load Save')
         if hasattr(self, '_save_path_label') and self._save_path_label:
             if not (hasattr(constants, 'current_save_path') and constants.current_save_path):
-                self._save_path_label.setText(t('tools.no_save_loaded') if t else 'No save loaded')
+                self._apply_save_path_display()
                 self._set_save_status('no_save')
             else:
+                self._apply_save_path_display()
                 self._set_save_status('loaded')
         if hasattr(self, '_drag_hint_label') and self._drag_hint_label:
             self._drag_hint_label.setText(t('tools.drag_hint') if t else 'or drag & drop a Level.sav file here')

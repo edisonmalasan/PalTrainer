@@ -24,6 +24,12 @@ QLabel[role="success"] { color: #2DD4BF; font-size: 11px; }
 QLabel[role="warning"] { color: #E8B44C; font-size: 11px; }
 QLabel[role="danger"] { color: #F87171; font-size: 11px; }
 QLabel[role="mono"] { font-family: 'Cascadia Mono','Consolas'; }
+/* uiux-audit-remediation 2.4 (design D5): mono token class for technical
+   data on non-label widgets; the bundled Cascadia Mono family resolves the
+   stack, Consolas is the system fallback. */
+QPushButton[class="mono"], QToolButton[class="mono"], QLineEdit[class="mono"] {
+    font-family: 'Cascadia Mono','Consolas';
+}
 
 QStackedWidget {
     background: transparent;
@@ -420,9 +426,26 @@ QPushButton#appBarUtility {
 }
 QPushButton#appBarUtility:hover { background: rgba(245,158,11,0.07); }
 QPushButton#appBarUtility:checked { background: rgba(245,158,11,0.12); }
+/* uiux-audit-remediation 2.2 (design D4): warning affordance tri-state via
+   the `warnState` property — none (hidden), unread (accent highlighted),
+   acknowledged (dimmed but visible while unresolved). */
 QPushButton#appBarWarnBtn {
     background: rgba(232,180,76,0.12);
     border: 1px solid rgba(232,180,76,0.35);
+}
+QPushButton#appBarWarnBtn[warnState="unread"] {
+    background: rgba(232,180,76,0.12);
+    border: 1px solid #E8B44C;
+}
+QPushButton#appBarWarnBtn[warnState="unread"]:hover {
+    background: rgba(232,180,76,0.35);
+}
+QPushButton#appBarWarnBtn[warnState="acknowledged"] {
+    background: transparent;
+    border: 1px solid transparent;
+}
+QPushButton#appBarWarnBtn[warnState="acknowledged"]:hover {
+    background: rgba(245,158,11,0.07);
 }
 QPushButton#windowControlBtn {
     background: transparent;
@@ -1297,6 +1320,14 @@ QPushButton#opsSavePath {
     font-family: 'Cascadia Mono','Consolas';
 }
 QPushButton#opsSavePath:hover { color: #F59E0B; }
+/* uiux-audit-remediation 2.3: click-to-copy affordance beside the path */
+QPushButton#opsCopyPathBtn {
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    padding: 2px;
+}
+QPushButton#opsCopyPathBtn:hover { background: rgba(245,158,11,0.07); }
 QLabel#opsDropHint { color: #5C564E; font-size: 10px; }
 QLabel#toolsFooterHint { color: #5C564E; font-size: 10px; }
 QWidget#metricRow { background: transparent; }

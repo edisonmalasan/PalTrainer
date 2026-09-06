@@ -163,7 +163,17 @@ class StatusBarStream(QObject):
         if self.detached and self.detach_window:
             self.detach_window.append_message(text)
         else:
-            self.status_bar.showMessage(text)
+            presented = _present_status(text)
+            if presented is _STATUS_SHOW_RAW:
+                self.status_bar.showMessage(text)
+            elif presented is _STATUS_DEMOTE:
+                # demoted to the log/console; keep the last human message,
+                # or leave the neutral ready message instead of stale text
+                if not self.status_bar.currentMessage():
+                    self.status_bar.showMessage(t('status.ready') if t else 'Ready')
+            else:
+                key, fallback = presented  # type: ignore[misc]
+                self.status_bar.showMessage(t(key) if t else fallback)
     def write(self, text):
         with self._stream_lock:
             self.stringio.write(text)
@@ -241,7 +251,39 @@ class UpdateChecker(QThread):
             self.update_checked.emit(not available, latest, self.branch)
         except Exception as e:
             print(f'Update check error: {e}')
-            self.update_checked.emit(True, None, None)
+            self.update_checked.emit(False, None, None)
+# Status strip presentation policy (uiux-audit-remediation 2.1 / design D3):
+# the strip shows one short human-readable message; raw technical payloads
+# are demoted to the log/console stream (StatusBarStream still routes every
+# payload verbatim when detached). Patterns match the producers:
+# - decompression stats: palsav compressor logger lines
+# - update-check failures: UpdateChecker.print in run(); they surface through
+#   the app-bar warning affordance (2.2) instead of strip text
+# - exception text / HTTP status codes: traceback blocks and HTTPError reprs
+_STATUS_SHOW_RAW = object()
+_STATUS_DEMOTE = object()
+_STATUS_SUMMARIZERS = (
+    (re.compile(r'Decompression successful', re.IGNORECASE), ('status.ready', 'Ready')),
+    (re.compile(r'^(?:Save )?load(?:ed| complete| successful)\b|Level\.sav loaded', re.IGNORECASE), ('status.loaded', 'Save loaded successfully')),
+    (re.compile(r'^Save (?:completed|saved)', re.IGNORECASE), ('status.saved', 'Save completed')),
+    (re.compile(r'load (?:failed|error)|failed to load', re.IGNORECASE), ('status.load_failed', 'Failed to load save')),
+    (re.compile(r'^Update check (?:error|callback error):'), _STATUS_DEMOTE),
+    (re.compile(r'^Traceback \(most recent call last\):'), _STATUS_DEMOTE),
+    (re.compile(r'^File "'), _STATUS_DEMOTE),
+    (re.compile(r'HTTP Error \d{3}'), _STATUS_DEMOTE),
+)
+def _present_status(text):
+    """Map a streamed payload to its strip presentation (design D3).
+
+    Returns _STATUS_DEMOTE (log/console only), (key, fallback) for a human
+    summary, or _STATUS_SHOW_RAW to display the payload unchanged."""
+    stripped = (text or '').strip()
+    if not stripped:
+        return _STATUS_SHOW_RAW
+    for pattern, presentation in _STATUS_SUMMARIZERS:
+        if pattern.search(stripped):
+            return presentation
+    return _STATUS_SHOW_RAW
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -337,7 +379,6 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.app_bar)
         self.app_bar.connect_warn()
         self.app_bar.set_warning_slot(self._show_warnings)
-        self.app_bar.show_warning(True)
         self.nav_strip = NavStrip()
         self.nav_strip.nav_changed.connect(self._on_nav_changed)
         main_layout.addWidget(self.nav_strip)
@@ -819,6 +860,15 @@ class MainWindow(QMainWindow):
                 self.status_bar.showMessage(f"{(t('update.current') if t else 'Current')}: {tools_version}{branch_text} | {(t('update.latest') if t else 'Latest')}: {latest} - Click version chip to update", 0)
             else:
                 self.app_bar.set_update_pulse(False)
+            # uiux-audit-remediation 2.2: a failed update check raises the
+            # warning affordance (tri-state) instead of pinning raw error
+            # text in the strip; any successful check — up-to-date (ok) or
+            # update-available (latest set) — resolves it.
+            if ok or latest is not None:
+                self.app_bar.resolve_warning()
+            else:
+                self.app_bar.raise_warning(
+                    t('status.update_check_failed') if t else 'Update check failed — click the warning for details')
         except Exception as e:
             print(f'Update check callback error: {e}')
     def _lock_ui(self):
@@ -845,6 +895,10 @@ class MainWindow(QMainWindow):
             constants.dirty = False
             self._set_dirty(False)
             self.app_bar.context.clear_selection()
+            # uiux-audit-remediation 2.5: the context indicator only exists
+            # while a save is loaded (placeholder rows cover the
+            # loaded-but-unselected state).
+            self.app_bar.context.setVisible(True)
             self._refresh_stats_all_before()
             self.status_bar.showMessage(t('status.loaded') if t else 'Save loaded successfully', 5000)
         else:
@@ -1043,8 +1097,16 @@ class MainWindow(QMainWindow):
             delattr(self, 'drag_position')
         super().mouseReleaseEvent(event)
     def _show_warnings(self):
+        # uiux-audit-remediation 2.2 (design D4): click-to-reveal includes
+        # the condition that raised the affordance (e.g. a failed update
+        # check) ahead of the standing save-safety notices.
+        lines = []
+        warn_detail = self.app_bar.warn_detail()
+        if warn_detail:
+            lines.append(warn_detail)
         warnings = [(t('notice.backup') if t else 'WARNING: ALWAYS BACKUP YOUR SAVES BEFORE USING THESE TOOLS!', {}), (t('notice.patch', game_version=get_versions()[1]) if t else 'MAKE SURE TO UPDATE YOUR SAVES AFTER EVERY GAME PATCH!', {}), (t('notice.errors') if t else 'IF YOU DO NOT UPDATE YOUR SAVES AFTER A PATCH,YOU MAY ENCOUNTER ERRORS!', {})]
-        combined = '\n\n'.join((w for w, _ in warnings if w))
+        lines.extend((w for w, _ in warnings if w))
+        combined = '\n\n'.join(lines)
         if not combined:
             combined = t('notice.none') if t else 'No warnings.'
         msg_box = self._create_message_box(QMessageBox.Warning)

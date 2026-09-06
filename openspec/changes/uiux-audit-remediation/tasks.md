@@ -11,12 +11,12 @@
 
 ## 2. Shell chrome: status strip, warning states, path, monospace, context
 
-- [ ] 2.1 Add presentation-layer status message policy per design D3: human-readable strip messages; raw errors/stats demoted to log/console; update-check failure feeds the warning affordance instead of strip text.
-- [ ] 2.2 Implement warning button tri-state (none/unread/acknowledged) with click-to-reveal per design D4.
-- [ ] 2.3 Save path: truncate + monospace + tooltip + copy affordance per design D6 (Tools masthead).
-- [ ] 2.4 Add monospace token class per design D5; apply to technical values in shell surfaces.
-- [ ] 2.5 Hide the app-bar context indicator when no save is loaded (restore on load).
-- [ ] 2.6 Verify: focused pytest run, compileall; manual smoke: no raw HTTP/byte strings visible in strip.
+- [x] 2.1 Add presentation-layer status message policy per design D3: human-readable strip messages; raw errors/stats demoted to log/console; update-check failure feeds the warning affordance instead of strip text.
+- [x] 2.2 Implement warning button tri-state (none/unread/acknowledged) with click-to-reveal per design D4.
+- [x] 2.3 Save path: truncate + monospace + tooltip + copy affordance per design D6 (Tools masthead).
+- [x] 2.4 Add monospace token class per design D5; apply to technical values in shell surfaces.
+- [x] 2.5 Hide the app-bar context indicator when no save is loaded (restore on load).
+- [x] 2.6 Verify: focused pytest run, compileall; manual smoke: no raw HTTP/byte strings visible in strip.
 
 ## 3. Tools page
 

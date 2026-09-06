@@ -121,9 +121,9 @@ def test_status_bar_stream_routes_to_status_strip(app):
     StatusBarStream = main_window_mod.StatusBarStream
     bar = QStatusBar()
     stream = StatusBarStream(bar)
-    stream.write('save loaded ok')
+    stream.write('waiting for input')
     stream._drain_pending()
-    assert bar.currentMessage() == 'save loaded ok'
+    assert bar.currentMessage() == 'waiting for input'
 
 
 def test_status_bar_stream_detaches_and_reattaches(app):

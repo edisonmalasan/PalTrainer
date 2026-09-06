@@ -338,6 +338,9 @@ class AppBar(QFrame):
         self.context = ContextIndicator()
         self.context.clicked.connect(self.context_clicked.emit)
         lay.addWidget(self.context)
+        # uiux-audit-remediation 2.5: no placeholder tray before a save loads;
+        # the placeholder rows only render for a loaded-but-unselected save.
+        self.context.setVisible(False)
 
         lay.addStretch(1)
 
@@ -360,6 +363,12 @@ class AppBar(QFrame):
         lay.addWidget(self.window_controls)
 
         self._warn_slot = None
+        # uiux-audit-remediation 2.2 (design D4): warning tri-state —
+        # 'none' (hidden), 'unread' (accent highlighted), 'acknowledged'
+        # (dimmed but visible while the condition is unresolved).
+        self._warn_state = 'none'
+        self._warn_resolved = False
+        self._warn_detail = ''
 
     # ------------------------------------------------------------ wiring
     def set_warning_slot(self, slot) -> None:
@@ -376,10 +385,48 @@ class AppBar(QFrame):
         self.brand.set_pulse(bool(on))
         self.save_chip.pulse_update(bool(on))
 
+    def raise_warning(self, detail: str = '') -> None:
+        """Report a warning condition (e.g. a failed update check). Shows
+        the button in its unread state with the detail retained for
+        click-to-reveal."""
+        self._warn_detail = detail or ''
+        self._warn_resolved = False
+        self._set_warn_state('unread')
+
+    def resolve_warning(self) -> None:
+        """Clear the condition (e.g. a later successful update check)."""
+        self._warn_resolved = True
+        self._warn_detail = ''
+        self._set_warn_state('none')
+
+    def _set_warn_state(self, state: str) -> None:
+        self._warn_state = state
+        self.warn_btn.setProperty('warnState', state)
+        self.warn_btn.setVisible(state != 'none')
+        self.warn_btn.style().unpolish(self.warn_btn)
+        self.warn_btn.style().polish(self.warn_btn)
+
+    def warn_state(self) -> str:
+        return self._warn_state
+
+    def warn_detail(self) -> str:
+        """Human-readable condition summary retained for click-to-reveal."""
+        return self._warn_detail
+
     def show_warning(self, show: bool = True) -> None:
-        self.warn_btn.setVisible(show)
+        """Legacy visibility shim. A false value only clears the current
+        condition; a true value keeps an existing condition visible rather
+        than forcing the always-lit behavior retired by design D4."""
+        if show:
+            if self._warn_state == 'none' and not self._warn_resolved:
+                self._warn_resolved = False
+            self.warn_btn.setVisible(self._warn_state != 'none')
+        else:
+            self.resolve_warning()
 
     def _noop_warn(self) -> None:
+        if self._warn_state == 'unread':
+            self._set_warn_state('acknowledged')
         if self._warn_slot is not None:
             self._warn_slot()
 
@@ -407,7 +454,10 @@ class AppBar(QFrame):
         self.save_chip.setToolTip(_txt('menu.file.save_changes', 'Save Changes'))
         self.console_btn.setToolTip(_txt('console.detach', 'Console'))
         self.guide_btn.setToolTip(_txt('tab_guide.tooltip', 'Tab Usage Guide'))
-        self.warn_btn.setToolTip(_txt('warning.title', 'Warnings'))
+        if self._warn_state == 'acknowledged' and self._warn_detail:
+            self.warn_btn.setToolTip(self._warn_detail)
+        else:
+            self.warn_btn.setToolTip(_txt('warning.title', 'Warnings'))
         self.about_btn.setToolTip(_txt('about.title', 'About PalTrainer'))
 
 

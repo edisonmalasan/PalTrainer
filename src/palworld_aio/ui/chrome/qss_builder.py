@@ -54,6 +54,12 @@ QLabel[role="success"] {{ color: {p['success']}; font-size: {TYPE['secondary'][0
 QLabel[role="warning"] {{ color: {p['warning']}; font-size: {TYPE['secondary'][0]}px; }}
 QLabel[role="danger"] {{ color: {p['danger']}; font-size: {TYPE['secondary'][0]}px; }}
 QLabel[role="mono"] {{ font-family: {fonts.font_family_qss(fonts.FONT_MONO_STACK)}; }}
+/* uiux-audit-remediation 2.4 (design D5): mono token class for technical
+   data on non-label widgets; the bundled Cascadia Mono family resolves the
+   stack, Consolas is the system fallback. */
+QPushButton[class="mono"], QToolButton[class="mono"], QLineEdit[class="mono"] {{
+    font-family: {fonts.font_family_qss(fonts.FONT_MONO_STACK)};
+}}
 
 QStackedWidget {{
     background: transparent;
@@ -450,9 +456,26 @@ QPushButton#appBarUtility {{
 }}
 QPushButton#appBarUtility:hover {{ background: {p['surface_hover']}; }}
 QPushButton#appBarUtility:checked {{ background: {p['surface_active']}; }}
+/* uiux-audit-remediation 2.2 (design D4): warning affordance tri-state via
+   the `warnState` property — none (hidden), unread (accent highlighted),
+   acknowledged (dimmed but visible while unresolved). */
 QPushButton#appBarWarnBtn {{
     background: {p['warning_bg']};
     border: 1px solid {p['warning_border']};
+}}
+QPushButton#appBarWarnBtn[warnState="unread"] {{
+    background: {p['warning_bg']};
+    border: 1px solid {p['warning']};
+}}
+QPushButton#appBarWarnBtn[warnState="unread"]:hover {{
+    background: {p['warning_border']};
+}}
+QPushButton#appBarWarnBtn[warnState="acknowledged"] {{
+    background: transparent;
+    border: 1px solid transparent;
+}}
+QPushButton#appBarWarnBtn[warnState="acknowledged"]:hover {{
+    background: {p['surface_hover']};
 }}
 QPushButton#windowControlBtn {{
     background: transparent;
@@ -1327,6 +1350,14 @@ QPushButton#opsSavePath {{
     font-family: {font_family_qss(FONT_MONO_STACK)};
 }}
 QPushButton#opsSavePath:hover {{ color: {p['accent']}; }}
+/* uiux-audit-remediation 2.3: click-to-copy affordance beside the path */
+QPushButton#opsCopyPathBtn {{
+    background: transparent;
+    border: none;
+    border-radius: {RADIUS['sm']}px;
+    padding: 2px;
+}}
+QPushButton#opsCopyPathBtn:hover {{ background: {p['surface_hover']}; }}
 QLabel#opsDropHint {{ color: {p['text_disabled']}; font-size: {TYPE['micro'][0]}px; }}
 QLabel#toolsFooterHint {{ color: {p['text_disabled']}; font-size: {TYPE['micro'][0]}px; }}
 QWidget#metricRow {{ background: transparent; }}
