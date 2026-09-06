@@ -484,6 +484,20 @@ def set_content_margins(target, top: int = 0, bottom: int = 0,
     target.setContentsMargins(left, top, left, bottom)
 
 
+def set_picker_selected(button: QPushButton, selected: bool) -> None:
+    """modernize-tab-ui 3.5: shared picker selected-state helper.
+
+    Toggles the ``pickerSelected`` dynamic property consumed by the
+    qss_builder ``QPushButton#ghostBtn[pickerSelected="true"]`` rule
+    (accent border). Used by the Player and Base Inventory picker buttons.
+    """
+    if button.property('pickerSelected') == ('true' if selected else None):
+        return
+    button.setProperty('pickerSelected', 'true' if selected else None)
+    button.style().unpolish(button)
+    button.style().polish(button)
+
+
 class PageFooter(QFrame):
     """Shared page footer (top-nav-shell 4.1): status text left, actions right.
 

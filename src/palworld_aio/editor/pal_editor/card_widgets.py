@@ -1,7 +1,9 @@
-﻿from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QPushButton, QVBoxLayout, QWidget, QApplication
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QPushButton, QVBoxLayout, QWidget, QApplication
 from PyQt6.QtCore import Qt, pyqtSignal
 from i18n import t
 from palworld_aio.ui.chrome.styles import slot_full, slot_selected
+from palworld_aio.ui.chrome import tokens as _chrome_tokens
+_P = _chrome_tokens.resolve()
 from palworld_aio.utils import extract_value, resolve_name, safe_nested_get
 
 from .data import get_pal_base_data
@@ -196,7 +198,7 @@ class PalIcon(QFrame):
 
         if is_lucky:
 
-            badge = QLabel('â˜†', self)
+            badge = QLabel('☆', self)
 
             badge.setStyleSheet('color: #A78BFA; font-size: 14px; font-weight: bold; background: rgba(0,0,0,0.6); border-radius: 8px; border: 1px solid rgba(167,139,250,0.4);')
 
@@ -212,7 +214,7 @@ class PalIcon(QFrame):
 
         elif is_boss:
 
-            badge = QLabel('Î±', self)
+            badge = QLabel('α', self)
 
             badge.setStyleSheet('color: #F59E0B; font-size: 12px; font-weight: bold; background: rgba(0,0,0,0.6); border-radius: 8px; border: 1px solid rgba(245,158,11,0.4);')
 
@@ -229,16 +231,16 @@ class PalIcon(QFrame):
         is_predator = cid.upper().startswith('PREDATOR_')
         if is_predator:
             pred_badge = QLabel(self)
-            pred_badge.setStyleSheet('color: #EF4444; font-size: 11px; font-weight: bold; background: transparent; border: none;')
+            pred_badge.setStyleSheet('color: #F87171; font-size: 11px; font-weight: bold; background: transparent; border: none;')
             pred_badge.setFixedSize(18, 18)
             pred_badge.setAlignment(Qt.AlignCenter)
             pred_badge.move(2, 2)
             pred_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
             try:
                 import nerdfont as _nf
-                pred_badge.setText(_nf.icons.get('nf-fa-paw', 'ðŸ¾'))
+                pred_badge.setText('P')
             except Exception:
-                pred_badge.setText('ðŸ¾')
+                pred_badge.setText('P')
             pred_badge.show()
 
         pal_name = _strip_prefix_label(resolve_name(cid, PalFrame._NAMEMAP) or cid)
@@ -281,7 +283,7 @@ class PalIcon(QFrame):
 
         self.setToolTip(tip)
 
-        self.setStyleSheet('QFrame#palIconNew { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; } QFrame#palIconNew:hover { background: rgba(125,211,252,0.08); border: 1px solid rgba(125,211,252,0.25); }')
+        self.setStyleSheet(f'QFrame#palIconNew {{ background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; }} QFrame#palIconNew:hover {{ background: {_P["info_bg"]}; border: 1px solid {_P["info_border"]}; }}')
 
         self.bg.lower()
 
@@ -512,10 +514,10 @@ class TribeIcon(QFrame):
 
         self.setToolTip(f'<b>{self._name}</b><br>ID: {self.tribe}')
         self.setStyleSheet(
-            'QFrame#tribeIcon { background: rgba(255,255,255,0.04); '
-            'border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; }'
-            'QFrame#tribeIcon:hover { background: rgba(125,211,252,0.08); '
-            'border: 1px solid rgba(125,211,252,0.25); }'
+            f'QFrame#tribeIcon {{ background: rgba(255,255,255,0.04); '
+            f'border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; }}'
+            f'QFrame#tribeIcon:hover {{ background: {_P["info_bg"]}; '
+            f'border: 1px solid {_P["info_border"]}; }}'
         )
         self.bg.lower()
 
@@ -527,15 +529,15 @@ class TribeIcon(QFrame):
     def set_selected(self, selected):
         if selected:
             self.setStyleSheet(
-                'QFrame#tribeIcon { background: rgba(125,211,252,0.15); '
-                'border: 1px solid #7DD3FC; border-radius: 6px; }'
+                f'QFrame#tribeIcon {{ background: {_P["info_bg"]}; '
+                f'border: 1px solid {_P["info"]}; border-radius: 6px; }}'
             )
         else:
             self.setStyleSheet(
-                'QFrame#tribeIcon { background: rgba(255,255,255,0.04); '
-                'border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; }'
-                'QFrame#tribeIcon:hover { background: rgba(125,211,252,0.08); '
-                'border: 1px solid rgba(125,211,252,0.25); }'
+                f'QFrame#tribeIcon {{ background: rgba(255,255,255,0.04); '
+                f'border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; }}'
+                f'QFrame#tribeIcon:hover {{ background: {_P["info_bg"]}; '
+                f'border: 1px solid {_P["info_border"]}; }}'
             )
 
 
@@ -656,13 +658,13 @@ class PalCardWidget(QFrame):
 
         name_lbl = QLabel(pal_name)
 
-        name_lbl.setStyleSheet('color: #E2E8F0; font-size: 13px; font-weight: 600; background: transparent;')
+        name_lbl.setStyleSheet('color: #ECE7E0; font-size: 13px; font-weight: 600; background: transparent;')
 
         name_row.addWidget(name_lbl)
 
         lvl_lbl = QLabel(f'Lv.{level}')
 
-        lvl_lbl.setStyleSheet('color: #7DD3FC; font-size: 11px; font-weight: 700; background: transparent;')
+        lvl_lbl.setStyleSheet('color: #93B7DD; font-size: 11px; font-weight: 700; background: transparent;')
 
         name_row.addWidget(lvl_lbl)
 
@@ -712,7 +714,7 @@ class PalCardWidget(QFrame):
 
         hp_fill.move(1, 1)
 
-        hp_fill.setStyleSheet(f'background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #10B981,stop:1 #34D399); border-radius: 3px;')
+        hp_fill.setStyleSheet(f'background: rgba(45,212,191,1); border-radius: 3px;')
 
         info.addWidget(hp_bar)
 
@@ -734,13 +736,13 @@ class PalCardWidget(QFrame):
 
         exp_fill.move(1, 1)
 
-        exp_fill.setStyleSheet('background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #6366F1,stop:1 #818CF8); border-radius: 2px;')
+        exp_fill.setStyleSheet('background: rgba(192,132,252,1); border-radius: 2px;')
 
         info.addWidget(exp_bar)
 
         layout.addLayout(info)
 
-        lock_btn = QPushButton('ðŸ”“')
+        lock_btn = QPushButton('L')
 
         lock_btn.setFixedSize(24, 24)
 

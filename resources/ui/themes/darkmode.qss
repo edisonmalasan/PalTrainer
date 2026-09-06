@@ -1094,6 +1094,80 @@ QPushButton#ghostBtn:hover, QPushButton#toolButton:hover {
 }
 QPushButton#ghostBtn:pressed, QPushButton#toolButton:pressed { background: rgba(245,158,11,0.12); }
 QPushButton#ghostBtn:disabled, QPushButton#toolButton:disabled { color: #5C564E; }
+/* modernize-tab-ui 2.5: selected state for picker buttons (accent border) */
+QPushButton#ghostBtn[pickerSelected="true"] {
+    border-color: rgba(245,158,11,0.5);
+    color: #F59E0B;
+}
+/* modernize-tab-ui 3.3: warning-tier bulk actions (Unlock All Fast Travel) */
+QPushButton#warnActionBtn {
+    background: transparent;
+    border: 1px solid rgba(232,180,76,0.35);
+    border-radius: 3px;
+    color: #E8B44C;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+QPushButton#warnActionBtn:hover {
+    background: rgba(232,180,76,0.12);
+    border-color: #E8B44C;
+    color: #ECE7E0;
+}
+QPushButton#warnActionBtn:pressed { background: rgba(245,158,11,0.12); }
+QPushButton#warnActionBtn:disabled { color: #5C564E; border-color: rgba(236,231,224,0.1); }
+QFrame#invToolbarSep {
+    background: rgba(236,231,224,0.1);
+    max-width: 1px;
+    border: none;
+    margin: 2px 4px;
+}
+/* modernize-tab-ui 3.1: Technology panel accents via special token */
+QLabel#techAtpLabel { color: #C084FC; }
+QFrame#techDivider { background: rgba(192,132,252,0.3); max-width: 1px; border: none; }
+QWidget#techAncientPlaceholder {
+    background: rgba(192,132,252,0.12);
+    border: 1px dashed rgba(192,132,252,0.3);
+    border-radius: 3px;
+}
+/* modernize-tab-ui 4.2: Pal Editor stat bar tiers (flat token fills). */
+QProgressBar#palStatBar {
+    background: #262220;
+    border: none;
+    border-radius: 2px;
+    text-align: center;
+    color: #ECE7E0;
+    font-size: 10px;
+    font-weight: 700;
+}
+QProgressBar#palStatBar[barTier="success"]::chunk { background: #2DD4BF; border-radius: 2px; }
+QProgressBar#palStatBar[barTier="warning"]::chunk { background: #E8B44C; border-radius: 2px; }
+QProgressBar#palStatBar[barTier="info"]::chunk { background: #93B7DD; border-radius: 2px; }
+QProgressBar#palStatBar[barTier="special"]::chunk { background: #C084FC; border-radius: 2px; }
+/* modernize-tab-ui 4.5: party HP pill — dark surface below the bar so the
+   value text never overlaps the fill. */
+QLabel#palHpPill {
+    background: rgba(33,30,27,0.98);
+    color: #ECE7E0;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 9999px;
+    padding: 0px 8px;
+}
+/* modernize-tab-ui 4.6: Pal Editor bulk toolbar — compact tier variants so the
+   eight toolbar actions hold a single row at the 1200px minimum window width. */
+QWidget#palboxPanel QPushButton#ghostBtn {
+    padding: 2px 5px;
+    font-size: 10px;
+}
+QWidget#palboxPanel QPushButton#warnActionBtn {
+    padding: 2px 5px;
+    font-size: 10px;
+}
+QWidget#palboxPanel QPushButton[class="danger"] {
+    padding: 2px 5px;
+    font-size: 10px;
+}
 QTreeWidget#jsonTree {
     background: #141312;
     alternate-background-color: #1B1917;
@@ -1105,6 +1179,29 @@ QWidget#mapLegendCard {
     background: #211E1B;
     border: 1px solid rgba(236,231,224,0.18);
     border-radius: 5px;
+}
+/* modernize-tab-ui 6.1: map overlay toggle buttons (token-styled; the
+   active toggle shows the accent state instead of the retired cyan ring).
+   Wide icon variant via the `wide` dynamic property. */
+QPushButton#mapToggleBtn {
+    color: #ECE7E0;
+    background: rgba(245,158,11,0.07);
+    padding: 6px 10px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    min-width: 36px;
+    min-height: 28px;
+}
+QPushButton#mapToggleBtn:hover {
+    background: rgba(245,158,11,0.12);
+    border-color: rgba(236,231,224,0.18);
+}
+QPushButton#mapToggleBtn:checked {
+    background: rgba(245,158,11,0.18);
+    border: 1px solid #F59E0B;
+}
+QPushButton#mapToggleBtn[wide="true"] {
+    min-width: 40px;
 }
 QLabel#saveStateChip {
     background: #211E1B;
@@ -1119,7 +1216,7 @@ QLabel#saveStateChip[state="dirty"] { color: #E8B44C; border-color: rgba(232,180
 QLabel#saveStateChip[state="saving"] { color: #93B7DD; border-color: rgba(147,183,221,0.3); background: rgba(147,183,221,0.1); }
 QLabel#saveStateChip[state="error"] { color: #F87171; border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.12); }
 
-/* ---- Start page v2 (plan 021): masthead + field report + campaign + missions ---- */
+/* ---- Start page v3 (modernize-tab-ui): masthead save-hub + two tool groups ---- */
 QWidget#startCanvas { background: transparent; }
 QFrame#opsMasthead {
     background: transparent;
@@ -1179,11 +1276,8 @@ QPushButton#opsSavePath {
 }
 QPushButton#opsSavePath:hover { color: #F59E0B; }
 QLabel#opsDropHint { color: #5C564E; font-size: 10px; }
-QFrame#fieldReport {
-    background: #1B1917;
-    border: 1px solid rgba(236,231,224,0.1);
-    border-radius: 5px;
-}
+QLabel#toolsFooterHint { color: #5C564E; font-size: 10px; }
+QWidget#metricRow { background: transparent; }
 QWidget#fieldMetric { background: transparent; border-radius: 3px; }
 QWidget#fieldMetric:hover { background: rgba(245,158,11,0.07); }
 QLabel#fieldMetricValue {
@@ -1193,24 +1287,6 @@ QLabel#fieldMetricValue {
     font-weight: 600;
 }
 QLabel#fieldMetricValue[placeholder="true"] { color: #5C564E; font-weight: 400; }
-QFrame#campaignStrip {
-    background: transparent;
-    border: none;
-    border-top: 1px solid rgba(236,231,224,0.1);
-    border-bottom: 1px solid rgba(236,231,224,0.1);
-}
-QPushButton#campaignStep {
-    background: transparent;
-    border: none;
-    border-radius: 3px;
-    color: #A69F94;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-}
-QPushButton#campaignStep:hover { background: rgba(245,158,11,0.07); color: #F59E0B; }
-QPushButton#campaignStep:pressed { background: rgba(245,158,11,0.12); }
-QPushButton#campaignStep:focus { border: 1px solid rgba(245,158,11,0.3); }
 QWidget#missionColumn { background: transparent; }
 QLabel#missionZone {
     color: #5C564E;
@@ -1221,21 +1297,24 @@ QLabel#missionZone {
     padding: 4px 0;
 }
 QPushButton#missionRow {
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid rgba(236,231,224,0.1);
-    border-radius: 3px;
-    color: #ECE7E0;
-    text-align: left;
-    padding: 10px 12px;
-    font-size: 12px;
+    background: #1B1917;
+    border: 1px solid rgba(236,231,224,0.1);
+    border-radius: 5px;
+    padding: 0px;
 }
 QPushButton#missionRow:hover {
     background: rgba(245,158,11,0.07);
-    color: #F59E0B;
+    border-color: rgba(245,158,11,0.3);
 }
-QPushButton#missionRow:pressed { background: rgba(245,158,11,0.12); color: #D98A06; }
-QPushButton#missionRow:focus { border: 1px solid rgba(245,158,11,0.3); }
+QPushButton#missionRow:pressed { background: rgba(245,158,11,0.12); }
+QPushButton#missionRow:focus { border: 1px solid rgba(245,158,11,0.5); }
+QLabel#missionRowIcon {
+    background: #211E1B;
+    border: 1px solid rgba(236,231,224,0.1);
+    border-radius: 3px;
+}
+QLabel#missionRowTitle { color: #ECE7E0; font-size: 11px; font-weight: 600; }
+QLabel#missionRowDesc { color: #A69F94; font-size: 10px; }
 
 QPushButton#dialogOption {
     background: #211E1B;

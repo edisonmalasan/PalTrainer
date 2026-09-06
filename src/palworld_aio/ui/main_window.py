@@ -34,11 +34,20 @@ from palworld_aio.managers.player_manager import rename_player
 from palworld_aio.map.map_generator import generate_world_map
 from palworld_aio.editor.dialogs import InputDialog, DaysInputDialog, LevelInputDialog, RadiusInputDialog, PalDefenderDialog, GameDaysInputDialog, InactiveFilterDialog
 from palworld_aio.widgets import SearchPanel, StatsPanel, ScrollableContextMenu
+from palworld_aio.widgets.empty_state import EmptyState
 from resource_resolver import resource_path
 from palworld_aio.ui.dialogs.player_item_dialog import PlayerItemActionDialog
 from palworld_aio.ui.dialogs.player_pal_dialog import PlayerPalActionDialog
 from palworld_aio.ui.dialogs.player_technology_dialog import PlayerTechnologyActionDialog
 from palworld_aio.ui.dialogs.guild_assign_dialog import GuildAssignDialog
+def _short_guid(value):
+    """modernize-tab-ui 5.2: first 8 chars + ellipsis for GUID display text."""
+    s = str(value or '')
+    return s[:8] + '…' if len(s) > 12 else s
+def _item_value(item, col):
+    """modernize-tab-ui 5.2: full column value (GUID role) with text fallback."""
+    value = item.data(col, SearchPanel.GUID_ROLE)
+    return value if value not in (None, '') else item.text(col)
 class DetachedStatusWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__()
@@ -489,6 +498,14 @@ class MainWindow(QMainWindow):
         self.guild_members_panel = SearchPanel('deletion.guild_members', ['deletion.col.member', 'deletion.col.last_seen', 'deletion.col.level', 'deletion.col.pals', 'deletion.col.uid', 'deletion.col.role'], [200, 120, 60, 100, 300, 80])
         self.guild_members_panel.item_selected.connect(self._on_guild_member_selected)
         self.guild_members_panel.tree.customContextMenuRequested.connect(self._show_guild_member_context_menu)
+        # modernize-tab-ui 5.3: shared EmptyState for the no-selection condition
+        # (distinct from the no-save hint the plain label keeps showing).
+        self._members_empty_state = EmptyState(
+            t('deletion.guild_members.select_hint') if t else 'Select a guild to view its members',
+            hint=t('deletion.guild_members.select_hint_sub') if t else 'Pick a guild in the list above.',
+            icon_name='guilds',
+        )
+        self.guild_members_panel.set_empty_state_widget(self._members_empty_state)
         splitter.addWidget(self.guild_members_panel)
         layout.addWidget(splitter, stretch=1)
         self.stacked_widget.addWidget(guilds_tab)
@@ -553,6 +570,7 @@ class MainWindow(QMainWindow):
         switch_row.setSpacing(6)
         self._excl_views = {}
         self._excl_btns = {}
+        self._excl_empty_states = {}
         switch_row.addStretch(1)
         layout.addLayout(switch_row)
         self._excl_stack = QStackedWidget()
@@ -575,6 +593,16 @@ class MainWindow(QMainWindow):
             else:
                 self.excl_bases_panel = panel
                 panel.tree.customContextMenuRequested.connect(lambda pos: self._show_exclusion_context_menu(pos, 'bases'))
+            # modernize-tab-ui 7.1: loaded-but-empty shows the shared
+            # EmptyState (no-save keeps the plain load-save hint; the state
+            # is re-evaluated in _refresh_exclusions/_apply_excl_empty_states).
+            empty = EmptyState(
+                t('deletion.exclusions.empty_title') if t else 'No exclusions configured',
+                hint=t(f'deletion.exclusions.empty_hint_{key}') if t else 'Use the right-click menu to exclude entries.',
+                icon_name='exclusions',
+            )
+            panel.set_empty_state_widget(empty)
+            self._excl_empty_states[key] = empty
             page_lay.addWidget(panel)
             self._excl_stack.addWidget(page)
             self._excl_views[key] = self._excl_stack.count() - 1
@@ -588,6 +616,7 @@ class MainWindow(QMainWindow):
         self._switch_exclusion_view('players')
         layout.addWidget(self._excl_stack, stretch=1)
         self.stacked_widget.addWidget(exclusions_tab)
+        self._apply_excl_empty_states()
     def _switch_exclusion_view(self, key):
         self._excl_stack.setCurrentIndex(self._excl_views[key])
         for k, btn in self._excl_btns.items():
@@ -909,24 +938,53 @@ class MainWindow(QMainWindow):
             is_leader = save_manager.is_player_guild_leader(gid, uid)
             display_name = f'[L]{name}' if is_leader else name
             sort_keys = {1: elapsed if elapsed is not None else float('inf'), 2: int(level) if str(level).isdigit() else 0, 3: int(pals) if str(pals).isdigit() else 0, 7: int(glevel) if str(glevel).isdigit() else 0}
-            self.players_panel.add_item([display_name, lastseen, level, pals, uid, gname, gid, glevel], sort_keys=sort_keys)
+            # modernize-tab-ui 5.2: UID column shows the short form with the
+            # full GUID in a tooltip; data/sort keys unchanged.
+            tooltips = {4: str(uid)}
+            self.players_panel.add_item([display_name, lastseen, level, pals, _short_guid(uid), gname, gid, glevel], sort_keys=sort_keys, tooltips=tooltips)
     def _refresh_guilds(self):
         self.guilds_panel.clear()
         self.guild_members_panel.clear()
         guilds = get_guilds()
         for g in guilds:
             sort_keys = {2: int(g['level']) if str(g['level']).isdigit() else 0, 3: int(g['member_count'])}
-            self.guilds_panel.add_item([g['name'], g['id'], g['level'], g['member_count']], sort_keys=sort_keys)
+            # modernize-tab-ui 5.2: Guild ID column short form + full tooltip.
+            tooltips = {1: str(g['id'])}
+            self.guilds_panel.add_item([g['name'], _short_guid(g['id']), g['level'], g['member_count']], sort_keys=sort_keys, tooltips=tooltips)
+        # modernize-tab-ui 5.3: no-save keeps the plain load-save hint; with a
+        # save loaded the members pane shows the shared EmptyState instead.
+        if not constants.loaded_level_json:
+            self.guild_members_panel.set_empty_state_widget(None)
+        else:
+            self.guild_members_panel.set_empty_state_widget(self._members_empty_state)
+            self._members_empty_state.setText(t('deletion.guild_members.select_hint') if t else 'Select a guild to view its members')
+            self._members_empty_state.setHint(t('deletion.guild_members.select_hint_sub') if t else 'Pick a guild in the list above.')
     def _refresh_bases(self):
         self.bases_panel.clear()
         bases = get_bases()
         for b in bases:
             glevel = save_manager.get_guild_level_by_id(b['guild_id'])
             sort_keys = {3: int(glevel) if str(glevel).isdigit() else 0}
-            self.bases_panel.add_item([b['id'], b['guild_id'], b['guild_name'], glevel], sort_keys=sort_keys)
+            # modernize-tab-ui 5.2: Base ID / Guild ID short form + full tooltip.
+            tooltips = {0: str(b['id']), 1: str(b['guild_id'])}
+            self.bases_panel.add_item([_short_guid(b['id']), _short_guid(b['guild_id']), b['guild_name'], glevel], sort_keys=sort_keys, tooltips=tooltips)
     def _refresh_map(self):
         if 'map_tab' in self.__dict__:
             self.map_tab.refresh()
+    def _apply_excl_empty_states(self):
+        """modernize-tab-ui 7.1: no-save keeps the plain load-save hint; with a
+        save loaded the exclusions panes show the shared EmptyState."""
+        loaded = bool(constants.loaded_level_json)
+        for key, empty in getattr(self, '_excl_empty_states', {}).items():
+            panel = getattr(self, f'excl_{key}_panel', None)
+            if panel is None:
+                continue
+            if loaded:
+                panel.set_empty_state_widget(empty)
+                empty.setText(t('deletion.exclusions.empty_title') if t else 'No exclusions configured')
+                empty.setHint(t(f'deletion.exclusions.empty_hint_{key}') if t else 'Use the right-click menu to exclude entries.')
+            else:
+                panel.set_empty_state_widget(None)
     def _refresh_exclusions(self):
         self.excl_players_panel.clear()
         for uid in constants.exclusions.get('players', []):
@@ -937,6 +995,7 @@ class MainWindow(QMainWindow):
         self.excl_bases_panel.clear()
         for bid in constants.exclusions.get('bases', []):
             self.excl_bases_panel.add_item([bid])
+        self._apply_excl_empty_states()
     def _refresh_base_inventory(self):
         if 'base_inventory_tab' in self.__dict__:
             self.base_inventory_tab.refresh()
@@ -1396,38 +1455,41 @@ class MainWindow(QMainWindow):
         item = self.players_panel.tree.itemAt(pos)
         if not item:
             return
+        uid = _item_value(item, 4)
+        gid = _item_value(item, 6)
         menu = ScrollableContextMenu(self)
-        menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('players', item.text(4))))
-        menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('players', item.text(4))))
-        menu.add_action(self._create_action(t('deletion.ctx.delete_player'), lambda: self._delete_player(item.text(4))))
-        menu.add_action(self._create_action(t('player.rename.menu'), lambda: self._rename_player(item.text(4), item.text(0))))
-        menu.add_action(self._create_action(t('player.viewing_cage.menu'), lambda: self._unlock_viewing_cage(item.text(4))))
-        menu.add_action(self._create_action(t('player.reset_timestamp.menu') if t else 'Reset Timestamp', lambda: self._reset_player_timestamp(item.text(4))))
-        menu.add_action(self._create_action(t('player.unlock_technologies.menu') if t else 'Unlock All Technologies', lambda: self._unlock_all_technologies_for_player(item.text(4))))
+        menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('players', uid)))
+        menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('players', uid)))
+        menu.add_action(self._create_action(t('deletion.ctx.delete_player'), lambda: self._delete_player(uid)))
+        menu.add_action(self._create_action(t('player.rename.menu'), lambda: self._rename_player(uid, item.text(0))))
+        menu.add_action(self._create_action(t('player.viewing_cage.menu'), lambda: self._unlock_viewing_cage(uid)))
+        menu.add_action(self._create_action(t('player.reset_timestamp.menu') if t else 'Reset Timestamp', lambda: self._reset_player_timestamp(uid)))
+        menu.add_action(self._create_action(t('player.unlock_technologies.menu') if t else 'Unlock All Technologies', lambda: self._unlock_all_technologies_for_player(uid)))
         menu.addSeparator()
-        menu.add_action(self._create_action('Set Player Level' if not t else t('player.set_level'), lambda: self._set_player_level(item.text(4))))
+        menu.add_action(self._create_action('Set Player Level' if not t else t('player.set_level'), lambda: self._set_player_level(uid)))
         menu.addSeparator()
-        menu.add_action(self._create_action(t('guild.ctx.make_leader'), lambda: self._make_leader(item.text(6), item.text(4))))
-        menu.add_action(self._create_action(t('deletion.ctx.delete_guild'), lambda: self._delete_guild(item.text(6))))
-        menu.add_action(self._create_action(t('guild.rename.menu'), lambda: self._rename_guild_action(item.text(6), item.text(5))))
-        menu.add_action(self._create_action(t('guild.unlock_lab_research.menu') if t else 'Unlock All Lab Research', lambda: self._unlock_all_lab_research_for_guild(item.text(6))))
-        menu.add_action(self._create_action(t('guild.menu.set_level'), lambda: self._set_guild_level(item.text(6))))
-        menu.add_action(self._create_action(t('button.import'), lambda: self._import_base_to_guild(item.text(6))))
+        menu.add_action(self._create_action(t('guild.ctx.make_leader'), lambda: self._make_leader(gid, uid)))
+        menu.add_action(self._create_action(t('deletion.ctx.delete_guild'), lambda: self._delete_guild(gid)))
+        menu.add_action(self._create_action(t('guild.rename.menu'), lambda: self._rename_guild_action(gid, item.text(5))))
+        menu.add_action(self._create_action(t('guild.unlock_lab_research.menu') if t else 'Unlock All Lab Research', lambda: self._unlock_all_lab_research_for_guild(gid)))
+        menu.add_action(self._create_action(t('guild.menu.set_level'), lambda: self._set_guild_level(gid)))
+        menu.add_action(self._create_action(t('button.import'), lambda: self._import_base_to_guild(gid)))
         menu.exec(self.players_panel.tree.viewport().mapToGlobal(pos))
     def _show_guild_context_menu(self, pos):
         item = self.guilds_panel.tree.itemAt(pos)
         if not item:
             return
+        gid = _item_value(item, 1)
         menu = ScrollableContextMenu(self)
-        menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('guilds', item.text(1))))
-        menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('guilds', item.text(1))))
-        menu.add_action(self._create_action(t('deletion.ctx.delete_guild'), lambda: self._delete_guild(item.text(1))))
-        menu.add_action(self._create_action(t('guild.rename.menu'), lambda: self._rename_guild_action(item.text(1), item.text(0))))
-        menu.add_action(self._create_action(t('guild.menu.set_level'), lambda: self._set_guild_level(item.text(1))))
-        menu.add_action(self._create_action(t('guild.unlock_lab_research.menu') if t else 'Unlock All Lab Research', lambda: self._unlock_all_lab_research_for_guild(item.text(1))))
+        menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('guilds', gid)))
+        menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('guilds', gid)))
+        menu.add_action(self._create_action(t('deletion.ctx.delete_guild'), lambda: self._delete_guild(gid)))
+        menu.add_action(self._create_action(t('guild.rename.menu'), lambda: self._rename_guild_action(gid, item.text(0))))
+        menu.add_action(self._create_action(t('guild.menu.set_level'), lambda: self._set_guild_level(gid)))
+        menu.add_action(self._create_action(t('guild.unlock_lab_research.menu') if t else 'Unlock All Lab Research', lambda: self._unlock_all_lab_research_for_guild(gid)))
         menu.add_sep()
-        menu.add_action(self._create_action(t('base.export_guild'), lambda: self._export_bases_for_guild(item.text(1))))
-        menu.add_action(self._create_action(t('base.import_multi'), lambda: self._import_base_to_guild(item.text(1))))
+        menu.add_action(self._create_action(t('base.export_guild'), lambda: self._export_bases_for_guild(gid)))
+        menu.add_action(self._create_action(t('base.import_multi'), lambda: self._import_base_to_guild(gid)))
         menu.exec(self.guilds_panel.tree.viewport().mapToGlobal(pos))
     def _show_guild_member_context_menu(self, pos):
         item = self.guild_members_panel.tree.itemAt(pos)
@@ -1436,9 +1498,10 @@ class MainWindow(QMainWindow):
         guild_data = self.guilds_panel.get_selected_data()
         if not guild_data:
             return
+        member_uid = _item_value(item, 4)
         role = None
         for pdata in (get_guild_members(guild_data[1]) or []):
-            if str(pdata.get('uid', '')).replace('-', '').lower() == str(item.text(4)).replace('-', '').lower():
+            if str(pdata.get('uid', '')).replace('-', '').lower() == str(member_uid).replace('-', '').lower():
                 role = pdata.get('role', 3)
                 break
         menu = ScrollableContextMenu(self)
@@ -1449,35 +1512,37 @@ class MainWindow(QMainWindow):
             chk = '✓ ' if rv == role else '  '
             menu.add_item(f'role_{rv}', f'{chk}{label}')
         menu.add_sep()
-        menu.add_action(self._create_action(t('guild.ctx.make_leader'), lambda: self._make_leader(guild_data[1], item.text(4))))
+        menu.add_action(self._create_action(t('guild.ctx.make_leader'), lambda: self._make_leader(guild_data[1], member_uid)))
         menu.add_action(self._create_action(t('guild.unlock_lab_research.menu') if t else 'Unlock All Lab Research', lambda: self._unlock_all_lab_research_for_guild(guild_data[1])))
         menu.add_sep()
-        menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('players', item.text(4))))
-        menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('players', item.text(4))))
-        menu.add_action(self._create_action(t('deletion.ctx.delete_player'), lambda: self._delete_player(item.text(4))))
-        menu.add_action(self._create_action(t('player.rename.menu'), lambda: self._rename_player(item.text(4), item.text(0).replace('[L]', ''))))
-        menu.add_action(self._create_action(t('player.reset_timestamp.menu') if t else 'Reset Timestamp', lambda: self._reset_player_timestamp(item.text(4))))
+        menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('players', member_uid)))
+        menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('players', member_uid)))
+        menu.add_action(self._create_action(t('deletion.ctx.delete_player'), lambda: self._delete_player(member_uid)))
+        menu.add_action(self._create_action(t('player.rename.menu'), lambda: self._rename_player(member_uid, item.text(0).replace('[L]', ''))))
+        menu.add_action(self._create_action(t('player.reset_timestamp.menu') if t else 'Reset Timestamp', lambda: self._reset_player_timestamp(member_uid)))
         menu.add_sep()
-        menu.add_action(self._create_action('Set Player Level' if not t else t('player.set_level'), lambda: self._set_player_level(item.text(4))))
+        menu.add_action(self._create_action('Set Player Level' if not t else t('player.set_level'), lambda: self._set_player_level(member_uid)))
         result = menu.exec(self.guild_members_panel.tree.viewport().mapToGlobal(pos))
         if result and result.startswith('role_'):
             role_val = int(result.split('_')[1])
-            self._set_guild_member_role(guild_data[1], item.text(4), role_val)
+            self._set_guild_member_role(guild_data[1], member_uid, role_val)
     def _show_base_context_menu(self, pos):
         item = self.bases_panel.tree.itemAt(pos)
         if not item:
             return
+        bid = _item_value(item, 0)
+        bgid = _item_value(item, 1)
         menu = ScrollableContextMenu(self)
-        menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('bases', item.text(0))))
-        menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('bases', item.text(0))))
-        menu.add_action(self._create_action(t('deletion.ctx.delete_base'), lambda: self._delete_base(item.text(0), item.text(1))))
-        menu.add_action(self._create_action(t('guild.rename.menu'), lambda: self._rename_guild_action(item.text(1), item.text(2))))
-        menu.add_action(self._create_action(t('guild.menu.set_level'), lambda: self._set_guild_level(item.text(1))))
-        menu.add_action(self._create_action(t('export.base'), lambda: self._export_base(item.text(0))))
-        menu.add_action(self._create_action(t('base.radius.menu') if t else 'Adjust Radius', lambda: self._adjust_base_radius(item.text(0))))
-        menu.add_action(self._create_action(t('import.base'), lambda: self._import_base(item.text(1))))
-        menu.add_action(self._create_action(t('clone.base'), lambda: self._clone_base(item.text(0), item.text(1))))
-        menu.add_action(self._create_action(t('base.palbox_nudge') if t else 'Nudge Palbox', lambda: self._nudge_palbox(item.text(0))))
+        menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('bases', bid)))
+        menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('bases', bid)))
+        menu.add_action(self._create_action(t('deletion.ctx.delete_base'), lambda: self._delete_base(bid, bgid)))
+        menu.add_action(self._create_action(t('guild.rename.menu'), lambda: self._rename_guild_action(bgid, item.text(2))))
+        menu.add_action(self._create_action(t('guild.menu.set_level'), lambda: self._set_guild_level(bgid)))
+        menu.add_action(self._create_action(t('export.base'), lambda: self._export_base(bid)))
+        menu.add_action(self._create_action(t('base.radius.menu') if t else 'Adjust Radius', lambda: self._adjust_base_radius(bid)))
+        menu.add_action(self._create_action(t('import.base'), lambda: self._import_base(bgid)))
+        menu.add_action(self._create_action(t('clone.base'), lambda: self._clone_base(bid, bgid)))
+        menu.add_action(self._create_action(t('base.palbox_nudge') if t else 'Nudge Palbox', lambda: self._nudge_palbox(bid)))
         menu.exec(self.bases_panel.tree.viewport().mapToGlobal(pos))
     def _show_exclusion_context_menu(self, pos, excl_type):
         panel = getattr(self, f'excl_{excl_type}_panel')
@@ -2199,6 +2264,9 @@ class MainWindow(QMainWindow):
             self.guilds_panel.refresh_labels()
         if hasattr(self, 'guild_members_panel'):
             self.guild_members_panel.refresh_labels()
+        if hasattr(self, '_members_empty_state'):
+            self._members_empty_state.setText(t('deletion.guild_members.select_hint') if t else 'Select a guild to view its members')
+            self._members_empty_state.setHint(t('deletion.guild_members.select_hint_sub') if t else 'Pick a guild in the list above.')
         if hasattr(self, 'bases_panel'):
             self.bases_panel.refresh_labels()
         if hasattr(self, 'excl_players_panel'):
@@ -2207,6 +2275,7 @@ class MainWindow(QMainWindow):
             self.excl_guilds_panel.refresh_labels()
         if hasattr(self, 'excl_bases_panel'):
             self.excl_bases_panel.refresh_labels()
+        self._apply_excl_empty_states()
         if hasattr(self, 'menu_bar'):
             self._setup_menus()
     def _add_exclusion(self, excl_type, value):

@@ -21,6 +21,9 @@ from ..map_view.map_markers import BaseMarker, PlayerMarker
 from ..map_view.map_effects import ImportEffect, SwapSourceEffect, CalibrationEffect
 from ..map_view.map_items import ExclusionZoneItem, PolygonExclusionZoneItem, BaseRadiusRing, ZonePreviewItem
 from ..map_view.map_view import MapGraphicsView
+from palworld_aio.ui.chrome.styles import MENU_STYLE
+from palworld_aio.ui.chrome import tokens as _chrome_tokens
+_P = _chrome_tokens.resolve()
 _SORT_ROLE = Qt.UserRole + 1
 class _SortableItem(QTreeWidgetItem):
     def __lt__(self, other):
@@ -171,7 +174,7 @@ class MapTab(QWidget):
         root_v = QVBoxLayout(self)
         root_v.setContentsMargins(0, 0, 0, 0)
         root_v.setSpacing(0)
-        root_v.addWidget(create_page_ribbon(t('map.viewer') if t else 'Map', (t('sidebar.section.inspect') if t else 'Load & Inspect').upper(), self))
+        root_v.addWidget(create_page_ribbon(t('map.viewer') if t else 'Map', (t('sidebar.section.world') if t else 'World Data').upper(), self))
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         self._map_widget = QWidget()
@@ -212,9 +215,10 @@ class MapTab(QWidget):
         overlay_layout.setSpacing(3)
         overlay_layout.addStretch()
         base_dir = constants.get_base_path()
-        tip_css = 'QToolTip { background-color: rgba(18,22,28,0.98); color: #E6EEF6; border: 1px solid rgba(125,211,252,0.30); border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; }'
-        btn_css = 'QPushButton { color: white; background: rgba(125,211,252,0.08); padding: 6px 10px; border-radius: 4px; border: none; min-width: 36px; min-height: 28px; } QPushButton:checked { background: rgba(125,211,252,0.25); border: 1px solid #7dd3fc; }'
-        btn_wide_css = 'QPushButton { color: white; background: rgba(125,211,252,0.08); padding: 6px 10px; border-radius: 4px; border: none; min-width: 40px; min-height: 28px; } QPushButton:checked { background: rgba(125,211,252,0.25); border: 1px solid #7dd3fc; }'
+        # modernize-tab-ui 6.1: overlay toggles ride the shared `mapToggleBtn`
+        # theme-builder rule (accent checked state); inline cyan styles retired.
+        # No widget-level stylesheet here: a widget QSS block would override
+        # the application rule (widget stylesheets win over app styles in Qt).
         self.btn_calibrate = QPushButton()
         self.btn_calibrate.setIcon(QIcon(resource_path(base_dir, 'calibrate.webp')))
         self.btn_calibrate.setIconSize(QSize(22, 22))
@@ -222,7 +226,7 @@ class MapTab(QWidget):
         self.btn_calibrate.setCheckable(True)
         self.btn_calibrate.setChecked(False)
         self.btn_calibrate.clicked.connect(self._on_calibrate_toggle)
-        self.btn_calibrate.setStyleSheet(btn_css + tip_css)
+        self.btn_calibrate.setObjectName('mapToggleBtn')
         overlay_layout.addWidget(self.btn_calibrate)
         self.btn_calibrate_tree = QPushButton()
         self.btn_calibrate_tree.setIcon(QIcon(resource_path(base_dir, 'calibrate.webp')))
@@ -231,7 +235,7 @@ class MapTab(QWidget):
         self.btn_calibrate_tree.setCheckable(True)
         self.btn_calibrate_tree.setChecked(False)
         self.btn_calibrate_tree.clicked.connect(self._on_calibrate_tree_toggle)
-        self.btn_calibrate_tree.setStyleSheet(btn_css + tip_css)
+        self.btn_calibrate_tree.setObjectName('mapToggleBtn')
         overlay_layout.addWidget(self.btn_calibrate_tree)
         self.toggle_map_bases = QPushButton()
         self.toggle_map_bases.setIcon(QIcon(resource_path(base_dir, 'baseicon.webp')))
@@ -240,7 +244,7 @@ class MapTab(QWidget):
         self.toggle_map_bases.setCheckable(True)
         self.toggle_map_bases.setChecked(True)
         self.toggle_map_bases.clicked.connect(self._on_toggle_changed)
-        self.toggle_map_bases.setStyleSheet(btn_css + tip_css)
+        self.toggle_map_bases.setObjectName('mapToggleBtn')
         overlay_layout.addWidget(self.toggle_map_bases)
         self.toggle_map_players = QPushButton()
         self.toggle_map_players.setIcon(QIcon(resource_path(base_dir, 'playericon.webp')))
@@ -249,7 +253,7 @@ class MapTab(QWidget):
         self.toggle_map_players.setCheckable(True)
         self.toggle_map_players.setChecked(False)
         self.toggle_map_players.clicked.connect(self._on_toggle_changed)
-        self.toggle_map_players.setStyleSheet(btn_css + tip_css)
+        self.toggle_map_players.setObjectName('mapToggleBtn')
         overlay_layout.addWidget(self.toggle_map_players)
         self.toggle_base_radius_rings = QPushButton()
         self.toggle_base_radius_rings.setIcon(QIcon(resource_path(base_dir, 'ring.webp')))
@@ -258,7 +262,7 @@ class MapTab(QWidget):
         self.toggle_base_radius_rings.setCheckable(True)
         self.toggle_base_radius_rings.setChecked(True)
         self.toggle_base_radius_rings.clicked.connect(self._on_radius_rings_toggle)
-        self.toggle_base_radius_rings.setStyleSheet(btn_css + tip_css)
+        self.toggle_base_radius_rings.setObjectName('mapToggleBtn')
         overlay_layout.addWidget(self.toggle_base_radius_rings)
         self.toggle_map_zones = QPushButton()
         self.toggle_map_zones.setIcon(QIcon(resource_path(base_dir, 'zones.webp')))
@@ -267,7 +271,7 @@ class MapTab(QWidget):
         self.toggle_map_zones.setCheckable(True)
         self.toggle_map_zones.setChecked(False)
         self.toggle_map_zones.clicked.connect(self._on_zones_toggle)
-        self.toggle_map_zones.setStyleSheet(btn_css + tip_css)
+        self.toggle_map_zones.setObjectName('mapToggleBtn')
         overlay_layout.addWidget(self.toggle_map_zones)
         self.toggle_map_type = QPushButton()
         self.toggle_map_type.setIcon(QIcon(resource_path(base_dir, 'T_TreeMap.webp')))
@@ -276,7 +280,8 @@ class MapTab(QWidget):
         self.toggle_map_type.setCheckable(True)
         self.toggle_map_type.setChecked(False)
         self.toggle_map_type.clicked.connect(self._on_map_type_toggle)
-        self.toggle_map_type.setStyleSheet(btn_wide_css + tip_css)
+        self.toggle_map_type.setObjectName('mapToggleBtn')
+        self.toggle_map_type.setProperty('wide', True)
         overlay_layout.addWidget(self.toggle_map_type)
         overlay_layout.addStretch()
         self.view.overlay_position_callback = self._reposition_map_overlay
@@ -284,7 +289,8 @@ class MapTab(QWidget):
         self._calibration_bases = []
         self._calibration_markers = []
         self._calibration_label = QLabel('', self.view)
-        self._calibration_label.setStyleSheet('background: rgba(0,0,0,180); color: #7dd3fc; padding: 6px 12px; border-radius: 4px; font-size: 12px;')
+        # modernize-tab-ui 6.5: info token (was hardcoded cyan #7dd3fc).
+        self._calibration_label.setStyleSheet(f'background: {_P["tooltip_bg"]}; color: {_P["info"]}; padding: 6px 12px; border-radius: 4px; font-size: 12px;')
         self._calibration_effect = None
         self._calibration_label.move(10, 50)
         self._calibration_label.setVisible(False)
@@ -298,7 +304,9 @@ class MapTab(QWidget):
         self._tree_cal_label.setVisible(False)
         self._undo_tree_cal = None
         self._sidebar_widget = QWidget()
-        self._sidebar_widget.setMinimumWidth(340)
+        # modernize-tab-ui 6.3: 360px so the browser tree columns fit at the
+        # 1200px minimum window width without truncating headers.
+        self._sidebar_widget.setMinimumWidth(360)
         self._sidebar_widget.setAttribute(Qt.WA_StyledBackground, True)
         # 008-r02: sidebar is now a floating legend card over the canvas
         self._sidebar_widget.setObjectName('mapLegendCard')
@@ -351,6 +359,12 @@ class MapTab(QWidget):
         self.base_tree.header().setStretchLastSection(True)
         self.base_tree.header().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.base_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # modernize-tab-ui 6.3: explicit widths so the five headers (Guild,
+        # Leader, Last Seen, Bases, Base Pals) fit the 360px sidebar at the
+        # 1200px minimum window width (QHeaderView section padding consumes
+        # ~16px per column); last section keeps the stretch.
+        for col, width in enumerate((78, 56, 66, 52, 84)):
+            self.base_tree.setColumnWidth(col, width)
         self.player_tree = QTreeWidget()
         self.player_tree.setObjectName('playerTree')
         self.player_tree.setHeaderLabels([t('map.header.player') if t else 'Player', t('map.info.level') if t else 'Level', t('map.header.lastseen') if t else 'Last Seen', t('player.pals') if t else 'Pals'])
@@ -367,6 +381,10 @@ class MapTab(QWidget):
         self.player_tree.header().setStretchLastSection(True)
         self.player_tree.header().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.player_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # modernize-tab-ui 6.3: Player/Level/Last Seen/Pals sized for the
+        # 360px sidebar; last section keeps the stretch.
+        for col, width in enumerate((108, 46, 66, 60)):
+            self.player_tree.setColumnWidth(col, width)
         self.map_tab_stack.addWidget(self.base_tree)
         self.map_tab_stack.addWidget(self.player_tree)
         sidebar_layout.addWidget(self.map_tab_stack, 1)
@@ -448,6 +466,10 @@ class MapTab(QWidget):
             sh = self.map_overlay.sizeHint()
             self.map_overlay.setGeometry(self.view.width() - sh.width() - 10, 6, sh.width(), sh.height())
             self.map_overlay.raise_()
+            # keep each toggle above the composite layers (map pixmap z-hides
+            # token surfaces otherwise)
+            for btn in self.map_overlay.findChildren(type(self.btn_calibrate)):
+                btn.raise_()
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._reposition_map_overlay()
@@ -833,10 +855,10 @@ class MapTab(QWidget):
                 player['img_coords'] = (ix, iy)
     def _switch_map_tab(self, index):
         self.map_tab_stack.setCurrentIndex(index)
-        bases_active = index == 0
-        players_active = index == 1
-        self.bases_tab_btn.setStyleSheet(f"QPushButton {{ background: rgba(125,211,252,{('0.2' if bases_active else '0.12')}); color: {('#fff' if bases_active else '#7DD3FC')}; border: 1px solid rgba(125,211,252,{('0.4' if bases_active else '0.2')}); border-radius: 6px; padding: 4px 12px; font-weight: {('700' if bases_active else '600')}; font-size: 12px; }} QPushButton:hover {{ background: rgba(125,211,252,0.25); }}")
-        self.players_tab_btn.setStyleSheet(f"QPushButton {{ background: rgba(125,211,252,{('0.2' if players_active else '0.12')}); color: {('#fff' if players_active else '#7DD3FC')}; border: 1px solid rgba(125,211,252,{('0.4' if players_active else '0.2')}); border-radius: 6px; padding: 4px 12px; font-weight: {('700' if players_active else '600')}; font-size: 12px; }} QPushButton:hover {{ background: rgba(125,211,252,0.25); }}")
+        # modernize-tab-ui 6.5: active tab state rides the shared
+        # pageSwitchBtn checked rule (accent); inline cyan styles retired.
+        self.bases_tab_btn.setChecked(index == 0)
+        self.players_tab_btn.setChecked(index == 1)
         if index == 0:
             self.info_label.setText(t('map.info.select_base') if t else 'Click on a base marker or list item to view details')
         else:
@@ -1261,7 +1283,7 @@ class MapTab(QWidget):
             self._on_swap_picker_click(data)
             return
         menu = QMenu(self)
-        menu.setStyleSheet('\n            QMenu {\n                background-color: rgba(18,20,24,0.95);\n                border: 1px solid rgba(125,211,252,0.3);\n                border-radius: 4px;\n                color: #e2e8f0;\n                padding: 4px;\n            }\n            QMenu::item {\n                padding: 6px 12px;\n                border-radius: 3px;\n            }\n            QMenu::item:selected {\n                background-color: rgba(59,142,208,0.3);\n            }\n        ')
+        menu.setStyleSheet(MENU_STYLE)
         if 'player_uid' in data:
             delete_action = menu.addAction(t('deletion.ctx.delete_player') if t else 'Delete Player')
             menu.addSeparator()
@@ -1313,7 +1335,7 @@ class MapTab(QWidget):
     def _on_empty_space_right_clicked(self, global_pos):
         from palworld_aio.editor.dialogs import ScrollableGuildSelectionDialog
         menu = QMenu(self)
-        menu.setStyleSheet('\n            QMenu {\n                background-color: rgba(18,20,24,0.95);\n                border: 1px solid rgba(125,211,252,0.3);\n                border-radius: 4px;\n                color: #e2e8f0;\n                padding: 4px;\n            }\n            QMenu::item {\n                padding: 6px 12px;\n                border-radius: 3px;\n            }\n            QMenu::item:selected {\n                background-color: rgba(59,142,208,0.3);\n            }\n        ')
+        menu.setStyleSheet(MENU_STYLE)
         if self._zone_drawing_mode:
             stop_drawing_action = menu.addAction(t('zone_exclusion.stop_drawing') if t else 'Stop Drawing Zones')
             action = menu.exec(global_pos.toPoint())
@@ -1427,7 +1449,7 @@ class MapTab(QWidget):
             return
         item_type, item_data = data
         menu = QMenu(self)
-        menu.setStyleSheet('\n            QMenu {\n                background-color: rgba(18,20,24,0.95);\n                border: 1px solid rgba(125,211,252,0.3);\n                border-radius: 4px;\n                color: #e2e8f0;\n                padding: 4px;\n            }\n            QMenu::item {\n                padding: 6px 12px;\n                border-radius: 3px;\n            }\n            QMenu::item:selected {\n                background-color: rgba(59,142,208,0.3);\n            }\n        ')
+        menu.setStyleSheet(MENU_STYLE)
         if item_type == 'base':
             delete_action = menu.addAction(t('delete.base') if t else 'Delete Base')
             export_action = menu.addAction(t('button.export') if t else 'Export Base')
@@ -2441,7 +2463,7 @@ class MapTab(QWidget):
         zone_id = zone_item.zone_data.get('id')
         zone_name = zone_item.zone_data.get('name', 'Unknown Zone')
         menu = QMenu(self)
-        menu.setStyleSheet('\n            QMenu {\n                background-color: rgba(18,20,24,0.95);\n                border: 1px solid rgba(125,211,252,0.3);\n                border-radius: 4px;\n                color: #e2e8f0;\n                padding: 4px;\n            }\n            QMenu::item {\n                padding: 6px 12px;\n                border-radius: 3px;\n            }\n            QMenu::item:selected {\n                background-color: rgba(59,142,208,0.3);\n            }\n        ')
+        menu.setStyleSheet(MENU_STYLE)
         delete_action = menu.addAction(t('zone_exclusion.delete_zone') if t else 'Delete Zone')
         rename_action = menu.addAction(t('zone_exclusion.rename_zone') if t else 'Rename Zone')
         stop_drawing_action = None

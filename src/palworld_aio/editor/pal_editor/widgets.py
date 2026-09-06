@@ -6,8 +6,20 @@ from i18n import t
 from palworld_aio import constants
 from resource_resolver import resource_path
 from palworld_aio.ui.chrome.styles import TOOLTIP_STYLE
+from palworld_aio.ui.chrome import tokens as _chrome_tokens
+_P = _chrome_tokens.resolve()
 
 PAL_SLOT_MIME = 'application/x-pst-pal-slot'
+
+
+def _tier_color(key: str, alpha: int) -> QColor:
+    """modernize-tab-ui 4.8: painter-side tier color from the shared tokens.
+
+    QSS consumes ``rgba()`` strings; QPainter needs QColor objects, so parse
+    the resolved token hex once here (cyan/purple painter literals retired).
+    """
+    h = _P[key].lstrip('#')
+    return QColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), alpha)
 
 
 class FlowLayout(QLayout):
@@ -123,11 +135,11 @@ class FramelessDialog(QDialog):
 
     def _apply_styles(self):
 
+        # modernize-tab-ui 4.2: gradient flattened to opaque token surface.
         self.setStyleSheet(TOOLTIP_STYLE + '''
             QWidget#editPalsContainer {
-                background: qlineargradient(spread:pad,x1:0,y1:0,x2:1,y2:1,
-                            stop:0 rgba(12,14,18,0.98),stop:0.5 rgba(10,16,22,0.98),stop:1 rgba(8,12,18,0.98));
-                border: 1px solid rgba(125,211,252,0.2);
+                background: rgba(27,25,23,0.98);
+                border: 1px solid rgba(147,183,221,0.30);
                 border-radius: 12px;
             }
             QWidget#editPalsContent {
@@ -178,7 +190,7 @@ class StrokedLabel(QLabel):
 
                     elif color_str in ['white', 'black', 'red', 'blue', 'green', 'yellow', 'purple', 'pink']:
 
-                        color_map = {'white': Qt.white, 'black': Qt.black, 'red': Qt.red, 'blue': Qt.blue, 'green': Qt.green, 'yellow': Qt.yellow, 'purple': QColor('#7DD3FC'), 'pink': QColor('#FB7185')}
+                        color_map = {'white': Qt.white, 'black': Qt.black, 'red': Qt.red, 'blue': Qt.blue, 'green': Qt.green, 'yellow': Qt.yellow, 'purple': QColor(_P['special']), 'pink': QColor(_P['danger'])}
 
                         self._text_color = color_map.get(color_str, Qt.white)
 
@@ -196,7 +208,7 @@ class StrokedLabel(QLabel):
 
         bg = QColor(0, 0, 0, 180)
 
-        border = QColor(125, 211, 252, 64)
+        border = _tier_color('info', 64)
 
         painter.setBrush(bg)
 
@@ -400,7 +412,7 @@ class _CircularIcon(QWidget):
 
 class CornerBracketWidget(QFrame):
 
-    def __init__(self, border_color='#7DD3FC', parent=None):
+    def __init__(self, border_color='#93B7DD', parent=None):
 
         super().__init__(parent)
 
@@ -448,7 +460,7 @@ class CornerBracketWidget(QFrame):
 
 class PortraitBracketWidget(QWidget):
 
-    def __init__(self, corner_color='#7DD3FC', parent=None):
+    def __init__(self, corner_color='#93B7DD', parent=None):
 
         super().__init__(parent)
 
@@ -528,13 +540,7 @@ class SANTrackerWidget(QWidget):
 
         painter.drawRoundedRect(0, y, w, bar_h, 1, 1)
 
-        gradient = QLinearGradient(0, 0, w, 0)
-
-        gradient.setColorAt(0, QColor('#10B981'))
-
-        gradient.setColorAt(1, QColor('#34D399'))
-
-        painter.setBrush(gradient)
+        painter.setBrush(QColor(_P['success']))
 
         fill_w = int(w * self._value / 100)
 
@@ -542,7 +548,7 @@ class SANTrackerWidget(QWidget):
 
             painter.drawRoundedRect(0, y, fill_w, bar_h, 1, 1)
 
-        painter.setPen(QPen(QColor(16, 185, 129, 40), 1))
+        painter.setPen(QPen(QColor(_P['success'])))
 
         for i in range(1, 5):
 
@@ -682,7 +688,7 @@ class GlowRing(QFrame):
 
         else:
 
-            painter.setPen(QPen(QColor(125, 211, 252, 115), 2))
+            painter.setPen(QPen(_tier_color('info', 115), 2))
 
             painter.setBrush(Qt.NoBrush)
 
@@ -842,7 +848,7 @@ class PassiveEffectOverlay(QWidget):
 
                         alpha = max(0, 160 - i * 13)
 
-                        painter.fillRect(QRectF(cx, y, col_w - 3, 2.2), QColor(168, 85, 247, alpha))
+                        painter.fillRect(QRectF(cx, y, col_w - 3, 2.2), _tier_color('special', alpha))
 
                 for i in range(4):
 
@@ -856,7 +862,7 @@ class PassiveEffectOverlay(QWidget):
 
                         alpha = 180 - i * 45
 
-                        painter.fillRect(QRectF(cx, y, col_w - 3, 2.2), QColor(192, 132, 252, alpha))
+                        painter.fillRect(QRectF(cx, y, col_w - 3, 2.2), _tier_color('special', alpha))
 
         elif self._anim_mode == 'legend':
 
@@ -864,11 +870,11 @@ class PassiveEffectOverlay(QWidget):
 
             grad = QLinearGradient(sweep_x, 0, sweep_x + w * 0.35, 0)
 
-            grad.setColorAt(0, QColor(125, 211, 252, 0))
+            grad.setColorAt(0, _tier_color('info', 0))
 
-            grad.setColorAt(0.5, QColor(125, 211, 252, 50))
+            grad.setColorAt(0.5, _tier_color('info', 50))
 
-            grad.setColorAt(1, QColor(125, 211, 252, 0))
+            grad.setColorAt(1, _tier_color('info', 0))
 
             painter.fillRect(QRectF(0, 0, w, h), grad)
 

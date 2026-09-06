@@ -282,6 +282,12 @@ class BreedingTab(QWidget):
         try:
             if not self._selected_tribe or not self._breeding_data:
                 self._search_filter.hide()
+                # modernize-tab-ui 8.1: the EmptyState owns the CTA while no
+                # pal is selected; the standalone select button + hint hide
+                # so exactly one "Select a Pal" action is visible.
+                self._select_btn.hide()
+                self._selected_label.hide()
+                self._hint_label.hide()
                 from palworld_aio.widgets.empty_state import EmptyState
                 empty = EmptyState(
                     t('breeding.no_selection') if t else 'Select a pal to see breeding combinations',
@@ -293,6 +299,11 @@ class BreedingTab(QWidget):
                 self._results_layout.addWidget(empty)
                 self._refreshing = False
                 return
+            # modernize-tab-ui 8.1: with a pal selected the button returns as
+            # the re-select affordance (hint + selected label alongside).
+            self._select_btn.show()
+            self._selected_label.show()
+            self._hint_label.show()
             self._search_filter.show()
             bd = self._breeding_data
             pal_info = bd.get('pal_info', {})

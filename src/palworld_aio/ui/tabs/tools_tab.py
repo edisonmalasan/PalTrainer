@@ -215,9 +215,20 @@ class DropOverlay(QWidget):
         hint_rect = QRectF(inner.x(), center_y + 40, inner.width(), 30)
         painter.drawText(hint_rect, Qt.AlignHCenter | Qt.AlignTop, self._drop_hint)
 class ToolsTab(QWidget):
-    """Start page v2 (plan 021): operations masthead + field report + campaign
-    strip + mission columns. All 7 tool entry points and deep-links preserved;
-    the old centered save card and glass tool-card grids are retired."""
+    """Start page v3 (modernize-tab-ui): save-hub masthead with metric chips +
+    two balanced tool groups (Conversion / Management). Campaign strip and
+    field-report frame are retired; all 7 tool entry points, handler indices,
+    and deep-links preserved."""
+
+    TOOL_ICONS = {
+        'tool.convert.saves': 'export',
+        'tool.convert.gamepass.steam': 'gamepass',
+        'tool.convert.steamid': 'copy',
+        'tool.restore_map': 'map',
+        'tool.slot_injector': 'container',
+        'tool.character_transfer': 'player_select',
+        'tool.fix_host_save': 'check_circle',
+    }
 
     # (translation key, handler attribute, handler index) per mission zone
     MISSION_ZONES = (
@@ -225,28 +236,19 @@ class ToolsTab(QWidget):
             ('tool.convert.saves', '_run_converting_tool', 0),
             ('tool.convert.gamepass.steam', '_run_converting_tool', 1),
             ('tool.convert.steamid', '_run_converting_tool', 2),
+            ('tool.restore_map', '_run_converting_tool', 3),
         )),
         ('tools.section.management', (
             ('tool.slot_injector', '_run_management_tool', 0),
             ('tool.character_transfer', '_run_management_tool', 1),
             ('tool.fix_host_save', '_run_management_tool', 2),
         )),
-        ('tools.section.world', (
-            ('tool.restore_map', '_run_converting_tool', 3),
-        )),
-    )
-    CAMPAIGN_STEPS = (
-        ('tool.convert.saves', '_run_converting_tool', 0),
-        ('tool.convert.gamepass.steam', '_run_converting_tool', 1),
-        ('tool.character_transfer', '_run_management_tool', 1),
-        ('tool.fix_host_save', '_run_management_tool', 2),
     )
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
         self._mission_rows = []
-        self._campaign_btns = []
         self._setup_ui()
 
     def _setup_ui(self):
@@ -261,13 +263,12 @@ class ToolsTab(QWidget):
         body.setContentsMargins(24, 18, 24, 20)
         body.setSpacing(18)
         body.addWidget(self._create_ops_masthead())
-        body.addWidget(self._create_field_report())
-        body.addWidget(self._create_campaign_strip())
         columns_row = QHBoxLayout()
         columns_row.setSpacing(24)
         for zone_key, rows in self.MISSION_ZONES:
             columns_row.addWidget(self._create_mission_column(zone_key, rows), stretch=1)
         body.addLayout(columns_row)
+        body.addWidget(self._create_footer_guidance())
         body.addStretch(1)
         scroll = QScrollArea()
         scroll.setObjectName('startScroll')
@@ -284,9 +285,6 @@ class ToolsTab(QWidget):
         lay = QVBoxLayout(mast)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(4)
-        kicker = QLabel((t('ops.save_ledger') if t else 'WORLD SAVE LEDGER').upper())
-        kicker.setObjectName('opsKicker')
-        lay.addWidget(kicker)
         top_row = QHBoxLayout()
         top_row.setSpacing(12)
         self._save_status_label = QLabel(t('dashboard.no_save') if t else 'No Save Loaded')
@@ -328,17 +326,16 @@ class ToolsTab(QWidget):
         self._drag_hint_label = QLabel(t('tools.drag_hint') if t else 'or drag & drop a Level.sav file here')
         self._drag_hint_label.setObjectName('opsDropHint')
         lay.addWidget(self._drag_hint_label)
+        lay.addWidget(self._make_hairline())
+        lay.addWidget(self._create_metric_row())
         return mast
 
-    def _create_field_report(self):
-        frame = QFrame()
-        frame.setObjectName('fieldReport')
-        lay = QHBoxLayout(frame)
-        lay.setContentsMargins(12, 8, 12, 8)
-        lay.setSpacing(24)
-        kicker = QLabel((t('ops.field_report') if t else 'FIELD REPORT').upper())
-        kicker.setObjectName('opsKicker')
-        lay.addWidget(kicker)
+    def _create_metric_row(self):
+        row = QWidget()
+        row.setObjectName('metricRow')
+        rl = QHBoxLayout(row)
+        rl.setContentsMargins(0, 4, 0, 0)
+        rl.setSpacing(24)
         self._stat_cards = {}
         self._stat_label_refs = {}
         stats = [('players', 'dashboard.stat_players'), ('guilds', 'dashboard.stat_guilds'), ('bases', 'dashboard.stat_bases'), ('pals', 'dashboard.stat_pals')]
@@ -358,11 +355,11 @@ class ToolsTab(QWidget):
             nav_key = {'players': 'players', 'guilds': 'guilds', 'bases': 'bases', 'pals': 'pal_editor'}.get(key)
             if nav_key and hasattr(self, 'parent_window') and self.parent_window:
                 chip.mouseReleaseEvent = self._make_nav_release(nav_key)
-            lay.addWidget(chip)
+            rl.addWidget(chip)
             self._stat_cards[key] = val
             self._stat_label_refs[key] = lbl
-        lay.addStretch(1)
-        return frame
+        rl.addStretch(1)
+        return row
 
     def _make_nav_release(self, nav_key):
         def _handler(event):
@@ -373,25 +370,6 @@ class ToolsTab(QWidget):
                     self.parent_window.nav_strip.set_active(nav_key)
                     self.parent_window._on_nav_changed(nav_key)
         return _handler
-
-    def _create_campaign_strip(self):
-        strip = QFrame()
-        strip.setObjectName('campaignStrip')
-        lay = QHBoxLayout(strip)
-        lay.setContentsMargins(12, 6, 12, 6)
-        lay.setSpacing(16)
-        kicker = QLabel((t('ops.campaign') if t else 'CAMPAIGN').upper())
-        kicker.setObjectName('opsKicker')
-        lay.addWidget(kicker)
-        for idx, (tool_key, handler, hidx) in enumerate(self.CAMPAIGN_STEPS, start=1):
-            btn = QPushButton(f'{idx:02d}  {t(tool_key) if t else tool_key}')
-            btn.setObjectName('campaignStep')
-            btn.setCursor(QCursor(Qt.PointingHandCursor))
-            btn.clicked.connect(lambda checked=False, h=handler, i=hidx: getattr(self, h)(i))
-            lay.addWidget(btn)
-            self._campaign_btns.append((btn, tool_key))
-        lay.addStretch(1)
-        return strip
 
     def _create_mission_column(self, zone_key, rows):
         col = QWidget()
@@ -408,16 +386,47 @@ class ToolsTab(QWidget):
             row.setObjectName('missionRow')
             row.setCursor(QCursor(Qt.PointingHandCursor))
             row.setMinimumHeight(44)
-            name = t(tool_key) if t else tool_key
+            rl = QHBoxLayout(row)
+            rl.setContentsMargins(12, 8, 12, 8)
+            rl.setSpacing(10)
+            icon_label = QLabel()
+            icon_label.setObjectName('missionRowIcon')
+            icon_label.setFixedSize(28, 28)
+            icon_label.setAlignment(Qt.AlignCenter)
+            title_label = QLabel(t(tool_key) if t else tool_key)
+            title_label.setObjectName('missionRowTitle')
             desc_key = TOOL_DESCRIPTIONS.get(tool_key)
-            desc = t(desc_key) if desc_key and t else ''
-            row.setText(name)
-            row.setToolTip(desc or name)
+            desc_label = QLabel(t(desc_key) if desc_key and t else '')
+            desc_label.setObjectName('missionRowDesc')
+            for child in (icon_label, title_label, desc_label):
+                child.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+            rl.addWidget(icon_label)
+            text_col = QVBoxLayout()
+            text_col.setContentsMargins(0, 0, 0, 0)
+            text_col.setSpacing(1)
+            text_col.addWidget(title_label)
+            text_col.addWidget(desc_label)
+            rl.addLayout(text_col, 1)
             row.clicked.connect(lambda checked=False, h=handler, i=hidx: getattr(self, h)(i))
             v.addWidget(row)
-            self._mission_rows.append((row, tool_key))
+            self._mission_rows.append((row, tool_key, icon_label, title_label, desc_label))
+            self._set_row_icon(icon_label, tool_key)
         v.addStretch(1)
         return col
+
+    @staticmethod
+    def _set_row_icon(icon_label, tool_key):
+        icon_name = ToolsTab.TOOL_ICONS.get(tool_key)
+        if not icon_name:
+            icon_label.setText('?')
+            return
+        screen = QGuiApplication.primaryScreen()
+        dpr = screen.devicePixelRatio() if screen else 1.0
+        pix = app_icons.get_pixmap(icon_name, role='text_secondary', size=16, dpr=dpr)
+        if pix is not None:
+            icon_label.setPixmap(pix)
+        else:
+            icon_label.setText('?')
 
     @staticmethod
     def _make_hairline():
@@ -425,6 +434,12 @@ class ToolsTab(QWidget):
         line.setObjectName('bandZoneRule')
         line.setFixedHeight(1)
         return line
+
+    def _create_footer_guidance(self):
+        hint = QLabel(t('tools.footer_hint') if t else 'Tool output streams to the status strip below; full run details are written to the application logs.')
+        hint.setObjectName('toolsFooterHint')
+        hint.setWordWrap(True)
+        return hint
 
     def _create_header_bar(self):
         return QWidget()
@@ -467,6 +482,8 @@ class ToolsTab(QWidget):
             self._save_state_dot.setProperty('state', state)
             self._save_state_dot.style().unpolish(self._save_state_dot)
             self._save_state_dot.style().polish(self._save_state_dot)
+        if hasattr(self, '_drag_hint_label'):
+            self._drag_hint_label.setVisible(state != 'loaded')
     @staticmethod
     def _safe_list(data: dict, key: str) -> list:
         return data.get(key, {}).get('value', [])
@@ -616,14 +633,12 @@ class ToolsTab(QWidget):
                 self._set_save_status('loaded')
         if hasattr(self, '_drag_hint_label') and self._drag_hint_label:
             self._drag_hint_label.setText(t('tools.drag_hint') if t else 'or drag & drop a Level.sav file here')
-        for row, tool_key in self._mission_rows:
-            label = t(tool_key) if t else tool_key
-            row.setText(label)
+        for row, tool_key, icon_label, title_label, desc_label in self._mission_rows:
+            title_label.setText(t(tool_key) if t else tool_key)
             desc_key = TOOL_DESCRIPTIONS.get(tool_key)
-            row.setToolTip((t(desc_key) if t else desc_key) if desc_key else label)
-        for btn, tool_key in self._campaign_btns:
-            idx = self._campaign_btns.index((btn, tool_key)) + 1
-            btn.setText(f'{idx:02d}  {t(tool_key) if t else tool_key}')
+            desc_label.setText((t(desc_key) if t else desc_key) if desc_key else '')
+            row.setToolTip(title_label.text())
+            self._set_row_icon(icon_label, tool_key)
         if hasattr(self.parent_window, '_drop_overlay'):
             self.parent_window._drop_overlay._drop_text = t('tools.drop_title') if t else 'Drop Level.sav to Load Save'
             self.parent_window._drop_overlay._drop_hint = t('tools.drop_hint_overlay') if t else "Or click the 'Load Save' button above"

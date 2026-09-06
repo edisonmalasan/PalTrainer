@@ -1124,6 +1124,80 @@ QPushButton#ghostBtn:hover, QPushButton#toolButton:hover {{
 }}
 QPushButton#ghostBtn:pressed, QPushButton#toolButton:pressed {{ background: {p['surface_active']}; }}
 QPushButton#ghostBtn:disabled, QPushButton#toolButton:disabled {{ color: {p['text_disabled']}; }}
+/* modernize-tab-ui 2.5: selected state for picker buttons (accent border) */
+QPushButton#ghostBtn[pickerSelected="true"] {{
+    border-color: {p['accent_border_strong']};
+    color: {p['accent']};
+}}
+/* modernize-tab-ui 3.3: warning-tier bulk actions (Unlock All Fast Travel) */
+QPushButton#warnActionBtn {{
+    background: transparent;
+    border: 1px solid {p['warning_border']};
+    border-radius: {RADIUS['sm']}px;
+    color: {p['warning']};
+    padding: {SPACING['xs']}px {SPACING['md']}px;
+    font-size: {TYPE['secondary'][0]}px;
+    font-weight: 600;
+}}
+QPushButton#warnActionBtn:hover {{
+    background: {p['warning_bg']};
+    border-color: {p['warning']};
+    color: {p['text']};
+}}
+QPushButton#warnActionBtn:pressed {{ background: {p['surface_active']}; }}
+QPushButton#warnActionBtn:disabled {{ color: {p['text_disabled']}; border-color: {p['border']}; }}
+QFrame#invToolbarSep {{
+    background: {p['border']};
+    max-width: 1px;
+    border: none;
+    margin: 2px {SPACING['xs']}px;
+}}
+/* modernize-tab-ui 3.1: Technology panel accents via special token */
+QLabel#techAtpLabel {{ color: {p['special']}; }}
+QFrame#techDivider {{ background: {p['special_border']}; max-width: 1px; border: none; }}
+QWidget#techAncientPlaceholder {{
+    background: {p['special_bg']};
+    border: 1px dashed {p['special_border']};
+    border-radius: {RADIUS['sm']}px;
+}}
+/* modernize-tab-ui 4.2: Pal Editor stat bar tiers (flat token fills). */
+QProgressBar#palStatBar {{
+    background: {p['surface_input']};
+    border: none;
+    border-radius: 2px;
+    text-align: center;
+    color: {p['text']};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 700;
+}}
+QProgressBar#palStatBar[barTier="success"]::chunk {{ background: {p['success']}; border-radius: 2px; }}
+QProgressBar#palStatBar[barTier="warning"]::chunk {{ background: {p['warning']}; border-radius: 2px; }}
+QProgressBar#palStatBar[barTier="info"]::chunk {{ background: {p['info']}; border-radius: 2px; }}
+QProgressBar#palStatBar[barTier="special"]::chunk {{ background: {p['special']}; border-radius: 2px; }}
+/* modernize-tab-ui 4.5: party HP pill — dark surface below the bar so the
+   value text never overlaps the fill. */
+QLabel#palHpPill {{
+    background: {p['tooltip_bg']};
+    color: {p['text']};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 700;
+    border-radius: {RADIUS['pill']}px;
+    padding: 0px {SPACING['sm']}px;
+}}
+/* modernize-tab-ui 4.6: Pal Editor bulk toolbar — compact tier variants so the
+   eight toolbar actions hold a single row at the 1200px minimum window width. */
+QWidget#palboxPanel QPushButton#ghostBtn {{
+    padding: 2px 5px;
+    font-size: {TYPE['micro'][0]}px;
+}}
+QWidget#palboxPanel QPushButton#warnActionBtn {{
+    padding: 2px 5px;
+    font-size: {TYPE['micro'][0]}px;
+}}
+QWidget#palboxPanel QPushButton[class="danger"] {{
+    padding: 2px 5px;
+    font-size: {TYPE['micro'][0]}px;
+}}
 QTreeWidget#jsonTree {{
     background: {p['canvas']};
     alternate-background-color: {p['surface']};
@@ -1135,6 +1209,29 @@ QWidget#mapLegendCard {{
     background: {p['surface_raised']};
     border: 1px solid {p['border_strong']};
     border-radius: {RADIUS['md']}px;
+}}
+/* modernize-tab-ui 6.1: map overlay toggle buttons (token-styled; the
+   active toggle shows the accent state instead of the retired cyan ring).
+   Wide icon variant via the `wide` dynamic property. */
+QPushButton#mapToggleBtn {{
+    color: {p['text']};
+    background: {p['surface_hover']};
+    padding: {SPACING['xs'] + 2}px {SPACING['sm'] + 2}px;
+    border-radius: {RADIUS['sm']}px;
+    border: 1px solid transparent;
+    min-width: 36px;
+    min-height: 28px;
+}}
+QPushButton#mapToggleBtn:hover {{
+    background: {p['surface_active']};
+    border-color: {p['border_strong']};
+}}
+QPushButton#mapToggleBtn:checked {{
+    background: {p['accent_bg_strong']};
+    border: 1px solid {p['accent']};
+}}
+QPushButton#mapToggleBtn[wide="true"] {{
+    min-width: 40px;
 }}
 QLabel#saveStateChip {{
     background: {p['surface_raised']};
@@ -1149,7 +1246,7 @@ QLabel#saveStateChip[state="dirty"] {{ color: {p['warning']}; border-color: {p['
 QLabel#saveStateChip[state="saving"] {{ color: {p['info']}; border-color: {p['info_border']}; background: {p['info_bg']}; }}
 QLabel#saveStateChip[state="error"] {{ color: {p['danger']}; border-color: {p['danger_border']}; background: {p['danger_bg']}; }}
 
-/* ---- Start page v2 (plan 021): masthead + field report + campaign + missions ---- */
+/* ---- Start page v3 (modernize-tab-ui): masthead save-hub + two tool groups ---- */
 QWidget#startCanvas {{ background: transparent; }}
 QFrame#opsMasthead {{
     background: transparent;
@@ -1209,11 +1306,8 @@ QPushButton#opsSavePath {{
 }}
 QPushButton#opsSavePath:hover {{ color: {p['accent']}; }}
 QLabel#opsDropHint {{ color: {p['text_disabled']}; font-size: {TYPE['micro'][0]}px; }}
-QFrame#fieldReport {{
-    background: {p['surface']};
-    border: 1px solid {p['border']};
-    border-radius: {RADIUS['md']}px;
-}}
+QLabel#toolsFooterHint {{ color: {p['text_disabled']}; font-size: {TYPE['micro'][0]}px; }}
+QWidget#metricRow {{ background: transparent; }}
 QWidget#fieldMetric {{ background: transparent; border-radius: {RADIUS['sm']}px; }}
 QWidget#fieldMetric:hover {{ background: {p['surface_hover']}; }}
 QLabel#fieldMetricValue {{
@@ -1223,24 +1317,6 @@ QLabel#fieldMetricValue {{
     font-weight: 600;
 }}
 QLabel#fieldMetricValue[placeholder="true"] {{ color: {p['text_disabled']}; font-weight: 400; }}
-QFrame#campaignStrip {{
-    background: transparent;
-    border: none;
-    border-top: 1px solid {p['border']};
-    border-bottom: 1px solid {p['border']};
-}}
-QPushButton#campaignStep {{
-    background: transparent;
-    border: none;
-    border-radius: {RADIUS['sm']}px;
-    color: {p['text_secondary']};
-    padding: {SPACING['sm'] - 2}px {SPACING['md']}px;
-    font-size: {TYPE['body'][0]}px;
-    font-weight: 600;
-}}
-QPushButton#campaignStep:hover {{ background: {p['surface_hover']}; color: {p['accent']}; }}
-QPushButton#campaignStep:pressed {{ background: {p['surface_active']}; }}
-QPushButton#campaignStep:focus {{ border: 1px solid {p['accent_border']}; }}
 QWidget#missionColumn {{ background: transparent; }}
 QLabel#missionZone {{
     color: {p['text_disabled']};
@@ -1251,21 +1327,24 @@ QLabel#missionZone {{
     padding: {SPACING['xs']}px 0;
 }}
 QPushButton#missionRow {{
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid {p['border']};
-    border-radius: {RADIUS['sm']}px;
-    color: {p['text']};
-    text-align: left;
-    padding: {SPACING['sm'] + 2}px {SPACING['md']}px;
-    font-size: {TYPE['body'][0]}px;
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+    padding: 0px;
 }}
 QPushButton#missionRow:hover {{
     background: {p['surface_hover']};
-    color: {p['accent']};
+    border-color: {p['accent_border']};
 }}
-QPushButton#missionRow:pressed {{ background: {p['surface_active']}; color: {p['accent_pressed']}; }}
-QPushButton#missionRow:focus {{ border: 1px solid {p['accent_border']}; }}
+QPushButton#missionRow:pressed {{ background: {p['surface_active']}; }}
+QPushButton#missionRow:focus {{ border: 1px solid {p['accent_border_strong']}; }}
+QLabel#missionRowIcon {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px;
+}}
+QLabel#missionRowTitle {{ color: {p['text']}; font-size: {TYPE['secondary'][0]}px; font-weight: 600; }}
+QLabel#missionRowDesc {{ color: {p['text_secondary']}; font-size: {TYPE['micro'][0]}px; }}
 
 QPushButton#dialogOption {{
     background: {p['surface_raised']};
