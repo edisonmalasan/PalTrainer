@@ -68,17 +68,23 @@ def load_save(path: Path) -> SaveSession:
 
 ## Git / PR conventions
 
-- Commit style: Conventional commits such as `feat:`, `fix:`, `chore:`, `docs:`, or `test:`.
-- Branch naming: `{type}/{short-description}` in kebab-case.
-- Merge strategy: merge commits; do not rewrite history unless explicitly authorized.
+- Commit style: Conventional Commits (`feat:`, `fix:`, `chore:`, `research:`).
+- Branch naming: `<type>/<topic>`, optionally prefixed with the user (observed: `chore/migrate-vanilla-css-to-tailwind`, `edisonmalasan/research/better-san-carlos-city`).
+- Branch workflow: Always create a dedicated branch in the repository for every change. Do not work directly on the default branch.
+- Push workflow: Always push the created branch to the remote repository.
+- PR workflow: Always open a GitHub PR from the created branch and merge the changes via the PR. Never merge changes directly without a PR.
+- Merge strategy: Use merge commits via GitHub PR.
+- Branch cleanup: After the PR has been successfully merged, always delete the remote branch and delete the local branch when it is no longer needed.
+- Verification: Confirm that the PR was successfully merged before deleting the branch.
 
 ### Git safety
 
-- Check `git status --short --branch` before significant work.
-- Inspect `git diff` before finishing and stage only the current change.
+- Check `git status` before significant work.
+- Inspect `git diff` before finishing.
 - Never discard existing user changes.
 - Do not use destructive Git operations unless explicitly authorized.
 - Do not rewrite history unless explicitly required.
+- Never delete a branch before its PR has been confirmed as merged.
 
 ## Source of truth
 
