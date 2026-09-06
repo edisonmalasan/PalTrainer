@@ -406,3 +406,89 @@ def test_shared_cap_helper_caps_both_panels(pwindow, app):
     helper(pwindow, pwindow.players_panel, '_y_chrome', 200)
     assert base_win.bases_panel.maximumHeight() >= 180
     assert pwindow.players_panel.maximumHeight() >= 180
+
+
+# ------------------------------------------ Task 6: Guilds page slice
+
+@pytest.fixture
+def gwindow(app):
+    """MainWindow shell with the Guilds page set up (no save loaded)."""
+    from PyQt6.QtWidgets import QStackedWidget
+    win = main_window_mod.MainWindow.__new__(main_window_mod.MainWindow)
+    win.stacked_widget = QStackedWidget()
+    win._setup_guilds_tab()
+    return win
+
+
+def test_guilds_layout_has_inspector_column(gwindow):
+    assert hasattr(gwindow, 'guilds_panel')
+    assert isinstance(gwindow._guilds_inspector_column,
+                      components.InspectorSideColumn)
+    assert gwindow._guilds_inspector_column.width() == 340
+    assert gwindow._guilds_inspector._empty.isVisibleTo(gwindow._guilds_inspector)
+    assert 'Select a guild' in gwindow._guilds_inspector._empty.text()
+
+
+def test_guilds_inspector_populates_on_selection(gwindow, app):
+    import types
+    guild_id = '707E7DCC8C7B7D4C9A2E0B1A3F4D5E60'
+
+    class _Ctx:
+        def set_guild(self, v):
+            pass
+    gwindow.app_bar = types.SimpleNamespace(context=_Ctx())
+    gwindow.get_guild_members = lambda gid: []
+    gwindow.guilds_panel.add_item(
+        ['Guild A', '707E7DCC…', 5, 12],
+        tooltips={1: guild_id})
+    gwindow.guilds_panel.tree.setCurrentItem(
+        gwindow.guilds_panel.tree.topLevelItem(0))
+    gwindow._on_guild_selected(['Guild A', '707E7DCC…', '5', '12'])
+    inspector = gwindow._guilds_inspector
+    assert inspector._title.text() == 'Guild A'
+    assert inspector._rows[0][1].text() == '5'
+    assert inspector._rows[1][1].text() == '12'
+    assert inspector._rows[2][1].value() == guild_id
+    assert not inspector._empty.isVisibleTo(inspector)
+
+
+def test_guilds_inspector_clears_when_refreshed(gwindow, app):
+    gwindow._guilds_inspector.show_details('Guild A', {0: 'x'})
+    gwindow._refresh_guilds()  # no save loaded -> empty table + empty inspector
+    assert gwindow._guilds_inspector._empty.isVisibleTo(gwindow._guilds_inspector)
+    assert not gwindow._guilds_inspector._grid_host.isVisibleTo(gwindow._guilds_inspector)
+
+
+def test_members_empty_state_uses_row_level_wording(gwindow, app, monkeypatch):
+    """ui-pages delta: no-selection copy describes the row interaction and
+    never implies no global selection was made."""
+    empty = gwindow._members_empty_state
+    # construction default in _setup_guilds_tab
+    assert 'Click a guild row' in empty.text()
+    assert 'Select a guild to view its members' not in empty.text()
+    # refresh path agrees with the construction default (save "loaded")
+    monkeypatch.setattr(main_window_mod.constants, 'loaded_level_json',
+                        object(), raising=False)
+    get_guilds_original = main_window_mod.get_guilds
+    monkeypatch.setattr(main_window_mod, 'get_guilds', lambda: [])
+    gwindow._refresh_guilds()
+    assert 'Click a guild row' in empty.text()
+    assert empty._hint_label is not None
+    assert 'clicked guild' in empty._hint_label.text()
+
+
+def test_guilds_id_columns_copyable_and_mono(gwindow, app):
+    assert gwindow.guilds_panel._copyable_columns == {1}
+    assert gwindow.guilds_panel._mono_columns == {1}
+    assert gwindow.guild_members_panel._copyable_columns == {4}
+    assert gwindow.guild_members_panel._mono_columns == {4}
+
+
+def test_guilds_table_capped_members_splitter_untouched(gwindow, app):
+    gwindow._refresh_guilds()  # no save -> 0 rows; cap applies a floor
+    maximum = gwindow.guilds_panel.maximumHeight()
+    assert 0 < maximum <= gwindow._guilds_table_cap + 300
+    # members pane keeps its splitter behavior (no cap applied)
+    assert gwindow.guild_members_panel.maximumHeight() == 16777215
+    splitter = gwindow.guilds_panel.parentWidget()
+    assert splitter is gwindow.guild_members_panel.parentWidget()

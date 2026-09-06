@@ -560,31 +560,56 @@ class MainWindow(QMainWindow):
         layout.addLayout(body, stretch=1)
         self.stacked_widget.addWidget(players_tab)
     def _setup_guilds_tab(self):
-        from .chrome.components import create_page_ribbon
+        from .chrome.components import InspectorSideColumn, create_page_ribbon
         guilds_tab = QWidget()
         layout = QVBoxLayout(guilds_tab)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(create_page_ribbon(t('deletion.search_guilds') if t else 'Search Guilds', (t('sidebar.section.world') if t else 'World Data').upper(), guilds_tab))
+        # uiux-audit-remediation 6.1 (design D7): guilds content (splitter
+        # untouched) + inspector side column for the GUILD table.
+        content = QHBoxLayout()
+        content.setContentsMargins(0, 0, 0, 0)
+        content.setSpacing(0)
         splitter = QSplitter(Qt.Vertical)
         splitter.setContentsMargins(0, 0, 0, 0)
         self.guilds_panel = SearchPanel('deletion.search_guilds', ['deletion.col.guild_name', 'deletion.col.guild_id', 'deletion.col.guild_level', 'deletion.col.members'], [200, 280, 100, 80])
         self.guilds_panel.item_selected.connect(self._on_guild_selected)
         self.guilds_panel.tree.customContextMenuRequested.connect(self._show_guild_context_menu)
+        # uiux-audit-remediation 6.3: Guild ID column (index 1) gets the
+        # mono + full-value Ctrl+C copy treatment.
+        self.guilds_panel.set_copyable_columns({1})
+        self.guilds_panel.set_mono_columns({1})
+        self.guilds_panel.tree.setMinimumHeight(160)
         splitter.addWidget(self.guilds_panel)
         self.guild_members_panel = SearchPanel('deletion.guild_members', ['deletion.col.member', 'deletion.col.last_seen', 'deletion.col.level', 'deletion.col.pals', 'deletion.col.uid', 'deletion.col.role'], [200, 120, 60, 100, 300, 80])
         self.guild_members_panel.item_selected.connect(self._on_guild_member_selected)
         self.guild_members_panel.tree.customContextMenuRequested.connect(self._show_guild_member_context_menu)
-        # modernize-tab-ui 5.3: shared EmptyState for the no-selection condition
-        # (distinct from the no-save hint the plain label keeps showing).
+        # uiux-audit-remediation 6.3: member UID column (index 4).
+        self.guild_members_panel.set_copyable_columns({4})
+        self.guild_members_panel.set_mono_columns({4})
+        # uiux-audit-remediation 6.2: row-level wording — a guild may already
+        # be selected globally, so the pane prompts the row interaction.
         self._members_empty_state = EmptyState(
-            t('deletion.guild_members.select_hint') if t else 'Select a guild to view its members',
-            hint=t('deletion.guild_members.select_hint_sub') if t else 'Pick a guild in the list above.',
+            t('deletion.guild_members.row_hint') if t else 'Click a guild row to view its members',
+            hint=t('deletion.guild_members.row_hint_sub') if t else 'Members of the clicked guild appear in this list.',
             icon_name='guilds',
         )
         self.guild_members_panel.set_empty_state_widget(self._members_empty_state)
         splitter.addWidget(self.guild_members_panel)
-        layout.addWidget(splitter, stretch=1)
+        content.addWidget(splitter, stretch=1)
+        self._guilds_inspector_column = InspectorSideColumn(340)
+        self._guilds_inspector = self._guilds_inspector_column.panel
+        self._guilds_inspector.add_row(t('deletion.col.guild_level') if t else 'Guild Level')
+        self._guilds_inspector.add_row(t('deletion.col.members') if t else 'Members')
+        self._guilds_inspector.add_row('Guild ID', monospace=True)
+        self._guilds_inspector.show_empty(
+            t('guilds.inspector_empty') if t else 'Select a guild to view its details')
+        content.addWidget(self._guilds_inspector_column)
+        # uiux-audit-remediation 6.4: the GUILD table caps to content height
+        # via the shared helper; the members pane keeps its splitter behavior.
+        self._guilds_table_cap = 300
+        layout.addLayout(content, stretch=1)
         self.stacked_widget.addWidget(guilds_tab)
     def _setup_bases_tab(self):
         from .chrome.components import (
@@ -1100,8 +1125,21 @@ class MainWindow(QMainWindow):
             self.guild_members_panel.set_empty_state_widget(None)
         else:
             self.guild_members_panel.set_empty_state_widget(self._members_empty_state)
-            self._members_empty_state.setText(t('deletion.guild_members.select_hint') if t else 'Select a guild to view its members')
-            self._members_empty_state.setHint(t('deletion.guild_members.select_hint_sub') if t else 'Pick a guild in the list above.')
+            # uiux-audit-remediation 6.2: row-level wording (matches the
+            # construction default in _setup_guilds_tab).
+            self._members_empty_state.setText(t('deletion.guild_members.row_hint') if t else 'Click a guild row to view its members')
+            self._members_empty_state.setHint(t('deletion.guild_members.row_hint_sub') if t else 'Members of the clicked guild appear in this list.')
+        # uiux-audit-remediation 6.1 (additive): the refreshed table has no
+        # selection, so the inspector returns to its empty presentation.
+        try:
+            inspector = self._guilds_inspector
+        except (AttributeError, RuntimeError):
+            inspector = None
+        if inspector is not None:
+            inspector.show_empty(
+                t('guilds.inspector_empty') if t else 'Select a guild to view its details')
+        self._cap_search_table_height(
+            self.guilds_panel, '_guilds_panel_chrome', self._guilds_table_cap)
     def _refresh_bases(self):
         self.bases_panel.clear()
         bases = get_bases()
@@ -1586,6 +1624,7 @@ class MainWindow(QMainWindow):
     def _on_guild_selected(self, data):
         if data:
             self.app_bar.context.set_guild(data[0])
+            self._populate_guilds_inspector(data)
             self.guild_members_panel.clear()
             members = get_guild_members(data[1])
             for m in members:
@@ -1594,6 +1633,24 @@ class MainWindow(QMainWindow):
                 rl = m.get('role_label', '')
                 sort_keys = {1: last_sort if last_sort is not None else float('inf'), 2: int(m['level']) if str(m['level']).isdigit() else 0, 3: int(m['pals']) if str(m['pals']).isdigit() else 0, 5: m.get('role', 3)}
                 self.guild_members_panel.add_item([prefix + m['name'], m['lastseen'], m['level'], m['pals'], m['uid'], rl], sort_keys=sort_keys)
+
+    def _populate_guilds_inspector(self, data):
+        """uiux-audit-remediation 6.1: mirror the selected guild row into the
+        inspector (context wiring and member population unchanged)."""
+        inspector = getattr(self, '_guilds_inspector', None)
+        if inspector is None:
+            return
+        if not data:
+            inspector.show_empty(
+                t('guilds.inspector_empty') if t else 'Select a guild to view its details')
+            return
+        item = self.guilds_panel.get_selected_item()
+        guild_id = str(item.toolTip(1)) if item is not None and item.toolTip(1) else str(data[1])
+        inspector.show_details(str(data[0]), {
+            0: str(data[2]),
+            1: str(data[3]),
+            2: guild_id,
+        })
     def _on_guild_member_selected(self, data):
         if data:
             name = data[0].replace('[L]', '')
