@@ -2,9 +2,10 @@
 import json
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea, QLabel, QPushButton, QFrame, QDialog, QLineEdit, QListWidget, QListWidgetItem, QSpinBox, QMessageBox, QTabWidget, QSizePolicy, QAbstractItemView, QMenu, QToolTip, QListView, QProgressBar, QComboBox, QApplication, QInputDialog, QCheckBox, QDialogButtonBox
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QPoint, QTimer, QThread, QEvent
-from PyQt6.QtGui import QPixmap, QIcon, QFont, QCursor, QColor, QPainter, QPen, QIntValidator
+from PyQt6.QtGui import QPixmap, QIcon, QFont, QCursor, QColor, QPainter, QPen, QIntValidator, QFontMetrics
 from PyQt6.QtWidgets import QStyledItemDelegate
 from i18n import t
+from palworld_aio.ui.chrome.components import set_picker_selected
 from palworld_aio.ui.chrome.styles import DIALOG_STYLE as DARK_THEME_STYLE, STATS_PANEL_STYLE, MENU_STYLE, PICKER_BG_STYLE, PICKER_SEARCH_STYLE, PICKER_LIST_STYLE, wrap_tooltip_text, slot_full, slot_rarity, slot_selected, slot_multi_selected, CONTENT_PANEL_STYLE, SLOT_EMPTY_STYLE, SLOT_HOVER_STYLE, INPUT_DIALOG_STYLE
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from palsav import json_tools
@@ -57,6 +58,15 @@ class ItemSlotWidget(QFrame):
                 if kind == 'icon':
                     c.move((w - cw) // 2, (h - ch - 14) // 2)
                 elif kind == 'name':
+                    # modernize-tab-ui 3.2: elide instead of mid-word clipping.
+                    full_name = getattr(c, '_full_name', '')
+                    if full_name:
+                        fm = c.fontMetrics()
+                        avail = max(20, w - 8)
+                        elided = fm.elidedText(full_name, Qt.ElideRight, avail)
+                        c.setText(elided)
+                        c.resize(min(avail, fm.horizontalAdvance(elided) + 5), c.height())
+                    cw, ch = c.width(), c.height()
                     c.move((w - cw) // 2, h - 13)
                 elif kind == 'qty':
                     c.move(2, 2)
@@ -90,12 +100,15 @@ class ItemSlotWidget(QFrame):
         self._children.append(icon_lbl)
         item_name = self.slot_data.get('item_name', 'Unknown')
         name_lbl = QLabel(item_name, self)
+        name_lbl._full_name = item_name
         name_lbl.setStyleSheet('color: #A69F94; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(245,158,11,0.15); border-radius: 2px; padding: 0 2px;')
         name_lbl.setAlignment(Qt.AlignCenter)
         name_lbl.adjustSize()
         name_lbl.setFixedHeight(10)
         name_lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
         name_lbl._slot_child_kind = 'name'
+        # modernize-tab-ui 3.2: full name stays available via tooltip.
+        name_lbl.setToolTip(item_name)
         name_lbl.show()
         self._children.append(name_lbl)
         stack_count = self.slot_data.get('stack_count', 1)
@@ -227,9 +240,10 @@ class EquipmentSlotWidget(QFrame):
             pixmap = ItemData.get_item_icon(icon_path, QSize(36, 36))
             self.icon_label.setPixmap(pixmap)
         name = slot_data.get('item_name', '')
-        if len(name) > 10:
-            name = name[:8] + '..'
-        self.name_label.setText(name)
+        # modernize-tab-ui 3.2: elide instead of mid-word clipping; full name via tooltip.
+        fm = QFontMetrics(self.name_label.font())
+        self.name_label.setText(fm.elidedText(name, Qt.ElideRight, self.name_label.width() or 52))
+        self.name_label.setToolTip(name)
         stack_count = slot_data.get('stack_count', 1)
         self.qty_label.setText(str(stack_count))
         rarity = slot_data.get('rarity', 0)
@@ -1182,7 +1196,9 @@ class TechnologyPanelWidget(QFrame):
         top.addWidget(self._tp_spin)
         top.addSpacing(16)
         self._atp_label = QLabel('Ancient Tech Points')
-        self._atp_label.setStyleSheet('font-size: 10px; font-weight: bold; color: #C084FC;')
+        # modernize-tab-ui 3.1: purple tint via qss_builder special token.
+        self._atp_label.setObjectName('techAtpLabel')
+        self._atp_label.setStyleSheet('font-size: 10px; font-weight: bold;')
         top.addWidget(self._atp_label)
         self._atp_spin = QSpinBox()
         self._atp_spin.setRange(0, 9999999); self._atp_spin.setFixedWidth(100)
@@ -1281,7 +1297,8 @@ class TechnologyPanelWidget(QFrame):
                 ph = QWidget(); ph.setFixedSize(self.BUTTON_SIZE, self.BUTTON_SIZE); rl.addWidget(ph)
             div = QFrame()
             div.setFrameShape(QFrame.VLine)
-            div.setStyleSheet('background: rgba(192,132,252,0.3); max-width: 1px;')
+            # modernize-tab-ui 3.1: token-driven tint (qss_builder).
+            div.setObjectName('techDivider')
             div.setFixedWidth(1)
             rl.addWidget(div)
             if g['ancient']:
@@ -1289,7 +1306,8 @@ class TechnologyPanelWidget(QFrame):
             else:
                 ph = QWidget()
                 ph.setFixedSize(self.BUTTON_SIZE, self.BUTTON_SIZE)
-                ph.setStyleSheet('background: rgba(192,132,252,0.04); border: 1px dashed rgba(192,132,252,0.1); border-radius: 4px;')
+                # modernize-tab-ui 3.1: token-driven tint (qss_builder).
+                ph.setObjectName('techAncientPlaceholder')
                 rl.addWidget(ph)
             rl.addStretch()
             self._scroll_layout.insertWidget(self._scroll_layout.count() - 1, row_w)
@@ -2041,7 +2059,9 @@ class InventoryGridWidget(QWidget):
         header.addWidget(self.clear_key_btn)
         self.sort_btn = QPushButton(t('inventory.sort', default='Sort'))
         self.sort_btn.setFixedHeight(24)
-        self.sort_btn.setStyleSheet('QPushButton { background: rgba(168,85,247,0.15); color: #a855f7; border: 1px solid rgba(168,85,247,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(168,85,247,0.25); border-color: rgba(168,85,247,0.5); color: #FFFFFF; }')
+        # modernize-tab-ui 3.1: token-driven ghost treatment (qss_builder);
+        # hardcoded purple inline stylesheet retired.
+        self.sort_btn.setObjectName('ghostBtn')
         self.sort_btn.setCursor(Qt.PointingHandCursor)
         self.sort_btn.clicked.connect(self.sort_requested.emit)
         header.addWidget(self.sort_btn)
@@ -2092,6 +2112,13 @@ class InventoryGridWidget(QWidget):
         main_layout.addWidget(scroll)
     def set_max_slots(self, max_slots: int):
         display_slots = max(max_slots, 42)
+        # modernize-tab-ui 3.4: remember the real capacity for item placement,
+        # then pad the trailing row with normal empty slots so incomplete
+        # rows never render a stretched gap.
+        self._item_slot_limit = display_slots
+        remainder = display_slots % GRID_COLS
+        if remainder:
+            display_slots += GRID_COLS - remainder
         if display_slots == self.max_visible_slots and self.slots:
             return
         self.max_visible_slots = display_slots
@@ -2106,9 +2133,10 @@ class InventoryGridWidget(QWidget):
         visible_count = min(len(self.slots), self.max_visible_slots)
         for i in range(visible_count):
             self.slots[i].clear_item()
+        slot_limit = getattr(self, '_item_slot_limit', self.max_visible_slots)
         for item in items:
             slot_index = item.get('slot_index', 0)
-            if slot_index < len(self.slots):
+            if slot_index < slot_limit:
                 self.slots[slot_index].set_item(item)
     def _on_slot_clicked(self, slot_data):
         sender = self.sender()
@@ -2552,32 +2580,42 @@ class PlayerInventoryTab(QWidget):
         self.main_grid.empty_slot_context_menu.connect(self._show_empty_slot_context_menu)
         self.main_grid.item_double_clicked.connect(self._delete_item_direct)
         self.main_grid.empty_slot_double_clicked.connect(self._on_empty_slot_double_clicked)
-        self.unlock_all_map_btn = QPushButton(t('inventory.unlock_all_map', default='Unlock All Map + Fast Travel'))
-        self.unlock_all_map_btn.setObjectName('pageSwitchBtn')
-        self.unlock_all_map_btn.setCursor(Qt.PointingHandCursor)
-        self.unlock_all_map_btn.setFixedHeight(24)
-        self.unlock_all_map_btn.clicked.connect(self._on_unlock_all_map_clicked)
-        sort_idx = self.main_grid.header_layout.indexOf(self.main_grid.sort_btn)
-        self.main_grid.header_layout.insertWidget(sort_idx, self.unlock_all_map_btn)
         self.main_grid.sort_requested.connect(self._on_sort_requested)
-        self.inv_loadout_btn = QPushButton(t('inventory.loadouts_btn', default='Loadouts'))
-        self.inv_loadout_btn.setObjectName('toolButton')
-        self.inv_loadout_btn.setFixedHeight(24)
-        self.inv_loadout_btn.setCursor(Qt.PointingHandCursor)
-        self.inv_loadout_btn.clicked.connect(self._on_inventory_loadout)
-        self.main_grid.header_layout.insertWidget(sort_idx, self.inv_loadout_btn)
+        # modernize-tab-ui 3.3: filters/clears left; utility actions grouped
+        # right ([Modify Slots][Loadouts][Sort]) with a separator before the
+        # warning-tier bulk action (Unlock All Fast Travel). Handlers unchanged.
         self.inv_clear_btn = QPushButton(t('inventory.clear_btn', default='Clear'))
         self.inv_clear_btn.setObjectName('toolButton')
         self.inv_clear_btn.setFixedHeight(24)
         self.inv_clear_btn.setCursor(Qt.PointingHandCursor)
         self.inv_clear_btn.clicked.connect(self._clear_all_inventory)
-        self.main_grid.header_layout.insertWidget(sort_idx + 2, self.inv_clear_btn)
+        self.main_grid.header_layout.insertWidget(1, self.inv_clear_btn)
         self.inv_modify_slots_btn = QPushButton(t('inventory.modify_slots_btn', default='Modify Slots'))
         self.inv_modify_slots_btn.setObjectName('toolButton')
         self.inv_modify_slots_btn.setFixedHeight(24)
         self.inv_modify_slots_btn.setCursor(Qt.PointingHandCursor)
         self.inv_modify_slots_btn.clicked.connect(self._on_modify_inventory_slots)
-        self.main_grid.header_layout.insertWidget(sort_idx + 3, self.inv_modify_slots_btn)
+        self.inv_loadout_btn = QPushButton(t('inventory.loadouts_btn', default='Loadouts'))
+        self.inv_loadout_btn.setObjectName('toolButton')
+        self.inv_loadout_btn.setFixedHeight(24)
+        self.inv_loadout_btn.setCursor(Qt.PointingHandCursor)
+        self.inv_loadout_btn.clicked.connect(self._on_inventory_loadout)
+        sort_idx = self.main_grid.header_layout.indexOf(self.main_grid.sort_btn)
+        self.main_grid.header_layout.insertWidget(sort_idx, self.inv_modify_slots_btn)
+        self.main_grid.header_layout.insertWidget(sort_idx + 1, self.inv_loadout_btn)
+        toolbar_separator = QFrame()
+        toolbar_separator.setObjectName('invToolbarSep')
+        toolbar_separator.setFrameShape(QFrame.VLine)
+        toolbar_separator.setFixedHeight(20)
+        sep_idx = self.main_grid.header_layout.indexOf(self.main_grid.sort_btn) + 1
+        self.main_grid.header_layout.insertWidget(sep_idx, toolbar_separator)
+        self.unlock_all_map_btn = QPushButton(t('inventory.unlock_all_map', default='Unlock All Map + Fast Travel'))
+        self.unlock_all_map_btn.setObjectName('warnActionBtn')
+        self.unlock_all_map_btn.setCursor(Qt.PointingHandCursor)
+        self.unlock_all_map_btn.setFixedHeight(24)
+        self.unlock_all_map_btn.clicked.connect(self._on_unlock_all_map_clicked)
+        sep_idx = self.main_grid.header_layout.indexOf(toolbar_separator)
+        self.main_grid.header_layout.insertWidget(sep_idx + 1, self.unlock_all_map_btn)
         self.inv_tabs.addTab(self.main_grid, t('inventory.main', default='Inventory'))
         self.key_grid = InventoryGridWidget('key_items')
         self.key_grid.item_selected.connect(self._on_item_selected)
@@ -2832,6 +2870,7 @@ class PlayerInventoryTab(QWidget):
                 return
             self.inventory = inv
             self.player_select_btn.setText(display)
+            set_picker_selected(self.player_select_btn, True)
             self.inv_tabs.setCurrentIndex(0)
             self._tab_loaded_for.clear()
             self._show_inventory()
@@ -2851,6 +2890,7 @@ class PlayerInventoryTab(QWidget):
         self.current_player_uid = uid
         self.current_player_name = name
         self.player_select_btn.setText(display)
+        set_picker_selected(self.player_select_btn, True)
         self.modified = False
         self._show_inventory()
     def clear_player(self):
@@ -2859,6 +2899,7 @@ class PlayerInventoryTab(QWidget):
         self.current_player_uid = None
         self.current_player_name = None
         self.player_select_btn.setText(t('inventory.select_player', default='Select Player...'))
+        set_picker_selected(self.player_select_btn, False)
         self._clear_display()
     def _open_player_popup(self):
         if not self._player_list:
@@ -2867,6 +2908,7 @@ class PlayerInventoryTab(QWidget):
         if chosen == '__clear__':
             self._clear_display()
             self.player_select_btn.setText(t('inventory.select_player', default='Select Player...'))
+            set_picker_selected(self.player_select_btn, False)
             self.current_player_uid = None
             self.current_player_name = None
             if hasattr(self.parent_window, 'pal_editor_tab'):
@@ -2880,6 +2922,7 @@ class PlayerInventoryTab(QWidget):
             self.current_player_uid = uid
             self.current_player_name = name
             self.player_select_btn.setText(display)
+            set_picker_selected(self.player_select_btn, True)
             self.modified = False
             if hasattr(self.parent_window, 'pal_editor_tab'):
                 self._syncing = True
@@ -3956,6 +3999,7 @@ class PlayerInventoryTab(QWidget):
             if player['uid'] == uid:
                 display = player['display']
                 self.player_select_btn.setText(display)
+                set_picker_selected(self.player_select_btn, True)
                 break
         self.inv_tabs.setCurrentIndex(0)
         self._tab_loaded_for.clear()
@@ -3994,6 +4038,7 @@ class PlayerInventoryTab(QWidget):
         self.palpedia_panel.refresh_labels()
         if not self.current_player_uid:
             self.player_select_btn.setText(t('inventory.select_player', default='Select Player...'))
+            set_picker_selected(self.player_select_btn, False)
         self.equip_title.setText(t('inventory.equipment', default='Equipment'))
         equip_label_keys = ['weapon', 'accessory', 'food', 'head', 'body', 'shield', 'glider', 'module']
         for key in equip_label_keys:
