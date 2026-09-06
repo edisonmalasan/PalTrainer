@@ -9,6 +9,8 @@ from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QPixmap, QIcon, QCursor, QPainter, QColor, QBrush
 from i18n import t
 from palworld_aio import constants
+from palworld_aio.ui.chrome import tokens as _chrome_tokens
+_P = _chrome_tokens.resolve()
 from palworld_aio.editor.pal_editor.icons import _get_element_pixmap
 from palworld_aio.editor.pal_editor.data import get_paldeck_pals
 from resource_resolver import resource_path
@@ -99,26 +101,29 @@ _CATEGORY_CONFIG = {
     },
 }
 
+# modernize-tab-ui 8.2: chrome styled from the shared token palette —
+# accent tier for active/selected states, neutral borders elsewhere;
+# the retired cyan family (#7DD3FC / rgba(125,211,252,…)) is gone.
 _BASE = "QPushButton { background: transparent; color: #94a3b8; border: none; border-radius: 4px; font-size: 11px; }"
-_BASE += "QPushButton:hover { background: rgba(125,211,252,0.06); color: #e2e8f0; }"
-_BASE += "QPushButton[active=true] { background: rgba(125,211,252,0.08); color: #7DD3FC; font-weight: 600; }"
-_SEARCH_S = "QLineEdit { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(125,211,252,0.2); border-radius: 6px; padding: 4px 8px; font-size: 11px; } QLineEdit:focus { border-color: rgba(125,211,252,0.4); }"
-_LIST_S = "QListWidget { background: transparent; border: 1px solid rgba(125,211,252,0.1); border-radius: 6px; color: #e2e8f0; font-size: 11px; } QListWidget::item { padding: 4px 6px; border-radius: 3px; } QListWidget::item:selected { background: rgba(125,211,252,0.12); color: #7DD3FC; } QListWidget::item:hover { background: rgba(125,211,252,0.06); }"
-_DETAIL_S = "QScrollArea { border: 1px solid rgba(125,211,252,0.1); border-radius: 6px; background: rgba(0,0,0,0.1); }"
-_CARD_S = "background: rgba(255,255,255,0.04); border: 1px solid rgba(125,211,252,0.1); border-radius: 6px; padding: 8px;"
+_BASE += f"QPushButton:hover {{ background: {_P['surface_hover']}; color: #e2e8f0; }}"
+_BASE += f"QPushButton[active=true] {{ background: {_P['accent_bg']}; color: {_P['accent']}; font-weight: 600; }}"
+_SEARCH_S = f"QLineEdit {{ background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid {_P['accent_border']}; border-radius: 6px; padding: 4px 8px; font-size: 11px; }} QLineEdit:focus {{ border-color: {_P['accent_border_strong']}; }}"
+_LIST_S = f"QListWidget {{ background: transparent; border: 1px solid {_P['border']}; border-radius: 6px; color: #e2e8f0; font-size: 11px; }} QListWidget::item {{ padding: 4px 6px; border-radius: 3px; }} QListWidget::item:selected {{ background: {_P['accent_bg']}; color: {_P['accent']}; }} QListWidget::item:hover {{ background: {_P['surface_hover']}; }}"
+_DETAIL_S = f"QScrollArea {{ border: 1px solid {_P['border']}; border-radius: 6px; background: rgba(0,0,0,0.1); }}"
+_CARD_S = f"background: rgba(255,255,255,0.04); border: 1px solid {_P['border']}; border-radius: 6px; padding: 8px;"
 _SORT_BTN_S = (
-    'QPushButton { background: transparent; color: #6b7280; border: 1px solid rgba(125,211,252,0.1); '
-    'border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 600; }'
-    'QPushButton:hover { color: #e2e8f0; background: rgba(125,211,252,0.08); }'
-    'QPushButton[active=true] { color: #7DD3FC; background: rgba(125,211,252,0.16); '
-    'border-color: #7DD3FC; }'
+    f"QPushButton {{ background: transparent; color: #6b7280; border: 1px solid {_P['border']}; "
+    f"border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 600; }}"
+    f"QPushButton:hover {{ color: #e2e8f0; background: {_P['surface_hover']}; }}"
+    f"QPushButton[active=true] {{ color: {_P['accent']}; background: {_P['accent_bg']}; "
+    f"border-color: {_P['accent']}; }}"
 )
 _FILTER_BTN_S = (
-    'QPushButton { background: transparent; color: #94a3b8; border: 1px solid rgba(125,211,252,0.1); '
-    'border-radius: 4px; padding: 2px 6px; font-size: 11px; }'
-    'QPushButton:hover { background: rgba(125,211,252,0.08); color: #e2e8f0; }'
-    'QPushButton[active=true] { background: rgba(125,211,252,0.18); color: #7DD3FC; '
-    'border-color: #7DD3FC; font-weight: 700; }'
+    f"QPushButton {{ background: transparent; color: #94a3b8; border: 1px solid {_P['border']}; "
+    f"border-radius: 4px; padding: 2px 6px; font-size: 11px; }}"
+    f"QPushButton:hover {{ background: {_P['surface_hover']}; color: #e2e8f0; }}"
+    f"QPushButton[active=true] {{ background: {_P['accent_bg_strong']}; color: {_P['accent']}; "
+    f"border-color: {_P['accent']}; font-weight: 700; }}"
 )
 
 _LIST_ICON = 28
@@ -352,7 +357,7 @@ class CatBtn(QPushButton):
             pw, ph = 3, 16
             px, py = 0, (self.height() - ph) // 2
             p.setPen(Qt.NoPen)
-            p.setBrush(QBrush(QColor('#7DD3FC')))
+            p.setBrush(QBrush(QColor(_P['accent'])))
             p.drawRoundedRect(px, py, pw, ph, pw / 2, pw / 2)
         p.end()
 
@@ -420,15 +425,17 @@ class WikiDetailPanel(QScrollArea):
         lo.addWidget(vl)
         return f
 
-    def _badge(self, text, color='#7DD3FC'):
+    def _badge(self, text, color=None):
+        # modernize-tab-ui 8.2: badge default rides the info tier token.
+        c = color or _P['info']
         l = QLabel(text)
-        l.setStyleSheet(f'background:rgba(125,211,252,0.08);color:{color};border-radius:4px;padding:2px 8px;font-size:11px;')
+        l.setStyleSheet(f'background:{_P["info_bg"]};color:{c};border-radius:4px;padding:2px 8px;font-size:11px;')
         return l
 
     def _sep(self):
         f = QFrame()
         f.setFrameShape(QFrame.HLine)
-        f.setStyleSheet('color:rgba(125,211,252,0.15);')
+        f.setStyleSheet(f'color:{_P["border"]};')
         return f
 
     def _pal_grid(self, pals, show_level=False):
@@ -442,7 +449,7 @@ class WikiDetailPanel(QScrollArea):
         for i, (pal, level) in enumerate(pals):
             r, c = divmod(i, cols)
             card = QFrame()
-            card.setStyleSheet('background:rgba(255,255,255,0.04);border:1px solid rgba(125,211,252,0.1);border-radius:6px;')
+            card.setStyleSheet(f'background:rgba(255,255,255,0.04);border:1px solid {_P["border"]};border-radius:6px;')
             clo = QHBoxLayout(card)
             clo.setContentsMargins(6, 4, 6, 4)
             clo.setSpacing(6)
@@ -457,7 +464,7 @@ class WikiDetailPanel(QScrollArea):
             clo.addWidget(nl)
             if show_level and level:
                 ll = QLabel(f'Lv.{int(level)}')
-                ll.setStyleSheet('font-size:10px;color:#7DD3FC;font-weight:600;')
+                ll.setStyleSheet(f'font-size:10px;color:{_P["info"]};font-weight:600;')
                 clo.addWidget(ll)
             clo.addStretch()
             gl.addWidget(card, r, c)
@@ -574,7 +581,7 @@ class WikiDetailPanel(QScrollArea):
                     dname = ws_map.get(k, k)
                     wip = _icon(_work_icon_path(k), 18)
                     card = QFrame()
-                    card.setStyleSheet('background:rgba(255,255,255,0.04);border:1px solid rgba(125,211,252,0.1);border-radius:6px;')
+                    card.setStyleSheet(f'background:rgba(255,255,255,0.04);border:1px solid {_P["border"]};border-radius:6px;')
                     clo = QHBoxLayout(card)
                     clo.setContentsMargins(8, 4, 8, 4)
                     clo.setSpacing(6)
@@ -585,14 +592,14 @@ class WikiDetailPanel(QScrollArea):
                         il.setToolTip(dname)
                         clo.addWidget(il)
                     lvl = QLabel(f'Lv.{int(v)}')
-                    lvl.setStyleSheet('font-size:10px;color:#7DD3FC;font-weight:600;')
+                    lvl.setStyleSheet(f'font-size:10px;color:{_P["info"]};font-weight:600;')
                     clo.addWidget(lvl)
                     wl.addWidget(card)
                 wl.addStretch()
                 self._l.addWidget(ww)
 
         if code and partner:
-            self._l.addWidget(self._hl(partner, 12, True, '#7DD3FC'))
+            self._l.addWidget(self._hl(partner, 12, True, _P['info']))
             from palworld_aio.editor.pal_editor.data import get_pal_base_data
             from palworld_aio.editor.pal_editor.icons import _resolve_partner_desc, _partner_desc_to_html
             base = get_pal_base_data(code) or {}
@@ -624,7 +631,7 @@ class WikiDetailPanel(QScrollArea):
                     src = m.get('source', '')
                     sname = _skill_name(wid)
                     card = QFrame()
-                    card.setStyleSheet('background:rgba(255,255,255,0.04);border:1px solid rgba(125,211,252,0.1);border-radius:6px;')
+                    card.setStyleSheet(f'background:rgba(255,255,255,0.04);border:1px solid {_P["border"]};border-radius:6px;')
                     clo = QHBoxLayout(card)
                     clo.setContentsMargins(8, 4, 8, 4)
                     clo.setSpacing(6)
@@ -639,7 +646,7 @@ class WikiDetailPanel(QScrollArea):
                     clo.addWidget(QLabel(sname))
                     if lvl:
                         ll = QLabel(f'Lv.{lvl}')
-                        ll.setStyleSheet('font-size:10px;color:#7DD3FC;font-weight:600;')
+                        ll.setStyleSheet(f'font-size:10px;color:{_P["info"]};font-weight:600;')
                         clo.addWidget(ll)
                     elif src == 'egg':
                         ll = QLabel('Egg')
@@ -1036,7 +1043,7 @@ class WikiDetailPanel(QScrollArea):
                 color = '#4ADE80' if ev > 0 else '#F87171'
                 sign = '+' if ev > 0 else ''
                 tag = QFrame()
-                tag.setStyleSheet(f'background:rgba(255,255,255,0.04);border:1px solid rgba(125,211,252,0.1);border-radius:6px;')
+                tag.setStyleSheet(f'background:rgba(255,255,255,0.04);border:1px solid {_P["border"]};border-radius:6px;')
                 tl = QHBoxLayout(tag)
                 tl.setContentsMargins(8, 4, 8, 4)
                 tl.setSpacing(4)
@@ -1298,7 +1305,11 @@ class WikiCategoryPage(QWidget):
         lbl = QLabel(t(fg['label_key']) + ':')
         lbl.setStyleSheet('font-size:10px;color:#6b7280;font-weight:600;')
         self._filter_labels[fg['id']] = lbl
-        if len(vals) <= cols:
+        # modernize-tab-ui 8.3: multi-value groups (element groups and any
+        # group with more than 4 values) render the label on its own row
+        # above the chips so the label never clips when icon chips follow.
+        multi_row = fg.get('is_element') or len(vals) > 4
+        if not multi_row and len(vals) <= cols:
             gl.addWidget(lbl, 0, 0, Qt.AlignLeft | Qt.AlignVCenter)
             for i, val in enumerate(vals):
                 btn = self._make_filter_btn(fg, val)
