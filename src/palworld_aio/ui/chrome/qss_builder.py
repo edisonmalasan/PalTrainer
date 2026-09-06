@@ -491,17 +491,39 @@ QPushButton#navTab:focus {{
     outline: none;
     color: {p['text']};
 }}
-QLabel#navZoneCaption {{
-    color: {p['text_disabled']};
-    font-family: {font_family_qss(FONT_HEADING_STACK)};
-    font-size: {TYPE['micro'][0]}px;
-    font-weight: 600;
-    letter-spacing: 1px;
+/* uiux-audit-remediation 1.3: primary-tier zone destinations. The
+   active-zone treatment is amber text only — the amber underline stays
+   reserved for the active secondary tab. */
+QPushButton#navZoneTab {{
     background: transparent;
-    padding: 0 4px;
+    color: {p['text_secondary']};
+    border: none;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    padding: 4px 10px 3px 10px;
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['body'][0]}px;
+    font-weight: 600;
 }}
-QFrame#navZoneRule {{
-    background: {p['border']};
+QPushButton#navZoneTab:hover {{
+    background: {p['surface_hover']};
+    color: {p['text']};
+}}
+QPushButton#navZoneTab:pressed {{
+    background: {p['surface_active']};
+}}
+QPushButton#navZoneTab:checked {{
+    color: {p['accent']};
+}}
+QPushButton#navZoneTab:checked:hover {{
+    color: {p['accent_hover']};
+}}
+QPushButton#navZoneTab:focus {{
+    outline: none;
+    color: {p['text']};
+}}
+QPushButton#navZoneTab:checked:focus {{
+    color: {p['accent']};
 }}
 QToolButton#navOverflowBtn {{
     background: transparent;

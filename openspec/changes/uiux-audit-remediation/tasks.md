@@ -2,12 +2,12 @@
 
 ## 1. Shell chrome: two-tier nav + icon collision
 
-- [ ] 1.1 Refactor `chrome/nav_strip.py` into two tiers per design D1: primary row (Tools, World, Edit, Reference zone tabs) + contextual secondary row (active zone's children); preserve `nav_changed(str)`, page IDs, `set_active`, shortcuts, i18n keys, and overflow/compact behavior per tier.
-- [ ] 1.2 Add last-visited-per-zone navigation with first-child fallback; Tools primary tab navigates directly.
-- [ ] 1.3 Add primary-tier active-zone treatment and keep active-page amber treatment on secondary tabs; extend QSS builder for the new classes.
-- [ ] 1.4 Differentiate the Base Inventory nav icon from Bases (reuse `container.svg` if it reads distinctly, else add one new bundled SVG per design D2).
-- [ ] 1.5 Add/extend unit tests covering: all 12 destinations reachable, signal contract unchanged, zone switching swaps secondary tier, overflow keeps everything reachable.
-- [ ] 1.6 Verify: focused pytest run, `uv run python -m compileall -q src tests`.
+- [x] 1.1 Refactor `chrome/nav_strip.py` into two tiers per design D1: primary row (Tools, World, Edit, Reference zone tabs) + contextual secondary row (active zone's children); preserve `nav_changed(str)`, page IDs, `set_active`, shortcuts, i18n keys, and overflow/compact behavior per tier.
+- [x] 1.2 Add last-visited-per-zone navigation with first-child fallback; Tools primary tab navigates directly.
+- [x] 1.3 Add primary-tier active-zone treatment and keep active-page amber treatment on secondary tabs; extend QSS builder for the new classes.
+- [x] 1.4 Differentiate the Base Inventory nav icon from Bases (reuse `container.svg` if it reads distinctly, else add one new bundled SVG per design D2).
+- [x] 1.5 Add/extend unit tests covering: all 12 destinations reachable, signal contract unchanged, zone switching swaps secondary tier, overflow keeps everything reachable.
+- [x] 1.6 Verify: focused pytest run, `uv run python -m compileall -q src tests`.
 
 ## 2. Shell chrome: status strip, warning states, path, monospace, context
 

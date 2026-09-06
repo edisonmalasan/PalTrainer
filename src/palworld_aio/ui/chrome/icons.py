@@ -62,6 +62,17 @@ ROLE_COLORS: dict[str, str] = {
 _pixmap_cache: dict[tuple[str, str, int, int], 'object'] = {}
 _svg_cache: dict[str, str] = {}
 
+# Destination aliases: the Base Inventory nav destination renders the bundled
+# container glyph so it reads as an open container instead of a second house
+# beside Bases (uiux-audit-remediation 1.4 / design D2).
+_SVG_ALIASES: dict[str, str] = {
+    'base_inventory': 'container',
+}
+
+
+def _resolve_svg_name(name: str) -> str:
+    return _SVG_ALIASES.get(name, name)
+
 
 def role_color(role: str = 'text', theme: str | None = None) -> str:
     """Resolve a semantic role to a palette hex color."""
@@ -73,6 +84,7 @@ def role_color(role: str = 'text', theme: str | None = None) -> str:
 
 def _svg_source(name: str) -> str | None:
     """Load and memoize an SVG file, with a color placeholder left intact."""
+    name = _resolve_svg_name(name)
     if name in _svg_cache:
         return _svg_cache[name]
     path = os.path.join(_svg_dir(), f'{name}.svg')
@@ -87,7 +99,7 @@ def _svg_source(name: str) -> str | None:
 
 
 def has_vector_icon(name: str) -> bool:
-    return os.path.isfile(os.path.join(_svg_dir(), f'{name}.svg'))
+    return os.path.isfile(os.path.join(_svg_dir(), f'{_resolve_svg_name(name)}.svg'))
 
 
 def get_pixmap(name: str, color: str | None = None, size: int = 16,
