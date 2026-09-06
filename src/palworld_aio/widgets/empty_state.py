@@ -33,6 +33,7 @@ class EmptyState(QWidget):
             'font-weight: 600; background: transparent;'
         )
         layout.addWidget(title_label)
+        hint_label = None
         if hint:
             hint_label = QLabel(hint)
             hint_label.setAlignment(Qt.AlignCenter)
@@ -60,7 +61,11 @@ class EmptyState(QWidget):
             layout.addLayout(btn_row)
         layout.addStretch()
         self._title_label = title_label
+        self._hint_label = hint_label if hint else None
     def setText(self, text):
         self._title_label.setText(text)
     def text(self):
         return self._title_label.text()
+    def setHint(self, text):
+        if self._hint_label is not None:
+            self._hint_label.setText(text)

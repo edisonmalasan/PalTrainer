@@ -4,6 +4,13 @@ from PyQt6.QtGui import QFont, QColor
 from i18n import t
 from palworld_aio import constants
 _SORT_ROLE = Qt.UserRole + 1
+# modernize-tab-ui 5.2: full GUID stored per column when the display text is
+# shortened; selection signals, context-menu readers, search and sort resolve
+# this role so behavior matches the pre-shortening text exactly.
+GUID_ROLE = Qt.UserRole + 2
+def _display_value(item, col):
+    value = item.data(col, GUID_ROLE)
+    return str(value) if value not in (None, '') else item.text(col)
 class _SortableTreeWidgetItem(QTreeWidgetItem):
     def __lt__(self, other):
         tree = self.treeWidget()
@@ -12,7 +19,7 @@ class _SortableTreeWidgetItem(QTreeWidgetItem):
         b = other.data(col, _SORT_ROLE)
         if a is not None and b is not None:
             return a < b
-        return self.text(col) < other.text(col)
+        return _display_value(self, col) < _display_value(other, col)
 class SearchPanel(QWidget):
     """Dense full-bleed table workspace (plan 023).
 
@@ -87,9 +94,14 @@ class SearchPanel(QWidget):
         self._empty_label.setGeometry(self.tree.viewport().rect())
         tree_resize = self.tree.resizeEvent
 
-        def _tree_resized(event, _tree=self.tree, _label=self._empty_label, _orig=tree_resize):
+        def _tree_resized(event, _tree=self.tree, _label=self._empty_label, _panel=self, _orig=tree_resize):
             QTreeWidget.resizeEvent(_tree, event)
             _label.setGeometry(_tree.viewport().rect())
+            # the viewport is a C++-created widget, so its resizeEvent cannot
+            # be overridden from Python; track the empty-state overlay here
+            widget = getattr(_panel, '_empty_widget', None)
+            if widget is not None:
+                widget.setGeometry(_tree.viewport().rect())
             if _orig:
                 _orig(event)
         self.tree.resizeEvent = _tree_resized  # type: ignore[method-assign]
@@ -111,12 +123,44 @@ class SearchPanel(QWidget):
 
     def set_empty_state(self, message: str) -> None:
         """Show a centered hint over the table when it has no rows."""
+        self._empty_message = message
         if not message:
             self._empty_label.hide()
             return
         self._empty_label.setText(message)
         self._empty_label.setGeometry(self.tree.viewport().rect())
         self._empty_label.show()
+
+    def set_empty_state_widget(self, widget) -> None:
+        """modernize-tab-ui 5.3: rich EmptyState overlay replacing the plain
+        hint for this panel's no-rows state (e.g. Guilds members pane).
+        Pass None to detach and fall back to the plain hint."""
+        previous = getattr(self, '_empty_widget', None)
+        self._empty_widget = widget
+        if widget is not None:
+            widget.setParent(self.tree.viewport())
+            widget.setGeometry(self.tree.viewport().rect())
+        if previous is not None and previous is not widget:
+            previous.hide()
+        # re-evaluate: the previous overlay (if any) may have been visible
+        self._refresh_empty_state()
+
+    def _show_empty_overlay(self, message: str) -> None:
+        widget = getattr(self, '_empty_widget', None)
+        if widget is not None:
+            self._empty_label.hide()
+            widget.setGeometry(self.tree.viewport().rect())
+            widget.show()
+        else:
+            self._empty_label.setText(message)
+            self._empty_label.setGeometry(self.tree.viewport().rect())
+            self._empty_label.show()
+
+    def _hide_empty_overlay(self) -> None:
+        self._empty_label.hide()
+        widget = getattr(self, '_empty_widget', None)
+        if widget is not None:
+            widget.hide()
 
     def _refresh_empty_state(self) -> None:
         visible = sum(0 if self.tree.topLevelItem(i).isHidden() else 1
@@ -126,14 +170,12 @@ class SearchPanel(QWidget):
             if searched and self.tree.topLevelItemCount() > 0:
                 message = t('search.no_matches') if t else 'No matches'
             elif self.tree.topLevelItemCount() == 0:
-                message = t('status.no_save_data') if t else 'No data — load a save first.'
+                message = getattr(self, '_empty_message', '') or (t('status.no_save_data') if t else 'No data — load a save first.')
             else:
                 message = t('search.no_matches') if t else 'No matches'
-            self._empty_label.setText(message)
-            self._empty_label.setGeometry(self.tree.viewport().rect())
-            self._empty_label.show()
+            self._show_empty_overlay(message)
         else:
-            self._empty_label.hide()
+            self._hide_empty_overlay()
     def _update_count(self):
         total = self.tree.topLevelItemCount()
         visible = sum(0 if self.tree.topLevelItem(i).isHidden() else 1 for i in range(total))
@@ -146,7 +188,7 @@ class SearchPanel(QWidget):
             item = self.tree.topLevelItem(i)
             match = False
             for col in range(item.columnCount()):
-                if text in item.text(col).lower():
+                if text in item.text(col).lower() or text in item.toolTip(col).lower():
                     match = True
                     break
             item.setHidden(not match)
@@ -155,22 +197,31 @@ class SearchPanel(QWidget):
         items = self.tree.selectedItems()
         if items:
             item = items[0]
-            data = [item.text(i) for i in range(item.columnCount())]
+            data = [_display_value(item, i) for i in range(item.columnCount())]
             self.item_selected.emit(data)
     def _on_double_click(self, item, column):
-        data = [item.text(i) for i in range(item.columnCount())]
+        data = [_display_value(item, i) for i in range(item.columnCount())]
         self.item_double_clicked.emit(data)
     def clear(self):
         self.tree.clear()
         self._all_items = []
         self._update_count()
-    def add_item(self, values, data=None, sort_keys=None):
+    def add_item(self, values, data=None, sort_keys=None, tooltips=None):
         item = _SortableTreeWidgetItem([str(v) for v in values])
         if data:
             item.setData(0, Qt.UserRole, data)
         if sort_keys:
             for col, key in sort_keys.items():
                 item.setData(col, _SORT_ROLE, key)
+        # modernize-tab-ui 5.2: per-column tooltip; the tooltip text is also
+        # stored in GUID_ROLE when it differs from the displayed (shortened)
+        # text, so readers of the row resolve the full value.
+        if tooltips:
+            for col, tip in tooltips.items():
+                if col < item.columnCount() and tip:
+                    item.setToolTip(col, str(tip))
+                    if str(tip) != item.text(col):
+                        item.setData(col, GUID_ROLE, str(tip))
         self.tree.addTopLevelItem(item)
         self._all_items.append(item)
         self._update_count()
@@ -185,10 +236,10 @@ class SearchPanel(QWidget):
     def get_selected_data(self):
         item = self.get_selected_item()
         if item:
-            return [item.text(i) for i in range(item.columnCount())]
+            return [_display_value(item, i) for i in range(item.columnCount())]
         return None
     def get_selected_data_all(self):
-        return [[item.text(i) for i in range(item.columnCount())] for item in self.tree.selectedItems()]
+        return [[_display_value(item, i) for i in range(item.columnCount())] for item in self.tree.selectedItems()]
     def set_items(self, items_data):
         self.clear()
         for values in items_data:
@@ -198,3 +249,4 @@ class SearchPanel(QWidget):
         self.search_input.setPlaceholderText(t('search.placeholder') if t else 'Type to search...')
         self.columns = [t(k) if k else '' for k in self.column_keys]
         self.tree.setHeaderLabels(self.columns)
+        self._refresh_empty_state()
