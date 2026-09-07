@@ -47,6 +47,20 @@ The Player Inventory page SHALL use the same visual distinction between context 
 - **WHEN** the Player Inventory page renders its context and view controls
 - **THEN** selector controls and view controls are visually distinguishable per the shared pattern, and the zone caption matches the Edit tier
 
+### Requirement: Pal Editor provides a jump-to-box control
+
+The Pal Editor palbox navigation SHALL provide a jump-to-box control (a numeric selector of the available box indices) alongside the existing previous/next box buttons; activating it displays that box directly. The control stays in sync when the box changes via other means.
+
+#### Scenario: Jump to a specific box
+
+- **WHEN** the user selects box N in the jump-to-box control
+- **THEN** the palbox grid shows box N and the control reflects the active box
+
+#### Scenario: Control stays in sync
+
+- **WHEN** the active box changes via the previous/next buttons or after edits
+- **THEN** the jump-to-box control shows the active box index
+
 ### Requirement: JSON Editor shows a persistent path breadcrumb
 
 The JSON Editor SHALL render a persistent breadcrumb of the current tree path above the table, updating as the selection or expansion point changes, so the user's position remains visible after scrolling deep nesting.
