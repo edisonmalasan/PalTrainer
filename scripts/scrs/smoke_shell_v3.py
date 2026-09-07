@@ -117,14 +117,14 @@ try:
     w._activate_nav('players')
     log('activate_nav_syncs=' + str(w.nav_strip.active_id() == 'players'))
 
-    # overflow behavior: collapse reference+edit and verify reachability
+    # overflow behavior: collapse reference+edit zones and verify reachability
     w.nav_strip.collapse_zones({'nav.zone.reference', 'nav.zone.edit'})
     app.processEvents()
     log('overflow_visible=' + str(w.nav_strip._overflow_btn.isVisible()))
     log('overflow_actions=' + str(w.nav_strip._overflow_menu.actions().__len__()))
-    log('collapsed_tab_hidden=' + str(w.nav_strip._tabs['breeding'].isHidden()))
+    log('collapsed_zone_hidden=' + str(w.nav_strip._zone_tabs['nav.zone.reference'].isHidden()))
     w.nav_strip.collapse_zones(set())
-    log('restored_visible=' + str(not w.nav_strip._tabs['breeding'].isHidden()))
+    log('restored_visible=' + str(not w.nav_strip._zone_tabs['nav.zone.reference'].isHidden()))
 
     # keyboard: 12 shortcuts registered
     log('shortcuts_registered=' + str(len(getattr(w, '_page_shortcuts', [])) == 12))

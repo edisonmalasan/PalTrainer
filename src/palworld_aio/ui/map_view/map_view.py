@@ -64,6 +64,23 @@ class MapGraphicsView(QGraphicsView):
         self.zoom_label.move(self.width() - 100, self.height() - 30)
         self.zoom_label.setAlignment(Qt.AlignCenter)
         self.zoom_label.setAttribute(Qt.WA_ShowWithoutActivating)
+        # uiux-audit-remediation 8.1 (D13): visible zoom controls beside the
+        # readout; both call zoom_by_step (same math path as wheel zooming).
+        from PyQt6.QtWidgets import QPushButton
+        self.zoom_in_btn = QPushButton('+', self)
+        self.zoom_in_btn.setObjectName('mapZoomBtn')
+        self.zoom_in_btn.setAccessibleName(t('map.zoom_in') if t else 'Zoom In')
+        self.zoom_in_btn.setToolTip(t('map.zoom_in') if t else 'Zoom In')
+        self.zoom_in_btn.setFixedSize(QSize(24, 24))
+        self.zoom_in_btn.clicked.connect(lambda: self.zoom_by_step(1))
+        self.zoom_out_btn = QPushButton('\u2212', self)
+        self.zoom_out_btn.setObjectName('mapZoomBtn')
+        self.zoom_out_btn.setAccessibleName(t('map.zoom_out') if t else 'Zoom Out')
+        self.zoom_out_btn.setToolTip(t('map.zoom_out') if t else 'Zoom Out')
+        self.zoom_out_btn.setFixedSize(QSize(24, 24))
+        self.zoom_out_btn.clicked.connect(lambda: self.zoom_by_step(-1))
+        self._position_zoom_controls()
+        self._update_zoom_buttons_enabled()
         self.overlay_position_callback = None
     def animate_to_coords(self, x, y, zoom_level=None):
         if zoom_level is None:
@@ -100,6 +117,10 @@ class MapGraphicsView(QGraphicsView):
         return QPointF(x, y)
     def wheelEvent(self, event):
         zoom_in = event.angleDelta().y() > 0
+        self._apply_zoom_step(zoom_in)
+    def _apply_zoom_step(self, zoom_in):
+        """Single zoom-step core shared by wheel and the +/- buttons
+        (uiux-audit-remediation 8.1 / D13) so both behave identically."""
         if zoom_in:
             factor = self.zoom_factor
             self.current_zoom *= factor
@@ -113,8 +134,20 @@ class MapGraphicsView(QGraphicsView):
             factor = self.max_zoom / (self.current_zoom / factor)
             self.current_zoom = self.max_zoom
         self.scale(factor, factor)
-        self.zoom_label.setText((t('zoom') if t else 'Zoom') + f': {int(self.current_zoom * 100)}%')
+        self._update_zoom_label()
         self.zoom_changed.emit(self.current_zoom)
+        self._update_zoom_buttons_enabled()
+    def _update_zoom_label(self):
+        self.zoom_label.setText((t('zoom') if t else 'Zoom') + f': {int(self.current_zoom * 100)}%')
+    def zoom_by_step(self, direction: int):
+        """Public zoom entry for the +/- buttons; direction > 0 zooms in,
+        direction < 0 zooms out. Uses the exact wheelEvent math."""
+        self._apply_zoom_step(direction > 0)
+    def _update_zoom_buttons_enabled(self):
+        if not hasattr(self, 'zoom_in_btn'):
+            return
+        self.zoom_in_btn.setEnabled(self.current_zoom < self.max_zoom)
+        self.zoom_out_btn.setEnabled(self.current_zoom > self.min_zoom)
     def mousePressEvent(self, event):
         item = self.itemAt(event.pos())
         if isinstance(item, BaseMarker):
@@ -352,10 +385,20 @@ class MapGraphicsView(QGraphicsView):
             self.scale(factor, factor)
             self.zoom_label.setText((t('zoom') if t else 'Zoom') + f': {int(self.current_zoom * 100)}%')
             self.zoom_changed.emit(self.current_zoom)
+    def _position_zoom_controls(self):
+        # bottom-right cluster: [−][+] then the readout; kept below the
+        # top-right toggle overlay row and clear of the legend card.
+        y = max(30, self.height() - 30)
+        self.zoom_out_btn.move(self.width() - 184, y)
+        self.zoom_in_btn.move(self.width() - 158, y)
+        self.zoom_out_btn.raise_()
+        self.zoom_in_btn.raise_()
+        self.zoom_label.raise_()
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.coords_label.move(10, self.height() - 30)
         self.zoom_label.move(self.width() - 100, self.height() - 30)
+        self._position_zoom_controls()
         self.coords_label.raise_()
         self.zoom_label.raise_()
         if self.overlay_position_callback:

@@ -8,9 +8,10 @@ consume these.
 from __future__ import annotations
 
 from typing import Callable, Optional
-from PyQt6.QtCore import pyqtSignal, Qt, QTimer
+from PyQt6.QtCore import QPoint, pyqtSignal, Qt, QTimer
 from PyQt6.QtGui import QFontMetrics, QPainter
 from PyQt6.QtWidgets import (
+    QApplication,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -28,6 +29,11 @@ from PyQt6.QtWidgets import (
 from palworld_aio.ui.chrome import fonts
 from palworld_aio.ui.chrome import icons as app_icons
 from palworld_aio.ui.chrome.tokens import HEIGHT, SPACING, TYPE
+
+try:
+    from i18n import t
+except ImportError:  # pragma: no cover - standalone component use
+    t = None
 
 _LEVELS = ('neutral', 'success', 'warning', 'danger', 'info', 'special', 'accent')
 
@@ -527,6 +533,169 @@ def create_page_footer(status_text: str = '', parent=None) -> PageFooter:
     if status_text:
         footer.status_label.setText(status_text)
     return footer
+
+
+# ---------------------------------------------------------------------------
+# Inspector panel (uiux-audit-remediation 4.1 / design D7)
+# ---------------------------------------------------------------------------
+class CopyValueRow(QWidget):
+    """Monospace identifier value with tooltip + click-to-copy and the
+    transient copy.svg -> check.svg feedback (task 2 pattern)."""
+
+    _COPY_FEEDBACK_MS = 2000
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setObjectName('copyValueRow')
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        self._row_label = ''
+        self._value = QPushButton('')
+        self._value.setObjectName('inspectorCopyValue')
+        self._value.setFlat(True)
+        self._value.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._value.setIcon(app_icons.get_qicon('copy', role='text_secondary'))
+        lay.addWidget(self._value, 1)
+        self._reset_timer = QTimer(self)
+        self._reset_timer.setSingleShot(True)
+        self._reset_timer.timeout.connect(self._reset_feedback)
+        self._value.clicked.connect(self._on_copy)
+
+    def set_label(self, label: str) -> None:
+        self._row_label = str(label or '')
+
+    def set_value(self, value: str) -> None:
+        value = str(value or '')
+        self._value.setText(value)
+        self._value.setToolTip(value)
+        self._value.setAccessibleName(f'{self._row_label}: {value}'.strip(': '))
+        self._value.setVisible(bool(value))
+
+    def value(self) -> str:
+        return self._value.text()
+
+    def _on_copy(self) -> None:
+        if not self._value.text():
+            return
+        clipboard = QApplication.clipboard()
+        clipboard.setText(self._value.text())
+        self._value.setIcon(app_icons.get_qicon('check', role='success'))
+        self._reset_timer.start(self._COPY_FEEDBACK_MS)
+
+    def _reset_feedback(self) -> None:
+        self._value.setIcon(app_icons.get_qicon('copy', role='text_secondary'))
+
+
+class InspectorPanel(QFrame):
+    """Right-hand detail panel following the Docs list-plus-detail pattern
+    (design D7): title row, stat-grid rows (label/value pairs, values may be
+    monospace), an optional action slot, and the shared empty-state
+    presentation when nothing is selected."""
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setObjectName('inspectorPanel')
+        self._root = QVBoxLayout(self)
+        self._root.setContentsMargins(SPACING['md'], SPACING['sm'], SPACING['md'], SPACING['sm'])
+        self._root.setSpacing(SPACING['xs'])
+
+        self._title = QLabel('')
+        self._title.setObjectName('inspectorTitle')
+        self._root.addWidget(self._title)
+
+        self._grid_host = QWidget(self)
+        self._grid = QVBoxLayout(self._grid_host)
+        self._grid.setContentsMargins(0, 0, 0, 0)
+        self._grid.setSpacing(SPACING['xs'])
+        self._rows: list[tuple[QLabel, QWidget]] = []
+        self._root.addWidget(self._grid_host)
+
+        self._actions_host = QWidget(self)
+        self._actions = QHBoxLayout(self._actions_host)
+        self._actions.setContentsMargins(0, SPACING['xs'], 0, 0)
+        self._actions.setSpacing(SPACING['sm'])
+        self._actions.addStretch(1)
+        self._root.addWidget(self._actions_host)
+
+        self._empty = QLabel(t('inspector.no_selection') if t else 'Nothing selected')
+        self._empty.setObjectName('inspectorEmpty')
+        self._empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty.setWordWrap(True)
+        self._empty.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._root.addWidget(self._empty, 1)
+
+        self.show_empty()
+
+    def add_row(self, label: str, monospace: bool = False) -> QWidget:
+        """Append a stat-grid row; returns the value widget (QLabel, or
+        CopyValueRow when monospace). Call ``show_details`` to set values."""
+        label_lbl = make_label(label, 'micro')
+        label_lbl.setObjectName('inspectorRowLabel')
+        if monospace:
+            value: QWidget = CopyValueRow()
+            value.set_label(label)
+            value.setFont(fonts.mono_font())
+        else:
+            value = QLabel('')
+            value.setObjectName('inspectorRowValue')
+            value.setWordWrap(True)
+        self._grid.addWidget(label_lbl)
+        self._grid.addWidget(value)
+        self._rows.append((label_lbl, value))
+        return value
+
+    def add_action(self, button: QPushButton) -> None:
+        self._actions.insertWidget(self._actions.count() - 1, button)
+
+    def show_details(self, title: str, values: dict[int, str] | None = None) -> None:
+        """Populate the title and, by row index, the row values. Rows whose
+        value is empty/None hide their label row."""
+        self._title.setText(title)
+        self._title.show()
+        values = values or {}
+        for index, (label_lbl, value) in enumerate(self._rows):
+            text = str(values.get(index, '') or '')
+            if isinstance(value, CopyValueRow):
+                value.set_value(text)
+                label_lbl.setVisible(bool(text))
+            else:
+                value.setText(text)
+                value.setVisible(bool(text))
+                label_lbl.setVisible(bool(text))
+        self._grid_host.show()
+        self._actions_host.show()
+        self._empty.hide()
+
+    def show_empty(self, message: str | None = None) -> None:
+        self._title.hide()
+        self._grid_host.hide()
+        self._actions_host.hide()
+        self._empty.setText(message if message else
+                            (t('inspector.no_selection') if t else 'Nothing selected'))
+        self._empty.show()
+
+    def clear(self) -> None:
+        self.show_empty()
+
+    def refresh_labels(self) -> None:
+        if self._empty.isVisible():
+            self.show_empty()
+
+
+class InspectorSideColumn(QFrame):
+    """Bases/Players/Guilds right-side inspector column (design D7):
+    fixed-width surface hosting an InspectorPanel at full canvas height."""
+
+    def __init__(self, width: int = 340, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setObjectName('inspectorSideColumn')
+        self.setFixedWidth(width)
+        col = QVBoxLayout(self)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(0)
+        self.panel = InspectorPanel(self)
+        col.addWidget(self.panel, 1)
 
 
 class NerdBtn(QPushButton):

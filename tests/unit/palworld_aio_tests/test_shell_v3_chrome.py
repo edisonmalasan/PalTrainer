@@ -1,8 +1,9 @@
 """Focused regression tests for shell v3 chrome (top-nav-shell task 5.4).
 
-Covers: nav strip overflow (compact labels + collapse menu), save chip
-states, and status strip streaming. Widgets are constructed standalone
-offscreen — no MainWindow boot required.
+Covers: nav strip tiers (12 destinations, active parity, compact labels;
+tier overflow lives in test_nav_strip.py), save chip states, and status
+strip streaming. Widgets are constructed standalone offscreen — no
+MainWindow boot required.
 """
 from __future__ import annotations
 
@@ -61,32 +62,13 @@ def test_nav_strip_active_id_parity(app):
     assert strip.active_id() == 'players'
 
 
-def test_nav_strip_collapse_zones_hides_and_overflow_reaches(app):
-    strip = nav_strip_mod.NavStrip()
-    strip.show()
-    strip.resize(1200, 40)
-    strip.collapse_zones({'nav.zone.reference', 'nav.zone.edit'})
-    assert strip._tabs['breeding'].isHidden()
-    assert strip._tabs['json_editor'].isHidden()
-    # every collapsed destination remains reachable via the overflow menu
-    overflow_ids = set()
-    for zone_key, _fallback, page_ids in nav_strip_mod.ZONES:
-        if zone_key in {'nav.zone.reference', 'nav.zone.edit'}:
-            overflow_ids.update(page_ids)
-    rebuilt = {a.text() for a in strip._overflow_menu.actions()}
-    labels = {nav_strip_mod.nav_full_label(pid) for pid in overflow_ids}
-    assert rebuilt == labels
-    strip.collapse_zones(set())
-    assert not strip._tabs['breeding'].isHidden()
-
-
 def test_nav_strip_compact_labels_shorten_text(app):
     strip = nav_strip_mod.NavStrip()
     tab = strip._tabs['base_inventory']
     full = tab.text()
-    strip._apply_layout_state(True, set())
+    tab.set_compact(True)
     compact = tab.text()
-    strip._apply_layout_state(False, set())
+    tab.set_compact(False)
     assert len(compact) < len(full)
 
 
@@ -139,9 +121,9 @@ def test_status_bar_stream_routes_to_status_strip(app):
     StatusBarStream = main_window_mod.StatusBarStream
     bar = QStatusBar()
     stream = StatusBarStream(bar)
-    stream.write('save loaded ok')
+    stream.write('waiting for input')
     stream._drain_pending()
-    assert bar.currentMessage() == 'save loaded ok'
+    assert bar.currentMessage() == 'waiting for input'
 
 
 def test_status_bar_stream_detaches_and_reattaches(app):

@@ -1096,6 +1096,35 @@ _CONTAINER_NAME_OVERRIDES = {
 }
 _CONTAINER_NAME_ARTIFACTS = {'3d', 'sk', 'common', 'drop', 'item'}
 
+# uiux-audit-remediation 8.3: dropped-item debris assets (world clutter).
+_DROPPED_ITEM_ASSET = 'dropitem'
+_DROPPED_ITEM_MAX_SLOTS = 1
+
+
+def _is_dropped_item_container(container_info):
+    """True for near-empty world debris ('3D/CommonDropItem...' assets with
+    at most one slot); everything else is meaningful storage."""
+    asset = str(container_info.get('map_object_id') or container_info.get('type') or '')
+    if _DROPPED_ITEM_ASSET not in asset.lower():
+        return False
+    try:
+        return int(container_info.get('slot_count', 0)) <= _DROPPED_ITEM_MAX_SLOTS
+    except (TypeError, ValueError):
+        return False
+
+
+def _order_containers_storage_first(containers):
+    """Split containers into storage vs dropped-item debris (8.3): meaningful
+    storage keeps its original order first, debris keeps its own order."""
+    storage = []
+    debris = []
+    for container in containers:
+        if _is_dropped_item_container(container):
+            debris.append(container)
+        else:
+            storage.append(container)
+    return storage, debris
+
 
 def _friendly_container_display_name(container_info):
     """Human container label (modernize-tab-ui 2.2): known-asset overrides
@@ -1155,6 +1184,32 @@ class ContainerListWidget(QTreeWidget):
         item.setSizeHint(0, QSize(300, 80))
         self.addTopLevelItem(item)
         self.setItemWidget(item, 0, self._create_container_widget(container_info, display_name))
+    def add_dropped_items_separator(self, label):
+        """uiux-audit-remediation 8.3: non-selectable muted section row that
+        separates dropped-item debris from meaningful storage."""
+        item = QTreeWidgetItem()
+        item.setText(0, label)
+        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
+        item.setSizeHint(0, QSize(300, 28))
+        item.setData(0, Qt.UserRole + 1, 'separator')
+        self.addTopLevelItem(item)
+        self.setItemWidget(item, 0, self._create_separator_widget(label))
+    def first_selectable_item(self):
+        """First row with a container id (skips section separators)."""
+        for i in range(self.topLevelItemCount()):
+            item = self.topLevelItem(i)
+            if item.data(0, Qt.UserRole) is not None:
+                return item
+        return None
+    def _create_separator_widget(self, label):
+        widget = QWidget()
+        widget.setStyleSheet('background: transparent;')
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(2, 6, 2, 2)
+        label_item = QLabel(label)
+        label_item.setObjectName('containerGroupLabel')
+        layout.addWidget(label_item)
+        return widget
     def add_structure_entry(self, structure_name, instance_id, structure_asset=''):
         item = QTreeWidgetItem()
         item.setText(0, '')
@@ -1253,6 +1308,8 @@ class ContainerListWidget(QTreeWidget):
         selected_items = self.selectedItems()
         if selected_items:
             container_id = selected_items[0].data(0, Qt.UserRole)
+            if container_id is None:
+                return
             self.container_selected.emit(container_id)
     def _on_item_clicked(self, item):
         container_id = item.data(0, Qt.UserRole)
@@ -1260,7 +1317,10 @@ class ContainerListWidget(QTreeWidget):
             self.container_selected.emit(container_id)
     def _show_context_menu(self, position):
         item = self.itemAt(position)
-        if item:
+        # uiux-audit-remediation 8.x edge fix: the 'Dropped Items' section
+        # separator is an item but not a container — only rows carrying a
+        # container id open the context menu.
+        if item and item.data(0, Qt.UserRole) is not None:
             container_id = item.data(0, Qt.UserRole)
             from palworld_aio.widgets.scrollable_context_menu import ScrollableContextMenu
             popup = ScrollableContextMenu(self)
@@ -2796,6 +2856,7 @@ class BaseInventoryTab(QWidget):
         self._current_base_name = ''
         self._guilds_data = []
         self._bases_data = []
+        self._pending_guild_selection = None
         self._setup_ui()
         self._setup_connections()
         self._auto_save_timer = QTimer(self)
@@ -2804,16 +2865,18 @@ class BaseInventoryTab(QWidget):
         self._auto_save_timer.timeout.connect(self._auto_save_changes)
     def _restore_container_selection(self, previous_container_id=None):
         if not previous_container_id:
-            if self.container_list.topLevelItemCount() > 0:
-                self.container_list.setCurrentItem(self.container_list.topLevelItem(0))
+            first = self.container_list.first_selectable_item()
+            if first is not None:
+                self.container_list.setCurrentItem(first)
             return
         for i in range(self.container_list.topLevelItemCount()):
             item = self.container_list.topLevelItem(i)
             if item.data(0, Qt.UserRole) == previous_container_id:
                 self.container_list.setCurrentItem(item)
                 return
-        if self.container_list.topLevelItemCount() > 0:
-            self.container_list.setCurrentItem(self.container_list.topLevelItem(0))
+        first = self.container_list.first_selectable_item()
+        if first is not None:
+            self.container_list.setCurrentItem(first)
     def refresh_labels(self):
         if hasattr(self, 'container_label'):
             self.container_label.setText(t('base_inventory.select_container') if t else 'Containers:')
@@ -2882,35 +2945,43 @@ class BaseInventoryTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        ribbon = create_page_ribbon(t('base_inventory.title', default='Base Inventory'), (t('sidebar.section.world') if t else 'World Data').upper(), self)
+        # uiux-audit-remediation 8.1: the page edits containers, so its zone
+        # caption reads EDITING (matches its Edit-tier nav position), not
+        # WORLD DATA.
+        ribbon = create_page_ribbon(t('base_inventory.title', default='Base Inventory'), (t('sidebar.section.editing') if t else 'Editing').upper(), self)
         layout.addWidget(ribbon)
         # top-nav-shell 4.4: guild/base selectors + view switch in a standard
-        # toolbar row below the page header.
+        # toolbar row below the page header. uiux-audit-remediation 8.2
+        # (design D10): the two control kinds get distinct treatments —
+        # context selectors are bordered dropdown chips with chevrons; view
+        # modes are underlined tabs (styled via the qss_builder).
         toolbar_row = QHBoxLayout()
         set_content_margins(toolbar_row, top=6, bottom=6)
         toolbar_row.setSpacing(6)
         self.guild_button = QPushButton(t('base_inventory.select_guild') if t else 'Select Guild')
-        self.guild_button.setObjectName('ghostBtn')
+        self.guild_button.setObjectName('selectorChip')
         self.guild_button.setMinimumWidth(140)
         self.guild_button.setCursor(Qt.PointingHandCursor)
+        self.guild_button.setIcon(app_icons.get_qicon('chevron_down', role='text_secondary'))
         self.guild_button.clicked.connect(self._show_guild_popup)
         toolbar_row.addWidget(self.guild_button)
         self.base_button = QPushButton(t('base_inventory.select_base') if t else 'Select Base')
-        self.base_button.setObjectName('ghostBtn')
+        self.base_button.setObjectName('selectorChip')
         self.base_button.setMinimumWidth(120)
         self.base_button.setCursor(Qt.PointingHandCursor)
+        self.base_button.setIcon(app_icons.get_qicon('chevron_down', role='text_secondary'))
         self.base_button.clicked.connect(self._show_base_popup)
         self.base_button.setEnabled(False)
         toolbar_row.addWidget(self.base_button)
         self.inv_tab_btn = QPushButton(t('base_inventory.tab_inventory') if t else 'Inventory')
-        self.inv_tab_btn.setObjectName('pageSwitchBtn')
+        self.inv_tab_btn.setObjectName('viewTabBtn')
         self.inv_tab_btn.setCheckable(True)
         self.inv_tab_btn.setChecked(True)
         self.inv_tab_btn.setCursor(Qt.PointingHandCursor)
         self.inv_tab_btn.clicked.connect(lambda: self._switch_tab(0))
         toolbar_row.addWidget(self.inv_tab_btn)
         self.pals_tab_btn = QPushButton(t('base_inventory.tab_base_pals') if t else 'Base Pals')
-        self.pals_tab_btn.setObjectName('pageSwitchBtn')
+        self.pals_tab_btn.setObjectName('viewTabBtn')
         self.pals_tab_btn.setCheckable(True)
         self.pals_tab_btn.setCursor(Qt.PointingHandCursor)
         self.pals_tab_btn.clicked.connect(lambda: self._switch_tab(1))
@@ -3081,6 +3152,19 @@ class BaseInventoryTab(QWidget):
         self.refresh_labels()
         if hasattr(self._main_window, 'parent') and hasattr(self._main_window.parent, 'results_widget'):
             pass
+    def select_guild(self, guild_id):
+        """Public targeting hook (uiux-audit-remediation 4.5): select a guild
+        programmatically by routing through the existing _on_guild_changed
+        flow. Before guild data has loaded the request is queued and applied
+        when _load_guilds finishes."""
+        if guild_id is None:
+            return
+        guilds = getattr(self, '_guilds_data', None)
+        if guilds:
+            if any(str(g['id']) == str(guild_id) for g in guilds):
+                self._on_guild_changed(guild_id)
+            return
+        self._pending_guild_selection = guild_id
     def _show_guild_popup(self):
         popup = QWidget()
         popup.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
@@ -3245,6 +3329,11 @@ class BaseInventoryTab(QWidget):
                 self.guild_button.setEnabled(True)
                 self.base_button.setEnabled(True)
                 self._clear_display()
+                pending = getattr(self, '_pending_guild_selection', None)
+                if pending is not None:
+                    self._pending_guild_selection = None
+                    if any(str(g['id']) == str(pending) for g in self._guilds_data):
+                        self._on_guild_changed(pending)
         run_with_loading(on_finished, task)
     def _on_guild_changed(self, guild_id):
         if guild_id is None:
@@ -3389,11 +3478,21 @@ class BaseInventoryTab(QWidget):
                 self.manager.current_base = base_info
         if containers is None:
             containers = self.manager.load_containers_for_base(base_id)
-        for container in containers:
+        # uiux-audit-remediation 8.3: meaningful storage first, then a muted
+        # separator, then dropped-item debris; every container stays listed
+        # and selectable.
+        storage, debris = _order_containers_storage_first(containers)
+        for container in storage:
             self.container_list.add_container(container)
+        if debris:
+            self.container_list.add_dropped_items_separator(
+                t('base_inventory.dropped_items') if t else 'Dropped Items')
+            for container in debris:
+                self.container_list.add_container(container)
         if containers:
-            if self.container_list.topLevelItemCount() > 0:
-                self.container_list.setCurrentItem(self.container_list.topLevelItem(0))
+            first = self.container_list.first_selectable_item()
+            if first is not None:
+                self.container_list.setCurrentItem(first)
         else:
             self.container_info.set_container_info(None)
             self.inventory_grid.clear()
@@ -3410,12 +3509,21 @@ class BaseInventoryTab(QWidget):
                     filtered_containers = guild_data[base_id_key]
                     if filtered_containers:
                         all_containers = containers if containers is not None else self.manager.load_containers_for_base(base_id)
-                        for container in all_containers:
-                            container_id_key = str(container['id']).replace('-', '').lower()
-                            if container_id_key in filtered_containers:
+                        matching = [container for container in all_containers
+                                    if str(container['id']).replace('-', '').lower() in filtered_containers]
+                        # uiux-audit-remediation 8.3: same storage-first
+                        # grouping as the unfiltered path.
+                        storage, debris = _order_containers_storage_first(matching)
+                        for container in storage:
+                            self.container_list.add_container(container)
+                        if debris:
+                            self.container_list.add_dropped_items_separator(
+                                t('base_inventory.dropped_items') if t else 'Dropped Items')
+                            for container in debris:
                                 self.container_list.add_container(container)
-                        if self.container_list.topLevelItemCount() > 0:
-                            self.container_list.setCurrentItem(self.container_list.topLevelItem(0))
+                        first = self.container_list.first_selectable_item()
+                        if first is not None:
+                            self.container_list.setCurrentItem(first)
                     else:
                         self.container_info.set_container_info(None)
                         self.inventory_grid.clear()

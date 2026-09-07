@@ -64,8 +64,9 @@ try:
             wired2 = False
             break
     log('campaign_wired=' + str(wired2))
-    # deep links exist on metric chips
-    log('load_btns=' + str(hasattr(tab, '_load_steam_btn') and hasattr(tab, '_load_xgp_btn')))
+    # segmented platform control (uiux-audit-remediation 3.1)
+    log('segmented_control=' + str(hasattr(tab, '_platform_segment')
+                                   and tab._platform_segment.selected() in ('steam', 'gamepass')))
     # no old objects
     old = [c for c in w.findChildren(type(tab)) if c.objectName() in ('saveCard', 'toolCard', 'glass')]
     log('old_cards_absent=' + str(len(old) == 0))

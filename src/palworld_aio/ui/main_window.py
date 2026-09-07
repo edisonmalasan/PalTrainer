@@ -48,6 +48,9 @@ def _item_value(item, col):
     """modernize-tab-ui 5.2: full column value (GUID role) with text fallback."""
     value = item.data(col, SearchPanel.GUID_ROLE)
     return value if value not in (None, '') else item.text(col)
+# uiux-audit-remediation 5.1: role used by _populate_players_inspector to
+# read the full Guild ID from the players table (search_panel.GUID_ROLE).
+from palworld_aio.widgets.search_panel import GUID_ROLE as _PLAYER_GUILD_ID_ROLE
 class DetachedStatusWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__()
@@ -163,7 +166,17 @@ class StatusBarStream(QObject):
         if self.detached and self.detach_window:
             self.detach_window.append_message(text)
         else:
-            self.status_bar.showMessage(text)
+            presented = _present_status(text)
+            if presented is _STATUS_SHOW_RAW:
+                self.status_bar.showMessage(text)
+            elif presented is _STATUS_DEMOTE:
+                # demoted to the log/console; keep the last human message,
+                # or leave the neutral ready message instead of stale text
+                if not self.status_bar.currentMessage():
+                    self.status_bar.showMessage(t('status.ready') if t else 'Ready')
+            else:
+                key, fallback = presented  # type: ignore[misc]
+                self.status_bar.showMessage(t(key) if t else fallback)
     def write(self, text):
         with self._stream_lock:
             self.stringio.write(text)
@@ -241,7 +254,39 @@ class UpdateChecker(QThread):
             self.update_checked.emit(not available, latest, self.branch)
         except Exception as e:
             print(f'Update check error: {e}')
-            self.update_checked.emit(True, None, None)
+            self.update_checked.emit(False, None, None)
+# Status strip presentation policy (uiux-audit-remediation 2.1 / design D3):
+# the strip shows one short human-readable message; raw technical payloads
+# are demoted to the log/console stream (StatusBarStream still routes every
+# payload verbatim when detached). Patterns match the producers:
+# - decompression stats: palsav compressor logger lines
+# - update-check failures: UpdateChecker.print in run(); they surface through
+#   the app-bar warning affordance (2.2) instead of strip text
+# - exception text / HTTP status codes: traceback blocks and HTTPError reprs
+_STATUS_SHOW_RAW = object()
+_STATUS_DEMOTE = object()
+_STATUS_SUMMARIZERS = (
+    (re.compile(r'Decompression successful', re.IGNORECASE), ('status.ready', 'Ready')),
+    (re.compile(r'^(?:Save )?load(?:ed| complete| successful)\b|Level\.sav loaded', re.IGNORECASE), ('status.loaded', 'Save loaded successfully')),
+    (re.compile(r'^Save (?:completed|saved)', re.IGNORECASE), ('status.saved', 'Save completed')),
+    (re.compile(r'load (?:failed|error)|failed to load', re.IGNORECASE), ('status.load_failed', 'Failed to load save')),
+    (re.compile(r'^Update check (?:error|callback error):'), _STATUS_DEMOTE),
+    (re.compile(r'^Traceback \(most recent call last\):'), _STATUS_DEMOTE),
+    (re.compile(r'^File "'), _STATUS_DEMOTE),
+    (re.compile(r'HTTP Error \d{3}'), _STATUS_DEMOTE),
+)
+def _present_status(text):
+    """Map a streamed payload to its strip presentation (design D3).
+
+    Returns _STATUS_DEMOTE (log/console only), (key, fallback) for a human
+    summary, or _STATUS_SHOW_RAW to display the payload unchanged."""
+    stripped = (text or '').strip()
+    if not stripped:
+        return _STATUS_SHOW_RAW
+    for pattern, presentation in _STATUS_SUMMARIZERS:
+        if pattern.search(stripped):
+            return presentation
+    return _STATUS_SHOW_RAW
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -337,7 +382,6 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.app_bar)
         self.app_bar.connect_warn()
         self.app_bar.set_warning_slot(self._show_warnings)
-        self.app_bar.show_warning(True)
         self.nav_strip = NavStrip()
         self.nav_strip.nav_changed.connect(self._on_nav_changed)
         main_layout.addWidget(self.nav_strip)
@@ -449,19 +493,37 @@ class MainWindow(QMainWindow):
             self.stacked_widget.insertWidget(idx, widget)
             self._tab_created.add(index)
     def _setup_players_tab(self):
-        from .chrome.components import create_page_ribbon
+        from .chrome.components import (
+            InspectorSideColumn, create_page_footer, create_page_ribbon,
+        )
+        from .chrome import icons as app_icons
         players_tab = QWidget()
         layout = QVBoxLayout(players_tab)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(create_page_ribbon(t('deletion.search_players') if t else 'Search Players', (t('sidebar.section.world') if t else 'World Data').upper(), players_tab))
+        # uiux-audit-remediation 5.1/5.2 (design D7): table column (bulk
+        # footer hugging the capped table card) + inspector side column.
+        self._players_table_cap = 420
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+        table_column = QWidget()
+        table_layout = QVBoxLayout(table_column)
+        table_layout.setContentsMargins(0, 0, 0, 0)
+        table_layout.setSpacing(0)
         self.players_panel = SearchPanel('deletion.search_players', ['deletion.col.player_name', 'deletion.col.last_seen', 'deletion.col.level', 'deletion.col.pals', 'deletion.col.uid', 'deletion.col.guild_name', 'deletion.col.guild_id', 'deletion.col.guild_level'], [140, 120, 60, 60, 150, 180, 180, 60])
         self.players_panel.item_selected.connect(self._on_player_selected)
         self.players_panel.tree.customContextMenuRequested.connect(self._show_player_context_menu)
-        layout.addWidget(self.players_panel, stretch=1)
+        # uiux-audit-remediation 5.3: Player UID (index 4) / Guild ID
+        # (index 6) columns get the mono + full-value Ctrl+C copy treatment.
+        self.players_panel.set_copyable_columns({4, 6})
+        self.players_panel.set_mono_columns({4, 6})
+        table_layout.addWidget(self.players_panel, stretch=1)
         # shared page footer (top-nav-shell 4.1): bulk actions live in the
-        # trailing actions slot; wiring unchanged
-        from .chrome.components import create_page_footer
+        # trailing actions slot; wiring unchanged. uiux-audit-remediation
+        # 5.2: the footer sits directly beneath the capped table card inside
+        # the table column instead of the stretched page bottom.
         bulk_frame = create_page_footer()
         bulk_layout = bulk_frame.actions
         self.bulk_label = QLabel(t('player.bulk_actions') if t else 'Bulk Actions:')
@@ -480,46 +542,128 @@ class MainWindow(QMainWindow):
         self.bulk_guild_btn = QPushButton(t('guild.assign.btn_open') if t else 'Guild Assignments')
         self.bulk_guild_btn.clicked.connect(self._open_guild_assign_dialog)
         bulk_layout.addWidget(self.bulk_guild_btn)
-        layout.addWidget(bulk_frame)
+        table_layout.addWidget(bulk_frame)
+        self._players_bulk_frame = bulk_frame
+        table_layout.addStretch(1)
+        body.addWidget(table_column, stretch=1)
+        self._players_inspector_column = InspectorSideColumn(340)
+        self._players_inspector = self._players_inspector_column.panel
+        self._players_inspector.add_row(t('deletion.col.last_seen') if t else 'Last Seen')
+        self._players_inspector.add_row(t('deletion.col.level') if t else 'Level')
+        self._players_inspector.add_row(t('deletion.col.pals') if t else 'Pals')
+        self._players_inspector.add_row(t('deletion.col.guild_name') if t else 'Guild')
+        self._players_inspector.add_row('Player UID', monospace=True)
+        self._players_inspector.add_row('Guild ID', monospace=True)
+        self._players_inspector.show_empty(
+            t('players.inspector_empty') if t else 'Select a player to view their details')
+        body.addWidget(self._players_inspector_column)
+        layout.addLayout(body, stretch=1)
         self.stacked_widget.addWidget(players_tab)
     def _setup_guilds_tab(self):
-        from .chrome.components import create_page_ribbon
+        from .chrome.components import InspectorSideColumn, create_page_ribbon
         guilds_tab = QWidget()
         layout = QVBoxLayout(guilds_tab)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(create_page_ribbon(t('deletion.search_guilds') if t else 'Search Guilds', (t('sidebar.section.world') if t else 'World Data').upper(), guilds_tab))
+        # uiux-audit-remediation 6.1 (design D7): guilds content (splitter
+        # untouched) + inspector side column for the GUILD table.
+        content = QHBoxLayout()
+        content.setContentsMargins(0, 0, 0, 0)
+        content.setSpacing(0)
         splitter = QSplitter(Qt.Vertical)
         splitter.setContentsMargins(0, 0, 0, 0)
         self.guilds_panel = SearchPanel('deletion.search_guilds', ['deletion.col.guild_name', 'deletion.col.guild_id', 'deletion.col.guild_level', 'deletion.col.members'], [200, 280, 100, 80])
         self.guilds_panel.item_selected.connect(self._on_guild_selected)
         self.guilds_panel.tree.customContextMenuRequested.connect(self._show_guild_context_menu)
+        # uiux-audit-remediation 6.3: Guild ID column (index 1) gets the
+        # mono + full-value Ctrl+C copy treatment.
+        self.guilds_panel.set_copyable_columns({1})
+        self.guilds_panel.set_mono_columns({1})
+        self.guilds_panel.tree.setMinimumHeight(160)
         splitter.addWidget(self.guilds_panel)
         self.guild_members_panel = SearchPanel('deletion.guild_members', ['deletion.col.member', 'deletion.col.last_seen', 'deletion.col.level', 'deletion.col.pals', 'deletion.col.uid', 'deletion.col.role'], [200, 120, 60, 100, 300, 80])
         self.guild_members_panel.item_selected.connect(self._on_guild_member_selected)
         self.guild_members_panel.tree.customContextMenuRequested.connect(self._show_guild_member_context_menu)
-        # modernize-tab-ui 5.3: shared EmptyState for the no-selection condition
-        # (distinct from the no-save hint the plain label keeps showing).
+        # uiux-audit-remediation 6.3: member UID column (index 4).
+        self.guild_members_panel.set_copyable_columns({4})
+        self.guild_members_panel.set_mono_columns({4})
+        # uiux-audit-remediation 6.2: row-level wording — a guild may already
+        # be selected globally, so the pane prompts the row interaction.
         self._members_empty_state = EmptyState(
-            t('deletion.guild_members.select_hint') if t else 'Select a guild to view its members',
-            hint=t('deletion.guild_members.select_hint_sub') if t else 'Pick a guild in the list above.',
+            t('deletion.guild_members.row_hint') if t else 'Click a guild row to view its members',
+            hint=t('deletion.guild_members.row_hint_sub') if t else 'Members of the clicked guild appear in this list.',
             icon_name='guilds',
         )
         self.guild_members_panel.set_empty_state_widget(self._members_empty_state)
         splitter.addWidget(self.guild_members_panel)
-        layout.addWidget(splitter, stretch=1)
+        content.addWidget(splitter, stretch=1)
+        self._guilds_inspector_column = InspectorSideColumn(340)
+        self._guilds_inspector = self._guilds_inspector_column.panel
+        self._guilds_inspector.add_row(t('deletion.col.guild_level') if t else 'Guild Level')
+        self._guilds_inspector.add_row(t('deletion.col.members') if t else 'Members')
+        self._guilds_inspector.add_row('Guild ID', monospace=True)
+        self._guilds_inspector.show_empty(
+            t('guilds.inspector_empty') if t else 'Select a guild to view its details')
+        content.addWidget(self._guilds_inspector_column)
+        # uiux-audit-remediation 6.4: the GUILD table caps to content height
+        # via the shared helper; the members pane keeps its splitter behavior.
+        self._guilds_table_cap = 300
+        layout.addLayout(content, stretch=1)
         self.stacked_widget.addWidget(guilds_tab)
     def _setup_bases_tab(self):
-        from .chrome.components import create_page_ribbon
+        from .chrome.components import (
+            InspectorSideColumn, create_page_ribbon,
+        )
+        from .chrome import icons as app_icons
         bases_tab = QWidget()
         layout = QVBoxLayout(bases_tab)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(create_page_ribbon(t('deletion.search_bases') if t else 'Search Bases', (t('sidebar.section.world') if t else 'World Data').upper(), bases_tab))
+        # uiux-audit-remediation 4.2 (design D7): table column + inspector
+        # side column; the inspector absorbs the freed canvas instead of the
+        # table forcing a full-height fill.
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+        table_column = QWidget()
+        table_layout = QVBoxLayout(table_column)
+        table_layout.setContentsMargins(0, 0, 0, 0)
+        table_layout.setSpacing(0)
+        # uiux-audit-remediation 4.2: the table sizes to its content up to a
+        # cap (internal scroll beyond) instead of forcing a full-height fill;
+        # the inspector side column occupies the freed canvas.
+        self._bases_table_cap = 420
         self.bases_panel = SearchPanel('deletion.search_bases', ['deletion.col.base_id', 'deletion.col.guild_id', 'deletion.col.guild_name', 'deletion.col.guild_level'], [200, 200, 200, 100])
+        self.bases_panel.tree.setMinimumHeight(160)
         self.bases_panel.item_selected.connect(self._on_base_selected)
         self.bases_panel.tree.customContextMenuRequested.connect(self._show_base_context_menu)
-        layout.addWidget(self.bases_panel, stretch=1)
+        # uiux-audit-remediation 4.3: Base ID / Guild ID columns get the
+        # mono + full-value Ctrl+C copy treatment (display stays shortened)
+        self.bases_panel.set_copyable_columns({0, 1})
+        self.bases_panel.set_mono_columns({0, 1})
+        table_layout.addWidget(self.bases_panel, stretch=1)
+        table_layout.addStretch(1)
+        body.addWidget(table_column, stretch=1)
+        self._bases_inspector_column = InspectorSideColumn(340)
+        self._bases_inspector = self._bases_inspector_column.panel
+        self._bases_inspector.add_row(t('deletion.col.guild_name') if t else 'Guild')
+        self._bases_inspector.add_row(t('deletion.col.guild_level') if t else 'Guild Level')
+        self._bases_inspector.add_row('Base ID', monospace=True)
+        self._bases_inspector.add_row('Guild ID', monospace=True)
+        self._bases_open_inventory_btn = QPushButton(
+            t('bases.open_in_inventory') if t else 'Open in Base Inventory')
+        self._bases_open_inventory_btn.setProperty('class', 'ghost')
+        self._bases_open_inventory_btn.setIcon(
+            app_icons.get_qicon('base_inventory', role='text_secondary'))
+        self._bases_open_inventory_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self._bases_open_inventory_btn.clicked.connect(self._open_base_in_inventory)
+        self._bases_inspector.add_action(self._bases_open_inventory_btn)
+        self._bases_inspector.show_empty(
+            t('bases.inspector_empty') if t else 'Select a base to view its details')
+        body.addWidget(self._bases_inspector_column)
+        layout.addLayout(body, stretch=1)
         self.stacked_widget.addWidget(bases_tab)
     def _setup_map_tab(self):
         from .tabs.map_tab import MapTab
@@ -571,6 +715,7 @@ class MainWindow(QMainWindow):
         self._excl_views = {}
         self._excl_btns = {}
         self._excl_empty_states = {}
+        self._excl_add_buttons = {}
         switch_row.addStretch(1)
         layout.addLayout(switch_row)
         self._excl_stack = QStackedWidget()
@@ -603,6 +748,19 @@ class MainWindow(QMainWindow):
             )
             panel.set_empty_state_widget(empty)
             self._excl_empty_states[key] = empty
+            # uiux-audit-remediation 7.1: persistent visible '+ Add Exclusion'
+            # affordance in the panel footer (outside the empty-state overlay,
+            # so it stays usable when the list is empty) routing into the
+            # existing _add_exclusion flow.
+            add_btn = QPushButton(t('deletion.exclusions.add') if t else '+ Add Exclusion')
+            add_btn.setObjectName('exclAddBtn')
+            add_btn.setProperty('class', 'ghost')
+            add_btn.setCursor(QCursor(Qt.PointingHandCursor))
+            add_btn.setToolTip(t('deletion.exclusions.add') if t else '+ Add Exclusion')
+            add_btn.setAccessibleName(t('deletion.exclusions.add') if t else '+ Add Exclusion')
+            add_btn.clicked.connect(lambda checked=False, k=key: self._add_exclusion_via_prompt(k))
+            panel.footer_slot.addWidget(add_btn)
+            self._excl_add_buttons[key] = add_btn
             page_lay.addWidget(panel)
             self._excl_stack.addWidget(page)
             self._excl_views[key] = self._excl_stack.count() - 1
@@ -621,6 +779,27 @@ class MainWindow(QMainWindow):
         self._excl_stack.setCurrentIndex(self._excl_views[key])
         for k, btn in self._excl_btns.items():
             btn.setChecked(k == key)
+    def _add_exclusion_via_prompt(self, excl_type):
+        """uiux-audit-remediation 7.1: visible '+ Add Exclusion' affordance —
+        prompts for the identifier and routes into the existing
+        _add_exclusion flow (storage/save/refresh untouched). Empty or
+        cancelled input does nothing."""
+        prompts = {
+            'players': ('deletion.exclusions.add_prompt_players', 'Enter the Player UID to exclude:'),
+            'guilds': ('deletion.exclusions.add_prompt_guilds', 'Enter the Guild ID to exclude:'),
+            'bases': ('deletion.exclusions.add_prompt_bases', 'Enter the Base ID to exclude:'),
+        }
+        prompt_key, prompt_fallback = prompts[excl_type]
+        text, ok = QInputDialog.getText(
+            self,
+            t('deletion.exclusions.add_title') if t else 'Add Exclusion',
+            t(prompt_key) if t else prompt_fallback)
+        if not ok:
+            return
+        value = text.strip()
+        if not value:
+            return
+        self._add_exclusion(excl_type, value)
     def _setup_menus(self):
         menu_actions = {'file': [(t('menu.file.load_save') if t else 'Load Save', self._load_save), (t('menu.file.load_xgp_save') if t else 'Load GamePass Save', self._load_xgp_save), (t('menu.file.load_backup') if t else 'Load from Backup', self._load_backup_save), (t('menu.file.load_gps') if t else 'Load Global Pal Storage', self._load_gps), (t('menu.file.load_worldoption') if t else 'Load WorldOption', self._load_worldoption), (t('menu.file.save_changes') if t else 'Save Changes', self._save_changes), (t('menu.file.rename_world') if t else 'Rename World', self._rename_world), (t('aio.menu.open_data_folder') if t else 'Open Data Folder', self._open_data_folder)], 'functions': [(t('deletion.menu.submenu.delete') if t else 'Delete', [(t('deletion.menu.delete_empty_guilds') if t else 'Delete Empty Guilds', self._delete_empty_guilds), (t('deletion.menu.delete_inactive_bases') if t else 'Delete Inactive Bases', self._delete_inactive_bases), (t('deletion.menu.delete_duplicate_players') if t else 'Delete Duplicate Players', self._delete_duplicate_players), (t('deletion.menu.delete_inactive_players') if t else 'Delete Inactive Players', self._delete_inactive_players), (t('deletion.menu.delete_unreferenced') if t else 'Delete Unreferenced Data', self._delete_unreferenced), (t('deletion.menu.delete_non_base_map_objs') if t else 'Delete Non-Base Map Objects', self._delete_non_base_map_objs), (t('deletion.menu.delete_all_skins') if t else 'Delete All Skins', self._delete_all_skins), (t('deletion.menu.delete_invalid_items') if t else 'Delete Invalid Items', self._remove_invalid_items), (t('deletion.menu.delete_invalid_structures') if t else 'Delete Invalid Structures', self._remove_invalid_structures), (t('deletion.menu.delete_imported_pals') if t else 'Delete Imported Pals', self._delete_imported_pals), (t('deletion.menu.delete_invalid_pals') if t else 'Delete Invalid Pals', self._remove_invalid_pals), (t('deletion.menu.delete_invalid_passives') if t else 'Delete Invalid Passives', self._remove_invalid_passives)]), (t('deletion.menu.submenu.fix') if t else 'Fix', [(t('deletion.menu.fix_structures') if t else 'Fix All Structures', self._repair_structures), (t('deletion.menu.fix_items') if t else 'Fix All Items', self._repair_items), (t('deletion.menu.fix_all_pals') if t else 'Fix All Pals', self._fix_all_pals), (t('deletion.menu.fix_illegal_pals') if t else 'Fix Illegal Pals', self._fix_illegal_pals), (t('deletion.menu.fix_illegal_players') if t else 'Fix Illegal Players', self._fix_illegal_players), (t('deletion.menu.fix_invalid_active_skills') if t else 'Fix Invalid Active Skills', self._fix_invalid_active_skills), (t('deletion.menu.fix_timestamps') if t else 'Fix All Negative Timestamps', self._fix_all_timestamps), (t('deletion.menu.fix_overfilled_inventories') if t else 'Fix Container Sizes', self._trim_overfilled_inventories), (t('deletion.menu.fix_all_guilds') if t else 'Fix All Guilds', self._rebuild_all_guilds)]), (t('deletion.menu.submenu.reset') if t else 'Reset', [(t('deletion.menu.reset_missions') if t else 'Reset Missions', self._reset_missions), (t('deletion.menu.reset_anti_air') if t else 'Reset Anti-Air Turrets', self._reset_anti_air), (t('deletion.menu.reset_oilrig') if t else 'Reset Oil Rigs', self._reset_oilrig), (t('deletion.menu.reset_invader') if t else 'Reset Invaders', self._reset_invader), (t('deletion.menu.reset_supply') if t else 'Reset Supply', self._reset_supply), (t('deletion.menu.reset_dungeons') if t else 'Reset Dungeons', self._reset_dungeons), (t('deletion.menu.reset_lock_gimmick') if t else 'Reset Mini Game Towers', self._reset_lock_gimmick)]), (t('deletion.menu.submenu.misc') if t else 'Misc', [(t('deletion.menu.unlock_private_chests') if t else 'Unlock Private Chests', self._unlock_private_chests), (t('deletion.menu.max_all_pals') if t else 'Max All Pals', self._max_all_pals), (t('deletion.menu.paldefender') if t else 'PalDefender Commands', self._open_paldefender),         (t('base.export_all') if t else 'Export All Bases', self._export_all_bases), (t('modify_container_slots') if t else 'Modify Container Slots', self._modify_container_slots), (t('deletion.menu.modify_all_player_slots') if t else 'Modify All Player Slots', self._modify_all_player_slots), (t('deletion.menu.modify_all_guild_chest_slots') if t else 'Modify All Guild Chest Slots', self._modify_all_guild_chest_slots), (t('gamedays.menu') if t else 'Edit Game Days', self._edit_game_days)])], 'configs': [(t('loading.mode.submenu') if t else 'Loading Screen Configs', [(t('loading.mode.show') if t else 'Show Loading Screen', partial(self._set_loading_screen_mode, 'overlay')), (t('loading.mode.hide') if t else 'Hide Loading Screen', partial(self._set_loading_screen_mode, 'header'))]), (t('pal_name_settings.title') if t else 'Pal Name Settings', self._open_pal_name_settings)], 'maps': [(t('deletion.menu.show_map') if t else 'Show Map', self._show_map), (t('deletion.menu.generate_map') if t else 'Generate Map', self._generate_map)], 'exclusions': [(t('deletion.menu.save_exclusions') if t else 'Save Exclusions', self._save_exclusions)], 'languages': [(get_native_lang_name(code), partial(self._change_language, code), {'en_US': '🇺🇸', 'zh_CN': '🇨🇳', 'ru_RU': '🇷🇺', 'fr_FR': '🇫🇷', 'es_ES': '🇪🇸', 'de_DE': '🇩🇪', 'ja_JP': '🇯🇵', 'ko_KR': '🇰🇷', 'pt_BR': '🇧🇷', 'pt_PT': '🇵🇹'}[code]) for code in ['en_US', 'zh_CN', 'ru_RU', 'fr_FR', 'es_ES', 'de_DE', 'ja_JP', 'ko_KR', 'pt_BR', 'pt_PT']]}
         self._set_menu_actions(menu_actions)
@@ -819,6 +998,15 @@ class MainWindow(QMainWindow):
                 self.status_bar.showMessage(f"{(t('update.current') if t else 'Current')}: {tools_version}{branch_text} | {(t('update.latest') if t else 'Latest')}: {latest} - Click version chip to update", 0)
             else:
                 self.app_bar.set_update_pulse(False)
+            # uiux-audit-remediation 2.2: a failed update check raises the
+            # warning affordance (tri-state) instead of pinning raw error
+            # text in the strip; any successful check — up-to-date (ok) or
+            # update-available (latest set) — resolves it.
+            if ok or latest is not None:
+                self.app_bar.resolve_warning()
+            else:
+                self.app_bar.raise_warning(
+                    t('status.update_check_failed') if t else 'Update check failed — click the warning for details')
         except Exception as e:
             print(f'Update check callback error: {e}')
     def _lock_ui(self):
@@ -845,6 +1033,10 @@ class MainWindow(QMainWindow):
             constants.dirty = False
             self._set_dirty(False)
             self.app_bar.context.clear_selection()
+            # uiux-audit-remediation 2.5: the context indicator only exists
+            # while a save is loaded (placeholder rows cover the
+            # loaded-but-unselected state).
+            self.app_bar.context.setVisible(True)
             self._refresh_stats_all_before()
             self.status_bar.showMessage(t('status.loaded') if t else 'Save loaded successfully', 5000)
         else:
@@ -942,6 +1134,17 @@ class MainWindow(QMainWindow):
             # full GUID in a tooltip; data/sort keys unchanged.
             tooltips = {4: str(uid)}
             self.players_panel.add_item([display_name, lastseen, level, pals, _short_guid(uid), gname, gid, glevel], sort_keys=sort_keys, tooltips=tooltips)
+        # uiux-audit-remediation 5.1 (additive): the refreshed table has no
+        # selection, so the inspector returns to its empty presentation.
+        try:
+            inspector = self._players_inspector
+        except (AttributeError, RuntimeError):
+            inspector = None
+        if inspector is not None:
+            inspector.show_empty(
+                t('players.inspector_empty') if t else 'Select a player to view their details')
+        self._cap_search_table_height(
+            self.players_panel, '_players_panel_chrome', self._players_table_cap)
     def _refresh_guilds(self):
         self.guilds_panel.clear()
         self.guild_members_panel.clear()
@@ -957,8 +1160,21 @@ class MainWindow(QMainWindow):
             self.guild_members_panel.set_empty_state_widget(None)
         else:
             self.guild_members_panel.set_empty_state_widget(self._members_empty_state)
-            self._members_empty_state.setText(t('deletion.guild_members.select_hint') if t else 'Select a guild to view its members')
-            self._members_empty_state.setHint(t('deletion.guild_members.select_hint_sub') if t else 'Pick a guild in the list above.')
+            # uiux-audit-remediation 6.2: row-level wording (matches the
+            # construction default in _setup_guilds_tab).
+            self._members_empty_state.setText(t('deletion.guild_members.row_hint') if t else 'Click a guild row to view its members')
+            self._members_empty_state.setHint(t('deletion.guild_members.row_hint_sub') if t else 'Members of the clicked guild appear in this list.')
+        # uiux-audit-remediation 6.1 (additive): the refreshed table has no
+        # selection, so the inspector returns to its empty presentation.
+        try:
+            inspector = self._guilds_inspector
+        except (AttributeError, RuntimeError):
+            inspector = None
+        if inspector is not None:
+            inspector.show_empty(
+                t('guilds.inspector_empty') if t else 'Select a guild to view its details')
+        self._cap_search_table_height(
+            self.guilds_panel, '_guilds_panel_chrome', self._guilds_table_cap)
     def _refresh_bases(self):
         self.bases_panel.clear()
         bases = get_bases()
@@ -968,6 +1184,54 @@ class MainWindow(QMainWindow):
             # modernize-tab-ui 5.2: Base ID / Guild ID short form + full tooltip.
             tooltips = {0: str(b['id']), 1: str(b['guild_id'])}
             self.bases_panel.add_item([_short_guid(b['id']), _short_guid(b['guild_id']), b['guild_name'], glevel], sort_keys=sort_keys, tooltips=tooltips)
+        # uiux-audit-remediation 4.2 (additive): the refreshed table has no
+        # selection, so the inspector returns to its empty presentation.
+        try:
+            inspector = self._bases_inspector
+        except (AttributeError, RuntimeError):
+            inspector = None
+        if inspector is not None:
+            inspector.show_empty(
+                t('bases.inspector_empty') if t else 'Select a base to view its details')
+        self._cap_bases_table_height()
+
+    def _cap_search_table_height(self, panel, chrome_attr: str, content_cap: int,
+                                 max_rows: int = 10, min_height: int = 180):
+        """uiux-audit-remediation 5.2 (design D7): shared content-height cap
+        for World-Data table cards (Bases, Players). The card sizes to its
+        rows up to ``content_cap`` (rows scroll internally beyond it) so the
+        bulk footer hugs the table and the inspector fills the side."""
+        tree = panel.tree
+        row_h = 26
+        if tree.topLevelItemCount():
+            measured = tree.visualItemRect(tree.topLevelItem(0)).height()
+            if measured > 0:
+                row_h = measured
+        header_h = tree.header().height() or 28
+        visible = min(tree.topLevelItemCount(), max_rows)
+        tree_needed = header_h + visible * row_h + 2
+        # non-tree chrome of the SearchPanel (search row + hairline + footer),
+        # measured once from a laid-out widget (falls back to the QSS sum)
+        try:
+            chrome = getattr(self, chrome_attr)
+        except (AttributeError, RuntimeError):
+            chrome = 0
+        if not chrome and panel.height() > 200:
+            measured = panel.height() - tree.height()
+            if measured >= 48:
+                setattr(self, chrome_attr, measured)
+                chrome = measured
+        if not chrome:
+            from palworld_aio.ui.chrome.tokens import HEIGHT
+            chrome = (HEIGHT['default'] + 18) + 1 + (HEIGHT['compact'] + 8)
+        cap = min(tree_needed + chrome, max(content_cap + chrome, 200))
+        panel.setMaximumHeight(max(cap, min_height))
+
+    def _cap_bases_table_height(self):
+        """uiux-audit-remediation 4.2: bound the bases table container to its
+        content height (see _cap_search_table_height)."""
+        self._cap_search_table_height(
+            self.bases_panel, '_bases_panel_chrome', self._bases_table_cap)
     def _refresh_map(self):
         if 'map_tab' in self.__dict__:
             self.map_tab.refresh()
@@ -1043,8 +1307,16 @@ class MainWindow(QMainWindow):
             delattr(self, 'drag_position')
         super().mouseReleaseEvent(event)
     def _show_warnings(self):
+        # uiux-audit-remediation 2.2 (design D4): click-to-reveal includes
+        # the condition that raised the affordance (e.g. a failed update
+        # check) ahead of the standing save-safety notices.
+        lines = []
+        warn_detail = self.app_bar.warn_detail()
+        if warn_detail:
+            lines.append(warn_detail)
         warnings = [(t('notice.backup') if t else 'WARNING: ALWAYS BACKUP YOUR SAVES BEFORE USING THESE TOOLS!', {}), (t('notice.patch', game_version=get_versions()[1]) if t else 'MAKE SURE TO UPDATE YOUR SAVES AFTER EVERY GAME PATCH!', {}), (t('notice.errors') if t else 'IF YOU DO NOT UPDATE YOUR SAVES AFTER A PATCH,YOU MAY ENCOUNTER ERRORS!', {})]
-        combined = '\n\n'.join((w for w, _ in warnings if w))
+        lines.extend((w for w, _ in warnings if w))
+        combined = '\n\n'.join(lines)
         if not combined:
             combined = t('notice.none') if t else 'No warnings.'
         msg_box = self._create_message_box(QMessageBox.Warning)
@@ -1360,9 +1632,34 @@ class MainWindow(QMainWindow):
         if data:
             self.app_bar.context.set_player(data[0])
             self.app_bar.context.set_guild(data[5])
+            self._populate_players_inspector(data)
+
+    def _populate_players_inspector(self, data):
+        """uiux-audit-remediation 5.1: mirror the selected player row into
+        the inspector (context wiring and data logic unchanged)."""
+        inspector = getattr(self, '_players_inspector', None)
+        if inspector is None:
+            return
+        if not data:
+            inspector.show_empty(
+                t('players.inspector_empty') if t else 'Select a player to view their details')
+            return
+        item = self.players_panel.get_selected_item()
+        uid = str(item.toolTip(4)) if item is not None and item.toolTip(4) else str(data[4])
+        guild_id = str(item.data(6, _PLAYER_GUILD_ID_ROLE)) if item is not None and item.data(6, _PLAYER_GUILD_ID_ROLE) else str(data[6])
+        title = str(data[0])
+        inspector.show_details(title, {
+            0: str(data[1]),
+            1: str(data[2]),
+            2: str(data[3]),
+            3: str(data[5]),
+            4: uid,
+            5: guild_id,
+        })
     def _on_guild_selected(self, data):
         if data:
             self.app_bar.context.set_guild(data[0])
+            self._populate_guilds_inspector(data)
             self.guild_members_panel.clear()
             members = get_guild_members(data[1])
             for m in members:
@@ -1371,6 +1668,24 @@ class MainWindow(QMainWindow):
                 rl = m.get('role_label', '')
                 sort_keys = {1: last_sort if last_sort is not None else float('inf'), 2: int(m['level']) if str(m['level']).isdigit() else 0, 3: int(m['pals']) if str(m['pals']).isdigit() else 0, 5: m.get('role', 3)}
                 self.guild_members_panel.add_item([prefix + m['name'], m['lastseen'], m['level'], m['pals'], m['uid'], rl], sort_keys=sort_keys)
+
+    def _populate_guilds_inspector(self, data):
+        """uiux-audit-remediation 6.1: mirror the selected guild row into the
+        inspector (context wiring and member population unchanged)."""
+        inspector = getattr(self, '_guilds_inspector', None)
+        if inspector is None:
+            return
+        if not data:
+            inspector.show_empty(
+                t('guilds.inspector_empty') if t else 'Select a guild to view its details')
+            return
+        item = self.guilds_panel.get_selected_item()
+        guild_id = str(item.toolTip(1)) if item is not None and item.toolTip(1) else str(data[1])
+        inspector.show_details(str(data[0]), {
+            0: str(data[2]),
+            1: str(data[3]),
+            2: guild_id,
+        })
     def _on_guild_member_selected(self, data):
         if data:
             name = data[0].replace('[L]', '')
@@ -1379,6 +1694,53 @@ class MainWindow(QMainWindow):
         if data:
             self.app_bar.context.set_base(data[0])
             self.app_bar.context.set_guild(data[2])
+            self._populate_bases_inspector(data)
+
+    def _populate_bases_inspector(self, data):
+        """uiux-audit-remediation 4.2: mirror the selected base row into the
+        inspector (selection wiring and data logic unchanged)."""
+        inspector = getattr(self, '_bases_inspector', None)
+        if inspector is None:
+            return
+        if not data:
+            inspector.show_empty(
+                t('bases.inspector_empty') if t else 'Select a base to view its details')
+            return
+        item = self.bases_panel.get_selected_item()
+        base_id = str(item.toolTip(0)) if item is not None and item.toolTip(0) else str(data[0])
+        guild_id = str(item.toolTip(1)) if item is not None and item.toolTip(1) else str(data[1])
+        # 1-based position of the base within its guild, from get_bases() order
+        base_number = 0
+        try:
+            guild_bases = [b for b in get_bases() if str(b['guild_id']) == guild_id]
+            base_number = next(
+                (i + 1 for i, b in enumerate(guild_bases) if str(b['id']) == base_id), 0)
+        except (TypeError, ValueError, KeyError):
+            base_number = 0
+        title = f'Base {base_number}' if base_number else (t('bases.inspector_title') if t else 'Base')
+        inspector.show_details(title, {
+            0: str(data[2]),
+            1: str(data[3]),
+            2: base_id,
+            3: guild_id,
+        })
+
+    def _open_base_in_inventory(self):
+        """uiux-audit-remediation 4.5: navigate to the Base Inventory page
+        and target the selected base's guild there (guild-level targeting —
+        the Base Inventory component's selection scope)."""
+        if not getattr(self, '_bases_inspector', None):
+            return
+        item = self.bases_panel.get_selected_item() if hasattr(self, 'bases_panel') else None
+        if item is None:
+            return
+        guild_id = item.toolTip(1) or item.text(1)
+        if not guild_id:
+            return
+        self._activate_nav('base_inventory')
+        tab = getattr(self, 'base_inventory_tab', None)
+        if tab is not None and hasattr(tab, 'select_guild'):
+            tab.select_guild(guild_id)
     def closeEvent(self, event: QCloseEvent):
         if constants.dirty and constants.current_save_path:
             self._set_dirty(False)

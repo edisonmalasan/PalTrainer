@@ -4,7 +4,7 @@ import json
 import threading
 import uuid
 from functools import partial
-from PyQt6.QtWidgets import QApplication, QCheckBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QScrollBar, QSizePolicy, QToolTip, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QCheckBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QScrollBar, QSizePolicy, QSpinBox, QToolTip, QVBoxLayout, QWidget
 from PyQt6.QtCore import Qt, QEvent, QSize, QTimer
 from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 from i18n import t
@@ -156,6 +156,17 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         self.box_label.setFixedWidth(110)
         self.box_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         mode_bar.addWidget(self.box_label)
+        # uiux-audit-remediation 7.5 (Phase 3.3): compact jump-to-box selector
+        # between the readout and the prev/next buttons; same navigation core.
+        self.box_jump_spin = QSpinBox()
+        self.box_jump_spin.setObjectName('boxJumpSpin')
+        self.box_jump_spin.setRange(1, 1)
+        self.box_jump_spin.setAlignment(Qt.AlignCenter)
+        self.box_jump_spin.setFixedSize(56, 24)
+        self.box_jump_spin.setToolTip(t('pal_editor.jump_to_box') if t else 'Jump to box')
+        self.box_jump_spin.setAccessibleName(t('pal_editor.jump_to_box') if t else 'Jump to box')
+        self.box_jump_spin.valueChanged.connect(self._on_box_jump)
+        mode_bar.addWidget(self.box_jump_spin)
         mode_bar.addWidget(self.prev_box_btn)
         mode_bar.addWidget(self.next_box_btn)
         self.multi_toolbar = QFrame()
@@ -241,6 +252,14 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         self.bulk_clone_btn.setCursor(Qt.PointingHandCursor)
         self.bulk_clone_btn.clicked.connect(self._open_bulk_clone)
         header_row.addWidget(self.bulk_clone_btn)
+        # uiux-audit-remediation 10.1 (D11): hard separator isolating the
+        # destructive bulk-delete tier from the safe/bulk actions.
+        self.bulk_delete_separator = QFrame()
+        self.bulk_delete_separator.setObjectName('toolbarTierSep')
+        self.bulk_delete_separator.setFrameShape(QFrame.NoFrame)
+        self.bulk_delete_separator.setFixedWidth(1)
+        self.bulk_delete_separator.setFixedHeight(22)
+        header_row.addWidget(self.bulk_delete_separator)
         self.bulk_delete_btn = QPushButton(t('edit_pals.bulk_delete') if t else 'Bulk Delete')
         # modernize-tab-ui 4.6: destructive tier (make_danger_button equivalent).
         self.bulk_delete_btn.setProperty('class', 'danger')
@@ -415,26 +434,40 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         else:
             count = len(self.palbox_pal_dict)
             self.box_label.setText(t('pal_editor.box_count', n=self.current_box_index, count=count) if t else f'Box {self.current_box_index} ({count})')
+        self._sync_box_jump_spin()
+    def _goto_box(self, idx):
+        """Shared navigation core for prev/next and the jump control
+        (uiux-audit-remediation 7.5): applies the index, clears the clicked-pal
+        state, and refreshes the page. Wrapping stays in the callers."""
+        self.current_box_index = max(1, min(int(idx), self._get_max_box()))
+        self._clicked_pal = None
+        self.selected_pal_slot = None
+        self.pal_info.set_clicked_pal(None)
+        self._update_box_label()
+        self._update_palbox_page()
+    def _on_box_jump(self, value):
+        self._goto_box(value)
+    def _sync_box_jump_spin(self):
+        """Track the current index and max without re-triggering valueChanged."""
+        spin = getattr(self, 'box_jump_spin', None)
+        if spin is None:
+            return
+        spin.blockSignals(True)
+        try:
+            spin.setRange(1, self._get_max_box())
+            spin.setValue(self.current_box_index)
+        finally:
+            spin.blockSignals(False)
     def _prev_box(self):
         if self.current_box_index > 1:
-            self.current_box_index -= 1
+            self._goto_box(self.current_box_index - 1)
         else:
-            self.current_box_index = self._get_max_box()
-        self._clicked_pal = None
-        self.selected_pal_slot = None
-        self.pal_info.set_clicked_pal(None)
-        self._update_box_label()
-        self._update_palbox_page()
+            self._goto_box(self._get_max_box())
     def _next_box(self):
         if self.current_box_index < self._get_max_box():
-            self.current_box_index += 1
+            self._goto_box(self.current_box_index + 1)
         else:
-            self.current_box_index = 1
-        self._clicked_pal = None
-        self.selected_pal_slot = None
-        self.pal_info.set_clicked_pal(None)
-        self._update_box_label()
-        self._update_palbox_page()
+            self._goto_box(1)
     def _on_party_slot_clicked(self, idx):
         slot = self.party_slots[idx]
         is_context = getattr(slot, '_context_click', False)

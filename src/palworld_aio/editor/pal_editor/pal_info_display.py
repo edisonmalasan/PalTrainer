@@ -476,6 +476,11 @@ class PalInfoDisplayMixin:
                 slot_layout.addWidget(power_lbl)
                 if e and skill_info:
                     tip_parts = [f'<b>{move_name}</b>', f'Element: {skill_elem}', f'Power: {skill_power}']
+                    # uiux-audit-remediation 10.3: unit-clarifying phrase so
+                    # the raw number is unambiguous (used to compute damage).
+                    power_hint = t('pal_editor.skill_power_hint') if t else 'Skill power — used to compute damage'
+                    if power_hint:
+                        tip_parts.append(power_hint)
                     cd = skill_info.get('cooldown', 0)
                     if cd:
                         tip_parts.append(f'Cooldown: {cd}s')

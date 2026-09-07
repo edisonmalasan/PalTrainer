@@ -48,6 +48,30 @@ def _format_value(val, max_len=200):
     return s if len(s) <= max_len else s[:max_len] + '...'
 
 
+class _ClickableCrumb(QLabel):
+    """Clickable breadcrumb chip (uiux-audit-remediation 11.1 / D12).
+    QLabel has no clicked signal, so clicks are surfaced here."""
+    clicked = pyqtSignal()
+    _json_path_item: QTreeWidgetItem | None
+
+    def __init__(self, text=''):
+        super().__init__(text)
+        self._json_path_item = None
+        self._armed = False
+
+    def mousePressEvent(self, ev):
+        if ev.button() == Qt.MouseButton.LeftButton:
+            self._armed = True
+        super().mousePressEvent(ev)
+
+    def mouseReleaseEvent(self, ev):
+        if self._armed and ev.button() == Qt.MouseButton.LeftButton:
+            self._armed = False
+            if self.rect().contains(ev.position().toPoint()):
+                self.clicked.emit()
+        super().mouseReleaseEvent(ev)
+
+
 class LazyJsonItem(QTreeWidgetItem):
     def __init__(self, parent, key, value):
         super().__init__()
@@ -142,6 +166,29 @@ class JsonEditorTab(QWidget):
         search_bar.addWidget(self._search_count_label)
         layout.addLayout(search_bar)
 
+        # uiux-audit-remediation 11.1 (D12): persistent clickable path
+        # breadcrumb tracking the current/last-visited tree item; clicking a
+        # crumb selects and scrolls to that ancestor.
+        self._breadcrumb_row = QHBoxLayout()
+        self._breadcrumb_row.setContentsMargins(12, 0, 12, 6)
+        self._breadcrumb_row.setSpacing(2)
+        self._crumb_elide_label = QLabel('')
+        self._crumb_elide_label.setObjectName('jsonCrumbMuted')
+        self._crumb_elide_label.hide()
+        self._breadcrumb_row.addWidget(self._crumb_elide_label)
+        self._breadcrumb_crumb_labels: list[_ClickableCrumb] = []
+        self._breadcrumb_separator_labels: list[QLabel] = []
+        self._breadcrumb_current: QTreeWidgetItem | None = None
+        self._breadcrumb_placeholder = QLabel(
+            t(f'{_JSON_KEY}.breadcrumb_root') if t else 'root')
+        self._breadcrumb_placeholder.setObjectName('jsonCrumbMuted')
+        self._breadcrumb_row.addWidget(self._breadcrumb_placeholder)
+        self._breadcrumb_row.addStretch(1)
+        self._breadcrumb_host = QWidget()
+        self._breadcrumb_host.setObjectName('jsonBreadcrumb')
+        self._breadcrumb_host.setLayout(self._breadcrumb_row)
+        layout.addWidget(self._breadcrumb_host)
+
         self._tree = QTreeWidget()
         self._tree.setObjectName('jsonTree')
         self._tree.setHeaderLabels([
@@ -160,6 +207,7 @@ class JsonEditorTab(QWidget):
         mono.setPointSize(10)
         self._tree.setFont(mono)
         self._tree.itemExpanded.connect(self._on_item_expanded)
+        self._tree.itemSelectionChanged.connect(self._update_breadcrumb)
         self._tree.setWordWrap(False)
         # no-save empty state (top-nav-shell 4.3): overlay hint on the tree
         hint_text = t(f'{_JSON_KEY}.no_save') if t else 'No save loaded'
@@ -202,6 +250,91 @@ class JsonEditorTab(QWidget):
     def _on_item_expanded(self, item):
         if isinstance(item, LazyJsonItem):
             item.load_children()
+
+    # ---------------------------------------------------------- breadcrumb
+    _BREADCRUMB_MAX_CRUMBS = 6
+
+    def _update_breadcrumb(self):
+        """uiux-audit-remediation 11.1 (D12): track the current (or
+        last-visited) item path in the clickable breadcrumb. Clicking a crumb
+        selects and scrolls to that ancestor."""
+        selected = self._tree.selectedItems()
+        if selected:
+            self._breadcrumb_current = selected[0]
+        item = self._breadcrumb_current
+        # rebuild crumb labels (root first, last N segments visible)
+        chain = []
+        while item is not None:
+            chain.append(item)
+            item = item.parent()
+        chain.reverse()
+        crumbs = [(c.text(0) or 'root') for c in chain]
+        for lbl in self._breadcrumb_crumb_labels + self._breadcrumb_separator_labels:
+            lbl.hide()
+        if not crumbs:
+            self._crumb_elide_label.hide()
+            self._breadcrumb_placeholder.show()
+            return
+        self._breadcrumb_placeholder.hide()
+        max_crumbs = self._BREADCRUMB_MAX_CRUMBS
+        visible = crumbs[-max_crumbs:]
+        hidden_count = len(crumbs) - len(visible)
+        col = 0
+        if hidden_count > 0:
+            self._crumb_elide_label.setText(f'… ({hidden_count})')
+            self._crumb_elide_label.show()
+            self._breadcrumb_row.insertWidget(col, self._crumb_elide_label)
+            col += 1
+        else:
+            self._crumb_elide_label.hide()
+        for idx, text in enumerate(visible):
+            chain_item = chain[len(crumbs) - len(visible) + idx]
+            if idx > 0 or hidden_count > 0:
+                sep_idx = idx - 1 + (1 if hidden_count > 0 else 0)
+                if sep_idx < len(self._breadcrumb_separator_labels):
+                    sep_lbl = self._breadcrumb_separator_labels[sep_idx]
+                else:
+                    sep_lbl = QLabel('›')
+                    sep_lbl.setObjectName('jsonCrumbMuted')
+                    self._breadcrumb_separator_labels.append(sep_lbl)
+                    self._breadcrumb_row.insertWidget(col, sep_lbl)
+                sep_lbl.show()
+                col += 1
+            if idx < len(self._breadcrumb_crumb_labels):
+                crumb_lbl = self._breadcrumb_crumb_labels[idx]
+                crumb_lbl.setText(text)
+                self._breadcrumb_row.insertWidget(col, crumb_lbl)
+            else:
+                crumb_lbl = _ClickableCrumb(text)
+                crumb_lbl.setObjectName('jsonCrumb')
+                crumb_lbl.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+                crumb_lbl.clicked.connect(self._on_crumb_clicked)
+                self._breadcrumb_crumb_labels.append(crumb_lbl)
+                self._breadcrumb_row.insertWidget(col, crumb_lbl)
+            crumb_lbl._json_path_item = chain_item
+            crumb_lbl.setToolTip(text)
+            crumb_lbl.show()
+            col += 1
+        for extra in self._breadcrumb_crumb_labels[len(visible):]:
+            extra.hide()
+
+    def _on_breadcrumb_clicked(self, item):
+        if item is None:
+            return
+        # ensure lazy ancestors are loaded so the item exists in the tree
+        parent = item.parent()
+        while parent is not None:
+            if isinstance(parent, LazyJsonItem):
+                parent.load_children()
+            parent = parent.parent()
+        self._tree.scrollToItem(item)
+        self._tree.setCurrentItem(item)
+
+    def _on_crumb_clicked(self):
+        crumb = self.sender()
+        if crumb not in self._breadcrumb_crumb_labels:
+            return
+        self._on_breadcrumb_clicked(getattr(crumb, '_json_path_item', None))
 
     def _on_search_changed(self, text):
         self._search_timer.start()
@@ -281,6 +414,8 @@ class JsonEditorTab(QWidget):
             return None
 
     def _populate_tree(self, data):
+        # drop the breadcrumb reference before clear() detaches the items
+        self._breadcrumb_current = None
         self._tree.clear()
         root = LazyJsonItem(self._tree, None, data)
         root.load_children()

@@ -24,6 +24,12 @@ QLabel[role="success"] { color: #2DD4BF; font-size: 11px; }
 QLabel[role="warning"] { color: #E8B44C; font-size: 11px; }
 QLabel[role="danger"] { color: #F87171; font-size: 11px; }
 QLabel[role="mono"] { font-family: 'Cascadia Mono','Consolas'; }
+/* uiux-audit-remediation 2.4 (design D5): mono token class for technical
+   data on non-label widgets; the bundled Cascadia Mono family resolves the
+   stack, Consolas is the system fallback. */
+QPushButton[class="mono"], QToolButton[class="mono"], QLineEdit[class="mono"] {
+    font-family: 'Cascadia Mono','Consolas';
+}
 
 QStackedWidget {
     background: transparent;
@@ -420,9 +426,26 @@ QPushButton#appBarUtility {
 }
 QPushButton#appBarUtility:hover { background: rgba(245,158,11,0.07); }
 QPushButton#appBarUtility:checked { background: rgba(245,158,11,0.12); }
+/* uiux-audit-remediation 2.2 (design D4): warning affordance tri-state via
+   the `warnState` property — none (hidden), unread (accent highlighted),
+   acknowledged (dimmed but visible while unresolved). */
 QPushButton#appBarWarnBtn {
     background: rgba(232,180,76,0.12);
     border: 1px solid rgba(232,180,76,0.35);
+}
+QPushButton#appBarWarnBtn[warnState="unread"] {
+    background: rgba(232,180,76,0.12);
+    border: 1px solid #E8B44C;
+}
+QPushButton#appBarWarnBtn[warnState="unread"]:hover {
+    background: rgba(232,180,76,0.35);
+}
+QPushButton#appBarWarnBtn[warnState="acknowledged"] {
+    background: transparent;
+    border: 1px solid transparent;
+}
+QPushButton#appBarWarnBtn[warnState="acknowledged"]:hover {
+    background: rgba(245,158,11,0.07);
 }
 QPushButton#windowControlBtn {
     background: transparent;
@@ -461,17 +484,39 @@ QPushButton#navTab:focus {
     outline: none;
     color: #ECE7E0;
 }
-QLabel#navZoneCaption {
-    color: #5C564E;
-    font-family: 'Hanken Grotesk','Segoe UI';
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 1px;
+/* uiux-audit-remediation 1.3: primary-tier zone destinations. The
+   active-zone treatment is amber text only — the amber underline stays
+   reserved for the active secondary tab. */
+QPushButton#navZoneTab {
     background: transparent;
-    padding: 0 4px;
+    color: #A69F94;
+    border: none;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    padding: 4px 10px 3px 10px;
+    font-family: 'Hanken Grotesk','Segoe UI';
+    font-size: 12px;
+    font-weight: 600;
 }
-QFrame#navZoneRule {
-    background: rgba(236,231,224,0.1);
+QPushButton#navZoneTab:hover {
+    background: rgba(245,158,11,0.07);
+    color: #ECE7E0;
+}
+QPushButton#navZoneTab:pressed {
+    background: rgba(245,158,11,0.12);
+}
+QPushButton#navZoneTab:checked {
+    color: #F59E0B;
+}
+QPushButton#navZoneTab:checked:hover {
+    color: #F7B03A;
+}
+QPushButton#navZoneTab:focus {
+    outline: none;
+    color: #ECE7E0;
+}
+QPushButton#navZoneTab:checked:focus {
+    color: #F59E0B;
 }
 QToolButton#navOverflowBtn {
     background: transparent;
@@ -1079,6 +1124,55 @@ QPushButton#pageSwitchBtn:checked {
     font-weight: 600;
 }
 QPushButton#pageSwitchBtn:focus { border-color: rgba(245,158,11,0.5); }
+/* uiux-audit-remediation 8.2 (design D10): context selectors render as
+   bordered dropdown chips (chevron icon set in code); the picker-selected
+   accent state mirrors the retired ghostBtn[pickerSelected] treatment. */
+QPushButton#selectorChip {
+    background: #211E1B;
+    border: 1px solid rgba(236,231,224,0.18);
+    border-radius: 9999px;
+    color: #A69F94;
+    padding: 5px 12px;
+    font-weight: 600;
+}
+QPushButton#selectorChip:hover {
+    border-color: rgba(245,158,11,0.3);
+    color: #ECE7E0;
+}
+QPushButton#selectorChip:disabled { color: #5C564E; border-color: rgba(236,231,224,0.1); }
+QPushButton#selectorChip[pickerSelected="true"] {
+    border-color: rgba(245,158,11,0.5);
+    color: #F59E0B;
+}
+/* uiux-audit-remediation 8.2 (design D10): view modes render as underlined
+   tabs — transparent body, active = accent text + bottom underline. */
+QPushButton#viewTabBtn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: #A69F94;
+    padding: 4px 12px;
+    font-weight: 600;
+}
+QPushButton#viewTabBtn:hover {
+    color: #ECE7E0;
+}
+QPushButton#viewTabBtn:checked {
+    color: #F59E0B;
+    border-bottom: 2px solid #F59E0B;
+}
+QPushButton#viewTabBtn:focus { outline: none; color: #ECE7E0; }
+QPushButton#viewTabBtn:checked:focus { color: #F59E0B; }
+/* uiux-audit-remediation 8.3: muted section label separating dropped-item
+   debris from meaningful storage in the container list. */
+QLabel#containerGroupLabel {
+    color: #5C564E;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+}
 QPushButton#ghostBtn, QPushButton#toolButton {
     background: transparent;
     border: 1px solid rgba(236,231,224,0.1);
@@ -1203,6 +1297,22 @@ QPushButton#mapToggleBtn:checked {
 QPushButton#mapToggleBtn[wide="true"] {
     min-width: 40px;
 }
+/* uiux-audit-remediation 10.1 (D11): hard separator isolating the
+   destructive bulk-delete tier in the Pal Editor toolbar. */
+QFrame#toolbarTierSep {
+    background: rgba(236,231,224,0.18);
+    border: none;
+    margin: 3px 4px;
+}
+/* uiux-audit-remediation 10.2 (D11): computed/read-only stat readouts are
+   visually demoted from editable input chrome. */
+QLabel[computedValue="true"] {
+    color: #A69F94;
+}
+QLabel[computedValue="true"][hinted="true"] {
+    color: #5C564E;
+}
+
 QLabel#saveStateChip {
     background: #211E1B;
     border: 1px solid rgba(236,231,224,0.1);
@@ -1275,6 +1385,84 @@ QPushButton#opsSavePath {
     font-family: 'Cascadia Mono','Consolas';
 }
 QPushButton#opsSavePath:hover { color: #F59E0B; }
+/* uiux-audit-remediation 3.1 (design D8): segmented platform control — two
+   exclusive segments rendered as one connected control; the selected
+   segment takes the primary accent treatment. */
+QWidget#platformSegment { background: transparent; }
+QPushButton#platformSegmentBtn {
+    background: #211E1B;
+    color: #A69F94;
+    border: 1px solid rgba(236,231,224,0.18);
+    border-radius: 0;
+    padding: 6px 14px;
+    min-height: 26px;
+    font-weight: 600;
+}
+QPushButton#platformSegmentBtn[segmentRole="start"] {
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-right: none;
+}
+QPushButton#platformSegmentBtn[segmentRole="end"] {
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+    border-left: none;
+}
+QPushButton#platformSegmentBtn:hover {
+    background: rgba(245,158,11,0.07);
+    color: #ECE7E0;
+}
+QPushButton#platformSegmentBtn:checked {
+    background: #F59E0B;
+    color: #1C1206;
+    border-color: #F59E0B;
+}
+QPushButton#platformSegmentBtn:checked:hover {
+    background: #F7B03A;
+    border-color: #F7B03A;
+}
+QPushButton#platformSegmentBtn:focus {
+    outline: none;
+    border-color: rgba(245,158,11,0.5);
+}
+QPushButton#platformSegmentBtn:checked:focus { border-color: #F59E0B; }
+/* uiux-audit-remediation 3.3: click-to-copy affordance beside the path */
+QPushButton#opsCopyPathBtn {
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    padding: 2px;
+}
+QPushButton#opsCopyPathBtn:hover { background: rgba(245,158,11,0.07); }
+/* uiux-audit-remediation 3.2 (design D9): live activity log panel —
+   bounded height, console-like dark surface, muted header row. */
+QWidget#activityLogPanel { background: transparent; }
+QLabel#activityLogTitle {
+    color: #5C564E;
+    font-family: 'Hanken Grotesk','Segoe UI';
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: transparent;
+}
+QPushButton#activityLogClearBtn {
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    padding: 2px;
+}
+QPushButton#activityLogClearBtn:hover { background: rgba(245,158,11,0.07); }
+QTextEdit#activityLogView {
+    background: #141312;
+    color: #A69F94;
+    border: 1px solid rgba(236,231,224,0.1);
+    border-radius: 5px;
+    padding: 8px;
+    selection-background-color: rgba(245,158,11,0.18);
+    selection-color: #ECE7E0;
+    font-family: 'Cascadia Mono','Consolas';
+    font-size: 11px;
+}
 QLabel#opsDropHint { color: #5C564E; font-size: 10px; }
 QLabel#toolsFooterHint { color: #5C564E; font-size: 10px; }
 QWidget#metricRow { background: transparent; }
@@ -1347,6 +1535,47 @@ QLabel#statsValue { color: #ECE7E0; }
 QLabel#statsHeader { color: #A69F94; font-size: 10px; font-weight: 600; letter-spacing: 1px; }
 QLabel#sectionHeader { color: #A69F94; font-size: 10px; font-weight: 600; letter-spacing: 1px; }
 QFrame#glassPanel { background: #1B1917; border: 1px solid rgba(236,231,224,0.1); border-radius: 8px; }
+
+/* ---- inspector panel (uiux-audit-remediation 4.1 / design D7) ---- */
+QFrame#inspectorPanel {
+    background: #1B1917;
+    border: 1px solid rgba(236,231,224,0.1);
+    border-radius: 8px;
+}
+QFrame#inspectorSideColumn { background: transparent; }
+QLabel#inspectorTitle {
+    color: #ECE7E0;
+    font-family: 'Hanken Grotesk','Segoe UI';
+    font-size: 12px;
+    font-weight: 600;
+}
+QLabel#inspectorRowLabel {
+    color: #5C564E;
+    font-size: 10px;
+    letter-spacing: 1px;
+    font-weight: 600;
+}
+QLabel#inspectorRowValue {
+    color: #ECE7E0;
+    font-size: 12px;
+}
+QLabel#inspectorEmpty {
+    color: #5C564E;
+    font-size: 12px;
+    background: transparent;
+    padding: 16px;
+}
+QPushButton#inspectorCopyValue {
+    background: transparent;
+    color: #ECE7E0;
+    border: none;
+    border-radius: 3px;
+    padding: 1px 2px;
+    text-align: left;
+    font-family: 'Cascadia Mono','Consolas';
+    font-size: 11px;
+}
+QPushButton#inspectorCopyValue:hover { background: rgba(245,158,11,0.07); color: #F59E0B; }
 
 /* ---- ui-modernization Phase 0: promoted selectors (were inline or missing).
    Token/property selectors only. Dialogs that still carry inline copies of
