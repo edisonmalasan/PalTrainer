@@ -1347,6 +1347,29 @@ QPushButton#mapToggleBtn:checked {{
 QPushButton#mapToggleBtn[wide="true"] {{
     min-width: 40px;
 }}
+/* uiux-audit-remediation 8.1 (design D13): +/− zoom buttons beside the
+   zoom readout — same overlay-button family, token-styled. */
+QPushButton#mapZoomBtn {{
+    color: {p['text']};
+    background: {p['surface_hover']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['sm']}px;
+    font-weight: 700;
+    padding: 0px;
+}}
+QPushButton#mapZoomBtn:hover {{
+    background: {p['surface_active']};
+    border-color: {p['accent_border']};
+}}
+QPushButton#mapZoomBtn:pressed {{
+    background: {p['accent_bg_strong']};
+    border-color: {p['accent_border_strong']};
+}}
+QPushButton#mapZoomBtn:disabled {{
+    color: {p['text_disabled']};
+    background: transparent;
+    border-color: transparent;
+}}
 /* uiux-audit-remediation 10.1 (D11): hard separator isolating the
    destructive bulk-delete tier in the Pal Editor toolbar. */
 QFrame#toolbarTierSep {{

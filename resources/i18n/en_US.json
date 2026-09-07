@@ -971,6 +971,8 @@
     "map.unknown.lastseen": "Unknown",
     "map.unknown.leader": "Unknown Leader",
     "map.viewer": "Map Viewer",
+    "map.zoom_in": "Zoom In",
+    "map.zoom_out": "Zoom Out",
     "map_gen_failed": "Map generation failed.",
     "map_generate": "Generate Map",
     "map_obj.checking_id": "Checking {object_name} ID: {instance_id}",

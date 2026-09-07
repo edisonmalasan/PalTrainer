@@ -90,16 +90,25 @@ class MapTab(QWidget):
             self.search_input.setPlaceholderText(t('map.search.placeholder') if t else 'Search guilds,leaders,bases...')
         if hasattr(self, 'toggle_map_bases'):
             self.toggle_map_bases.setToolTip(t('map.toggle.bases') if t else 'Bases')
+            self.toggle_map_bases.setAccessibleName(self.toggle_map_bases.toolTip())
         if hasattr(self, 'toggle_map_players'):
             self.toggle_map_players.setToolTip(t('map.toggle.players') if t else 'Players')
+            self.toggle_map_players.setAccessibleName(self.toggle_map_players.toolTip())
         if hasattr(self, 'toggle_base_radius_rings'):
             self.toggle_base_radius_rings.setToolTip(t('map.toggle.base_radius_rings') if t else 'Base Radius Rings')
+            self.toggle_base_radius_rings.setAccessibleName(self.toggle_base_radius_rings.toolTip())
         if hasattr(self, 'toggle_map_zones'):
             self.toggle_map_zones.setToolTip(t('map.toggle.zones') if t else 'Zones')
+            self.toggle_map_zones.setAccessibleName(self.toggle_map_zones.toolTip())
         if hasattr(self, 'toggle_map_type'):
             self.toggle_map_type.setToolTip(t('map.toggle.world_map') if self.current_map == 'tree' else t('map.toggle.tree_map'))
+            self.toggle_map_type.setAccessibleName(self.toggle_map_type.toolTip())
         if hasattr(self, 'btn_calibrate'):
             self.btn_calibrate.setToolTip(t('calibrate.button'))
+            self.btn_calibrate.setAccessibleName(self.btn_calibrate.toolTip())
+        if hasattr(self, 'btn_calibrate_tree'):
+            self.btn_calibrate_tree.setToolTip(t('calibrate.tree_button'))
+            self.btn_calibrate_tree.setAccessibleName(self.btn_calibrate_tree.toolTip())
         if hasattr(self, '_calibration_label') and self._calibration_label.isVisible():
             n = len(self._calibration_points)
             total = len(self._calibration_bases)
@@ -223,6 +232,7 @@ class MapTab(QWidget):
         self.btn_calibrate.setIcon(QIcon(resource_path(base_dir, 'calibrate.webp')))
         self.btn_calibrate.setIconSize(QSize(22, 22))
         self.btn_calibrate.setToolTip(t('calibrate.button'))
+        self.btn_calibrate.setAccessibleName(self.btn_calibrate.toolTip())
         self.btn_calibrate.setCheckable(True)
         self.btn_calibrate.setChecked(False)
         self.btn_calibrate.clicked.connect(self._on_calibrate_toggle)
@@ -232,6 +242,7 @@ class MapTab(QWidget):
         self.btn_calibrate_tree.setIcon(QIcon(resource_path(base_dir, 'calibrate.webp')))
         self.btn_calibrate_tree.setIconSize(QSize(22, 22))
         self.btn_calibrate_tree.setToolTip(t('calibrate.tree_button'))
+        self.btn_calibrate_tree.setAccessibleName(self.btn_calibrate_tree.toolTip())
         self.btn_calibrate_tree.setCheckable(True)
         self.btn_calibrate_tree.setChecked(False)
         self.btn_calibrate_tree.clicked.connect(self._on_calibrate_tree_toggle)
@@ -241,6 +252,7 @@ class MapTab(QWidget):
         self.toggle_map_bases.setIcon(QIcon(resource_path(base_dir, 'baseicon.webp')))
         self.toggle_map_bases.setIconSize(QSize(22, 22))
         self.toggle_map_bases.setToolTip(t('map.toggle.bases') if t else 'Bases')
+        self.toggle_map_bases.setAccessibleName(self.toggle_map_bases.toolTip())
         self.toggle_map_bases.setCheckable(True)
         self.toggle_map_bases.setChecked(True)
         self.toggle_map_bases.clicked.connect(self._on_toggle_changed)
@@ -250,6 +262,7 @@ class MapTab(QWidget):
         self.toggle_map_players.setIcon(QIcon(resource_path(base_dir, 'playericon.webp')))
         self.toggle_map_players.setIconSize(QSize(22, 22))
         self.toggle_map_players.setToolTip(t('map.toggle.players') if t else 'Players')
+        self.toggle_map_players.setAccessibleName(self.toggle_map_players.toolTip())
         self.toggle_map_players.setCheckable(True)
         self.toggle_map_players.setChecked(False)
         self.toggle_map_players.clicked.connect(self._on_toggle_changed)
@@ -259,6 +272,7 @@ class MapTab(QWidget):
         self.toggle_base_radius_rings.setIcon(QIcon(resource_path(base_dir, 'ring.webp')))
         self.toggle_base_radius_rings.setIconSize(QSize(22, 22))
         self.toggle_base_radius_rings.setToolTip(t('map.toggle.base_radius_rings') if t else 'Base Radius Rings')
+        self.toggle_base_radius_rings.setAccessibleName(self.toggle_base_radius_rings.toolTip())
         self.toggle_base_radius_rings.setCheckable(True)
         self.toggle_base_radius_rings.setChecked(True)
         self.toggle_base_radius_rings.clicked.connect(self._on_radius_rings_toggle)
@@ -268,6 +282,7 @@ class MapTab(QWidget):
         self.toggle_map_zones.setIcon(QIcon(resource_path(base_dir, 'zones.webp')))
         self.toggle_map_zones.setIconSize(QSize(22, 22))
         self.toggle_map_zones.setToolTip(t('map.toggle.zones') if t else 'Zones')
+        self.toggle_map_zones.setAccessibleName(self.toggle_map_zones.toolTip())
         self.toggle_map_zones.setCheckable(True)
         self.toggle_map_zones.setChecked(False)
         self.toggle_map_zones.clicked.connect(self._on_zones_toggle)
@@ -277,6 +292,7 @@ class MapTab(QWidget):
         self.toggle_map_type.setIcon(QIcon(resource_path(base_dir, 'T_TreeMap.webp')))
         self.toggle_map_type.setIconSize(QSize(26, 26))
         self.toggle_map_type.setToolTip(t('map.toggle.tree_map') if t else 'Tree Map')
+        self.toggle_map_type.setAccessibleName(self.toggle_map_type.toolTip())
         self.toggle_map_type.setCheckable(True)
         self.toggle_map_type.setChecked(False)
         self.toggle_map_type.clicked.connect(self._on_map_type_toggle)
@@ -496,6 +512,7 @@ class MapTab(QWidget):
         icon = 'T_WorldMap.webp' if checked else 'T_TreeMap.webp'
         self.toggle_map_type.setIcon(QIcon(resource_path(base_dir, icon)))
         self.toggle_map_type.setToolTip(t('map.toggle.world_map') if checked else t('map.toggle.tree_map'))
+        self.toggle_map_type.setAccessibleName(self.toggle_map_type.toolTip())
         self.view.set_map_type(self.current_map, palworld_coord.get_treemap_coord_range() if checked else 1000)
         self._recalc_img_coords()
         self._load_map(self.current_map)
@@ -1053,12 +1070,21 @@ class MapTab(QWidget):
             for gid, guild in self.filtered_guilds.items():
                 total_pals = sum(b.get('pal_count', 0) for b in guild['bases'])
                 guild_item = _SortableItem([guild['guild_name'], guild['leader_name'], guild['last_seen'], str(len(guild['bases'])), str(total_pals)])
+                # uiux-audit-remediation 8.2 (D13): elided cells keep the
+                # full value reachable via tooltip
+                guild_item.setToolTip(0, guild['guild_name'])
+                guild_item.setToolTip(1, guild['leader_name'])
+                guild_item.setToolTip(2, guild['last_seen'])
+                guild_item.setToolTip(3, str(len(guild['bases'])))
+                guild_item.setToolTip(4, str(total_pals))
                 guild_item.setData(0, Qt.UserRole, ('guild', gid))
                 guild_item.setData(2, _SORT_ROLE, guild.get('last_seen_sort', float('inf')))
                 guild_item.setData(3, _SORT_ROLE, len(guild['bases']))
                 guild_item.setData(4, _SORT_ROLE, total_pals)
                 for base in guild['bases']:
                     base_item = _SortableItem([f"X:{int(base['coords'][0])} Y:{int(base['coords'][1])}", str(base['base_id'])[:12] + '...', '', '', str(base.get('pal_count', 0))])
+                    base_item.setToolTip(0, f"X:{int(base['coords'][0])} Y:{int(base['coords'][1])}")
+                    base_item.setToolTip(1, str(base['base_id']))
                     base_item.setData(0, Qt.UserRole, ('base', base))
                     base_item.setData(0, _SORT_ROLE, (int(base['coords'][0]), int(base['coords'][1])))
                     base_item.setData(4, _SORT_ROLE, base.get('pal_count', 0))
@@ -1070,6 +1096,10 @@ class MapTab(QWidget):
             filtered_players = self._filter_players(self.search_text)
             for player in filtered_players:
                 player_item = _SortableItem([player['player_name'], str(player['level']), player['last_seen'], str(player['pal_count'])])
+                player_item.setToolTip(0, player['player_name'])
+                player_item.setToolTip(1, str(player['level']))
+                player_item.setToolTip(2, player['last_seen'])
+                player_item.setToolTip(3, str(player['pal_count']))
                 player_item.setData(0, Qt.UserRole, ('player', player))
                 player_item.setData(1, _SORT_ROLE, player.get('level', 0))
                 player_item.setData(2, _SORT_ROLE, player.get('last_seen_sort', float('inf')))
