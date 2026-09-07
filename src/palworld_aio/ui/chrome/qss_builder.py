@@ -1298,6 +1298,26 @@ QTreeWidget#jsonTree {{
     border: none;
     border-top: 1px solid {p['border']};
 }}
+/* uiux-audit-remediation 7.3 (design D12): JSON Editor path breadcrumb —
+   muted separators/placeholder, clickable crumb chips with accent hover. */
+QWidget#jsonBreadcrumb {{
+    background: transparent;
+}}
+QLabel#jsonCrumb {{
+    color: {p['text_secondary']};
+    background: transparent;
+    border-radius: {RADIUS['sm']}px;
+    padding: 0 4px;
+}}
+QLabel#jsonCrumb:hover {{
+    color: {p['accent']};
+    background: {p['accent_bg']};
+}}
+QLabel#jsonCrumbMuted {{
+    color: {p['text_disabled']};
+    background: transparent;
+    padding: 0 2px;
+}}
 /* Map viewer: floating legend card over the canvas (008-r02) */
 QWidget#mapLegendCard {{
     background: {p['surface_raised']};

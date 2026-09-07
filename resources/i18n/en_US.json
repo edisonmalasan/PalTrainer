@@ -1975,6 +1975,7 @@
     "edit_pals.learnt_skills_search": "Search skills...",
     "edit_pals.learnt_skills_learn_all": "Learn All",
     "json_editor.tab": "JSON Editor",
+    "json_editor.breadcrumb_root": "root",
     "json_editor.refresh": "Refresh from Save",
     "json_editor.export": "Export JSON",
     "json_editor.import": "Import JSON",
