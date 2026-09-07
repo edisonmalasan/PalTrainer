@@ -2052,7 +2052,7 @@
     "breeding.mode.children": "Children",
     "breeding.search": "Search pal...",
     "breeding.egg_hint": "Palworld Breeding Combos",
-    "breeding.hint": "Click the button above to select a pal and view breeding combinations.",
+    "breeding.hint": "Select a pal to view breeding combinations.",
     "breeding.type_to_search": "Type a pal name to see breeding combinations",
     "breeding.not_found": "Pal not found in breeding data",
     "breeding.parents_for": "Parents for {name}",

@@ -35,6 +35,7 @@ _TEST_STEM_ALIASES: dict[str, str] = {
     'pal_editor_toolbar': 'palworld_aio/editor/pal_editor/pal_editor_widget',
     'json_editor_breadcrumb': 'palworld_aio/ui/tabs/json_editor_tab',
     'map_zoom_controls': 'palworld_aio/ui/tabs/map_tab',
+    'breeding_hint': 'palworld_aio/ui/tabs/breeding_tab',
     'domain_stats': 'stats',
     'palworld_coord': 'palworld_coord/__init__',
     'xgp_import': 'palworld_xgp_import/__init__',
