@@ -2046,6 +2046,7 @@
     "pal_editor.dps_page": "DPS {current}/{total}",
     "player_pal.dps_pals": "Player DPS Pals (DPS saves)",
     "pal_editor.box_count": "Box {n} ({count})",
+    "pal_editor.jump_to_box": "Jump to box",
     "pal_editor.dps_count": "DPS {n}/{m} ({count})",
     "breeding.tab": "Breeding",
     "breeding.mode.parents": "Parents",

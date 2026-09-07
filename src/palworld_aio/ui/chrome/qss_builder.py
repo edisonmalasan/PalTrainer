@@ -111,6 +111,25 @@ QLineEdit[error="true"], QSpinBox[error="true"], QDoubleSpinBox[error="true"] {{
     background-color: {p['danger_bg']};
 }}
 QLineEdit[error="true"]:focus {{ border: 1px solid {p['danger']}; }}
+/* uiux-audit-remediation 7.5 (Phase 3.3): compact jump-to-box selector in
+   the Pal Editor mode bar — tighter than the default spin chrome. */
+QSpinBox#boxJumpSpin {{
+    background-color: {p['surface_input']};
+    color: {p['text']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px;
+    padding: 1px 2px;
+    min-height: 0px;
+}}
+QSpinBox#boxJumpSpin:focus {{ border: 1px solid {p['accent_border_strong']}; }}
+QSpinBox#boxJumpSpin::up-button, QSpinBox#boxJumpSpin::down-button {{
+    background: {p['surface_raised']};
+    border: none;
+    width: 14px;
+}}
+QSpinBox#boxJumpSpin::up-button:hover, QSpinBox#boxJumpSpin::down-button:hover {{
+    background: {p['surface_hover']};
+}}
 
 QComboBox {{
     background-color: {p['surface_input']};

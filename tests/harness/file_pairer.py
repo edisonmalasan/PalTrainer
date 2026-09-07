@@ -33,6 +33,7 @@ _TEST_STEM_ALIASES: dict[str, str] = {
     'base_inventory_chips': 'palworld_aio/ui/tabs/base_inventory_tab',
     'inventory_chip': 'palworld_aio/ui/tabs/inventory_tab',
     'pal_editor_toolbar': 'palworld_aio/editor/pal_editor/pal_editor_widget',
+    'pal_editor_box_jump': 'palworld_aio/editor/pal_editor/pal_editor_widget',
     'json_editor_breadcrumb': 'palworld_aio/ui/tabs/json_editor_tab',
     'map_zoom_controls': 'palworld_aio/ui/tabs/map_tab',
     'breeding_hint': 'palworld_aio/ui/tabs/breeding_tab',
