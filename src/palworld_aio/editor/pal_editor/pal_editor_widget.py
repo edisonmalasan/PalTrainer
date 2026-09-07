@@ -241,6 +241,14 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         self.bulk_clone_btn.setCursor(Qt.PointingHandCursor)
         self.bulk_clone_btn.clicked.connect(self._open_bulk_clone)
         header_row.addWidget(self.bulk_clone_btn)
+        # uiux-audit-remediation 10.1 (D11): hard separator isolating the
+        # destructive bulk-delete tier from the safe/bulk actions.
+        self.bulk_delete_separator = QFrame()
+        self.bulk_delete_separator.setObjectName('toolbarTierSep')
+        self.bulk_delete_separator.setFrameShape(QFrame.NoFrame)
+        self.bulk_delete_separator.setFixedWidth(1)
+        self.bulk_delete_separator.setFixedHeight(22)
+        header_row.addWidget(self.bulk_delete_separator)
         self.bulk_delete_btn = QPushButton(t('edit_pals.bulk_delete') if t else 'Bulk Delete')
         # modernize-tab-ui 4.6: destructive tier (make_danger_button equivalent).
         self.bulk_delete_btn.setProperty('class', 'danger')

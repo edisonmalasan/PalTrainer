@@ -739,6 +739,10 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self.atk_lbl = QLabel('0')
         self.atk_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.atk_lbl.setStyleSheet(f'font-size: 11px; font-weight: 700; color: {_P["text"]}; background: transparent; border: none;')
+        # uiux-audit-remediation 10.2 (D11): computed/read-only readout —
+        # demoted styling + explanatory hint, distinct from editable inputs.
+        self.atk_lbl.setProperty('computedValue', 'true')
+        self.atk_lbl.setToolTip(t('pal_editor.computed_hint') if t else 'Calculated from level, IVs and passives')
         stats_grid.addWidget(self.atk_lbl, 0, 2, Qt.AlignVCenter)
         def_icon = QLabel('DEF')
         def_icon.setFixedSize(24, 14)
@@ -752,6 +756,8 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self.def_lbl = QLabel('0')
         self.def_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.def_lbl.setStyleSheet(f'font-size: 11px; font-weight: 700; color: {_P["text"]}; background: transparent; border: none;')
+        self.def_lbl.setProperty('computedValue', 'true')
+        self.def_lbl.setToolTip(t('pal_editor.computed_hint') if t else 'Calculated from level, IVs and passives')
         stats_grid.addWidget(self.def_lbl, 1, 2, Qt.AlignVCenter)
         wspd_icon = QLabel('WS')
         wspd_icon.setFixedSize(24, 14)
@@ -765,6 +771,8 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self.wspd_lbl = QLabel('0')
         self.wspd_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.wspd_lbl.setStyleSheet(f'font-size: 11px; font-weight: 700; color: {_P["text"]}; background: transparent; border: none;')
+        self.wspd_lbl.setProperty('computedValue', 'true')
+        self.wspd_lbl.setToolTip(t('pal_editor.computed_hint') if t else 'Calculated from level, IVs and passives')
         stats_grid.addWidget(self.wspd_lbl, 2, 2, Qt.AlignVCenter)
         right_layout.addWidget(stats_q)
         columns.addWidget(right_col, 1)

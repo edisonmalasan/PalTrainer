@@ -2156,6 +2156,8 @@
     "xgp.save_unreadable.msg": "Your GamePass save data could not be read.\n\nThe container index may be corrupted or from an incompatible version.\n\nTry logging into your world on Xbox Game Pass and updating to the latest Palworld version, then try again.",
     "edit_pals.bulk_clone": "Bulk Clone Pals",
     "edit_pals.bulk_delete": "Bulk Delete Pals",
+    "pal_editor.computed_hint": "Calculated from level, IVs and passives — read-only",
+    "pal_editor.skill_power_hint": "Skill power — used to compute damage",
     "edit_pals.bulk_clone_header": "Select species to clone",
     "edit_pals.bulk_delete_header": "Select species to delete",
     "edit_pals.bulk_sources": "Source:",

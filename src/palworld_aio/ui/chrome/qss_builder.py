@@ -1327,6 +1327,22 @@ QPushButton#mapToggleBtn:checked {{
 QPushButton#mapToggleBtn[wide="true"] {{
     min-width: 40px;
 }}
+/* uiux-audit-remediation 10.1 (D11): hard separator isolating the
+   destructive bulk-delete tier in the Pal Editor toolbar. */
+QFrame#toolbarTierSep {{
+    background: {p['border_strong']};
+    border: none;
+    margin: 3px 4px;
+}}
+/* uiux-audit-remediation 10.2 (D11): computed/read-only stat readouts are
+   visually demoted from editable input chrome. */
+QLabel[computedValue="true"] {{
+    color: {p['text_secondary']};
+}}
+QLabel[computedValue="true"][hinted="true"] {{
+    color: {p['text_disabled']};
+}}
+
 QLabel#saveStateChip {{
     background: {p['surface_raised']};
     border: 1px solid {p['border']};
