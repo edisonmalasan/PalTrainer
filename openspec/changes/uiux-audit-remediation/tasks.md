@@ -52,7 +52,7 @@
 - [ ] 7.2 Pal Editor inspector: editable fields vs computed stats visual affordance; unit tooltips on skill power values.
 - [ ] 7.3 JSON Editor: persistent clickable path breadcrumb above the table.
 - [x] 7.4 Verify: focused pytest run, compileall; confirm all toolbar handlers fire and editor mutations unchanged.
-- [ ] 7.5 Pal Editor: jump-to-box numeric control for large pal box counts (audit Phase 3.3, added post-review).
+- [x] 7.5 Pal Editor: jump-to-box numeric control for large pal box counts (audit Phase 3.3, added post-review).
 
 ## 8. Map Viewer + Breeding
 
