@@ -67,19 +67,24 @@ def test_jump_i18n_key_present():
 
 # ------------------------------------------- _goto_box navigation core
 
-def test_goto_box_navigates_and_clears_state(editor):
+def test_goto_box_navigates_and_preserves_absolute_selection(editor):
     editor.current_box_index = 1
     editor.total_slots = 90  # 3 boxes
-    editor._clicked_pal = object()
-    editor.selected_pal_slot = ('palbox', 0)
+    selected_pal = object()
+    editor._clicked_pal = selected_pal
+    editor.selected_pal_slot = ('palbox', 4)
     editor._goto_box(3)
     assert editor.current_box_index == 3
-    assert editor._clicked_pal is None
-    assert editor.selected_pal_slot is None
+    assert editor._clicked_pal is selected_pal
+    assert editor.selected_pal_slot == ('palbox', 4)
+    assert editor.palbox_slots[4].selected is False
     assert 'Box 3' in editor.box_label.text()
-    editor._goto_box(2)
-    assert editor.current_box_index == 2
-    assert 'Box 2' in editor.box_label.text()
+    editor._goto_box(1)
+    assert editor.current_box_index == 1
+    assert editor.palbox_slots[4].selected is True
+    editor._clicked_pal = None
+    editor.selected_pal_slot = None
+    editor._clear_palbox_highlight()
 
 
 def test_goto_box_clamps_out_of_range(editor):
@@ -88,6 +93,27 @@ def test_goto_box_clamps_out_of_range(editor):
     assert editor.current_box_index == 3
     editor._goto_box(0)
     assert editor.current_box_index == 1
+
+
+def test_hundreds_of_boxes_fixture_reaches_first_and_last(editor):
+    editor.total_slots = 218 * 30
+    editor.palbox_pal_dict = {0: {'data': {}}, 6539: {'data': {}}}
+
+    editor._goto_box(218)
+
+    assert editor.current_box_index == 218
+    assert editor.box_jump_spin.maximum() == 218
+    assert editor.box_jump_spin.value() == 218
+    assert editor.box_label.text() == 'Box 218 of 218 (2 Pals)'
+
+    editor._goto_box(10_000)
+    assert editor.current_box_index == 218
+    editor._goto_box(-10_000)
+    assert editor.current_box_index == 1
+    assert editor.box_label.text() == 'Box 1 of 218 (2 Pals)'
+    editor.palbox_pal_dict = {}
+    editor.total_slots = 960
+    editor._update_palbox_page()
 
 
 # ------------------------------------------- spin sync

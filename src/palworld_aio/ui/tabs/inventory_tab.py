@@ -1,13 +1,29 @@
 ﻿import os
 import json
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea, QLabel, QPushButton, QFrame, QDialog, QLineEdit, QListWidget, QListWidgetItem, QSpinBox, QMessageBox, QTabWidget, QSizePolicy, QAbstractItemView, QMenu, QToolTip, QListView, QProgressBar, QComboBox, QApplication, QInputDialog, QCheckBox, QDialogButtonBox
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea, QLabel, QPushButton, QFrame, QDialog, QLineEdit, QListWidget, QListWidgetItem, QSpinBox, QTabWidget, QSizePolicy, QAbstractItemView, QMenu, QListView, QProgressBar, QComboBox, QApplication, QCheckBox, QDialogButtonBox
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QPoint, QTimer, QThread, QEvent
-from PyQt6.QtGui import QPixmap, QIcon, QFont, QCursor, QColor, QPainter, QPen, QIntValidator, QFontMetrics
+from PyQt6.QtGui import QPixmap, QIcon, QFont, QColor, QPainter, QPen, QIntValidator
 from PyQt6.QtWidgets import QStyledItemDelegate
 from i18n import t
 from palworld_aio.ui.chrome import icons as app_icons
-from palworld_aio.ui.chrome.components import set_picker_selected
-from palworld_aio.ui.chrome.styles import DIALOG_STYLE as DARK_THEME_STYLE, STATS_PANEL_STYLE, MENU_STYLE, PICKER_BG_STYLE, PICKER_SEARCH_STYLE, PICKER_LIST_STYLE, wrap_tooltip_text, slot_full, slot_rarity, slot_selected, slot_multi_selected, CONTENT_PANEL_STYLE, SLOT_EMPTY_STYLE, SLOT_HOVER_STYLE, INPUT_DIALOG_STYLE
+from palworld_aio.ui.chrome.components import (
+    BaseDialog,
+    InputPromptDialog as QInputDialog,
+    MessageDialog as QMessageBox,
+    make_button,
+    make_chip,
+    make_filter_button,
+    make_search_field,
+    make_vdivider,
+    set_picker_selected,
+)
+from palworld_aio.ui.chrome.content_cards import (
+    InventoryGrid as SharedInventoryGrid,
+    InventorySlot,
+    InventorySlotModel,
+)
+from palworld_aio.ui.chrome.tokens import SPACING
+from palworld_aio.ui.chrome.styles import DIALOG_STYLE as DARK_THEME_STYLE, STATS_PANEL_STYLE, MENU_STYLE, PICKER_BG_STYLE, PICKER_SEARCH_STYLE, PICKER_LIST_STYLE, wrap_tooltip_text, CONTENT_PANEL_STYLE, SLOT_EMPTY_STYLE, SLOT_HOVER_STYLE, INPUT_DIALOG_STYLE
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from palsav import json_tools
 from palworld_aio import constants as _constants
@@ -28,270 +44,192 @@ except Exception:
 SPHERE_ICON = _nf.icons.get('nf-md-pokeball', '\u2B55') if _nf else '\u2B55'
 EQUIP_SLOT_FILTERS = {'weapon': {'type_a': ['EPalItemTypeA::Weapon', 'EPalItemTypeA::MonsterEquipWeapon']}, 'head': {'type_a': 'EPalItemTypeA::Armor', 'type_b': 'EPalItemTypeB::ArmorHead'}, 'body': {'type_a': 'EPalItemTypeA::Armor', 'type_b': 'EPalItemTypeB::ArmorBody'}, 'shield': {'type_a': 'EPalItemTypeA::Armor', 'type_b': 'EPalItemTypeB::Shield'}, 'accessory': {'type_a': 'EPalItemTypeA::Accessory'}, 'glider': {'type_a': 'EPalItemTypeA::Glider'}, 'sphere_mod': {'type_a': 'EPalItemTypeA::CaptureItemModifier'}, 'food': {'type_a': 'EPalItemTypeA::Food'}}
 GRID_COLS = 6
-class ItemSlotWidget(QFrame):
+class ItemSlotWidget(InventorySlot):
     clicked = pyqtSignal(object)
     double_clicked = pyqtSignal(object)
     context_menu_requested = pyqtSignal(object, QPoint)
     def __init__(self, slot_index: int, container_type: str='main', parent=None):
-        super().__init__(parent)
         self.slot_index = slot_index
         self.container_type = container_type
         self.slot_data = None
         self.multi_selected = False
         self._click_modifiers = Qt.NoModifier
-        self.setObjectName('itemSlot')
+        super().__init__(self._empty_model(), parent)
         self.setMinimumWidth(56)
-        self.setFixedHeight(86)
+        self.setFixedHeight(104)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setCursor(Qt.PointingHandCursor)
-        self.setMouseTracking(True)
-        self._children = []
-        self._rebuild()
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if not hasattr(self, '_children'):
-            return
-        w, h = (self.width(), self.height())
-        for c in self._children:
-            try:
-                kind = c._slot_child_kind
-                cw, ch = (c.width(), c.height())
-                if kind == 'icon':
-                    c.move((w - cw) // 2, (h - ch - 14) // 2)
-                elif kind == 'name':
-                    # modernize-tab-ui 3.2: elide instead of mid-word clipping.
-                    full_name = getattr(c, '_full_name', '')
-                    if full_name:
-                        fm = c.fontMetrics()
-                        avail = max(20, w - 8)
-                        elided = fm.elidedText(full_name, Qt.ElideRight, avail)
-                        c.setText(elided)
-                        c.resize(min(avail, fm.horizontalAdvance(elided) + 5), c.height())
-                    cw, ch = c.width(), c.height()
-                    c.move((w - cw) // 2, h - 13)
-                elif kind == 'qty':
-                    c.move(2, 2)
-                elif kind == 'special':
-                    c.move(w - cw - 2, 2)
 
-            except Exception:
-                pass
-    def _rebuild(self):
-        was_selected = self.multi_selected
-        for c in list(self._children):
-            c.hide()
-            c.setParent(None)
-            c.deleteLater()
-        self._children = []
-        if not self.slot_data or not self.slot_data.get('item_id'):
-            self.setStyleSheet(slot_full('QFrame#itemSlot'))
-            self.setToolTip('')
-            return
-        icon_path = self.slot_data.get('icon_path', '')
-        icon_lbl = QLabel(self)
-        icon_lbl.setFixedSize(32, 32)
-        icon_lbl.setAlignment(Qt.AlignCenter)
-        if icon_path:
-            pixmap = ItemData.get_item_icon(icon_path, QSize(32, 32))
-            icon_lbl.setPixmap(pixmap)
-        icon_lbl.setStyleSheet('background: transparent; border: none;')
-        icon_lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
-        icon_lbl._slot_child_kind = 'icon'
-        icon_lbl.show()
-        self._children.append(icon_lbl)
-        item_name = self.slot_data.get('item_name', 'Unknown')
-        name_lbl = QLabel(item_name, self)
-        name_lbl._full_name = item_name
-        name_lbl.setStyleSheet('color: #A69F94; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(245,158,11,0.15); border-radius: 2px; padding: 0 2px;')
-        name_lbl.setAlignment(Qt.AlignCenter)
-        name_lbl.adjustSize()
-        name_lbl.setFixedHeight(10)
-        name_lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
-        name_lbl._slot_child_kind = 'name'
-        # modernize-tab-ui 3.2: full name stays available via tooltip.
-        name_lbl.setToolTip(item_name)
-        name_lbl.show()
-        self._children.append(name_lbl)
-        stack_count = self.slot_data.get('stack_count', 1)
-        qty_lbl = QLabel(str(stack_count), self)
-        qty_lbl.setStyleSheet('color: #ECE7E0; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); border: 1px solid rgba(245,158,11,0.25); border-radius: 3px; padding: 0 3px;')
-        qty_lbl.adjustSize()
-        qty_lbl.setFixedHeight(11)
-        qty_lbl.setAlignment(Qt.AlignCenter)
-        qty_lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
-        qty_lbl._slot_child_kind = 'qty'
-        qty_lbl.show()
-        self._children.append(qty_lbl)
-        is_booth = self.slot_data.get('is_booth_product', False)
-        is_booth_ask = self.slot_data.get('is_booth_asking', False)
-        if is_booth or is_booth_ask:
-            special_badge = QLabel('$' if is_booth_ask else 'â‡„', self)
-            special_badge.setFixedSize(14, 14)
-            special_badge.setAlignment(Qt.AlignCenter)
-            special_badge.setStyleSheet('font-size: 11px; font-weight: bold; color: #E8B44C; background: rgba(0,0,0,0.55); border: 1px solid rgba(232,180,76,0.3); border-radius: 7px;')
-            special_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
-            special_badge._slot_child_kind = 'special'
-            special_badge.show()
-            self._children.append(special_badge)
-        qty = self.slot_data.get('stack_count', 1)
-        item_id = self.slot_data.get('item_id', '')
-        item_desc = self.slot_data.get('description', '')
-        tip = f'<b>{item_name}</b><br>Qty: {qty}<br><i>{item_id}</i>'
-        if is_booth:
-            cost_name = self.slot_data.get('cost_name', 'Unknown')
-            cost_count = self.slot_data.get('cost_count', 0)
-            tip = f'<b>{item_name}</b><br><i>{item_id}</i>'
-            tip += f'<br><br><span style="color:#E8B44C;font-weight:bold">&#xf0ec;</span> <b>{cost_name}</b> x{cost_count}'
-        elif is_booth_ask:
-            tip = f'<b>{item_name}</b><br>Qty: {qty}<br><i>{item_id}</i>'
-            tip += f'<br><br><span style="color:#E8B44C;font-weight:bold">&#xf0ec; Asking Price</span>'
-        if item_desc:
-            cleaned = _clean_desc_for_tooltip(item_desc)
-            tip += f'<br><br><span style="color:#A69F94;font-size:11px">{wrap_tooltip_text(cleaned)}</span>'
-        self.setToolTip(tip)
-        rarity = self.slot_data.get('rarity', 0)
-        rarity_colors = {1: '#4ade80', 2: '#60a5fa', 3: '#a855f7'}
-        r_color = rarity_colors.get(rarity)
-        if was_selected:
-            self.setStyleSheet(slot_multi_selected('QFrame#itemSlot'))
-        elif r_color:
-            self.setStyleSheet(slot_rarity('QFrame#itemSlot', r_color))
-        elif rarity >= 4:
-            self.setStyleSheet(slot_rarity('QFrame#itemSlot', '#fbbf24'))
-        else:
-            self.setStyleSheet(slot_rarity('QFrame#itemSlot', '#ffffff'))
-        self.resizeEvent(None)
+    def _empty_model(self) -> InventorySlotModel:
+        return InventorySlotModel(
+            str(self.slot_index),
+            slot_label=t(
+                'ui.inventory.numbered_empty_slot',
+                default='Slot {number}', number=self.slot_index + 1),
+        )
+
+    def _model_from_data(self, slot_data: dict) -> InventorySlotModel:
+        icon_path = slot_data.get('icon_path', '')
+        portrait = (
+            ItemData.get_item_icon(icon_path, QSize(40, 40))
+            if icon_path else None)
+        is_product = bool(slot_data.get('is_booth_product'))
+        is_asking = bool(slot_data.get('is_booth_asking'))
+        badge = (
+            t('ui.inventory.asking_badge', default='Ask') if is_asking
+            else t('ui.inventory.trade_badge', default='Trade') if is_product
+            else '')
+        description = _clean_desc_for_tooltip(
+            slot_data.get('description', '') or '')
+        if is_product:
+            description = t(
+                'ui.inventory.trade_detail',
+                default='Costs {count} × {name}',
+                count=slot_data.get('cost_count', 0),
+                name=slot_data.get('cost_name', 'Unknown'))
+        elif is_asking:
+            description = t(
+                'ui.inventory.asking_detail', default='Booth asking price')
+        return InventorySlotModel(
+            str(self.slot_index),
+            str(slot_data.get('item_name', 'Unknown')),
+            max(0, int(slot_data.get('stack_count', 1) or 0)),
+            max(0, int(slot_data.get('rarity', 0) or 0)),
+            portrait,
+            'booth' if is_product or is_asking else '',
+            str(slot_data.get('item_id', '')),
+            description,
+            badge,
+        )
+
     def set_item(self, slot_data: dict):
         self.slot_data = slot_data
-        self._rebuild()
+        self.set_model(self._model_from_data(slot_data))
     def clear_item(self):
         self.slot_data = None
-        self._rebuild()
+        self.set_selected(False, emit=False)
+        self.set_model(self._empty_model())
     def set_selected_multi(self, selected):
         self.multi_selected = selected
-        if selected:
-            self.setStyleSheet(slot_multi_selected('QFrame#itemSlot'))
-        else:
-            self.setStyleSheet(slot_full('QFrame#itemSlot'))
+        self.set_selected(bool(selected), emit=False)
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self._click_modifiers = event.modifiers()
+            self.setFocus(Qt.FocusReason.MouseFocusReason)
             self.clicked.emit(self.slot_data)
+            event.accept()
+            return
         super().mousePressEvent(event)
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.double_clicked.emit(self.slot_data)
+            event.accept()
+            return
         super().mouseDoubleClickEvent(event)
     def contextMenuEvent(self, event):
         self.context_menu_requested.emit(self.slot_data, event.globalPos())
-class EquipmentSlotWidget(QFrame):
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self._click_modifiers = event.modifiers()
+            self.clicked.emit(self.slot_data)
+            event.accept()
+            return
+        if event.key() == Qt.Key.Key_Menu:
+            self.context_menu_requested.emit(
+                self.slot_data, self.mapToGlobal(self.rect().center()))
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+
+class EquipmentSlotWidget(InventorySlot):
     item_changed = pyqtSignal(str, object)
     double_clicked = pyqtSignal(object)
     context_menu_requested = pyqtSignal(object, QPoint)
     unlock_requested = pyqtSignal(str)
+    preview_requested = pyqtSignal(object)
     def __init__(self, slot_name: str, label: str, parent=None):
-        super().__init__(parent)
         self.slot_name = slot_name
+        self.slot_label = label
         self.current_item = None
         self._locked = False
         self._lock_type = None
-        self.setFixedSize(56, 70)
-        self.setFrameStyle(QFrame.Box | QFrame.Raised)
-        self.setCursor(Qt.PointingHandCursor)
-        self._setup_ui(label)
-        self._apply_style()
-    def _setup_ui(self, label: str):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(2, 2, 2, 2)
-        layout.setSpacing(1)
-        self.label = QLabel(label)
-        self.label.setAlignment(Qt.AlignCenter)
-        self.label.setStyleSheet('font-size: 11px; font-weight: bold; color: #aaa;')
-        layout.addWidget(self.label)
-        icon_container = QWidget()
-        icon_layout = QVBoxLayout(icon_container)
-        icon_layout.setContentsMargins(0, 0, 0, 0)
-        icon_layout.setSpacing(0)
-        self.icon_label = QLabel()
-        self.icon_label.setAlignment(Qt.AlignCenter)
-        self.icon_label.setFixedSize(36, 36)
-        icon_layout.addWidget(self.icon_label, alignment=Qt.AlignCenter)
-        self.qty_label = QLabel()
-        self.qty_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
-        self.qty_label.setStyleSheet('font-size: 11px; font-weight: bold; color: white; background: transparent;')
-        icon_layout.addWidget(self.qty_label, alignment=Qt.AlignRight)
-        layout.addWidget(icon_container, alignment=Qt.AlignCenter)
-        self.name_label = QLabel()
-        self.name_label.setAlignment(Qt.AlignCenter)
-        self.name_label.setStyleSheet('font-size: 11px; color: #888;')
-        self.name_label.setWordWrap(True)
-        layout.addWidget(self.name_label)
-    def _apply_style(self):
-        self.setStyleSheet(slot_full('EquipmentSlotWidget'))
+        super().__init__(self._empty_model(), parent)
+        self.setProperty('equipmentSlot', True)
+        self.setMinimumWidth(88)
+        self.setMaximumWidth(220)
+        self.setFixedHeight(104)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+
+    @property
+    def icon_label(self):
+        return self.portrait_label
+
+    @property
+    def qty_label(self):
+        return self.quantity_label
+
+    def _empty_model(self) -> InventorySlotModel:
+        return InventorySlotModel(
+            self.slot_name, slot_label=self.slot_label)
+
+    def _item_model(self, slot_data: dict) -> InventorySlotModel:
+        icon_path = slot_data.get('icon_path', '')
+        portrait = (
+            ItemData.get_item_icon(icon_path, QSize(40, 40))
+            if icon_path else None)
+        return InventorySlotModel(
+            self.slot_name,
+            str(slot_data.get('item_name', 'Unknown')),
+            max(0, int(slot_data.get('stack_count', 1) or 0)),
+            max(0, int(slot_data.get('rarity', 0) or 0)),
+            portrait,
+            'equipped',
+            str(slot_data.get('item_id', '')),
+            _clean_desc_for_tooltip(slot_data.get('description', '') or ''),
+            self.slot_label,
+        )
+
     def set_item(self, slot_data: dict):
         self.current_item = slot_data
         if not slot_data:
-            self.icon_label.clear()
-            self.name_label.clear()
-            self.qty_label.clear()
-            self._apply_style()
+            self.set_model(self._empty_model())
             return
-        icon_path = slot_data.get('icon_path', '')
-        if icon_path:
-            pixmap = ItemData.get_item_icon(icon_path, QSize(36, 36))
-            self.icon_label.setPixmap(pixmap)
-        name = slot_data.get('item_name', '')
-        # modernize-tab-ui 3.2: elide instead of mid-word clipping; full name via tooltip.
-        fm = QFontMetrics(self.name_label.font())
-        self.name_label.setText(fm.elidedText(name, Qt.ElideRight, self.name_label.width() or 52))
-        self.name_label.setToolTip(name)
-        stack_count = slot_data.get('stack_count', 1)
-        self.qty_label.setText(str(stack_count))
-        rarity = slot_data.get('rarity', 0)
-        if rarity <= 0:
-            color = '#aaaaaa'
-        elif rarity <= 1:
-            color = '#4ade80'
-        elif rarity <= 2:
-            color = '#60a5fa'
-        elif rarity <= 3:
-            color = '#a855f7'
-        else:
-            color = '#fbbf24'
-        self.setStyleSheet(slot_rarity('EquipmentSlotWidget', color))
+        self.set_model(self._item_model(slot_data))
     def set_locked(self, locked: bool, lock_type: str=None):
         self._locked = locked
         self._lock_type = lock_type if locked else None
+        self.setProperty('locked', locked)
         if locked:
-            self.setEnabled(True)
-            self.setCursor(Qt.PointingHandCursor)
-            self.icon_label.setText('ðŸ”’')
-            self.icon_label.setStyleSheet('font-size: 20px;')
-            self.name_label.setText(t('inventory.locked', default='Locked'))
-            self.name_label.setStyleSheet('font-size: 11px; color: #faa61a;')
-            self.qty_label.clear()
-            self.setStyleSheet('EquipmentSlotWidget { background: rgba(236,231,224,0.03); border: 2px dashed #faa61a; border-radius: 8px; } EquipmentSlotWidget:hover { background: rgba(245,158,11,0.06); border: 2px dashed #ffc107; }')
+            self.set_model(InventorySlotModel(
+                self.slot_name,
+                t('inventory.locked', default='Locked'),
+                status='locked',
+                badge=self.slot_label,
+                technical_id=t(
+                    f'inventory.unlock_hint_{lock_type}',
+                    default='Activate to unlock this slot'),
+            ))
         else:
-            self.setEnabled(True)
-            self.setCursor(Qt.PointingHandCursor)
-            self.icon_label.clear()
-            self.icon_label.setStyleSheet('')
-            self.name_label.clear()
-            self.name_label.setStyleSheet('font-size: 11px; color: #888;')
-            self.qty_label.clear()
-            self._apply_style()
+            self.set_item(self.current_item)
+        self.style().unpolish(self)
+        self.style().polish(self)
     def is_locked(self) -> bool:
         return self._locked
     def clear_item(self):
         self.current_item = None
-        self.icon_label.clear()
-        self.name_label.clear()
-        self.qty_label.clear()
         if not self._locked:
-            self._apply_style()
+            self.set_selected(False, emit=False)
+            self.set_model(self._empty_model())
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and self._locked:
             self.unlock_requested.emit(self.slot_name)
+            event.accept()
+            return
+        if event.button() == Qt.LeftButton:
+            self.setFocus(Qt.FocusReason.MouseFocusReason)
+            self.set_selected(not self.selected)
+            self.preview_requested.emit(self)
+            event.accept()
             return
         super().mousePressEvent(event)
     def mouseDoubleClickEvent(self, event):
@@ -302,27 +240,28 @@ class EquipmentSlotWidget(QFrame):
         if self._locked:
             return
         self.context_menu_requested.emit(self, event.globalPos())
-    def enterEvent(self, event):
-        if self._locked:
-            if self._lock_type == 'food':
-                tooltip = f"<b>{t('inventory.locked', default='Locked')}</b><br>{t('inventory.unlock_hint_food', default='Click to unlock with AutoMealPouch')}"
-            elif self._lock_type == 'accessory':
-                tooltip = f"<b>{t('inventory.locked', default='Locked')}</b><br>{t('inventory.unlock_hint_accessory', default='Click to unlock with Accessory Slot Item')}"
-            elif self._lock_type == 'weapon':
-                tooltip = f"<b>{t('inventory.locked', default='Locked')}</b><br>{t('inventory.unlock_hint_weapon', default='Click to unlock with Weapon Slot Item')}"
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Space:
+            if self._locked:
+                self.unlock_requested.emit(self.slot_name)
             else:
-                tooltip = f"<b>{t('inventory.locked', default='Locked')}</b>"
-            QToolTip.showText(QCursor.pos(), tooltip)
-        elif self.current_item:
-            item_name = self.current_item.get('item_name', 'Unknown')
-            item_id = self.current_item.get('item_id', '')
-            item_desc = self.current_item.get('description', '')
-            tooltip = f'<b>{item_name}</b><br><i>{item_id}</i>'
-            if item_desc:
-                cleaned = _clean_desc_for_tooltip(item_desc)
-                tooltip += f'<br><br><span style="color:#A69F94;font-size:11px">{wrap_tooltip_text(cleaned)}</span>'
-            QToolTip.showText(QCursor.pos(), tooltip)
-        super().enterEvent(event)
+                self.set_selected(not self.selected)
+                self.preview_requested.emit(self)
+            event.accept()
+            return
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if self._locked:
+                self.unlock_requested.emit(self.slot_name)
+            else:
+                self.double_clicked.emit(self)
+            event.accept()
+            return
+        if event.key() == Qt.Key.Key_Menu and not self._locked:
+            self.context_menu_requested.emit(
+                self, self.mapToGlobal(self.rect().center()))
+            event.accept()
+            return
+        super().keyPressEvent(event)
 def _load_exp_table():
     try:
         base_dir = constants.get_base_path()
@@ -2005,19 +1944,20 @@ class InventoryGridWidget(QWidget):
         self.current_items = []
         self.max_visible_slots = 42
         self.header_layout = None
+        self._filter_mode = 'all'
+        self._search_text = ''
         self._multi_selected = set()
         self._multi_select_anchor = None
         self._setup_ui()
     def _ensure_slot(self, index):
         if index in self.slots:
             return self.slots[index]
-        row = index // GRID_COLS
-        col = index % GRID_COLS
         slot = ItemSlotWidget(index, self.container_type)
         slot.clicked.connect(self._on_slot_clicked)
         slot.double_clicked.connect(self._on_slot_double_clicked)
         slot.context_menu_requested.connect(self._on_slot_context_menu)
-        self.grid_layout.addWidget(slot, row, col)
+        self.grid_widget.place_slot(slot, index)
+        self.grid_widget.slots.append(slot)
         slot.setVisible(index < self.max_visible_slots)
         self.slots[index] = slot
         return slot
@@ -2028,104 +1968,186 @@ class InventoryGridWidget(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(4)
-        header = QHBoxLayout()
-        self.header_layout = header
+        self.toolbar = QFrame(self)
+        self.toolbar.setObjectName('inventoryGridToolbar')
+        self.toolbar.setProperty('class', 'stickyToolbar')
+        toolbar_layout = QVBoxLayout(self.toolbar)
+        toolbar_layout.setContentsMargins(
+            SPACING['sm'], SPACING['sm'], SPACING['sm'], SPACING['sm'])
+        toolbar_layout.setSpacing(SPACING['xs'])
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(SPACING['xs'])
         self.tab_label = QLabel(t(f'inventory.{self.container_type}', default=self.container_type.title()))
         self.tab_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
         self.tab_label.setObjectName('sectionHeader')
-        self.tab_label.setStyleSheet('QLabel#sectionHeader { margin-left: 0px; padding-left: 10px; }')
-        self.tab_label.setAlignment(Qt.AlignCenter)
-        header.addWidget(self.tab_label)
-        header.addStretch()
-        self.effigies_btn = QPushButton(t('inventory.max_all_abilities', default='Max All Abilities'))
-        self.effigies_btn.setFixedHeight(24)
-        self.effigies_btn.setStyleSheet('QPushButton { background: rgba(232,180,76,0.15); color: #E8B44C; border: 1px solid rgba(232,180,76,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(232,180,76,0.25); border-color: rgba(232,180,76,0.5); color: #FFFFFF; }')
-        self.effigies_btn.setCursor(Qt.PointingHandCursor)
+        self.tab_label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        title_row.addWidget(self.tab_label)
+        title_row.addStretch(1)
+        self.filter_count_label = QLabel(self.toolbar)
+        self.filter_count_label.setObjectName('inventoryFilterCount')
+        self.filter_count_label.setProperty('class', 'secondary')
+        title_row.addWidget(self.filter_count_label)
+        self.preview_label = QLabel(self.toolbar)
+        self.preview_label.setObjectName('inventorySelectionPreview')
+        self.preview_label.setProperty('class', 'secondary')
+        self.preview_label.setVisible(False)
+        title_row.addWidget(self.preview_label)
+        toolbar_layout.addLayout(title_row)
+
+        filter_row = QHBoxLayout()
+        filter_row.setContentsMargins(0, 0, 0, 0)
+        filter_row.setSpacing(SPACING['xs'])
+        self.filter_layout = filter_row
+        self.search_frame, self.search_input = make_search_field(
+            t('inventory.search_placeholder', default='Type to search items...'),
+            self._on_search_changed,
+            self.toolbar,
+        )
+        self.search_frame.setMinimumWidth(160)
+        self.search_frame.setMaximumWidth(260)
+        filter_row.addWidget(self.search_frame, 1)
+        self.filter_buttons = {}
+        for mode, label in (
+            ('all', t('ui.inventory.filter_all', default='All')),
+            ('items', t('ui.inventory.filter_items', default='Items')),
+            ('empty', t('ui.inventory.filter_empty', default='Empty')),
+        ):
+            button = make_filter_button(
+                label, checked=mode == self._filter_mode, parent=self.toolbar)
+            button.clicked.connect(
+                lambda _checked, key=mode: self._set_filter_mode(key))
+            self.filter_buttons[mode] = button
+            filter_row.addWidget(button)
+        filter_row.addStretch(1)
+        toolbar_layout.addLayout(filter_row)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(SPACING['xs'])
+        self.header_layout = header
+        self.effigies_btn = make_button(
+            t('inventory.max_all_abilities', default='Max All Abilities'),
+            'warning', parent=self.toolbar)
         self.effigies_btn.clicked.connect(self.add_all_effigies_requested.emit)
         self.effigies_btn.setVisible(self.container_type == 'key_items')
         header.addWidget(self.effigies_btn)
-        self.key_items_btn = QPushButton(t('inventory.add_all_key_items', default='Add All Key Items'))
-        self.key_items_btn.setFixedHeight(24)
-        self.key_items_btn.setStyleSheet('QPushButton { background: rgba(147,183,221,0.15); color: #93B7DD; border: 1px solid rgba(147,183,221,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(147,183,221,0.25); border-color: rgba(147,183,221,0.5); color: #FFFFFF; }')
-        self.key_items_btn.setCursor(Qt.PointingHandCursor)
+        self.key_items_btn = make_button(
+            t('inventory.add_all_key_items', default='Add All Key Items'),
+            'secondary', parent=self.toolbar)
         self.key_items_btn.clicked.connect(self.add_all_key_items_requested.emit)
         self.key_items_btn.setVisible(self.container_type == 'key_items')
         header.addWidget(self.key_items_btn)
-        self.clear_key_btn = QPushButton(t('inventory.clear_key_btn', default='Clear'))
-        self.clear_key_btn.setFixedHeight(24)
-        self.clear_key_btn.setStyleSheet('QPushButton { background: rgba(248,113,113,0.15); color: #F87171; border: 1px solid rgba(248,113,113,0.3); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 11px; } QPushButton:hover { background: rgba(248,113,113,0.25); border-color: rgba(248,113,113,0.5); color: #FFFFFF; }')
-        self.clear_key_btn.setCursor(Qt.PointingHandCursor)
+        self.clear_key_btn = make_button(
+            t('inventory.clear_key_btn', default='Clear'),
+            'destructive', parent=self.toolbar)
         self.clear_key_btn.setVisible(self.container_type == 'key_items')
         self.clear_key_btn.clicked.connect(self.clear_key_items_requested.emit)
         header.addWidget(self.clear_key_btn)
-        self.sort_btn = QPushButton(t('inventory.sort', default='Sort'))
-        self.sort_btn.setFixedHeight(24)
-        # modernize-tab-ui 3.1: token-driven ghost treatment (qss_builder);
-        # hardcoded purple inline stylesheet retired.
-        self.sort_btn.setObjectName('ghostBtn')
-        self.sort_btn.setCursor(Qt.PointingHandCursor)
+        header.addStretch(1)
+        self.sort_btn = make_button(
+            t('inventory.sort', default='Sort'), 'tertiary', parent=self.toolbar)
         self.sort_btn.clicked.connect(self.sort_requested.emit)
         header.addWidget(self.sort_btn)
-        self.multi_toolbar = QFrame()
+        self.multi_toolbar = QFrame(self.toolbar)
         self.multi_toolbar.setObjectName('invMultiToolbar')
-        self.multi_toolbar.setStyleSheet('QFrame#invMultiToolbar { background: transparent; border: none; }')
         self.multi_toolbar.setVisible(False)
         mt_layout = QHBoxLayout(self.multi_toolbar)
         mt_layout.setContentsMargins(0, 0, 0, 0)
         mt_layout.setSpacing(4)
         self.multi_count_label = QLabel()
-        self.multi_count_label.setStyleSheet('font-size: 11px; font-weight: 700; color: #38BDF8; background: transparent; border: none; padding: 0 4px;')
+        self.multi_count_label.setProperty('role', 'info')
         mt_layout.addWidget(self.multi_count_label)
-        del_btn = QPushButton(t('inventory.multi_delete_btn', default='Delete'))
+        del_btn = make_button(
+            t('inventory.multi_delete_btn', default='Delete'),
+            'destructive', parent=self.multi_toolbar)
         del_btn.setObjectName('invMultiDeleteBtn')
-        del_btn.setFixedHeight(22)
-        del_btn.setCursor(Qt.PointingHandCursor)
-        del_btn.setStyleSheet('QPushButton { background: rgba(248,113,113,0.12); color: #F87171; border: 1px solid rgba(248,113,113,0.25); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(248,113,113,0.25); color: #FFFFFF; }')
         del_btn.clicked.connect(self._on_multi_delete)
         mt_layout.addWidget(del_btn)
-        clear_btn = QPushButton(t('inventory.multi_clear_btn', default='Clear Qty'))
+        clear_btn = make_button(
+            t('inventory.multi_clear_btn', default='Clear Qty'),
+            'warning', parent=self.multi_toolbar)
         clear_btn.setObjectName('invMultiClearBtn')
-        clear_btn.setFixedHeight(22)
-        clear_btn.setCursor(Qt.PointingHandCursor)
-        clear_btn.setStyleSheet('QPushButton { background: rgba(232,180,76,0.12); color: #E8B44C; border: 1px solid rgba(232,180,76,0.25); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(232,180,76,0.25); color: #FFFFFF; }')
         clear_btn.clicked.connect(self._on_multi_clear_qty)
         mt_layout.addWidget(clear_btn)
-        deselect_btn = QPushButton(t('inventory.multi_deselect_btn', default='Deselect'))
+        deselect_btn = make_button(
+            t('inventory.multi_deselect_btn', default='Deselect'),
+            'tertiary', parent=self.multi_toolbar)
         deselect_btn.setObjectName('invMultiDeselectBtn')
-        deselect_btn.setFixedHeight(22)
-        deselect_btn.setCursor(Qt.PointingHandCursor)
-        deselect_btn.setStyleSheet('QPushButton { background: rgba(236,231,224,0.05); color: #9CA3AF; border: 1px solid rgba(236,231,224,0.1); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(236,231,224,0.1); color: #FFFFFF; }')
         deselect_btn.clicked.connect(self._clear_multi_selection)
         mt_layout.addWidget(deselect_btn)
         header.addWidget(self.multi_toolbar)
-        main_layout.addLayout(header)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet('QScrollArea { border: none; background: transparent; }')
-        self.grid_widget = QWidget()
-        self.grid_layout = QGridLayout(self.grid_widget)
+        toolbar_layout.addLayout(header)
+        main_layout.addWidget(self.toolbar)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setStyleSheet('QScrollArea { border: none; background: transparent; }')
+        self.grid_widget = SharedInventoryGrid(columns=GRID_COLS)
+        self.grid_layout = self.grid_widget.grid_layout
         self.grid_layout.setHorizontalSpacing(2)
         self.grid_layout.setVerticalSpacing(4)
-        self.grid_layout.setContentsMargins(0, 0, 0, 0)
-        for c in range(GRID_COLS):
-            self.grid_layout.setColumnStretch(c, 1)
-        scroll.setWidget(self.grid_widget)
-        main_layout.addWidget(scroll)
+        self.scroll.setWidget(self.grid_widget)
+        main_layout.addWidget(self.scroll)
+        self._apply_filter()
+
+    def _on_search_changed(self, text: str) -> None:
+        self._search_text = text.strip().casefold()
+        self._apply_filter()
+
+    def _set_filter_mode(self, mode: str) -> None:
+        if mode not in self.filter_buttons:
+            return
+        self._filter_mode = mode
+        for key, button in self.filter_buttons.items():
+            button.blockSignals(True)
+            button.setChecked(key == mode)
+            button.blockSignals(False)
+        self._apply_filter()
+
+    def _slot_matches_filter(self, slot: ItemSlotWidget) -> bool:
+        item = slot.slot_data
+        if self._filter_mode == 'items' and item is None:
+            return False
+        if self._filter_mode == 'empty' and item is not None:
+            return False
+        if not self._search_text:
+            return True
+        if item is None:
+            return False
+        searchable = ' '.join(str(item.get(key, '')) for key in (
+            'item_name', 'item_id', 'type_a', 'type_b'))
+        return self._search_text in searchable.casefold()
+
+    def _apply_filter(self) -> None:
+        visible_slots = []
+        for index in range(min(len(self.slots), self.max_visible_slots)):
+            slot = self.slots[index]
+            if self._slot_matches_filter(slot):
+                visible_slots.append(slot)
+            slot.hide()
+        filtered = self._filter_mode != 'all' or bool(self._search_text)
+        for position, slot in enumerate(visible_slots):
+            grid_index = position if filtered else slot.slot_index
+            self.grid_widget.place_slot(slot, grid_index)
+            slot.show()
+        self.filter_count_label.setText(t(
+            'ui.inventory.slot_count',
+            default='{visible} of {total} slots',
+            visible=len(visible_slots), total=self.max_visible_slots))
     def set_max_slots(self, max_slots: int):
-        display_slots = max(max_slots, 42)
-        # modernize-tab-ui 3.4: remember the real capacity for item placement,
-        # then pad the trailing row with normal empty slots so incomplete
-        # rows never render a stretched gap.
+        display_slots = max(0, int(max_slots))
+        # The shared grid gives every column equal stretch, so a partial final
+        # row keeps normal slot widths without inventing extra capacity.  The
+        # default 42-slot view still applies until a real container capacity is
+        # supplied through this method.
         self._item_slot_limit = display_slots
-        remainder = display_slots % GRID_COLS
-        if remainder:
-            display_slots += GRID_COLS - remainder
         if display_slots == self.max_visible_slots and self.slots:
             return
         self.max_visible_slots = display_slots
         self._ensure_slots_up_to(display_slots)
         for i, slot in self.slots.items():
             slot.setVisible(i < display_slots)
+        self._apply_filter()
     def load_items(self, items: list, max_slots: int=None):
         if max_slots is not None:
             self.set_max_slots(max_slots)
@@ -2139,6 +2161,7 @@ class InventoryGridWidget(QWidget):
             slot_index = item.get('slot_index', 0)
             if slot_index < slot_limit:
                 self.slots[slot_index].set_item(item)
+        self._apply_filter()
     def _on_slot_clicked(self, slot_data):
         sender = self.sender()
         if not sender:
@@ -2166,8 +2189,33 @@ class InventoryGridWidget(QWidget):
             return
         self._clear_multi_selection()
         self._multi_select_anchor = idx
+        sender.set_selected(True, emit=False)
+        self._show_slot_preview(sender)
         if has_item:
             self.item_selected.emit(slot_data)
+
+    def _show_slot_preview(self, slot: ItemSlotWidget) -> None:
+        data = slot.slot_data
+        if data:
+            name = str(data.get('item_name', 'Unknown'))
+            quantity = int(data.get('stack_count', 1) or 0)
+            text = t(
+                'ui.inventory.preview_item',
+                default='{name} ×{quantity}', name=name, quantity=quantity)
+            tooltip = str(data.get('item_id', ''))
+            description = _clean_desc_for_tooltip(
+                data.get('description', '') or '')
+            if description:
+                tooltip = f'{tooltip}\n{description}'.strip()
+        else:
+            text = t(
+                'ui.inventory.preview_empty', default='Slot {number} is empty',
+                number=slot.slot_index + 1)
+            tooltip = text
+        self.preview_label.setText(text)
+        self.preview_label.setToolTip(tooltip)
+        self.preview_label.setAccessibleName(text)
+        self.preview_label.setVisible(True)
     def _toggle_multi_slot(self, idx, force_add=False):
         key = idx
         if key in self._multi_selected:
@@ -2187,6 +2235,9 @@ class InventoryGridWidget(QWidget):
                 self.slots[idx].set_selected_multi(False)
         self._multi_selected.clear()
         self._multi_select_anchor = None
+        for slot in self.slots.values():
+            slot.set_selected(False, emit=False)
+        self.preview_label.setVisible(False)
         if update_toolbar:
             self._update_multi_toolbar()
     def _gather_multi_selected(self):
@@ -2233,6 +2284,17 @@ class InventoryGridWidget(QWidget):
     def refresh_labels(self):
         self.tab_label.setText(t(f'inventory.{self.container_type}', default=self.container_type.title()))
         self.sort_btn.setText(t('inventory.sort', default='Sort'))
+        placeholder = t(
+            'inventory.search_placeholder', default='Type to search items...')
+        self.search_input.setPlaceholderText(placeholder)
+        self.search_input.setAccessibleName(placeholder)
+        for mode, label in (
+            ('all', t('ui.inventory.filter_all', default='All')),
+            ('items', t('ui.inventory.filter_items', default='Items')),
+            ('empty', t('ui.inventory.filter_empty', default='Empty')),
+        ):
+            self.filter_buttons[mode].setText(label)
+            self.filter_buttons[mode].setAccessibleName(label)
         self.effigies_btn.setText(t('inventory.max_all_abilities', default='Max All Abilities'))
         self.key_items_btn.setText(t('inventory.add_all_key_items', default='Add All Key Items'))
         self.clear_key_btn.setText(t('inventory.clear_key_btn', default='Clear'))
@@ -2245,6 +2307,8 @@ class InventoryGridWidget(QWidget):
                     btn.setText(t('inventory.multi_clear_btn', default='Clear Qty'))
                 elif obj == 'invMultiDeselectBtn':
                     btn.setText(t('inventory.multi_deselect_btn', default='Deselect'))
+                btn.setAccessibleName(btn.text())
+        self._apply_filter()
         self._update_multi_toolbar()
     def clear(self):
         self.load_items([])
@@ -2279,24 +2343,22 @@ class RarityBorderDelegate(QStyledItemDelegate):
         rect = option.rect.adjusted(4, 4, -4, -4)
         painter.drawRoundedRect(rect, 4, 4)
         painter.restore()
-class ItemPickerDialog(QDialog):
+class ItemPickerDialog(BaseDialog):
     item_selected = pyqtSignal(str, int)
     def __init__(self, parent=None, filter_type_a=None, filter_type_b=None, filter_exclude_type_a=None, hide_quantity=False, exclude_assets=None):
-        super().__init__(parent)
-        self.setWindowTitle(t('inventory.select_item', default='Select Item'))
-        self.setMinimumSize(840, 600)
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        title = t('inventory.select_item', default='Select Item')
+        super().__init__(
+            title, parent, min_size=(840, 600),
+            kicker=t('ui.dialog.inventory_kicker', default='Inventory'))
         self.selected_item = None
         self._filter_type_a = filter_type_a
         self._filter_type_b = filter_type_b
         self._filter_exclude_type_a = filter_exclude_type_a
         self._hide_quantity = hide_quantity
         self._exclude_assets = exclude_assets or set()
-        self.setStyleSheet(DARK_THEME_STYLE)
         self._setup_ui()
-        self._adjust_width()
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         layout.setSpacing(8)
         search_layout = QHBoxLayout()
         search_label = QLabel(t('common.search', default='Search:'))
@@ -2322,7 +2384,7 @@ class ItemPickerDialog(QDialog):
         self.results_list.itemDoubleClicked.connect(self._on_item_double_clicked)
         layout.addWidget(self.results_list)
         self.desc_label = QLabel('')
-        self.desc_label.setStyleSheet('color: #A69F94; font-size: 11px; padding: 2px 4px;')
+        self.desc_label.setProperty('class', 'secondary')
         self.desc_label.setWordWrap(True)
         self.desc_label.setVisible(False)
         self.desc_label.setMaximumHeight(50)
@@ -2332,20 +2394,17 @@ class ItemPickerDialog(QDialog):
         self.qty_input = QLineEdit('1')
         self.qty_input.setValidator(QIntValidator(1, constants.MAX_QUANTITY))
         self.qty_input.setFixedWidth(100)
-        self.qty_input.setStyleSheet('QLineEdit { background: rgba(236,231,224,0.06); color: #ECE7E0; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 2px 6px; }')
         qty_layout.addWidget(self.qty_label)
         qty_layout.addWidget(self.qty_input)
         if self._hide_quantity:
             self.qty_label.setVisible(False)
             self.qty_input.setVisible(False)
         qty_layout.addStretch()
-        add_btn = QPushButton(t('button.add', default='Add'))
-        add_btn.clicked.connect(self._add_item)
-        qty_layout.addWidget(add_btn)
-        cancel_btn = QPushButton(t('button.cancel', default='Cancel'))
-        cancel_btn.clicked.connect(self.reject)
-        qty_layout.addWidget(cancel_btn)
         layout.addLayout(qty_layout)
+        self.add_button = make_button(
+            t('button.add', default='Add'), 'primary', parent=self)
+        self.add_button.clicked.connect(self._add_item)
+        self.footer.insertWidget(self.footer.count() - 1, self.add_button)
         items = ItemData.get_all_items()
         for item in items:
             type_a = item.get('type_a', '')
@@ -2446,36 +2505,32 @@ class ItemPickerDialog(QDialog):
                 qty = 1
             self.item_selected.emit(self.selected_item, qty)
             self.accept()
-class ModifyInventorySlotsDialog(QDialog):
+class ModifyInventorySlotsDialog(BaseDialog):
     def __init__(self, current_slots=42, current_items=0, parent=None):
-        super().__init__(parent)
+        title = t('inventory.modify_slots_title', default='Modify Inventory Slots')
+        super().__init__(
+            title, parent, min_size=(400, 240),
+            kicker=t('ui.dialog.inventory_kicker', default='Inventory'))
         self.current_slots = max(42, current_slots)
         self.current_items = current_items
         self.new_slot_count = self.current_slots
         self._setup_ui()
     def _setup_ui(self):
-        self.setWindowTitle(t('inventory.modify_slots_title', default='Modify Inventory Slots'))
-        self.setModal(True)
-        self.setMinimumWidth(350)
-        self.setStyleSheet(DARK_THEME_STYLE)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(10)
+        layout = self.content_layout
         status_group = QFrame()
         status_layout = QVBoxLayout(status_group)
         status_layout.setContentsMargins(0, 0, 0, 0)
         status_layout.setSpacing(4)
         self.current_slots_label = QLabel(t('inventory.modify_slots_current_slots', count=self.current_slots, default=f'Current Slots: {self.current_slots}'))
-        self.current_slots_label.setStyleSheet('font-weight: bold; color: #ECE7E0;')
+        self.current_slots_label.setProperty('class', 'emphasis')
         status_layout.addWidget(self.current_slots_label)
         self.current_items_label = QLabel(t('inventory.modify_slots_current_items', count=self.current_items, default=f'Current Items: {self.current_items}'))
-        self.current_items_label.setStyleSheet('font-weight: bold; color: #A69F94;')
+        self.current_items_label.setProperty('class', 'secondary')
         status_layout.addWidget(self.current_items_label)
         layout.addWidget(status_group)
         input_row = QHBoxLayout()
         input_row.setSpacing(8)
         new_label = QLabel(t('inventory.modify_slots_new', default='New Slot Count'))
-        new_label.setStyleSheet('color: #ECE7E0;')
         input_row.addWidget(new_label)
         input_row.addStretch()
         self.slot_spinbox = QSpinBox()
@@ -2486,19 +2541,14 @@ class ModifyInventorySlotsDialog(QDialog):
         input_row.addWidget(self.slot_spinbox)
         layout.addLayout(input_row)
         self.warning_label = QLabel('')
-        self.warning_label.setStyleSheet('color: #ff6b6b; font-weight: bold;')
+        self.warning_label.setProperty('role', 'danger')
         self.warning_label.setVisible(False)
         layout.addWidget(self.warning_label)
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        self.ok_button = QPushButton(t('inventory.modify_slots_ok', default='OK'))
+        self.ok_button = make_button(
+            t('inventory.modify_slots_ok', default='OK'), 'primary', parent=self)
         self.ok_button.clicked.connect(self.accept)
         self.ok_button.setEnabled(False)
-        button_layout.addWidget(self.ok_button)
-        cancel_button = QPushButton(t('inventory.modify_slots_cancel', default='Cancel'))
-        cancel_button.clicked.connect(self.reject)
-        button_layout.addWidget(cancel_button)
-        layout.addLayout(button_layout)
+        self.footer.insertWidget(self.footer.count() - 1, self.ok_button)
         self._update_validation()
     def _on_slot_count_changed(self, value):
         self.new_slot_count = value
@@ -2531,36 +2581,56 @@ class PlayerInventoryTab(QWidget):
         self._player_list = []
         self._tab_loaded_for = {}
         self._syncing = False
+        self._applying_workspace_context = False
+        self._workspace_context = None
+        self._context_unsubscribe = None
+        self._loading_player_uid = None
         self.equip_headers = {}
         self._context_container_type = 'main'
         self._context_slot_index = 0
         self._setup_ui()
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon, set_content_margins
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-        # top-nav-shell 4.4: player picker in a standard toolbar row below
-        # the page header (ribbon keeps title/zone only).
-        ribbon = create_page_ribbon(t('inventory.title', default='Player Inventory'), (t('sidebar.section.editing') if t else 'Editing').upper(), self)
-        main_layout.addWidget(ribbon)
-        toolbar_row = QHBoxLayout()
-        set_content_margins(toolbar_row, top=6, bottom=6)
-        toolbar_row.setSpacing(6)
-        self.player_select_btn = QPushButton(t('inventory.select_player', default='Select Player...'))
-        # uiux-audit-remediation 6.4: selector chip parity with Base
-        # Inventory — bordered dropdown chip + chevron; the picker-selected
-        # accent state (set_picker_selected) is covered by the
-        # selectorChip[pickerSelected="true"] rule.
-        self.player_select_btn.setObjectName('selectorChip')
-        self.player_select_btn.setMinimumWidth(200)
+        main_layout.setSpacing(SPACING['sm'])
+
+        self.context_bar = QFrame(self)
+        self.context_bar.setObjectName('editorContextBar')
+        toolbar_row = QHBoxLayout(self.context_bar)
+        toolbar_row.setContentsMargins(
+            SPACING['md'], SPACING['sm'], SPACING['md'], SPACING['sm'])
+        toolbar_row.setSpacing(SPACING['sm'])
+        self.context_label = QLabel(
+            t('ui.inventory.player_context', default='Player'), self.context_bar)
+        self.context_label.setObjectName('editorContextLabel')
+        toolbar_row.addWidget(self.context_label)
+        self.player_select_btn = make_chip(
+            t('inventory.select_player', default='Select Player...'),
+            checkable=False,
+            parent=self.context_bar,
+        )
+        self.player_select_btn.setObjectName('workspacePlayerSelector')
+        self.player_select_btn.setProperty('contextKind', 'player')
+        self.player_select_btn.setMinimumWidth(220)
         self.player_select_btn.setCursor(Qt.PointingHandCursor)
         self.player_select_btn.setIcon(
             app_icons.get_qicon('chevron_down', role='text_secondary'))
+        self.player_select_btn.setToolTip(t(
+            'ui.inventory.change_player', default='Choose or change player'))
+        self.player_select_btn.setAccessibleDescription(
+            self.player_select_btn.toolTip())
         self.player_select_btn.clicked.connect(self._open_player_popup)
         toolbar_row.addWidget(self.player_select_btn)
+        self.context_summary = QLabel(
+            t('ui.inventory.context_hint', default='Inventory changes apply to this player.'),
+            self.context_bar,
+        )
+        self.context_summary.setObjectName('editorContextHint')
+        self.context_summary.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        toolbar_row.addWidget(self.context_summary)
         toolbar_row.addStretch(1)
-        main_layout.addLayout(toolbar_row)
+        main_layout.addWidget(self.context_bar)
         self.content_area = QFrame()
         self.content_area.setObjectName('inventoryContent')
         self.content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -2579,6 +2649,10 @@ class PlayerInventoryTab(QWidget):
         inner_content.setSpacing(10)
         self.inv_tabs = QTabWidget()
         self.inv_tabs.setObjectName('inventoryTabs')
+        self.inv_tabs.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.inv_tabs.tabBar().setAccessibleName(t(
+            'ui.inventory.views', default='Player editor views'))
         self.main_grid = InventoryGridWidget('main')
         self.main_grid.item_selected.connect(self._on_item_selected)
         self.main_grid.multi_delete_requested.connect(self._on_bulk_delete_items)
@@ -2591,35 +2665,33 @@ class PlayerInventoryTab(QWidget):
         # modernize-tab-ui 3.3: filters/clears left; utility actions grouped
         # right ([Modify Slots][Loadouts][Sort]) with a separator before the
         # warning-tier bulk action (Unlock All Fast Travel). Handlers unchanged.
-        self.inv_clear_btn = QPushButton(t('inventory.clear_btn', default='Clear'))
-        self.inv_clear_btn.setObjectName('toolButton')
-        self.inv_clear_btn.setFixedHeight(24)
-        self.inv_clear_btn.setCursor(Qt.PointingHandCursor)
+        self.inv_clear_btn = make_button(
+            t('inventory.clear_btn', default='Clear'), 'tertiary',
+            parent=self.main_grid.toolbar)
         self.inv_clear_btn.clicked.connect(self._clear_all_inventory)
-        self.main_grid.header_layout.insertWidget(1, self.inv_clear_btn)
-        self.inv_modify_slots_btn = QPushButton(t('inventory.modify_slots_btn', default='Modify Slots'))
-        self.inv_modify_slots_btn.setObjectName('toolButton')
-        self.inv_modify_slots_btn.setFixedHeight(24)
-        self.inv_modify_slots_btn.setCursor(Qt.PointingHandCursor)
+        self.main_grid.filter_layout.insertWidget(4, self.inv_clear_btn)
+        self.inv_modify_slots_btn = make_button(
+            t('inventory.modify_slots_btn', default='Modify Slots'),
+            'secondary', parent=self.main_grid.toolbar)
         self.inv_modify_slots_btn.clicked.connect(self._on_modify_inventory_slots)
-        self.inv_loadout_btn = QPushButton(t('inventory.loadouts_btn', default='Loadouts'))
-        self.inv_loadout_btn.setObjectName('toolButton')
-        self.inv_loadout_btn.setFixedHeight(24)
-        self.inv_loadout_btn.setCursor(Qt.PointingHandCursor)
+        self.inv_loadout_btn = make_button(
+            t('inventory.loadouts_btn', default='Loadouts'),
+            'secondary', parent=self.main_grid.toolbar)
         self.inv_loadout_btn.clicked.connect(self._on_inventory_loadout)
         sort_idx = self.main_grid.header_layout.indexOf(self.main_grid.sort_btn)
         self.main_grid.header_layout.insertWidget(sort_idx, self.inv_modify_slots_btn)
         self.main_grid.header_layout.insertWidget(sort_idx + 1, self.inv_loadout_btn)
-        toolbar_separator = QFrame()
+        toolbar_separator = make_vdivider()
         toolbar_separator.setObjectName('invToolbarSep')
-        toolbar_separator.setFrameShape(QFrame.VLine)
-        toolbar_separator.setFixedHeight(20)
         sep_idx = self.main_grid.header_layout.indexOf(self.main_grid.sort_btn) + 1
         self.main_grid.header_layout.insertWidget(sep_idx, toolbar_separator)
-        self.unlock_all_map_btn = QPushButton(t('inventory.unlock_all_map', default='Unlock All Map + Fast Travel'))
-        self.unlock_all_map_btn.setObjectName('warnActionBtn')
-        self.unlock_all_map_btn.setCursor(Qt.PointingHandCursor)
-        self.unlock_all_map_btn.setFixedHeight(24)
+        self.unlock_all_map_btn = make_button(
+            t('ui.inventory.unlock_fast_travel', default='Unlock Fast Travel'),
+            'warning',
+            tooltip=t(
+                'inventory.unlock_all_map',
+                default='Unlock All Map + Fast Travel'),
+            parent=self.main_grid.toolbar)
         self.unlock_all_map_btn.clicked.connect(self._on_unlock_all_map_clicked)
         sep_idx = self.main_grid.header_layout.indexOf(toolbar_separator)
         self.main_grid.header_layout.insertWidget(sep_idx + 1, self.unlock_all_map_btn)
@@ -2672,27 +2744,31 @@ class PlayerInventoryTab(QWidget):
         inner_content.addWidget(self.inv_tabs, 2)
         equip_wrapper = QWidget()
         self.equip_wrapper = equip_wrapper
-        equip_wrapper.setMinimumWidth(400)
+        equip_wrapper.setObjectName('equipmentWorkspace')
+        equip_wrapper.setMinimumWidth(0)
         equip_wrapper_layout = QVBoxLayout(equip_wrapper)
         equip_wrapper_layout.setContentsMargins(4, 0, 4, 0)
         equip_wrapper_layout.setSpacing(4)
         equip_header_row = QHBoxLayout()
         equip_header_row.setContentsMargins(0, 0, 0, 0)
         self.equip_title = QLabel(t('inventory.equipment', default='Equipment'))
-        self.equip_title.setStyleSheet('font-size: 11px; font-weight: bold; color: #ECE7E0;')
+        self.equip_title.setObjectName('equipmentWorkspaceTitle')
         self.equip_title.setAlignment(Qt.AlignCenter)
         equip_header_row.addWidget(self.equip_title)
+        self.equip_preview_label = QLabel(equip_wrapper)
+        self.equip_preview_label.setObjectName('equipmentSelectionPreview')
+        self.equip_preview_label.setProperty('class', 'secondary')
+        self.equip_preview_label.setVisible(False)
+        equip_header_row.addWidget(self.equip_preview_label)
         equip_header_row.addStretch()
-        self.equip_loadout_btn = QPushButton(t('inventory.equip_loadouts_btn', default='Loadouts'))
-        self.equip_loadout_btn.setObjectName('toolButton')
-        self.equip_loadout_btn.setFixedHeight(22)
-        self.equip_loadout_btn.setCursor(Qt.PointingHandCursor)
+        self.equip_loadout_btn = make_button(
+            t('inventory.equip_loadouts_btn', default='Loadouts'),
+            'secondary', parent=equip_wrapper)
         self.equip_loadout_btn.clicked.connect(self._on_equipment_loadout)
         equip_header_row.addWidget(self.equip_loadout_btn)
-        self.equip_clear_btn = QPushButton(t('inventory.equip_clear_btn', default='Clear'))
-        self.equip_clear_btn.setObjectName('toolButton')
-        self.equip_clear_btn.setFixedHeight(22)
-        self.equip_clear_btn.setCursor(Qt.PointingHandCursor)
+        self.equip_clear_btn = make_button(
+            t('inventory.equip_clear_btn', default='Clear'),
+            'destructive', parent=equip_wrapper)
         self.equip_clear_btn.clicked.connect(self._clear_all_equipment)
         equip_header_row.addWidget(self.equip_clear_btn)
         equip_wrapper_layout.addLayout(equip_header_row)
@@ -2708,10 +2784,17 @@ class PlayerInventoryTab(QWidget):
         self.equip_slots = {}
         equip_main_layout = QHBoxLayout()
         equip_main_layout.setSpacing(8)
-        left_col = QVBoxLayout()
+        equip_main_layout.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        left_panel = QWidget(equip_content)
+        left_panel.setObjectName('equipmentCategoryColumn')
+        left_panel.setMaximumWidth(476)
+        left_col = QVBoxLayout(left_panel)
+        left_col.setContentsMargins(0, 0, 0, 0)
         left_col.setSpacing(2)
         weapon_header = QLabel(t('inventory.weapon', default='Weapon'))
-        weapon_header.setStyleSheet('font-size: 11px; font-weight: bold; color: #A6B8C8;')
+        weapon_header.setObjectName('equipmentCategoryHeader')
+        weapon_header.setProperty('categoryKind', 'weapon')
         left_col.addWidget(weapon_header)
         self.equip_headers['weapon'] = weapon_header
         weapon_grid = QGridLayout()
@@ -2727,7 +2810,8 @@ class PlayerInventoryTab(QWidget):
         left_col.addLayout(weapon_grid)
         left_col.addSpacing(8)
         acc_header = QLabel(t('inventory.accessory', default='Accessory'))
-        acc_header.setStyleSheet('font-size: 11px; font-weight: bold; color: #A6B8C8;')
+        acc_header.setObjectName('equipmentCategoryHeader')
+        acc_header.setProperty('categoryKind', 'accessory')
         left_col.addWidget(acc_header)
         self.equip_headers['accessory'] = acc_header
         acc_grid = QGridLayout()
@@ -2743,7 +2827,8 @@ class PlayerInventoryTab(QWidget):
         left_col.addLayout(acc_grid)
         left_col.addSpacing(8)
         food_header = QLabel(t('inventory.food', default='Food'))
-        food_header.setStyleSheet('font-size: 11px; font-weight: bold; color: #A6B8C8;')
+        food_header.setObjectName('equipmentCategoryHeader')
+        food_header.setProperty('categoryKind', 'food')
         left_col.addWidget(food_header)
         self.equip_headers['food'] = food_header
         food_grid = QGridLayout()
@@ -2758,11 +2843,16 @@ class PlayerInventoryTab(QWidget):
             food_grid.addWidget(slot, row, col)
         food_grid.setAlignment(Qt.AlignLeft)
         left_col.addLayout(food_grid)
-        equip_main_layout.addLayout(left_col)
-        right_col = QVBoxLayout()
+        equip_main_layout.addWidget(left_panel)
+        right_panel = QWidget(equip_content)
+        right_panel.setObjectName('equipmentCategoryColumn')
+        right_panel.setMaximumWidth(220)
+        right_col = QVBoxLayout(right_panel)
+        right_col.setContentsMargins(0, 0, 0, 0)
         right_col.setSpacing(4)
         head_header = QLabel(t('inventory.head', default='Head'))
-        head_header.setStyleSheet('font-size: 11px; font-weight: bold; color: #A6B8C8;')
+        head_header.setObjectName('equipmentCategoryHeader')
+        head_header.setProperty('categoryKind', 'head')
         right_col.addWidget(head_header)
         self.equip_headers['head'] = head_header
         slot = EquipmentSlotWidget('head', 'H1')
@@ -2770,7 +2860,8 @@ class PlayerInventoryTab(QWidget):
         slot.context_menu_requested.connect(self._show_equip_context_menu)
         right_col.addWidget(slot)
         body_header = QLabel(t('inventory.body', default='Body'))
-        body_header.setStyleSheet('font-size: 11px; font-weight: bold; color: #A6B8C8;')
+        body_header.setObjectName('equipmentCategoryHeader')
+        body_header.setProperty('categoryKind', 'body')
         right_col.addWidget(body_header)
         self.equip_headers['body'] = body_header
         slot = EquipmentSlotWidget('body', 'B1')
@@ -2778,7 +2869,8 @@ class PlayerInventoryTab(QWidget):
         slot.context_menu_requested.connect(self._show_equip_context_menu)
         right_col.addWidget(slot)
         shield_header = QLabel(t('inventory.shield', default='Shield'))
-        shield_header.setStyleSheet('font-size: 11px; font-weight: bold; color: #A6B8C8;')
+        shield_header.setObjectName('equipmentCategoryHeader')
+        shield_header.setProperty('categoryKind', 'shield')
         right_col.addWidget(shield_header)
         self.equip_headers['shield'] = shield_header
         slot = EquipmentSlotWidget('shield', 'S1')
@@ -2786,7 +2878,8 @@ class PlayerInventoryTab(QWidget):
         slot.context_menu_requested.connect(self._show_equip_context_menu)
         right_col.addWidget(slot)
         glider_header = QLabel(t('inventory.glider', default='Glider'))
-        glider_header.setStyleSheet('font-size: 11px; font-weight: bold; color: #A6B8C8;')
+        glider_header.setObjectName('equipmentCategoryHeader')
+        glider_header.setProperty('categoryKind', 'glider')
         right_col.addWidget(glider_header)
         self.equip_headers['glider'] = glider_header
         slot = EquipmentSlotWidget('glider', 'G1')
@@ -2794,7 +2887,8 @@ class PlayerInventoryTab(QWidget):
         slot.context_menu_requested.connect(self._show_equip_context_menu)
         right_col.addWidget(slot)
         module_header = QLabel(t('inventory.module', default='Module'))
-        module_header.setStyleSheet('font-size: 11px; font-weight: bold; color: #A6B8C8;')
+        module_header.setObjectName('equipmentCategoryHeader')
+        module_header.setProperty('categoryKind', 'module')
         right_col.addWidget(module_header)
         self.equip_headers['module'] = module_header
         slot = EquipmentSlotWidget('sphere_mod', 'SM')
@@ -2803,11 +2897,13 @@ class PlayerInventoryTab(QWidget):
         right_col.addWidget(slot)
         for equip_slot in self.equip_slots.values():
             equip_slot.double_clicked.connect(self._on_equip_double_clicked)
-        equip_main_layout.addLayout(right_col)
+            equip_slot.preview_requested.connect(self._on_equipment_preview)
+        equip_main_layout.addWidget(right_panel)
         center_layout.addLayout(equip_main_layout)
         equip_scroll.setWidget(equip_content)
         equip_wrapper_layout.addWidget(equip_scroll)
-        inner_content.addWidget(equip_wrapper, 1)
+        self.inv_tabs.insertTab(
+            1, equip_wrapper, t('inventory.equipment', default='Equipment'))
         content_layout.addLayout(inner_content)
         main_layout.addWidget(self.content_area)
         self.inv_tabs.hide()
@@ -2832,52 +2928,162 @@ class PlayerInventoryTab(QWidget):
     def _on_tab_changed(self, idx):
         if not self.current_player_uid:
             return
-        if idx not in (3, 4, 5):
+        widget = self.inv_tabs.widget(idx)
+        loaders = {
+            self.missions_tab: ('missions', self.missions_panel.load_player),
+            self.tech_tab: ('technology', self.tech_panel.load_player),
+            self.palpedia_tab: ('palpedia', self.palpedia_panel.load_player),
+        }
+        if widget not in loaders:
             return
         uid = self.current_player_uid
-        if self._tab_loaded_for.get(idx) == uid:
+        key, loader = loaders[widget]
+        if self._tab_loaded_for.get(key) == uid:
             return
         QApplication.processEvents()
         self.inv_tabs.blockSignals(True)
         try:
-            if idx == 3:
-                self.missions_panel.load_player(uid)
-            elif idx == 4:
-                self.tech_panel.load_player(uid)
-            elif idx == 5:
-                self.palpedia_panel.load_player(uid)
-            self._tab_loaded_for[idx] = uid
+            loader(uid)
+            self._tab_loaded_for[key] = uid
         finally:
             QApplication.processEvents()
             self.inv_tabs.blockSignals(False)
     def refresh_players(self):
         self._player_list = []
-        self.current_player_uid = None
-        self.current_player_name = None
-        self.player_select_btn.setText(t('inventory.select_player', default='Select Player...'))
         if constants.loaded_level_json:
             from palworld_aio.managers.save_manager import save_manager
             players = save_manager.get_players()
             for uid, name, gid, lastseen, level, *_ in players:
                 display_name = f'{name} (Lv.{level})'
                 self._player_list.append({'uid': uid, 'name': name, 'level': level, 'display': display_name})
+        self._reconcile_player_context()
+
+    def bind_workspace_context(self, context) -> None:
+        """Bind player selection to the shell's identifier-only context."""
+        if self._context_unsubscribe is not None:
+            self._context_unsubscribe()
+        self._workspace_context = context
+        self._context_unsubscribe = context.subscribe(
+            self._on_workspace_context_changed)
+        self._on_workspace_context_changed(context.snapshot)
+
+    def _reconcile_player_context(self) -> None:
+        context = self._workspace_context
+        valid = {str(player['uid']) for player in self._player_list}
+        if context is not None:
+            from palworld_aio.ui.routes import ContextKind
+            from palworld_aio.ui.workspace_context import ContextSelection
+            context.invalidate_missing({ContextKind.PLAYER: valid})
+            context.apply_smart_defaults(players=(
+                ContextSelection(str(player['uid']), str(player['name']))
+                for player in self._player_list
+            ))
+            selected = context.snapshot.player
+            if selected is not None:
+                self._set_selector_copy(
+                    selected.identifier, selected.label, selected.detail)
+                return
+        elif len(self._player_list) == 1 and self.current_player_uid is None:
+            only = self._player_list[0]
+            self.select_player(only['uid'], only['name'], only['display'])
+            return
+        if self.current_player_uid is not None and str(self.current_player_uid) in valid:
+            player = next(
+                item for item in self._player_list
+                if str(item['uid']) == str(self.current_player_uid))
+            self._set_selector_copy(
+                str(player['uid']), str(player['name']), str(player['display']))
+            return
+        self.current_player_uid = None
+        self.current_player_name = None
+        self._set_selector_copy(None, '', '')
+
+    def _set_selector_copy(self, uid, name: str, display: str = '') -> None:
+        if uid is None:
+            label = t('inventory.select_player', default='Select Player...')
+            self.player_select_btn.setText(label)
+            self.player_select_btn.setAccessibleName(label)
+            tooltip = t(
+                'ui.inventory.change_player', default='Choose or change player')
+            self.player_select_btn.setToolTip(tooltip)
+            self.player_select_btn.setAccessibleDescription(tooltip)
+            set_picker_selected(self.player_select_btn, False)
+            self.context_summary.setText(t(
+                'ui.inventory.context_hint',
+                default='Inventory changes apply to this player.'))
+            return
+        label = display or name or str(uid)
+        self.player_select_btn.setText(label)
+        self.player_select_btn.setAccessibleName(t(
+            'ui.inventory.player_selected', default='Selected player: {name}',
+            name=name or label))
+        self.player_select_btn.setToolTip(str(uid))
+        self.player_select_btn.setAccessibleDescription(t(
+            'ui.inventory.player_uid', default='Player ID: {uid}', uid=str(uid)))
+        set_picker_selected(self.player_select_btn, True)
+        self.context_summary.setText(t(
+            'ui.inventory.selected_hint',
+            default='Edits apply only to {name}.', name=name or label))
+
+    def _publish_player_context(self, uid, name: str) -> None:
+        if self._workspace_context is None or self._applying_workspace_context:
+            return
+        from palworld_aio.ui.workspace_context import ContextSelection
+        selection = (
+            ContextSelection(str(uid), str(name)) if uid is not None else None)
+        self._workspace_context.set_player(selection)
+
+    def _on_workspace_context_changed(self, snapshot) -> None:
+        if self._applying_workspace_context:
+            return
+        selection = snapshot.player
+        self._applying_workspace_context = True
+        try:
+            if selection is None:
+                if self.current_player_uid is not None:
+                    self.clear_player()
+                else:
+                    self._set_selector_copy(None, '', '')
+                return
+            if not self._player_list and constants.loaded_level_json:
+                self.refresh_players()
+            player = next((
+                item for item in self._player_list
+                if str(item['uid']) == selection.identifier
+            ), None)
+            if player is None:
+                self._set_selector_copy(
+                    selection.identifier, selection.label, selection.detail)
+                return
+            display = str(player['display'])
+            if str(self.current_player_uid or '') != selection.identifier:
+                self._set_selector_copy(
+                    selection.identifier, selection.label, display)
+                self.select_player(selection.identifier, selection.label, display)
+            else:
+                self._set_selector_copy(
+                    selection.identifier, selection.label, display)
+        finally:
+            self._applying_workspace_context = False
     def select_player(self, uid, name, display):
         if self._syncing:
             return
         gen = self._selection_generation = getattr(self, '_selection_generation', 0) + 1
+        self.current_player_uid = uid
+        self.current_player_name = name
+        self._loading_player_uid = str(uid)
+        self._set_selector_copy(uid, name, display)
+        self._publish_player_context(uid, name)
 
         def task():
-            self.current_player_uid = uid
-            self.current_player_name = name
             self.modified = False
             return get_player_inventory(self.current_player_uid)
 
         def on_finished(inv):
             if self._selection_generation != gen:
                 return
+            self._loading_player_uid = None
             self.inventory = inv
-            self.player_select_btn.setText(display)
-            set_picker_selected(self.player_select_btn, True)
             self.inv_tabs.setCurrentIndex(0)
             self._tab_loaded_for.clear()
             self._show_inventory()
@@ -2896,8 +3102,8 @@ class PlayerInventoryTab(QWidget):
             return
         self.current_player_uid = uid
         self.current_player_name = name
-        self.player_select_btn.setText(display)
-        set_picker_selected(self.player_select_btn, True)
+        self._set_selector_copy(uid, name, display)
+        self._publish_player_context(uid, name)
         self.modified = False
         self._show_inventory()
     def clear_player(self):
@@ -2905,19 +3111,15 @@ class PlayerInventoryTab(QWidget):
             return
         self.current_player_uid = None
         self.current_player_name = None
-        self.player_select_btn.setText(t('inventory.select_player', default='Select Player...'))
-        set_picker_selected(self.player_select_btn, False)
+        self._set_selector_copy(None, '', '')
+        self._publish_player_context(None, '')
         self._clear_display()
     def _open_player_popup(self):
         if not self._player_list:
             self.refresh_players()
         chosen = show_player_select_popup(self.player_select_btn, self._player_list, self.current_player_uid)
         if chosen == '__clear__':
-            self._clear_display()
-            self.player_select_btn.setText(t('inventory.select_player', default='Select Player...'))
-            set_picker_selected(self.player_select_btn, False)
-            self.current_player_uid = None
-            self.current_player_name = None
+            self.clear_player()
             if hasattr(self.parent_window, 'pal_editor_tab'):
                 self._syncing = True
                 self.parent_window.pal_editor_tab.clear_player()
@@ -2928,8 +3130,8 @@ class PlayerInventoryTab(QWidget):
             display = chosen['display']
             self.current_player_uid = uid
             self.current_player_name = name
-            self.player_select_btn.setText(display)
-            set_picker_selected(self.player_select_btn, True)
+            self._set_selector_copy(uid, name, display)
+            self._publish_player_context(uid, name)
             self.modified = False
             if hasattr(self.parent_window, 'pal_editor_tab'):
                 self._syncing = True
@@ -2968,13 +3170,9 @@ class PlayerInventoryTab(QWidget):
     def _show_inventory(self):
         self.placeholder_label.hide()
         self.inv_tabs.show()
-        if hasattr(self, 'equip_wrapper'):
-            self.equip_wrapper.show()
     def _clear_display(self):
         self.placeholder_label.show()
         self.inv_tabs.hide()
-        if hasattr(self, 'equip_wrapper'):
-            self.equip_wrapper.hide()
         self.main_grid.load_items([])
         self.key_grid.load_items([])
         self.stats_panel.clear()
@@ -3463,6 +3661,33 @@ class PlayerInventoryTab(QWidget):
         self.stats_panel.set_player(self.current_player_uid, self.current_player_name)
     def _on_item_selected(self, slot_data):
         self.selected_item = slot_data
+
+    def _on_equipment_preview(self, slot_widget) -> None:
+        for slot in self.equip_slots.values():
+            if slot is not slot_widget:
+                slot.set_selected(False, emit=False)
+        item = slot_widget.current_item
+        if item:
+            name = str(item.get('item_name', 'Unknown'))
+            quantity = int(item.get('stack_count', 1) or 0)
+            text = t(
+                'ui.inventory.equipment_preview',
+                default='{slot} · {name} ×{quantity}',
+                slot=slot_widget.slot_label, name=name, quantity=quantity)
+            tooltip = str(item.get('item_id', ''))
+            description = _clean_desc_for_tooltip(
+                item.get('description', '') or '')
+            if description:
+                tooltip = f'{tooltip}\n{description}'.strip()
+        else:
+            text = t(
+                'ui.inventory.equipment_empty_preview',
+                default='{slot} · Empty slot', slot=slot_widget.slot_label)
+            tooltip = text
+        self.equip_preview_label.setText(text)
+        self.equip_preview_label.setToolTip(tooltip)
+        self.equip_preview_label.setAccessibleName(text)
+        self.equip_preview_label.setVisible(True)
     def _on_bulk_delete_items(self, items):
         if not self.inventory or not items:
             return
@@ -3515,16 +3740,25 @@ class PlayerInventoryTab(QWidget):
         is_singleton = type_a in SINGLETON_TYPE_A and type_b != 'EPalItemTypeB::WeaponThrowObject'
         if not is_singleton:
             popup.add_item('edit_qty', t('inventory.edit_qty', default='Edit Quantity'))
+        popup.add_item('reference', t(
+            'inventory.open_reference', default='Open in Reference'))
+        popup.add_sep()
         popup.add_item('delete', t('inventory.delete_item', default='Delete'))
         popup.add_sep()
         popup.add_item('add_item', t('inventory.add_item', default='Add Item'))
         key = popup.exec(pos)
         if key == 'edit_qty':
             self._edit_quantity_for(slot_data)
+        elif key == 'reference':
+            self._open_item_reference(item_id)
         elif key == 'delete':
             self._delete_item(slot_data)
         elif key == 'add_item':
             self._show_add_item_dialog()
+
+    def _open_item_reference(self, item_id: str) -> bool:
+        opener = getattr(self.window(), 'open_reference', None)
+        return bool(callable(opener) and opener('items', item_id))
     def _show_empty_slot_context_menu(self, container_type: str, slot_index: int, pos):
         self._context_container_type = container_type
         self._context_slot_index = slot_index
@@ -4005,9 +4239,9 @@ class PlayerInventoryTab(QWidget):
         for player in self._player_list:
             if player['uid'] == uid:
                 display = player['display']
-                self.player_select_btn.setText(display)
-                set_picker_selected(self.player_select_btn, True)
+                self._set_selector_copy(uid, name or uid, display)
                 break
+        self._publish_player_context(uid, name or uid)
         self.inv_tabs.setCurrentIndex(0)
         self._tab_loaded_for.clear()
         self._show_inventory()
@@ -4033,19 +4267,33 @@ class PlayerInventoryTab(QWidget):
         if hasattr(self, 'equip_clear_btn'):
             self.equip_clear_btn.setText(t('inventory.equip_clear_btn', default='Clear'))
         if hasattr(self, 'unlock_all_map_btn'):
-            self.unlock_all_map_btn.setText(t('inventory.unlock_all_map', default='Unlock All Map + Fast Travel'))
-        self.inv_tabs.setTabText(0, t('inventory.main', default='Inventory'))
-        self.inv_tabs.setTabText(1, t('inventory.key_items', default='Key Items'))
-        self.inv_tabs.setTabText(2, t('inventory.stats', default='Stats'))
-        self.inv_tabs.setTabText(3, t('inventory.missions', default='Missions'))
-        self.inv_tabs.setTabText(4, t('inventory.technology', default='Technology'))
-        self.inv_tabs.setTabText(5, t('inventory.palpedia', default='Palpedia'))
+            self.unlock_all_map_btn.setText(t(
+                'ui.inventory.unlock_fast_travel',
+                default='Unlock Fast Travel'))
+            self.unlock_all_map_btn.setAccessibleName(
+                self.unlock_all_map_btn.text())
+            tooltip = t(
+                'inventory.unlock_all_map',
+                default='Unlock All Map + Fast Travel')
+            self.unlock_all_map_btn.setToolTip(tooltip)
+            self.unlock_all_map_btn.setAccessibleDescription(tooltip)
+        for widget, label in (
+            (self.main_grid, t('inventory.main', default='Inventory')),
+            (self.equip_wrapper, t('inventory.equipment', default='Equipment')),
+            (self.key_grid, t('inventory.key_items', default='Key Items')),
+            (self.stats_tab, t('inventory.stats', default='Stats')),
+            (self.missions_tab, t('inventory.missions', default='Missions')),
+            (self.tech_tab, t('inventory.technology', default='Technology')),
+            (self.palpedia_tab, t('inventory.palpedia', default='Palpedia')),
+        ):
+            self.inv_tabs.setTabText(self.inv_tabs.indexOf(widget), label)
         self.missions_panel.refresh_labels()
         self.tech_panel.refresh_labels()
         self.palpedia_panel.refresh_labels()
         if not self.current_player_uid:
-            self.player_select_btn.setText(t('inventory.select_player', default='Select Player...'))
-            set_picker_selected(self.player_select_btn, False)
+            self._set_selector_copy(None, '', '')
+        self.context_label.setText(t(
+            'ui.inventory.player_context', default='Player'))
         self.equip_title.setText(t('inventory.equipment', default='Equipment'))
         equip_label_keys = ['weapon', 'accessory', 'food', 'head', 'body', 'shield', 'glider', 'module']
         for key in equip_label_keys:
@@ -4063,26 +4311,18 @@ class PlayerInventoryTab(QWidget):
                 if p['uid'] == prev_uid:
                     self.select_player(prev_uid, prev_name or p['name'], p['display'])
                     break
-class QuantityDialog(QDialog):
+class QuantityDialog(BaseDialog):
     def __init__(self, current_qty: int=1, max_val: int = None, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(t('inventory.edit_qty', default='Edit Quantity'))
-        self.setFixedSize(280, 120)
-        self.setStyleSheet(DARK_THEME_STYLE)
-        layout = QVBoxLayout(self)
+        title = t('inventory.edit_qty', default='Edit Quantity')
+        super().__init__(
+            title, parent, min_size=(400, 180),
+            kicker=t('ui.dialog.inventory_kicker', default='Inventory'))
+        layout = self.content_layout
         max_q = max_val if max_val is not None else constants.MAX_QUANTITY
         self.qty_input = QLineEdit(str(current_qty))
         self.qty_input.setValidator(QIntValidator(1, max_q))
-        self.qty_input.setStyleSheet('QLineEdit { background: rgba(236,231,224,0.06); color: #ECE7E0; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 4px 8px; font-size: 14px; }')
         layout.addWidget(self.qty_input)
-        btn_layout = QHBoxLayout()
-        ok_btn = QPushButton(t('button.ok', default='OK'))
-        ok_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(ok_btn)
-        cancel_btn = QPushButton(t('button.cancel', default='Cancel'))
-        cancel_btn.clicked.connect(self.reject)
-        btn_layout.addStretch()
-        layout.addLayout(btn_layout)
+        self.ok_btn = self.add_confirm_button(t('button.ok', default='OK'))
     def get_quantity(self) -> int:
         try:
             return int(self.qty_input.text())
@@ -4139,63 +4379,52 @@ def _consolidate_container_slots(container, container_type, singleton_set):
         item_info = ItemData.get_item_by_asset(item_id)
         new_slots.append({'slot_index': idx, 'item_id': item_id, 'item_name': item_info.get('name', item_id), 'icon_path': item_info.get('icon', ''), 'stack_count': s.get('stack_count', 1), 'category': ItemData.get_item_category(item_id), 'container_type': container_type, 'raw_data': s.get('raw_data')})
     container.update_slots(new_slots)
-class InventoryLoadoutDialog(QDialog):
+class InventoryLoadoutDialog(BaseDialog):
     def __init__(self, parent, get_current_items_fn, apply_loadout_fn, title=None, get_extra_fn=None, loadouts_path=None, key_prefix='inventory'):
-        super().__init__(parent)
+        dialog_title = title or t(
+            f'{key_prefix}.loadouts_title', default='Inventory Loadouts')
+        super().__init__(
+            dialog_title, parent, min_size=(420, 400),
+            kicker=t('ui.dialog.inventory_kicker', default='Inventory'))
         self._get_items = get_current_items_fn
         self._apply_fn = apply_loadout_fn
         self._get_extra_fn = get_extra_fn
         self._kp = key_prefix
         self._loadouts_path = loadouts_path or os.path.join(get_user_config_dir(), 'inventory_loadouts.json')
-        self.setWindowTitle(title or t(f'{key_prefix}.loadouts_title', default='Inventory Loadouts'))
-        self.setMinimumSize(420, 400)
-        self.setMaximumSize(520, 500)
-        self.setStyleSheet(DARK_THEME_STYLE)
         self._setup_ui()
     def _t(self, key, default='', **kwargs):
         return t(f'{self._kp}_{key}', default=default, **kwargs)
     def _setup_ui(self):
         self._load_loadouts()
         inner = QWidget()
-        inner.setStyleSheet('QWidget { background: transparent; }')
         il = QVBoxLayout(inner)
         il.setContentsMargins(8, 4, 8, 8)
         il.setSpacing(6)
         list_lbl = QLabel(self._t('loadouts_saved', default='Saved Loadouts:'))
-        list_lbl.setStyleSheet('font-size: 10px; font-weight: 600; color: #F59E0B; background: transparent; border: none;')
+        list_lbl.setProperty('class', 'label')
         il.addWidget(list_lbl)
         self.list_widget = QListWidget()
-        self.list_widget.setStyleSheet('QListWidget { background: rgba(20,19,18,0.95); border: 1px solid rgba(245,158,11,0.15); border-radius: 4px; color: #ECE7E0; font-size: 10px; } QListWidget::item { padding: 6px 8px; } QListWidget::item:hover { background: rgba(245,158,11,0.08); } QListWidget::item:selected { background: rgba(245,158,11,0.15); color: #F59E0B; }')
+        self.list_widget.setObjectName('loadoutList')
         self._refresh_list()
         il.addWidget(self.list_widget, 1)
         info_lbl = QLabel(self._t('loadouts_info', default=''))
-        info_lbl.setStyleSheet('font-size: 11px; color: #A69F94; background: transparent; border: none; padding: 2px 0;')
+        info_lbl.setProperty('class', 'secondary')
         info_lbl.setWordWrap(True)
         il.addWidget(info_lbl)
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(4)
-        save_btn = QPushButton(self._t('loadouts_save', default='Save Current'))
-        save_btn.setStyleSheet('QPushButton { background: rgba(45,212,191,0.12); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(45,212,191,0.22); color: #FFFFFF; }')
-        btn_row.addWidget(save_btn)
-        load_btn = QPushButton(self._t('loadouts_apply', default='Apply Selected'))
-        load_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(245,158,11,0.22); color: #FFFFFF; }')
-        btn_row.addWidget(load_btn)
-        delete_btn = QPushButton(self._t('loadouts_delete_btn', default='Delete'))
-        delete_btn.setStyleSheet('QPushButton { background: rgba(248,113,113,0.12); color: #F87171; border: 1px solid rgba(248,113,113,0.25); border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(248,113,113,0.22); color: #FFFFFF; }')
-        btn_row.addWidget(delete_btn)
-        btn_row.addStretch()
-        close_btn = QPushButton(self._t('loadouts_close', default='Close'))
-        close_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.08); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 6px 20px; font-size: 10px; font-weight: 600; } QPushButton:hover { background: rgba(245,158,11,0.16); color: #FFFFFF; }')
-        btn_row.addWidget(close_btn)
-        il.addLayout(btn_row)
-        save_btn.clicked.connect(self._do_save)
-        load_btn.clicked.connect(self._do_load)
-        delete_btn.clicked.connect(self._do_delete)
-        close_btn.clicked.connect(self.accept)
+        self.save_btn = self.add_secondary_button(
+            self._t('loadouts_save', default='Save Current'), self._do_save)
+        self.load_btn = make_button(
+            self._t('loadouts_apply', default='Apply Selected'),
+            'primary', parent=self)
+        self.load_btn.clicked.connect(self._do_load)
+        self.footer.insertWidget(self.footer.count() - 1, self.load_btn)
+        self.delete_btn = self.add_danger_button(
+            self._t('loadouts_delete_btn', default='Delete'), self._do_delete)
+        self.cancel_btn.setText(self._t('loadouts_close', default='Close'))
+        self.cancel_btn.clicked.disconnect()
+        self.cancel_btn.clicked.connect(self.accept)
         self.list_widget.itemDoubleClicked.connect(self._do_load)
-        dlg_layout = QVBoxLayout(self)
-        dlg_layout.setContentsMargins(0, 0, 0, 0)
-        dlg_layout.addWidget(inner)
+        self.content_layout.addWidget(inner)
     def _load_loadouts(self):
         if os.path.exists(self._loadouts_path):
             try:

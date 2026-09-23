@@ -2,7 +2,10 @@ from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QMenu, QP
 from PyQt6.QtCore import QMimeData, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag
 from i18n import t
-from palworld_aio.ui.chrome.styles import slot_full, slot_selected, slot_multi_selected
+from palworld_aio.ui.chrome.content_cards import (
+    PalCardModel,
+    apply_pal_card_semantics,
+)
 from palworld_aio.ui.chrome import tokens as _chrome_tokens
 _P = _chrome_tokens.resolve()
 from palworld_aio.utils import calculate_max_hp, extract_value, resolve_name, safe_nested_get, _hp_breakdown, stat_breakdown_tooltip
@@ -400,6 +403,13 @@ class PartySlotWidget(QFrame):
 
         if not raw or not isinstance(raw, dict):
 
+            self._card_model = PalCardModel(
+                f'party-{self.slot_index}',
+                t('ui.pal_editor.empty_party_slot', default='Empty party slot'),
+                0,
+                status='empty',
+            )
+            apply_pal_card_semantics(self, self._card_model)
             self._apply_slot_style()
 
             self.setToolTip('')
@@ -463,6 +473,20 @@ class PartySlotWidget(QFrame):
         is_imported = extract_value(raw, 'bImportedCharacter', False)
 
         is_awake = bool(extract_value(raw, 'bIsAwakening', False))
+
+        status = ', '.join(part for part, active in (
+            ('Boss', is_boss), ('Predator', is_predator),
+            ('Lucky', is_lucky), ('Awakened', is_awake),
+        ) if active)
+        self._card_model = PalCardModel(
+            str(cid), str(pal_name), int(level or 0),
+            gender='female' if extract_value(raw, 'IsFemale', False) else 'male',
+            status=status,
+            rarity=4 if (is_boss or is_lucky) else 0,
+            technical_id=str(cid),
+        )
+        apply_pal_card_semantics(self, self._card_model)
+        self.setToolTip(tip)
 
         fav_idx = extract_value(raw, 'FavoriteIndex', 0)
 
@@ -846,18 +870,11 @@ class PartySlotWidget(QFrame):
         self._apply_slot_style()
 
     def _apply_slot_style(self):
-
-        if self.selected:
-
-            self.setStyleSheet(slot_selected('QFrame#partySlot'))
-
-        elif self.multi_selected:
-
-            self.setStyleSheet(slot_multi_selected('QFrame#partySlot'))
-
-        else:
-
-            self.setStyleSheet(slot_full('QFrame#partySlot'))
+        self.setProperty('selected', self.selected)
+        self.setProperty('multiSelected', self.multi_selected)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
 
     def set_selected(self, selected):
 

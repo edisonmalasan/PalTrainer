@@ -6,6 +6,8 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QCursor, QPixmap, QIcon
 from palworld_aio import constants
 from palworld_aio.ui.chrome import icons as app_icons
+from palworld_aio.ui.chrome.components import SegmentedControl, make_button, make_search_field
+from palworld_aio.ui.chrome.state_views import ConfiguredEmptyState, ErrorState, NoResultState
 from resource_resolver import resource_path
 from i18n import t
 from palworld_aio.editor.pal_editor import PalFrame, PalCreateDialog, _get_pal_icon_path, _get_cached_pixmap, _BOSS_PREFIXES
@@ -185,40 +187,43 @@ class BreedingTab(QWidget):
         self._load_data()
 
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon, set_content_margins
+        from palworld_aio.ui.chrome.components import set_content_margins
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        layout.addWidget(create_page_ribbon(t('breeding.tab') if t else 'Breeding', (t('sidebar.section.reference') if t else 'Reference').upper(), self))
-
         sub_bar = QHBoxLayout()
         set_content_margins(sub_bar, top=6, bottom=6)
         sub_bar.setSpacing(6)
-        self._sub_btns = {}
-        for sid, skey in [('parents', 'Parents'), ('children', 'Children')]:
-            btn = QPushButton(t(f'breeding.mode.{sid}') if t else skey)
-            btn.setFixedHeight(28)
-            btn.setCursor(QCursor(Qt.PointingHandCursor))
-            btn.setObjectName('pageSwitchBtn')
-            btn.setCheckable(True)
-            btn.clicked.connect(lambda checked, s=sid: self._switch_mode(s))
-            self._sub_btns[sid] = btn
-            sub_bar.addWidget(btn)
+        self._mode_switch = SegmentedControl(
+            [
+                ('parents', t('breeding.mode.parents') if t else 'Parents'),
+                ('children', t('breeding.mode.children') if t else 'Children'),
+            ],
+            current='parents',
+            accessible_name=t('breeding.mode.accessible', default='Breeding result mode'),
+            parent=self,
+        )
+        self._mode_switch.currentChanged.connect(self._switch_mode)
+        self._sub_btns = self._mode_switch._buttons
+        sub_bar.addWidget(self._mode_switch)
         sub_bar.addStretch()
         layout.addLayout(sub_bar)
 
         select_row = QHBoxLayout()
         set_content_margins(select_row)
         select_row.setSpacing(10)
-        self._select_btn = QPushButton(t("breeding.select_pal") if t else "Select a Pal...")
-        self._select_btn.setIcon(app_icons.get_qicon('breeding', role='text_secondary'))
-        self._select_btn.setObjectName('opsLoadBtn')
-        self._select_btn.setProperty('loadKind', 'secondary')
-        self._select_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self._select_btn.setMinimumHeight(34)
+        self._select_btn = make_button(
+            t('breeding.select_pal') if t else 'Select a Pal...',
+            'secondary', icon='breeding', parent=self)
         self._select_btn.clicked.connect(self._open_pal_dialog)
         select_row.addWidget(self._select_btn)
+        self._reference_btn = make_button(
+            t('breeding.open_reference', default='Open Pal Reference'),
+            'tertiary', parent=self)
+        self._reference_btn.setEnabled(False)
+        self._reference_btn.clicked.connect(self._open_selected_reference)
+        select_row.addWidget(self._reference_btn)
         select_row.addStretch()
         self._selected_label = QLabel('')
         self._selected_label.setObjectName('opsWorldName')
@@ -231,15 +236,15 @@ class BreedingTab(QWidget):
         self._hint_label.setWordWrap(True)
         layout.addWidget(self._hint_label)
 
-        self._search_filter = QLineEdit()
-        self._search_filter.setObjectName('searchInput')
-        self._search_filter.setPlaceholderText(t('breeding.filter') if t else 'Filter results...')
-        self._search_filter.setFixedHeight(30)
-        self._search_filter.textChanged.connect(self._on_filter_changed)
-        self._search_filter.hide()
+        self._search_frame, self._search_filter = make_search_field(
+            t('breeding.filter') if t else 'Filter results...',
+            self._on_filter_changed,
+            self,
+        )
+        self._search_frame.hide()
         filter_row = QHBoxLayout()
         set_content_margins(filter_row, top=6, bottom=6)
-        filter_row.addWidget(self._search_filter, 1)
+        filter_row.addWidget(self._search_frame, 1)
         layout.addLayout(filter_row)
 
         self._scroll = QScrollArea()
@@ -256,8 +261,8 @@ class BreedingTab(QWidget):
 
     def _switch_mode(self, mode):
         self._mode = mode
-        for sid, btn in self._sub_btns.items():
-            btn.setChecked(sid == mode)
+        if self._mode_switch.current() != mode:
+            self._mode_switch.set_current(mode)
         self._update_results()
 
     def _on_filter_changed(self, text):
@@ -281,21 +286,19 @@ class BreedingTab(QWidget):
         self._scroll.verticalScrollBar().setValue(0)
         try:
             if not self._selected_tribe or not self._breeding_data:
-                self._search_filter.hide()
+                self._search_frame.hide()
                 # modernize-tab-ui 8.1: the EmptyState owns the CTA while no
                 # pal is selected; the standalone select button + hint hide
                 # so exactly one "Select a Pal" action is visible.
                 self._select_btn.hide()
                 self._selected_label.hide()
                 self._hint_label.hide()
-                from palworld_aio.widgets.empty_state import EmptyState
-                empty = EmptyState(
+                empty = ConfiguredEmptyState(
                     t('breeding.no_selection') if t else 'Select a pal to see breeding combinations',
-                    hint=t('breeding.hint') if t else 'Click the button above to select a pal and view breeding combinations.',
-                    icon_name='breeding',
-                    action_text=t('breeding.select_pal') if t else 'Select a Pal...',
+                    t('breeding.hint') if t else 'Select a Pal to view breeding combinations.',
+                    t('breeding.select_pal') if t else 'Select a Pal...',
                 )
-                empty.action_clicked.connect(self._open_pal_dialog)
+                empty.actionTriggered.connect(self._open_pal_dialog)
                 self._results_layout.addWidget(empty)
                 self._refreshing = False
                 return
@@ -304,7 +307,7 @@ class BreedingTab(QWidget):
             self._select_btn.show()
             self._selected_label.show()
             self._hint_label.show()
-            self._search_filter.show()
+            self._search_frame.show()
             bd = self._breeding_data
             pal_info = bd.get('pal_info', {})
             self._page_data = []
@@ -312,9 +315,14 @@ class BreedingTab(QWidget):
                 self._show_parents(self._selected_tribe, self._selected_name, self._selected_icon, bd, pal_info)
             else:
                 self._show_children(self._selected_tribe, self._selected_name, self._selected_icon, bd, pal_info)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
+        except Exception:
+            error_state = ErrorState(
+                t('breeding.error_title', default='Breeding data unavailable'),
+                t('breeding.error_message', default='Breeding combinations could not be calculated.'),
+                t('ui.state.retry', default='Retry'),
+            )
+            error_state.actionTriggered.connect(self._update_results)
+            self._results_layout.addWidget(error_state)
         self._refreshing = False
 
     def _lookup_tribe(self, key):
@@ -338,19 +346,28 @@ class BreedingTab(QWidget):
             self._page = 0
             self._filter_text = ''
             self._search_filter.setText('')
-            asset = dlg.selected_asset
-            tribe, info, icon = self._lookup_tribe(asset)
-            if tribe:
-                self._selected_tribe = tribe
-                self._selected_name = info.get('name', dlg.selected_name)
-                self._selected_icon = icon
-                self._selected_label.setText(self._selected_name)
-            else:
-                self._selected_tribe = asset
-                self._selected_name = dlg.selected_name
-                self._selected_icon = ''
-                self._selected_label.setText(dlg.selected_name)
-            self._update_results()
+            self.select_pal(dlg.selected_asset, dlg.selected_name)
+
+    def select_pal(self, asset: str, fallback_name: str = '') -> bool:
+        """Select a Pal by asset ID for editor and Reference cross-links."""
+        tribe, info, icon = self._lookup_tribe(asset)
+        if tribe is None:
+            return False
+        self._page = 0
+        self._filter_text = ''
+        self._search_filter.clear()
+        self._selected_tribe = tribe
+        self._selected_name = info.get('name') or fallback_name or tribe
+        self._selected_icon = icon
+        self._selected_label.setText(self._selected_name)
+        self._reference_btn.setEnabled(True)
+        self._update_results()
+        return True
+
+    def _open_selected_reference(self):
+        opener = getattr(self.window(), 'open_reference', None)
+        if callable(opener) and self._selected_tribe:
+            opener('pals', self._selected_tribe)
 
     def _show_parents(self, target_tribe, target_name, target_icon, bd, pal_info, target_info=None):
         pal_info_map = pal_info
@@ -394,12 +411,13 @@ class BreedingTab(QWidget):
                 seen_pairs.add(key)
                 self._page_data.append({'type': 'pair', 'a': pair['parent_a'], 'b': pair['parent_b'], 'child': target_tribe})
         if not self._page_data:
-            if target_info.get('ignore_combi', False):
-                msg = QLabel(t('breeding.no_breed') if t else 'This pal cannot breed')
-            else:
-                msg = QLabel(t('breeding.no_combos') if t else 'No breeding combos found')
-            msg.setObjectName('bulkHintLabel')
-            self._results_layout.addWidget(msg)
+            title = (t('breeding.no_breed') if t else 'This Pal cannot breed') \
+                if target_info.get('ignore_combi', False) else \
+                (t('breeding.no_combos') if t else 'No breeding combos found')
+            self._results_layout.addWidget(ConfiguredEmptyState(
+                title,
+                t('breeding.no_combos_hint', default='Try another Pal or switch result mode.'),
+            ))
             return
         self._render_cards(pal_info_map)
 
@@ -442,12 +460,13 @@ class BreedingTab(QWidget):
             for partner in sorted(data['partners']):
                 self._page_data.append({'type': 'child', 'parent': target_tribe, 'partner': partner, 'child': child_tribe})
         if not self._page_data:
-            if target_info.get('ignore_combi', False):
-                msg = QLabel(t('breeding.no_breed') if t else 'This pal cannot breed')
-            else:
-                msg = QLabel(t('breeding.no_combos') if t else 'No breeding combos found')
-            msg.setObjectName('bulkHintLabel')
-            self._results_layout.addWidget(msg)
+            title = (t('breeding.no_breed') if t else 'This Pal cannot breed') \
+                if target_info.get('ignore_combi', False) else \
+                (t('breeding.no_combos') if t else 'No breeding combos found')
+            self._results_layout.addWidget(ConfiguredEmptyState(
+                title,
+                t('breeding.no_combos_hint', default='Try another Pal or switch result mode.'),
+            ))
             return
         self._render_cards(pal_info_map)
 
@@ -465,6 +484,14 @@ class BreedingTab(QWidget):
         else:
             display_data = self._page_data
         total = len(display_data)
+        if total == 0:
+            state = NoResultState(
+                t('breeding.no_results', default='No matching combinations'),
+                t('breeding.no_results_hint', default='Clear the filter to see all combinations.'),
+            )
+            state.actionTriggered.connect(self._search_filter.clear)
+            self._results_layout.addWidget(state)
+            return
         start = self._page * _MAX_COMBOS
         end = min(start + _MAX_COMBOS, total)
         for i in range(start, end):
@@ -595,6 +622,8 @@ class BreedingTab(QWidget):
                 self._sub_btns[sid].setText(t(f'breeding.mode.{sid}') if t else skey)
         self._select_btn.setText(t("breeding.select_pal") if t else "Select a Pal...")
         self._select_btn.setIcon(app_icons.get_qicon('breeding', role='text_secondary'))
+        self._reference_btn.setText(t(
+            'breeding.open_reference', default='Open Pal Reference'))
         self._hint_label.setText(t('breeding.hint') if t else 'Click the button above to select a pal and view breeding combinations.')
         self._search_filter.setPlaceholderText(t('breeding.filter') if t else 'Filter results...')
         self._update_results()

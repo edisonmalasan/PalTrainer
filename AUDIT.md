@@ -7,6 +7,17 @@
 
 ---
 
+## Implementation Checkpoint
+
+- **OpenSpec change:** `implement-audit-uiux-rehaul`
+- **Status:** In progress — Phase 8 (Remaining Tools, Dialogs, and System Surfaces); Phases 1–7 complete.
+- **Last completed task:** 8.7 — Traversed all registered, hidden application-menu, save-gated, and context-menu workflows against the shared shell/component/localization contracts. All 19 route descriptors are live in `WorkspaceShell`, every save-gated route presents the shared prerequisite state, every Tool Center utility retains its registered launch contract, and no separate unregistered experimental screen or feature flag was found. Map, guild-role, application, workspace-overflow, and legacy-non-live overflow menus now share the token-driven `appContextMenu` identity and localized accessible naming; Map's last inline `MENU_STYLE` calls and the generic context tree's hardcoded table stylesheet were removed.
+- **Verification:** The focused dialog/MainWindow/route/tool/guild/map/localization/resource selection passed (68 tests). New repository-wide structural contracts reject unowned context workflows, direct native menus without the centralized QSS identity, inline styling in the generic context tree, missing live route registrations, and save-gated routes that bypass the prerequisite state. Full `src`/`tests` compilation, diff checks, strict OpenSpec validation, and focused Pyright for every touched runtime module (0 errors) passed. The repository-wide Pyright baseline remains 517 pre-existing errors and is not presented as passing.
+- **Deliberate deviations:** Native `QFileDialog` remains the operating-system file/folder picker boundary; replacing it would reduce platform accessibility and was not required by the shared in-app scaffold. Slot Injector remains a dedicated complex `QDialog` workspace owned and verified by task 8.3 rather than being forced into the simple-dialog scaffold. Global Pal Storage retains the historical `FramelessDialog` import name only as a source-compatible alias to the shared `PalEditorDialog`/`BaseDialog` implementation. The pre-change Base Inventory had no item-move handler or enabled drag/drop contract to preserve; no new save mutation was invented. Fix Host Save's former browse-time write remains removed because cancellation must not mutate `Level.sav`.
+- **Next task:** 8.8 — Run the complete focused Remaining Tools/System/Dialog verification set, compile all source/tests, and render representative conversion, repair, transfer, Settings, About, Diagnostics, and gated-operation states for visual inspection.
+
+---
+
 # 1. Purpose of This Audit
 
 This document defines a complete UI/UX rehaul for PalTrainer based on the supplied screenshots.

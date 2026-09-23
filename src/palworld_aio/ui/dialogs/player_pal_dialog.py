@@ -1,23 +1,24 @@
 import os
 import re
 from palsav import json_tools
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QGroupBox, QMessageBox, QAbstractItemView, QListView, QTabWidget, QWidget, QStyledItemDelegate, QFrame, QSizePolicy
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QGroupBox, QAbstractItemView, QListView, QTabWidget, QWidget, QStyledItemDelegate, QFrame, QSizePolicy
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer, QPoint
-from PyQt6.QtGui import QPixmap, QIcon, QPainter, QColor, QCursor, QFont, QFontMetrics
+from PyQt6.QtGui import QPixmap, QIcon, QPainter, QColor, QCursor, QFontMetrics
 from i18n import t
 from palworld_aio import constants
 from palworld_aio.editor.edit_pals import PalFrame, _get_boss_alpha_pixmap, _composite_badge, _BOSS_PREFIXES, _get_element_pixmap, _ensure_element_data, _resolve_partner_desc, _partner_desc_to_html, _get_cached_pixmap, _get_pal_icon_path, PalInfoWidget
 from palworld_aio.editor.pal_editor.widgets import PassiveEffectOverlay
 from palworld_aio.editor.pal_editor import data as _pedata
 from palworld_aio.ui.dialogs.skill_picker import SkillPicker
-from palworld_aio.ui.chrome.components import BaseDialog, NerdBtn, make_button
+from palworld_aio.ui.chrome.components import (
+    BaseDialog,
+    BulkWorkflowReview,
+    MessageDialog as QMessageBox,
+    make_button,
+)
+from palworld_aio.ui.chrome import icons as app_icons
 from palworld_aio.ui.chrome import tokens as ui_tokens
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
-try:
-    import nerdfont as nf
-except:
-    class nf:
-        icons = {'nf-fa-times': '\uf00d'}
 from resource_resolver import resource_path
 
 
@@ -91,16 +92,71 @@ class PlayerPalActionDialog(BaseDialog):
         self._load_data()
     def _setup_ui(self):
         layout = self.content_layout
+        self.workflow_review = BulkWorkflowReview(
+            source=t('ui.bulk.select_source', default='Select a Pal or skill'),
+            target=t('ui.bulk.pal_targets_all', default='All matching Pals'),
+            review=t('ui.bulk.review_prompt', default='Review the bulk action before applying it.'),
+            parent=self,
+        )
+        self.workflow_review.set_risk(
+            t(
+                'ui.bulk.pal_risk',
+                default='Deletion and skill removal affect every matching Pal in the selected scope and cannot be undone here.',
+            ),
+            t(
+                'ui.bulk.backup_guidance',
+                default='Create or verify a backup before applying broad save changes.',
+            ),
+        )
+        layout.addWidget(self.workflow_review)
         self.tab_widget = QTabWidget()
         self.delete_pal_tab = self._create_delete_pal_tab()
         self.tab_widget.addTab(self.delete_pal_tab, t('player_pal.delete_pal_tab') if t else 'Delete Pal')
         self.remove_skills_tab = self._create_remove_skills_tab()
         self.tab_widget.addTab(self.remove_skills_tab, t('player_pal.remove_skills_tab') if t else 'Remove Skills')
+        self.tab_widget.currentChanged.connect(self._update_workflow_review)
         layout.addWidget(self.tab_widget)
         self.status_label = QLabel('')
         self.status_label.setProperty('role', 'success')
         self.footer.insertWidget(1, self.status_label, stretch=1)
         self.cancel_btn.setText(t('button.close') if t else 'Close')
+
+    def _update_workflow_review(self, *_args):
+        if self.tab_widget.currentIndex() == 0:
+            source = self.selected_pal_name or t(
+                'ui.bulk.select_source', default='Select a Pal species')
+            target = t(
+                'ui.bulk.pal_targets_all',
+                default='All matching Pals in players, bases, and DPS saves',
+            )
+            review = t(
+                'ui.bulk.pal_delete_review',
+                default='Delete every Pal whose species matches the source.',
+            )
+        else:
+            selected_skills = [
+                name for name in (
+                    self.selected_active_skill_name,
+                    self.selected_passive_skill_name,
+                ) if name
+            ]
+            source = ', '.join(selected_skills) or t(
+                'ui.bulk.select_source', default='Select active or passive skills')
+            scopes = []
+            if self.skills_player_pals_checkbox.isChecked():
+                scopes.append(t('player_pal.player_pals', default='Player Pals'))
+            if self.skills_base_pals_checkbox.isChecked():
+                scopes.append(t('player_pal.base_pals', default='Base Pals'))
+            if self.skills_dps_pals_checkbox.isChecked():
+                scopes.append(t('player_pal.dps_pals', default='DPS Pals'))
+            target = ', '.join(scopes) or t(
+                'ui.bulk.no_targets', default='No scope selected')
+            review = t(
+                'ui.bulk.skill_remove_review',
+                default='Remove the selected skills from equipped and learned skill lists.',
+            )
+        self.workflow_review.set_context(
+            source=source, target=target, review=review)
     def _create_delete_pal_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -173,9 +229,11 @@ class PlayerPalActionDialog(BaseDialog):
         self.active_skill_label.setWordWrap(True)
         active_layout.addWidget(self.active_skill_label, 1)
         active_layout.addStretch()
-        self.active_clear_btn = NerdBtn(nf.icons.get('nf-fa-times', '\uf00d'))
+        self.active_clear_btn = QPushButton()
+        self.active_clear_btn.setIcon(app_icons.get_qicon('close', role='danger'))
+        self.active_clear_btn.setAccessibleName('Clear active skill')
+        self.active_clear_btn.setToolTip('Clear active skill')
         self.active_clear_btn.setFixedSize(22, 22)
-        self.active_clear_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 10))
         self.active_clear_btn.setStyleSheet(_danger_tool_style(ui_tokens.resolve()))
         self.active_clear_btn.clicked.connect(self._clear_active_skill)
         self.active_clear_btn.setVisible(False)
@@ -212,9 +270,11 @@ class PlayerPalActionDialog(BaseDialog):
         self.passive_effect_overlay = PassiveEffectOverlay(self.passive_skill_card)
         passive_layout.addWidget(self.passive_skill_card, 1)
         passive_layout.addStretch()
-        self.passive_clear_btn = NerdBtn(nf.icons.get('nf-fa-times', '\uf00d'))
+        self.passive_clear_btn = QPushButton()
+        self.passive_clear_btn.setIcon(app_icons.get_qicon('close', role='danger'))
+        self.passive_clear_btn.setAccessibleName('Clear passive skill')
+        self.passive_clear_btn.setToolTip('Clear passive skill')
         self.passive_clear_btn.setFixedSize(22, 22)
-        self.passive_clear_btn.setFont(QFont(constants.FONT_FAMILY_NERD, 10))
         self.passive_clear_btn.setStyleSheet(_danger_tool_style(ui_tokens.resolve()))
         self.passive_clear_btn.clicked.connect(self._clear_passive_skill)
         self.passive_clear_btn.setVisible(False)
@@ -225,12 +285,18 @@ class PlayerPalActionDialog(BaseDialog):
         scope_layout = QVBoxLayout()
         self.skills_player_pals_checkbox = ToggleCheckBtn(t('player_pal.player_pals') if t else 'Player Pals (Party + Palbox)')
         self.skills_player_pals_checkbox.setChecked(True)
+        self.skills_player_pals_checkbox.toggled.connect(
+            self._update_workflow_review)
         scope_layout.addWidget(self.skills_player_pals_checkbox)
         self.skills_base_pals_checkbox = ToggleCheckBtn(t('player_pal.base_pals') if t else 'Base Pals (All bases)')
         self.skills_base_pals_checkbox.setChecked(True)
+        self.skills_base_pals_checkbox.toggled.connect(
+            self._update_workflow_review)
         scope_layout.addWidget(self.skills_base_pals_checkbox)
         self.skills_dps_pals_checkbox = ToggleCheckBtn(t('player_pal.dps_pals') if t else 'Player DPS Pals (DPS saves)')
         self.skills_dps_pals_checkbox.setChecked(True)
+        self.skills_dps_pals_checkbox.toggled.connect(
+            self._update_workflow_review)
         scope_layout.addWidget(self.skills_dps_pals_checkbox)
         scope_group.setLayout(scope_layout)
         layout.addWidget(scope_group)
@@ -360,6 +426,7 @@ class PlayerPalActionDialog(BaseDialog):
         self.pal_info_label.setProperty('role', 'success')
         _polish(self.pal_info_label)
         self.delete_pal_btn.setEnabled(True)
+        self._update_workflow_review()
     def _on_active_skill_pick(self):
         picker = SkillPicker(self)
         pos = self.active_skill_btn.mapToGlobal(self.active_skill_btn.rect().bottomLeft())
@@ -376,6 +443,7 @@ class PlayerPalActionDialog(BaseDialog):
         _polish(self.active_skill_label)
         self.active_clear_btn.setVisible(True)
         self._update_remove_button()
+        self._update_workflow_review()
     def _on_passive_skill_pick(self):
         picker = SkillPicker(self)
         pos = self.passive_skill_btn.mapToGlobal(self.passive_skill_btn.rect().bottomLeft())
@@ -416,6 +484,7 @@ class PlayerPalActionDialog(BaseDialog):
         self.passive_clear_btn.setVisible(True)
         QTimer.singleShot(0, self._shrink_passive_text)
         self._update_remove_button()
+        self._update_workflow_review()
     def _shrink_passive_text(self):
         lbl = self.passive_skill_label
         text = lbl.text()
@@ -452,6 +521,7 @@ class PlayerPalActionDialog(BaseDialog):
         _polish(self.active_skill_label)
         self.active_clear_btn.setVisible(False)
         self._update_remove_button()
+        self._update_workflow_review()
     def _clear_passive_skill(self):
         self.selected_passive_skill_id = None
         self.selected_passive_skill_name = None
@@ -465,6 +535,7 @@ class PlayerPalActionDialog(BaseDialog):
         self.passive_effect_overlay.set_mode(None)
         self.passive_clear_btn.setVisible(False)
         self._update_remove_button()
+        self._update_workflow_review()
     def _update_remove_button(self):
         has_active = self.selected_active_skill_id is not None
         has_passive = self.selected_passive_skill_id is not None
@@ -481,15 +552,13 @@ class PlayerPalActionDialog(BaseDialog):
         reply = QMessageBox.question(self, t('player_pal.confirm_delete_all') if t else 'Confirm Delete All', t('player_pal.confirm_delete_all_msg').format(pal_name=self.selected_pal_name) if t else f'Delete ALL "{self.selected_pal_name}" pals from everywhere (players + bases)? This cannot be undone!', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             action = f'delete_pal:{self.selected_pal_id}'
+            self.workflow_review.set_progress(
+                0, 1, t('ui.bulk.applying', default='Applying changes…'))
             self.pal_action_selected.emit('all', action, [])
             self._refresh_after_action()
 
     def _on_delete_pal_direct(self):
-        if not self.selected_pal_id:
-            return
-        action = f'delete_pal:{self.selected_pal_id}'
-        self.pal_action_selected.emit('all', action, [])
-        self._refresh_after_action()
+        self._on_delete_pal()
     def _on_remove_skills(self):
         if not self.selected_active_skill_id and (not self.selected_passive_skill_id):
             QMessageBox.warning(self, t('player_pal.no_skill_selected') if t else 'No Skill Selected', t('player_pal.select_skill_first') if t else 'Please select at least one skill.')
@@ -517,12 +586,20 @@ class PlayerPalActionDialog(BaseDialog):
                 scope_parts.append('dps')
             scope_str = ','.join(scope_parts) if scope_parts else 'all'
             action = f"remove_all:{self.selected_active_skill_id or ''}:{self.selected_passive_skill_id or ''}:{scope_str}"
+            self.workflow_review.set_progress(
+                0, 1, t('ui.bulk.applying', default='Applying changes…'))
             self.pal_action_selected.emit('all', action, [])
             self._refresh_after_action()
     def _refresh_after_action(self):
-        self.status_label.setText(t('player_pal.action_complete').format(item_name='Operation') if t else 'Operation completed successfully!')
+        self.status_label.setText(t(
+            'ui.bulk.submitted',
+            default='Bulk action submitted. Results appear when processing finishes.',
+        ))
         self.status_label.setProperty('role', 'success')
         _polish(self.status_label)
+        self.workflow_review.set_progress(
+            1, 1, t('ui.bulk.submitted_short', default='Submitted'))
+        self.workflow_review.set_result(self.status_label.text())
         QTimer.singleShot(3000, lambda s=self: s.status_label.setText('') if hasattr(s, 'status_label') else None)
     def refresh_labels(self):
         title = t('player_pal.title') if t else 'Bulk Pal Management'

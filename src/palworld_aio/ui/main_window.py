@@ -9,7 +9,7 @@ import collections
 import threading
 from functools import partial
 import logging
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QMenuBar, QMenu, QStatusBar, QSplitter, QMessageBox, QFileDialog, QInputDialog, QDialog, QComboBox, QApplication, QStackedWidget, QTextEdit, QLineEdit
+from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QMenuBar, QMenu, QStatusBar, QSplitter, QFileDialog, QDialog, QComboBox, QApplication, QStackedWidget, QTextEdit, QLineEdit
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QPoint, QPropertyAnimation, QEasingCurve, QByteArray, QThread
 
 from PyQt6.QtGui import QIcon, QFont, QAction, QPixmap, QCloseEvent, QTextCursor, QCursor
@@ -40,6 +40,20 @@ from palworld_aio.ui.dialogs.player_item_dialog import PlayerItemActionDialog
 from palworld_aio.ui.dialogs.player_pal_dialog import PlayerPalActionDialog
 from palworld_aio.ui.dialogs.player_technology_dialog import PlayerTechnologyActionDialog
 from palworld_aio.ui.dialogs.guild_assign_dialog import GuildAssignDialog
+from palworld_aio.ui.dialogs.repair_workflow_dialog import (
+    RepairWorkflowDialog,
+    loaded_save_repair_spec,
+    require_repair_success,
+)
+from palworld_aio.ui.dialogs.transfer_workflow_dialog import (
+    TransferWorkflowDialog,
+    TransferWorkflowSpec,
+)
+from palworld_aio.ui.chrome.components import (
+    BaseDialog,
+    InputPromptDialog as QInputDialog,
+    MessageDialog as QMessageBox,
+)
 def _short_guid(value):
     """modernize-tab-ui 5.2: first 8 chars + ellipsis for GUID display text."""
     s = str(value or '')
@@ -300,13 +314,16 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._refresh_exclusions()
         self._load_theme()
-        if getattr(self, 'nav_strip', None) is not None:
-            self.nav_strip.set_active('tools')
+        initial_route = self.__dict__.get('workspace_settings')
+        self._activate_nav(initial_route.current_route if initial_route else 'tools')
         self._setup_menus()
         self._setup_connections()
         QTimer.singleShot(0, self._check_update)
         self.status_stream = StatusBarStream(self.status_bar, self)
         self.status_stream.detach_state_changed.connect(self._on_detach_state_changed)
+        self.status_stream.text_written.connect(
+            self.diagnostics_page.append_console_message)
+        self._sync_diagnostics_console()
         sys.stdout = self.status_stream
         sys.stderr = self.status_stream
         from palsav import setup_logging
@@ -334,12 +351,12 @@ class MainWindow(QMainWindow):
         logging.lastResort = None
         if self.user_settings.get('console_detached', False):
             self.status_stream.detach()
-            self.app_bar.set_console_visible(True)
+            self._set_console_action_state(True)
     def _setup_ui(self):
         self.setWindowTitle(t('deletion.title') if t else 'All-in-One Tools')
-        self.setMinimumSize(1200, 750)
+        self.setMinimumSize(1024, 700)
         screen = QApplication.primaryScreen().availableGeometry()
-        w = min(1448, screen.width() - 40)
+        w = min(1450, screen.width() - 40)
         h = min(800, screen.height() - 40)
         self.resize(w, h)
         self.setWindowFlags(Qt.FramelessWindowHint)
@@ -351,9 +368,7 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
-        # Deck Operations shell v2 (plan 020): full-bleed page canvas + right
-        # NexusBand rail. Legacy sidebar/header/dock path removed (plan 025).
-        self._setup_ui_v2(main_layout)
+        self._setup_workspace_shell(main_layout)
         # Status strip (top-nav-shell 1.5): visible host for streamed
         # load/save/log messages; detachable console behavior unchanged.
         self.status_bar = QStatusBar()
@@ -366,48 +381,160 @@ class MainWindow(QMainWindow):
         self._drop_overlay.setVisible(False)
         self._drop_overlay.setGeometry(self.rect())
 
-    def _setup_ui_v2(self, main_layout):
+    def _setup_workspace_shell(self, main_layout):
         from .chrome.stats_drawer import StatsDrawer
-        from .chrome.app_bar import AppBar
-        from .chrome.nav_strip import NavStrip
-        self._shell_v2 = True
-        # shell v3 top chrome (top-nav-shell 3.1/5.1): app bar + nav strip
-        # above the canvas; the right rail is retired.
-        self.app_bar = AppBar()
-        self.app_bar.save_clicked.connect(self._save_changes)
-        self.app_bar.console_toggled.connect(self._detach_status)
-        self.app_bar.about_clicked.connect(self._show_about)
-        self.app_bar.guide_clicked.connect(self._show_tab_guide)
-        self.app_bar.masthead_clicked.connect(self._show_menu_popup_v2)
-        main_layout.addWidget(self.app_bar)
-        self.app_bar.connect_warn()
-        self.app_bar.set_warning_slot(self._show_warnings)
-        self.nav_strip = NavStrip()
-        self.nav_strip.nav_changed.connect(self._on_nav_changed)
-        main_layout.addWidget(self.nav_strip)
-        body_layout = QHBoxLayout()
-        body_layout.setContentsMargins(0, 0, 0, 0)
-        body_layout.setSpacing(0)
+        from .chrome.tokens import LAYOUT
+        from .chrome.workspace_shell import WorkspaceShell
+        from palworld_aio.ui.operation_journal import OperationJournal
+        from palworld_aio.ui.pages.activity_page import ActivityPage
+        from palworld_aio.ui.pages.about_page import AboutPage
+        from palworld_aio.ui.pages.backups_page import BackupsPage
+        from palworld_aio.ui.pages.diagnostics_page import DiagnosticsPage
+        from palworld_aio.ui.pages.overview_page import OverviewPage
+        from palworld_aio.ui.pages.settings_page import SettingsPage
+        from palworld_aio.ui.pages.tool_center_page import ToolCenterPage
+        from palworld_aio.ui.workspace_context import WorkspaceContext
+        from palworld_aio.ui.workspace_settings import WorkspaceSettings
+        self._workspace_shell_live = True
+        self.workspace_settings = WorkspaceSettings.from_mapping(
+            self.user_settings.get('workspace_ui'))
+        self.workspace_context = WorkspaceContext()
+        self.operation_journal = OperationJournal(parent=self)
+        self.workspace_shell = WorkspaceShell(self.workspace_context)
+        self.workspace_shell.minimizeRequested.connect(self.showMinimized)
+        self.workspace_shell.maximizeRequested.connect(self._toggle_maximize)
+        self.workspace_shell.closeRequested.connect(self.close)
+        self.workspace_shell.routeChanged.connect(self._show_legacy_route)
+        main_layout.addWidget(self.workspace_shell, stretch=1)
+
+        header = self.workspace_shell.header
+        self._shell_save_button = header.add_action(
+            'save', t('menu.file.save_changes') if t else 'Save Changes',
+            self._save_changes, primary=True, icon='save')
+        self._shell_menu_button = header.add_action(
+            'menu', t('Menu') if t else 'Menu', self._show_menu_popup_v2,
+            icon='menu')
+        self._shell_search_button = header.add_action(
+            'global_search', t('ui.search.global_title') if t else 'Search everything',
+            self._show_global_search, icon='search')
+        self._shell_stats_button = header.add_action(
+            'statistics', t('deletion.stats_panel') if t else 'Statistics',
+            lambda: self._set_tray_drawer_visible(True), icon='grid')
+        self._shell_console_button = header.add_action(
+            'console', t('console.detach') if t else 'Console',
+            self._detach_status, icon='console')
+        self._shell_guide_button = header.add_action(
+            'guide', t('tab_guide.tooltip') if t else 'Tab Usage Guide',
+            self._show_tab_guide, icon='toolbox')
+        self._shell_warning_button = header.add_action(
+            'warnings', t('warning.title') if t else 'Warnings',
+            self._show_warnings, icon='warning')
+        self._shell_about_button = header.add_action(
+            'about', t('about.title') if t else 'About PalTrainer',
+            self._show_about, icon='info')
+
         self.stacked_widget = QStackedWidget()
         self._build_pages()
-        # statistics drawer overlay: canvas-local frame above the stack
-        # (hidden; opened from the app-bar context indicator)
-        self._tray_drawer = StatsDrawer(self.stacked_widget)
-        self._tray_drawer.hide()
+        for route_id in self._LEGACY_PAGE_INDEX:
+            self.workspace_shell.register_page(route_id, self.stacked_widget)
+        self._ensure_tab(4)
+        players_index = self.stacked_widget.indexOf(self.players_page)
+        self.stacked_widget.removeWidget(self.players_page)
+        self._players_legacy_placeholder = QWidget()
+        self.stacked_widget.insertWidget(
+            players_index, self._players_legacy_placeholder)
+        self.workspace_shell.register_page('players', self.players_page)
+        self._ensure_tab(5)
+        guilds_index = self.stacked_widget.indexOf(self.guilds_page)
+        self.stacked_widget.removeWidget(self.guilds_page)
+        self._guilds_legacy_placeholder = QWidget()
+        self.stacked_widget.insertWidget(
+            guilds_index, self._guilds_legacy_placeholder)
+        self.workspace_shell.register_page('guilds', self.guilds_page)
+        self._ensure_tab(6)
+        bases_index = self.stacked_widget.indexOf(self.bases_page)
+        self.stacked_widget.removeWidget(self.bases_page)
+        self._bases_legacy_placeholder = QWidget()
+        self.stacked_widget.insertWidget(
+            bases_index, self._bases_legacy_placeholder)
+        self.workspace_shell.register_page('bases', self.bases_page)
+        self._ensure_tab(7)
+        map_index = self.stacked_widget.indexOf(self.map_tab)
+        self.stacked_widget.removeWidget(self.map_tab)
+        self._map_legacy_placeholder = QWidget()
+        self.stacked_widget.insertWidget(
+            map_index, self._map_legacy_placeholder)
+        self.workspace_shell.register_page('map', self.map_tab)
+        self._ensure_tab(8)
+        exclusions_index = self.stacked_widget.indexOf(self.exclusions_page)
+        self.stacked_widget.removeWidget(self.exclusions_page)
+        self._exclusions_legacy_placeholder = QWidget()
+        self.stacked_widget.insertWidget(
+            exclusions_index, self._exclusions_legacy_placeholder)
+        self.workspace_shell.register_page('exclusions', self.exclusions_page)
+        self.overview_page = OverviewPage()
+        self.overview_page.navigateRequested.connect(self._activate_nav)
+        self.overview_page.openSaveRequested.connect(self._load_save)
+        self.overview_page.openFolderRequested.connect(self._load_save_folder)
+        self.overview_page.recentSaveRequested.connect(self._load_recent_save)
+        self.overview_page.locateRecentRequested.connect(self._locate_recent_save)
+        self.overview_page.removeRecentRequested.connect(self._remove_recent_save)
+        self.overview_page.utilityRequested.connect(self._launch_overview_utility)
+        self.workspace_shell.register_page('overview', self.overview_page)
+        self.activity_page = ActivityPage(self.operation_journal)
+        self.workspace_shell.register_page('activity', self.activity_page)
+        self.backups_page = BackupsPage()
+        self.backups_page.refreshRequested.connect(self._refresh_backups)
+        self.backups_page.revealRequested.connect(self._reveal_backup_folder)
+        self.backups_page.restoreRequested.connect(self._restore_backup_record)
+        self.workspace_shell.register_page('backups', self.backups_page)
+        self.tool_center_page = ToolCenterPage(self.workspace_context)
+        self.tool_center_page.launchRequested.connect(self._launch_registered_tool)
+        self.tool_center_page.prerequisiteRequested.connect(
+            self._resolve_tool_prerequisite)
+        self.workspace_shell.register_page('tools', self.tool_center_page)
+        self.settings_page = SettingsPage(self.user_settings)
+        self.settings_page.preferencesChanged.connect(self._apply_preferences)
+        self.workspace_shell.register_page('settings', self.settings_page)
+        self.about_page = AboutPage()
+        self.about_page.projectRequested.connect(webbrowser.open)
+        self.about_page.updateCheckRequested.connect(self._check_update)
+        self.about_page.diagnosticsRequested.connect(
+            lambda: self._activate_nav('diagnostics'))
+        self.workspace_shell.register_page('about', self.about_page)
+        self.diagnostics_page = DiagnosticsPage()
+        self.diagnostics_page.copyRequested.connect(
+            self._copy_diagnostics_report)
+        self.diagnostics_page.exportRequested.connect(
+            self._export_diagnostics_report)
+        self.diagnostics_page.revealPathRequested.connect(
+            self._reveal_system_path)
+        self.diagnostics_page.detachConsoleRequested.connect(self._detach_status)
+        self.diagnostics_page.updateCheckRequested.connect(self._check_update)
+        self.workspace_shell.register_page('diagnostics', self.diagnostics_page)
+        self._unsubscribe_overview_context = self.workspace_context.subscribe(
+            self._sync_overview_context)
+        self._show_no_save_overview()
+        self.workspace_shell.sidebar.restore_settings({
+            'collapsed': self.workspace_settings.sidebar_collapsed,
+            'expanded_width': self.workspace_settings.sidebar_width,
+        })
+        self.workspace_shell.restore_splitter_sizes(
+            self.workspace_settings.splitter_sizes)
+        self.workspace_shell.router.restore_persistent_state(
+            current_route=self.workspace_settings.current_route,
+            last_routes=self.workspace_settings.last_routes,
+            page_view_state=self.workspace_settings.page_view_state,
+        )
+
+        self._tray_drawer = StatsDrawer()
+        self._tray_drawer.setFixedWidth(LAYOUT['inspector_width'])
         self._tray_drawer.close_requested.connect(self._close_tray_drawer)
-        self.app_bar.context_clicked.connect(
-            lambda: self._set_tray_drawer_visible(not self._tray_drawer.isVisible()))
-        self._tray_scrim = QWidget(self.stacked_widget)
-        self._tray_scrim.setObjectName('trayScrim')
-        self._tray_scrim.hide()
-        self._window_controls = self.app_bar.window_controls
-        self._window_controls.minimize_clicked.connect(self.showMinimized)
-        self._window_controls.maximize_clicked.connect(self._toggle_maximize)
-        self._window_controls.close_clicked.connect(self.close)
-        body_layout.addWidget(self.stacked_widget, stretch=1)
-        main_layout.addLayout(body_layout, stretch=1)
-        # loading_manager 'header' mode drives the app-bar save chip
-        constants.header_loading_widget = self.app_bar.save_chip
+        self.workspace_shell.set_inspector(
+            self._tray_drawer, title=t('deletion.stats_panel') if t else 'Statistics')
+        self.workspace_shell.inspector_side.hide()
+        self._window_controls = self.workspace_shell.title_bar.window_controls
+        constants.header_loading_widget = self.workspace_shell.header.save_context
 
     def _show_menu_popup_v2(self):
         from palworld_aio.widgets import MenuPopup
@@ -415,30 +542,21 @@ class MainWindow(QMainWindow):
             self._menu_popup_v2 = MenuPopup(self)
             if getattr(self, '_menu_actions_dict', None):
                 self._menu_popup_v2.set_menu_actions(self._menu_actions_dict)
-        # anchor under the app-bar brand mark (shell v3)
-        anchor = getattr(self, 'app_bar', None)
+        anchor = getattr(self, '_shell_menu_button', None)
         if anchor is not None:
-            gp = anchor.mapToGlobal(anchor.brand.geometry().topLeft())
-            self._menu_popup_v2.show_at(QPoint(gp.x(), gp.y() + anchor.brand.height() + 4))
+            gp = anchor.mapToGlobal(anchor.rect().bottomLeft())
+            self._menu_popup_v2.show_at(QPoint(gp.x(), gp.y() + 4))
             return
 
     def _set_tray_drawer_visible(self, visible):
-        if not getattr(self, '_shell_v2', False):
+        if not getattr(self, '_workspace_shell_live', False):
             return
-        drawer = self._tray_drawer
         if visible:
-            area = self.stacked_widget.geometry()
-            dh = min(drawer.sizeHint().height(), area.height() - 24)
-            drawer.resize(drawer.width(), max(dh, 240))
-            drawer.move(area.width() - drawer.width() - 12, 12)
-            self._tray_scrim.setGeometry(area)
-            self._tray_scrim.raise_()
-            self._tray_scrim.show()
-            drawer.raise_()
-            drawer.show()
+            self.workspace_shell.open_inspector(self._shell_stats_button)
         else:
-            drawer.hide()
-            self._tray_scrim.hide()
+            if self.workspace_shell.inspector_drawer.isVisible():
+                self.workspace_shell.inspector_drawer.close_drawer()
+            self.workspace_shell.inspector_side.hide()
         self.user_settings['tray_expanded'] = visible
         self._save_user_settings()
 
@@ -462,6 +580,21 @@ class MainWindow(QMainWindow):
         self.stacked_widget.setCurrentIndex(0)
         self.stacked_widget.currentWidget().update()
         self.stacked_widget.repaint()
+
+    _LEGACY_PAGE_INDEX = {
+        'tools': 0,
+        'base_inventory': 1,
+        'player_inventory': 2,
+        'pal_editor': 3,
+        'players': 4,
+        'guilds': 5,
+        'bases': 6,
+        'map': 7,
+        'exclusions': 8,
+        'json_editor': 9,
+        'docs': 10,
+        'breeding': 11,
+    }
 
     _TAB_SETUP = {
         0: '_setup_tools_tab',
@@ -491,183 +624,81 @@ class MainWindow(QMainWindow):
             widget = self.stacked_widget.widget(self.stacked_widget.count() - 1)
             self.stacked_widget.removeWidget(widget)
             self.stacked_widget.insertWidget(idx, widget)
+            for ribbon in widget.findChildren(QFrame, 'pageRibbon'):
+                ribbon.hide()
             self._tab_created.add(index)
     def _setup_players_tab(self):
-        from .chrome.components import (
-            InspectorSideColumn, create_page_footer, create_page_ribbon,
-        )
-        from .chrome import icons as app_icons
-        players_tab = QWidget()
-        layout = QVBoxLayout(players_tab)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.addWidget(create_page_ribbon(t('deletion.search_players') if t else 'Search Players', (t('sidebar.section.world') if t else 'World Data').upper(), players_tab))
-        # uiux-audit-remediation 5.1/5.2 (design D7): table column (bulk
-        # footer hugging the capped table card) + inspector side column.
-        self._players_table_cap = 420
-        body = QHBoxLayout()
-        body.setContentsMargins(0, 0, 0, 0)
-        body.setSpacing(0)
-        table_column = QWidget()
-        table_layout = QVBoxLayout(table_column)
-        table_layout.setContentsMargins(0, 0, 0, 0)
-        table_layout.setSpacing(0)
-        self.players_panel = SearchPanel('deletion.search_players', ['deletion.col.player_name', 'deletion.col.last_seen', 'deletion.col.level', 'deletion.col.pals', 'deletion.col.uid', 'deletion.col.guild_name', 'deletion.col.guild_id', 'deletion.col.guild_level'], [140, 120, 60, 60, 150, 180, 180, 60])
-        self.players_panel.item_selected.connect(self._on_player_selected)
+        from palworld_aio.ui.pages.players_page import PlayersPage
+        self.players_page = PlayersPage()
+        self.players_panel = self.players_page.browser
         self.players_panel.tree.customContextMenuRequested.connect(self._show_player_context_menu)
-        # uiux-audit-remediation 5.3: Player UID (index 4) / Guild ID
-        # (index 6) columns get the mono + full-value Ctrl+C copy treatment.
-        self.players_panel.set_copyable_columns({4, 6})
-        self.players_panel.set_mono_columns({4, 6})
-        table_layout.addWidget(self.players_panel, stretch=1)
-        # shared page footer (top-nav-shell 4.1): bulk actions live in the
-        # trailing actions slot; wiring unchanged. uiux-audit-remediation
-        # 5.2: the footer sits directly beneath the capped table card inside
-        # the table column instead of the stretched page bottom.
-        bulk_frame = create_page_footer()
-        bulk_layout = bulk_frame.actions
-        self.bulk_label = QLabel(t('player.bulk_actions') if t else 'Bulk Actions:')
-        self.bulk_label.setObjectName('bulkActionLabel')
-        bulk_frame.status_label.hide()
-        bulk_layout.addWidget(self.bulk_label)
-        self.bulk_item_btn = QPushButton(t('player.bulk_item_management') if t else 'Bulk Item Management')
-        self.bulk_item_btn.clicked.connect(self._open_bulk_player_item_dialog)
-        bulk_layout.addWidget(self.bulk_item_btn)
-        self.bulk_pal_btn = QPushButton(t('player.bulk_pal_management') if t else 'Bulk Pal Management')
-        self.bulk_pal_btn.clicked.connect(self._open_bulk_player_pal_dialog)
-        bulk_layout.addWidget(self.bulk_pal_btn)
-        self.bulk_tech_btn = QPushButton(t('player.bulk_technology_management') if t else 'Bulk Technology Management')
-        self.bulk_tech_btn.clicked.connect(self._open_bulk_technology_dialog)
-        bulk_layout.addWidget(self.bulk_tech_btn)
-        self.bulk_guild_btn = QPushButton(t('guild.assign.btn_open') if t else 'Guild Assignments')
-        self.bulk_guild_btn.clicked.connect(self._open_guild_assign_dialog)
-        bulk_layout.addWidget(self.bulk_guild_btn)
-        table_layout.addWidget(bulk_frame)
-        self._players_bulk_frame = bulk_frame
-        table_layout.addStretch(1)
-        body.addWidget(table_column, stretch=1)
-        self._players_inspector_column = InspectorSideColumn(340)
-        self._players_inspector = self._players_inspector_column.panel
-        self._players_inspector.add_row(t('deletion.col.last_seen') if t else 'Last Seen')
-        self._players_inspector.add_row(t('deletion.col.level') if t else 'Level')
-        self._players_inspector.add_row(t('deletion.col.pals') if t else 'Pals')
-        self._players_inspector.add_row(t('deletion.col.guild_name') if t else 'Guild')
-        self._players_inspector.add_row('Player UID', monospace=True)
-        self._players_inspector.add_row('Guild ID', monospace=True)
-        self._players_inspector.show_empty(
-            t('players.inspector_empty') if t else 'Select a player to view their details')
-        body.addWidget(self._players_inspector_column)
-        layout.addLayout(body, stretch=1)
-        self.stacked_widget.addWidget(players_tab)
+        self.players_page.playerSelected.connect(self._on_player_record_selected)
+        self.players_page.openInventoryRequested.connect(self._edit_player_inventory)
+        self.players_page.openPalEditorRequested.connect(self._open_player_pal_editor)
+        self.players_page.openGuildRequested.connect(self._open_player_guild)
+        self.players_page.bulkItemsRequested.connect(self._open_bulk_player_item_dialog)
+        self.players_page.bulkPalsRequested.connect(self._open_bulk_player_pal_dialog)
+        self.players_page.bulkTechnologyRequested.connect(
+            self._open_bulk_technology_dialog)
+        self.players_page.bulkGuildRequested.connect(
+            self._open_guild_assign_dialog)
+        self.players_page.stateActionRequested.connect(
+            lambda action: self._handle_world_state_action(
+                action, self._refresh_players))
+        self._players_inspector_column = self.players_page.entity_browser.inspector_host
+        self._players_inspector = self.players_page.inspector
+        self._players_bulk_frame = self.players_page.bulk_footer
+        self.bulk_item_btn = self.players_page.bulk_item_button
+        self.bulk_pal_btn = self.players_page.bulk_pal_button
+        self.bulk_tech_btn = self.players_page.bulk_technology_button
+        self.bulk_guild_btn = self.players_page.bulk_guild_button
+        self.bulk_label = self.players_page.bulk_footer.status_label
+        self._players_table_cap = 420
+        self.stacked_widget.addWidget(self.players_page)
     def _setup_guilds_tab(self):
-        from .chrome.components import InspectorSideColumn, create_page_ribbon
-        guilds_tab = QWidget()
-        layout = QVBoxLayout(guilds_tab)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.addWidget(create_page_ribbon(t('deletion.search_guilds') if t else 'Search Guilds', (t('sidebar.section.world') if t else 'World Data').upper(), guilds_tab))
-        # uiux-audit-remediation 6.1 (design D7): guilds content (splitter
-        # untouched) + inspector side column for the GUILD table.
-        content = QHBoxLayout()
-        content.setContentsMargins(0, 0, 0, 0)
-        content.setSpacing(0)
-        splitter = QSplitter(Qt.Vertical)
-        splitter.setContentsMargins(0, 0, 0, 0)
-        self.guilds_panel = SearchPanel('deletion.search_guilds', ['deletion.col.guild_name', 'deletion.col.guild_id', 'deletion.col.guild_level', 'deletion.col.members'], [200, 280, 100, 80])
-        self.guilds_panel.item_selected.connect(self._on_guild_selected)
+        from palworld_aio.ui.pages.guilds_page import GuildsPage
+        self.guilds_page = GuildsPage()
+        self.guilds_panel = self.guilds_page.browser
+        self.guild_members_panel = self.guilds_page.members_browser
         self.guilds_panel.tree.customContextMenuRequested.connect(self._show_guild_context_menu)
-        # uiux-audit-remediation 6.3: Guild ID column (index 1) gets the
-        # mono + full-value Ctrl+C copy treatment.
-        self.guilds_panel.set_copyable_columns({1})
-        self.guilds_panel.set_mono_columns({1})
-        self.guilds_panel.tree.setMinimumHeight(160)
-        splitter.addWidget(self.guilds_panel)
-        self.guild_members_panel = SearchPanel('deletion.guild_members', ['deletion.col.member', 'deletion.col.last_seen', 'deletion.col.level', 'deletion.col.pals', 'deletion.col.uid', 'deletion.col.role'], [200, 120, 60, 100, 300, 80])
-        self.guild_members_panel.item_selected.connect(self._on_guild_member_selected)
         self.guild_members_panel.tree.customContextMenuRequested.connect(self._show_guild_member_context_menu)
-        # uiux-audit-remediation 6.3: member UID column (index 4).
-        self.guild_members_panel.set_copyable_columns({4})
-        self.guild_members_panel.set_mono_columns({4})
-        # uiux-audit-remediation 6.2: row-level wording — a guild may already
-        # be selected globally, so the pane prompts the row interaction.
-        self._members_empty_state = EmptyState(
-            t('deletion.guild_members.row_hint') if t else 'Click a guild row to view its members',
-            hint=t('deletion.guild_members.row_hint_sub') if t else 'Members of the clicked guild appear in this list.',
-            icon_name='guilds',
-        )
-        self.guild_members_panel.set_empty_state_widget(self._members_empty_state)
-        splitter.addWidget(self.guild_members_panel)
-        content.addWidget(splitter, stretch=1)
-        self._guilds_inspector_column = InspectorSideColumn(340)
-        self._guilds_inspector = self._guilds_inspector_column.panel
-        self._guilds_inspector.add_row(t('deletion.col.guild_level') if t else 'Guild Level')
-        self._guilds_inspector.add_row(t('deletion.col.members') if t else 'Members')
-        self._guilds_inspector.add_row('Guild ID', monospace=True)
-        self._guilds_inspector.show_empty(
-            t('guilds.inspector_empty') if t else 'Select a guild to view its details')
-        content.addWidget(self._guilds_inspector_column)
-        # uiux-audit-remediation 6.4: the GUILD table caps to content height
-        # via the shared helper; the members pane keeps its splitter behavior.
-        self._guilds_table_cap = 300
-        layout.addLayout(content, stretch=1)
-        self.stacked_widget.addWidget(guilds_tab)
+        self.guilds_page.guildSelected.connect(self._on_guild_record_selected)
+        self.guilds_page.memberSelected.connect(self._on_guild_member_record_selected)
+        self.guilds_page.openPlayersRequested.connect(self._open_guild_players)
+        self.guilds_page.openBasesRequested.connect(self._open_guild_bases)
+        self.guilds_page.stateActionRequested.connect(
+            lambda action: self._handle_world_state_action(
+                action, self._refresh_guilds))
+        self._guilds_inspector_column = self.guilds_page.entity_browser.inspector_host
+        self._guilds_inspector = self.guilds_page.inspector
+        self._guilds_table_cap = 420
+        self.stacked_widget.addWidget(self.guilds_page)
     def _setup_bases_tab(self):
-        from .chrome.components import (
-            InspectorSideColumn, create_page_ribbon,
-        )
-        from .chrome import icons as app_icons
-        bases_tab = QWidget()
-        layout = QVBoxLayout(bases_tab)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.addWidget(create_page_ribbon(t('deletion.search_bases') if t else 'Search Bases', (t('sidebar.section.world') if t else 'World Data').upper(), bases_tab))
-        # uiux-audit-remediation 4.2 (design D7): table column + inspector
-        # side column; the inspector absorbs the freed canvas instead of the
-        # table forcing a full-height fill.
-        body = QHBoxLayout()
-        body.setContentsMargins(0, 0, 0, 0)
-        body.setSpacing(0)
-        table_column = QWidget()
-        table_layout = QVBoxLayout(table_column)
-        table_layout.setContentsMargins(0, 0, 0, 0)
-        table_layout.setSpacing(0)
-        # uiux-audit-remediation 4.2: the table sizes to its content up to a
-        # cap (internal scroll beyond) instead of forcing a full-height fill;
-        # the inspector side column occupies the freed canvas.
-        self._bases_table_cap = 420
-        self.bases_panel = SearchPanel('deletion.search_bases', ['deletion.col.base_id', 'deletion.col.guild_id', 'deletion.col.guild_name', 'deletion.col.guild_level'], [200, 200, 200, 100])
-        self.bases_panel.tree.setMinimumHeight(160)
-        self.bases_panel.item_selected.connect(self._on_base_selected)
+        from palworld_aio.ui.pages.bases_page import BasesPage
+        self.bases_page = BasesPage()
+        self.bases_panel = self.bases_page.browser
         self.bases_panel.tree.customContextMenuRequested.connect(self._show_base_context_menu)
-        # uiux-audit-remediation 4.3: Base ID / Guild ID columns get the
-        # mono + full-value Ctrl+C copy treatment (display stays shortened)
-        self.bases_panel.set_copyable_columns({0, 1})
-        self.bases_panel.set_mono_columns({0, 1})
-        table_layout.addWidget(self.bases_panel, stretch=1)
-        table_layout.addStretch(1)
-        body.addWidget(table_column, stretch=1)
-        self._bases_inspector_column = InspectorSideColumn(340)
-        self._bases_inspector = self._bases_inspector_column.panel
-        self._bases_inspector.add_row(t('deletion.col.guild_name') if t else 'Guild')
-        self._bases_inspector.add_row(t('deletion.col.guild_level') if t else 'Guild Level')
-        self._bases_inspector.add_row('Base ID', monospace=True)
-        self._bases_inspector.add_row('Guild ID', monospace=True)
-        self._bases_open_inventory_btn = QPushButton(
-            t('bases.open_in_inventory') if t else 'Open in Base Inventory')
-        self._bases_open_inventory_btn.setProperty('class', 'ghost')
-        self._bases_open_inventory_btn.setIcon(
-            app_icons.get_qicon('base_inventory', role='text_secondary'))
-        self._bases_open_inventory_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self._bases_open_inventory_btn.clicked.connect(self._open_base_in_inventory)
-        self._bases_inspector.add_action(self._bases_open_inventory_btn)
-        self._bases_inspector.show_empty(
-            t('bases.inspector_empty') if t else 'Select a base to view its details')
-        body.addWidget(self._bases_inspector_column)
-        layout.addLayout(body, stretch=1)
-        self.stacked_widget.addWidget(bases_tab)
+        self.bases_page.baseSelected.connect(self._on_base_record_selected)
+        self.bases_page.openInventoryRequested.connect(
+            self._open_base_record_inventory)
+        self.bases_page.openMapRequested.connect(self._open_base_record_map)
+        self.bases_page.openGuildRequested.connect(self._open_base_record_guild)
+        self.bases_page.stateActionRequested.connect(
+            lambda action: self._handle_world_state_action(
+                action, self._refresh_bases))
+        self._bases_inspector_column = self.bases_page.entity_browser.inspector_host
+        self._bases_inspector = self.bases_page.inspector
+        self._bases_open_inventory_btn = self.bases_page.inventory_button
+        self._bases_table_cap = 420
+        self.stacked_widget.addWidget(self.bases_page)
     def _setup_map_tab(self):
         from .tabs.map_tab import MapTab
         self.map_tab = MapTab(self)
+        self.map_tab.openBaseRequested.connect(self._open_map_base)
+        self.map_tab.openPlayerRequested.connect(self._open_map_player)
+        self.map_tab.openGuildRequested.connect(self._open_map_guild)
+        self.map_tab.loadSaveRequested.connect(self._load_save)
+        self.map_tab.retryRequested.connect(self._refresh_map)
         self.stacked_widget.addWidget(self.map_tab)
     def _setup_tools_tab(self):
         from .tabs.tools_tab import ToolsTab
@@ -676,15 +707,22 @@ class MainWindow(QMainWindow):
     def _setup_base_inventory_tab(self):
         from .tabs.base_inventory_tab import BaseInventoryTab
         self.base_inventory_tab = BaseInventoryTab(self)
+        if 'workspace_context' in self.__dict__:
+            self.base_inventory_tab.bind_workspace_context(
+                self.workspace_context)
         self.stacked_widget.addWidget(self.base_inventory_tab)
     def _setup_inventory_tab(self):
         from .tabs.inventory_tab import PlayerInventoryTab
         self.inventory_tab = PlayerInventoryTab(self)
+        if 'workspace_context' in self.__dict__:
+            self.inventory_tab.bind_workspace_context(self.workspace_context)
         self.stacked_widget.addWidget(self.inventory_tab)
         self.inventory_tab.unlock_all_map_requested.connect(self._on_bulk_unlock_all_map)
     def _setup_pal_editor_tab(self):
         from .tabs.pal_editor_tab import PalEditorTab
         self.pal_editor_tab = PalEditorTab(self)
+        if 'workspace_context' in self.__dict__:
+            self.pal_editor_tab.bind_workspace_context(self.workspace_context)
         self.stacked_widget.addWidget(self.pal_editor_tab)
     def _setup_docs_tab(self):
         from .tabs.docs_tab import DocsTab
@@ -702,83 +740,29 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.breeding_tab)
 
     def _setup_exclusions_tab(self):
-        from .chrome.components import create_page_ribbon, set_content_margins
-        exclusions_tab = QWidget()
-        layout = QVBoxLayout(exclusions_tab)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.addWidget(create_page_ribbon(t('deletion.menu.exclusions') if t else 'Exclusions', (t('sidebar.section.world') if t else 'World Data').upper(), exclusions_tab))
-        # segmented control switching one full-bleed table (014-r02)
-        switch_row = QHBoxLayout()
-        set_content_margins(switch_row, top=6, bottom=6, left=12)
-        switch_row.setSpacing(6)
-        self._excl_views = {}
-        self._excl_btns = {}
+        from palworld_aio.ui.pages.exclusions_page import ExclusionsPage
+        self.exclusions_page = ExclusionsPage()
+        self.exclusions_page.addRequested.connect(self._add_exclusion_via_prompt)
+        self.exclusions_page.removeRequested.connect(self._remove_exclusion)
+        self.exclusions_page.stateActionRequested.connect(
+            lambda action: self._handle_world_state_action(
+                action, self._refresh_exclusions))
+        self.exclusions_page.browser.tree.customContextMenuRequested.connect(
+            lambda pos: self._show_exclusion_context_menu(
+                pos, self.exclusions_page.current_kind))
+        self.excl_players_panel = self.exclusions_page.browser
+        self.excl_guilds_panel = self.exclusions_page.browser
+        self.excl_bases_panel = self.exclusions_page.browser
+        self._excl_add_buttons = {
+            key: self.exclusions_page.add_button
+            for key in ('players', 'guilds', 'bases')
+        }
+        self._excl_btns = self.exclusions_page.segmented._buttons
         self._excl_empty_states = {}
-        self._excl_add_buttons = {}
-        switch_row.addStretch(1)
-        layout.addLayout(switch_row)
-        self._excl_stack = QStackedWidget()
-        specs = [
-            ('players', 'deletion.exclusions.player_label', ['deletion.excluded_player_uid'], [300]),
-            ('guilds', 'deletion.exclusions.guild_label', ['deletion.excluded_guild_id'], [300]),
-            ('bases', 'deletion.exclusions.base_label', ['deletion.excluded_bases'], [300]),
-        ]
-        for key, label_key, cols, widths in specs:
-            page = QWidget()
-            page_lay = QVBoxLayout(page)
-            page_lay.setContentsMargins(0, 0, 0, 0)
-            panel = SearchPanel(label_key, cols, widths)
-            if key == 'players':
-                self.excl_players_panel = panel
-                panel.tree.customContextMenuRequested.connect(lambda pos: self._show_exclusion_context_menu(pos, 'players'))
-            elif key == 'guilds':
-                self.excl_guilds_panel = panel
-                panel.tree.customContextMenuRequested.connect(lambda pos: self._show_exclusion_context_menu(pos, 'guilds'))
-            else:
-                self.excl_bases_panel = panel
-                panel.tree.customContextMenuRequested.connect(lambda pos: self._show_exclusion_context_menu(pos, 'bases'))
-            # modernize-tab-ui 7.1: loaded-but-empty shows the shared
-            # EmptyState (no-save keeps the plain load-save hint; the state
-            # is re-evaluated in _refresh_exclusions/_apply_excl_empty_states).
-            empty = EmptyState(
-                t('deletion.exclusions.empty_title') if t else 'No exclusions configured',
-                hint=t(f'deletion.exclusions.empty_hint_{key}') if t else 'Use the right-click menu to exclude entries.',
-                icon_name='exclusions',
-            )
-            panel.set_empty_state_widget(empty)
-            self._excl_empty_states[key] = empty
-            # uiux-audit-remediation 7.1: persistent visible '+ Add Exclusion'
-            # affordance in the panel footer (outside the empty-state overlay,
-            # so it stays usable when the list is empty) routing into the
-            # existing _add_exclusion flow.
-            add_btn = QPushButton(t('deletion.exclusions.add') if t else '+ Add Exclusion')
-            add_btn.setObjectName('exclAddBtn')
-            add_btn.setProperty('class', 'ghost')
-            add_btn.setCursor(QCursor(Qt.PointingHandCursor))
-            add_btn.setToolTip(t('deletion.exclusions.add') if t else '+ Add Exclusion')
-            add_btn.setAccessibleName(t('deletion.exclusions.add') if t else '+ Add Exclusion')
-            add_btn.clicked.connect(lambda checked=False, k=key: self._add_exclusion_via_prompt(k))
-            panel.footer_slot.addWidget(add_btn)
-            self._excl_add_buttons[key] = add_btn
-            page_lay.addWidget(panel)
-            self._excl_stack.addWidget(page)
-            self._excl_views[key] = self._excl_stack.count() - 1
-            btn = QPushButton(t(label_key) if t else key.title())
-            btn.setObjectName('pageSwitchBtn')
-            btn.setCheckable(True)
-            btn.setCursor(QCursor(Qt.PointingHandCursor))
-            btn.clicked.connect(lambda checked, k=key: self._switch_exclusion_view(k))
-            switch_row.insertWidget(switch_row.count() - 1, btn)
-            self._excl_btns[key] = btn
-        self._switch_exclusion_view('players')
-        layout.addWidget(self._excl_stack, stretch=1)
-        self.stacked_widget.addWidget(exclusions_tab)
+        self.stacked_widget.addWidget(self.exclusions_page)
         self._apply_excl_empty_states()
     def _switch_exclusion_view(self, key):
-        self._excl_stack.setCurrentIndex(self._excl_views[key])
-        for k, btn in self._excl_btns.items():
-            btn.setChecked(k == key)
+        self.exclusions_page.switch_view(key)
     def _add_exclusion_via_prompt(self, excl_type):
         """uiux-audit-remediation 7.1: visible '+ Add Exclusion' affordance —
         prompts for the identifier and routes into the existing
@@ -806,6 +790,15 @@ class MainWindow(QMainWindow):
     def _open_data_folder(self):
         from resource_resolver import get_user_config_dir
         _p = os.path.dirname(get_user_config_dir())
+        self._reveal_system_path(_p)
+    def _reveal_system_path(self, path):
+        _p = os.path.abspath(str(path))
+        if not os.path.exists(_p):
+            self._show_error(
+                t('error.title') if t else 'Error',
+                t('ui.diagnostics.path_missing',
+                  default='This path is not available: {path}', path=_p))
+            return
         try:
             if sys.platform == 'win32':
                 os.startfile(_p)
@@ -816,7 +809,52 @@ class MainWindow(QMainWindow):
                 import subprocess
                 subprocess.Popen(['xdg-open', _p])
         except Exception as _e:
-            self._show_error('Error', f'Could not open folder:\n{_p}\n{_e}')
+            print(f'Could not open diagnostics path {_p}: {_e}')
+            self._show_error(
+                t('error.title') if t else 'Error',
+                t('ui.diagnostics.open_failed',
+                  default='Could not open this application path.'))
+    def _copy_diagnostics_report(self, report):
+        QApplication.clipboard().setText(str(report))
+        page = self.__dict__.get('diagnostics_page')
+        if page is not None:
+            page.set_result(t(
+                'ui.diagnostics.copied',
+                default='Support report copied to the clipboard.'))
+    def _export_diagnostics_report(self, report):
+        from pathlib import Path
+        path, _selected_filter = QFileDialog.getSaveFileName(
+            self,
+            t('ui.diagnostics.export', default='Export Report'),
+            'PalTrainer-diagnostics.txt',
+            t('ui.diagnostics.text_files', default='Text Files (*.txt)'))
+        if not path:
+            return
+        page = self.__dict__.get('diagnostics_page')
+        try:
+            Path(path).write_text(str(report), encoding='utf-8')
+        except OSError as error:
+            print(f'Failed to export diagnostics report: {error}')
+            if page is not None:
+                page.set_result(t(
+                    'ui.diagnostics.export_failed',
+                    default='The report could not be exported.'), 'danger')
+            return
+        if page is not None:
+            page.set_result(t(
+                'ui.diagnostics.exported',
+                default='Support report exported to {path}.', path=path))
+    def _sync_diagnostics_console(self):
+        page = self.__dict__.get('diagnostics_page')
+        stream = self.__dict__.get('status_stream')
+        if page is None:
+            return
+        if stream is not None:
+            page.set_console_text(stream.stringio.getvalue())
+            page.set_console_detached(bool(stream.detached))
+        warning = self.__dict__.get('_warning_detail', '')
+        if warning:
+            page.set_update_warning(warning)
     def _create_action(self, text, callback):
         action = QAction(text, self)
         action.triggered.connect(callback)
@@ -849,26 +887,206 @@ class MainWindow(QMainWindow):
             shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
             shortcut.activated.connect(lambda pid=page_id: self._activate_nav(pid))
             self._page_shortcuts.append(shortcut)
+        self._command_shortcuts = []
+        for sequence in ('Ctrl+K', 'Ctrl+P'):
+            shortcut = QShortcut(QKeySequence(sequence), self)
+            shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            shortcut.activated.connect(self._show_command_palette)
+            self._command_shortcuts.append(shortcut)
+        self._global_search_shortcut = QShortcut(QKeySequence('Ctrl+Shift+F'), self)
+        self._global_search_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self._global_search_shortcut.activated.connect(self._show_global_search)
         esc = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
         esc.setContext(Qt.ShortcutContext.ApplicationShortcut)
         esc.activated.connect(self._on_global_escape)
         self._esc_shortcut = esc
 
+    def _show_command_palette(self):
+        from palworld_aio.ui.chrome.command_palette import (
+            CommandDescriptor, CommandPalette, route_commands,
+        )
+        palette = self.__dict__.get('_command_palette')
+        if palette is None:
+            category = t('ui.command.category.application') if t else 'Application'
+            commands = list(route_commands(self._activate_nav))
+            commands.extend((
+                CommandDescriptor(
+                    'app:load_save',
+                    t('ui.command.load_save') if t else 'Load Save',
+                    category,
+                    self._load_save,
+                    ('open', 'file', 'world'),
+                    'Ctrl+O',
+                ),
+                CommandDescriptor(
+                    'app:save_changes',
+                    t('ui.command.save_changes') if t else 'Save Changes',
+                    category,
+                    self._save_changes,
+                    ('write', 'pending', 'changes'),
+                    'Ctrl+S',
+                ),
+            ))
+            palette = CommandPalette(commands, self)
+            self._command_palette = palette
+        palette.open_palette()
+
+    def _show_global_search(self):
+        from palworld_aio.ui.global_search import GlobalSearchDialog, GlobalSearchIndex
+        index = self.__dict__.get('_global_search_index')
+        if index is None:
+            index = GlobalSearchIndex()
+            self._global_search_index = index
+        dialog = self.__dict__.get('_global_search_dialog')
+        if dialog is None:
+            dialog = GlobalSearchDialog(index, self.workspace_shell.router, self)
+            self._global_search_dialog = dialog
+        dialog.open_search()
+
+    def _refresh_global_search_index(self):
+        """Build identifier-only search records from loaded and bundled data."""
+        from palworld_aio.ui.global_search import GlobalSearchIndex, build_search_records
+        from palworld_aio.world.projections import SaveProjections
+
+        players = [
+            {'uid': uid, 'name': name, 'guild_id': guild_id}
+            for uid, name, guild_id, *_rest in save_manager.get_players()
+        ]
+        guilds = get_guilds()
+        bases = get_bases()
+        pals = []
+        level = constants.loaded_level_json
+        if level:
+            wsd = level['properties']['worldSaveData']['value']
+            for entry in SaveProjections.get_pal_char_entries(wsd):
+                parameter = SaveProjections.get_save_param(entry)
+                instance_id = str(
+                    entry.get('key', {}).get('InstanceId', {}).get('value', ''))
+                character_id = parameter.get('CharacterID', {}).get('value', '')
+                nickname = parameter.get('NickName', {}).get('value', '')
+                owner_uid = parameter.get('OwnerPlayerUId', {}).get('value', '')
+                if instance_id:
+                    pals.append({
+                        'instance_id': instance_id,
+                        'name': str(nickname or character_id or instance_id),
+                        'owner_uid': str(owner_uid or ''),
+                        'detail': str(character_id or ''),
+                    })
+
+        def game_data(filename, key):
+            path = resource_path(constants.get_base_path(), 'game_data', filename)
+            try:
+                payload = json_tools.load(path)
+            except (OSError, ValueError, TypeError):
+                return []
+            values = payload.get(key, []) if isinstance(payload, dict) else []
+            return values if isinstance(values, list) else []
+
+        items = game_data('items.json', 'items')
+        skills = game_data('skills.json', 'skills')
+        technologies = game_data('world.json', 'technology')
+        fast_travel_path = resource_path(
+            constants.get_base_path(), 'game_data', 'fast_travel_points.json')
+        try:
+            fast_travel = json_tools.load(fast_travel_path)
+        except (OSError, ValueError, TypeError):
+            fast_travel = {}
+        world_data = [
+            {'id': key, 'name': value.get('localized_name') or value.get('id') or key}
+            for key, value in fast_travel.items()
+            if isinstance(value, dict)
+        ] if isinstance(fast_travel, dict) else []
+        records = build_search_records(
+            players=players,
+            guilds=guilds,
+            bases=bases,
+            pals=pals,
+            items=items,
+            skills=skills,
+            technologies=technologies,
+            world_data=world_data,
+        )
+        index = self.__dict__.get('_global_search_index')
+        if index is None:
+            index = GlobalSearchIndex(records)
+            self._global_search_index = index
+        else:
+            index.replace(records)
+        self.__dict__.pop('_global_search_dialog', None)
+
     def _activate_nav(self, page_id: str) -> None:
         """Single keyboard/programmatic nav entry."""
-        if getattr(self, 'nav_strip', None) is not None:
-            self.nav_strip.set_active(page_id)
+        shell = self.__dict__.get('workspace_shell')
+        if shell is not None:
+            shell.navigate(page_id)
+            return
+        nav_strip = self.__dict__.get('nav_strip')
+        if nav_strip is not None:
+            nav_strip.set_active(page_id)
         self._on_nav_changed(page_id)
+
+    def _activate_contextual_nav(self, page_id: str, **context) -> None:
+        """Navigate with target context after the source history entry is saved."""
+        shell = self.__dict__.get('workspace_shell')
+        if shell is not None:
+            shell.router.open_contextual(page_id, **context)
+            return
+        workspace_context = self.__dict__.get('workspace_context')
+        if workspace_context is not None:
+            for name, selection in context.items():
+                setter = getattr(workspace_context, f'set_{name}', None)
+                if setter is not None:
+                    setter(selection)
+        self._activate_nav(page_id)
+
+    def open_reference(self, category: str, identifier: str) -> bool:
+        """Navigate from an editor to a bundled-data record."""
+        self._activate_nav('docs')
+        self._ensure_tab(self._LEGACY_PAGE_INDEX['docs'])
+        docs_tab = self.__dict__.get('docs_tab')
+        return bool(docs_tab and docs_tab.open_reference(category, identifier))
+
+    def open_breeding(self, pal_asset: str) -> bool:
+        """Navigate from a Pal surface to its breeding combinations."""
+        self._activate_nav('breeding')
+        self._ensure_tab(self._LEGACY_PAGE_INDEX['breeding'])
+        breeding_tab = self.__dict__.get('breeding_tab')
+        return bool(breeding_tab and breeding_tab.select_pal(pal_asset))
 
     def _on_global_escape(self):
         active = QApplication.activeModalWidget()
         if active is not None:
             return
-        if getattr(self, '_shell_v2', False) and self._tray_drawer.isVisible():
+        shell = self.__dict__.get('workspace_shell')
+        if shell is not None and shell.inspector_drawer.isVisible():
             self._close_tray_drawer()
     def _set_dirty(self, dirty):
-        if getattr(self, 'app_bar', None) is not None:
-            self.app_bar.save_chip.set_dirty(dirty)
+        workspace_context = self.__dict__.get('workspace_context')
+        if workspace_context is not None:
+            from palworld_aio.ui.workspace_context import PendingChangesSummary
+            current = workspace_context.snapshot.pending_changes
+            if dirty and current.count == 0:
+                from palworld_aio.ui.operation_journal import (
+                    ActivityKind, ActivityStatus,
+                )
+                self._record_activity(
+                    ActivityKind.MUTATION,
+                    t('ui.activity.change_recorded', default='Unsaved change recorded'),
+                    status=ActivityStatus.WARNING,
+                    detail=(current.latest_label or t(
+                        'ui.activity.change_detail',
+                        default='The current save has in-memory changes.')),
+                )
+            workspace_context.set_pending_changes(
+                PendingChangesSummary(
+                    max(1, current.count),
+                    current.latest_label or 'Unsaved changes',
+                    current.has_high_risk,
+                ) if dirty else PendingChangesSummary())
+            return
+        app_bar = self.__dict__.get('app_bar')
+        if app_bar is not None:
+            app_bar.save_chip.set_dirty(dirty)
 
     def _set_menu_actions(self, actions_dict):
         self._menu_actions_dict = actions_dict
@@ -877,6 +1095,22 @@ class MainWindow(QMainWindow):
 
     def _update_stats_all(self, stats):
         self._tray_drawer.stats_panel.update_stats(stats)
+
+    def _record_activity(
+        self, kind, title, *, status=None, detail='', context='', undo=None,
+    ):
+        journal = self.__dict__.get('operation_journal')
+        if journal is None:
+            return None
+        from palworld_aio.ui.operation_journal import ActivityStatus
+        if not context:
+            snapshot = self.workspace_context.snapshot
+            context = snapshot.save.display_name if snapshot.save else ''
+        return journal.record(
+            kind, title, context=context,
+            status=status or ActivityStatus.SUCCESS,
+            detail=detail, undo=undo,
+        )
 
     def _refresh_stats_all_before(self):
         from palworld_aio.managers.save_manager import save_manager
@@ -888,13 +1122,104 @@ class MainWindow(QMainWindow):
         stats = save_manager.get_current_stats()
         self._tray_drawer.stats_panel.refresh_stats_after(stats)
 
+    @staticmethod
+    def _overview_backup_label(snapshot):
+        backup = snapshot.backup
+        if backup.latest_label:
+            return backup.latest_label
+        if backup.count:
+            return t('ui.overview.backup.available', default='Backup available')
+        if backup.recommended:
+            return t('ui.overview.backup.recommended', default='Backup recommended')
+        return t('ui.overview.backup.none', default='No backup recorded')
+
+    def _sync_overview_context(self, snapshot):
+        overview = self.__dict__.get('overview_page')
+        if overview is None:
+            return
+        if snapshot.save is None:
+            self._show_no_save_overview()
+            return
+        overview.update_context_summary(
+            pending_changes=snapshot.pending_changes.count,
+            backup_label=self._overview_backup_label(snapshot),
+        )
+
+    def _recent_overview_entries(self):
+        from pathlib import Path
+        from palworld_aio.ui.pages.overview_page import RecentSaveEntry
+        entries = []
+        for item in self.workspace_settings.recent_saves:
+            path = Path(item.path)
+            level_path = path if path.name.lower() == 'level.sav' else path / 'Level.sav'
+            available = level_path.is_file() and (level_path.parent / 'Players').is_dir()
+            entries.append(RecentSaveEntry(
+                save_id=item.save_id,
+                label=item.display_name,
+                path=item.path,
+                platform=(
+                    'Game Pass' if item.platform == 'xbox' else
+                    'Steam' if item.platform == 'steam' else 'Unknown platform'
+                ),
+                available=available,
+            ))
+        return tuple(entries)
+
+    def _show_no_save_overview(self):
+        overview = self.__dict__.get('overview_page')
+        if overview is not None:
+            overview.set_no_save(self._recent_overview_entries())
+
+    def _populate_loaded_overview(self):
+        from palworld_aio.ui.pages.overview_page import (
+            LoadedOverviewModel, OverviewActivityItem,
+        )
+        snapshot = self.workspace_context.snapshot
+        identity = snapshot.save
+        if identity is None:
+            return
+        stats = save_manager.get_current_stats()
+        counts = {
+            key.lower(): max(0, int(value))
+            for key, value in stats.items()
+            if key.lower() in {'players', 'guilds', 'bases', 'pals'}
+        }
+        modified_at = identity.modified_at or t(
+            'ui.overview.modified_unknown', default='Unknown')
+        platform = (
+            'Game Pass' if identity.platform.value == 'xbox' else
+            'Steam' if identity.platform.value == 'steam' else
+            t('ui.overview.platform_unknown', default='Unknown platform')
+        )
+        self.overview_page.set_loaded(LoadedOverviewModel(
+            save_name=identity.display_name,
+            platform=platform,
+            modified_at=modified_at,
+            backup_label=self._overview_backup_label(snapshot),
+            pending_changes=snapshot.pending_changes.count,
+            counts=counts,
+            activity=(OverviewActivityItem(
+                t('ui.overview.activity.loaded', default='Save loaded'),
+                f'{platform} • {modified_at}',
+                'success',
+            ),),
+        ))
+
     def _on_shell_loading(self):
+        workspace_context = self.__dict__.get('workspace_context')
+        if workspace_context is not None:
+            workspace_context.begin_load()
+            return
         try:
             from palworld_aio.shell_state import ShellState
             self.app_bar.save_chip.set_shell_state(ShellState.LOADING)
         except (RuntimeError, AttributeError, ImportError):
             pass
     def _on_shell_saving(self):
+        workspace_context = self.__dict__.get('workspace_context')
+        if workspace_context is not None:
+            workspace_context.begin_save()
+            return
         try:
             from palworld_aio.shell_state import ShellState
             self.app_bar.save_chip.set_shell_state(ShellState.SAVING)
@@ -926,40 +1251,255 @@ class MainWindow(QMainWindow):
         msg_box.setWindowTitle(title)
         msg_box.setText(text)
         msg_box.exec()
-    def _on_nav_changed(self, button_id):
-        page_index = {'tools': 0, 'base_inventory': 1, 'player_inventory': 2, 'pal_editor': 3, 'players': 4, 'guilds': 5, 'bases': 6, 'map': 7, 'exclusions': 8, 'json_editor': 9, 'docs': 10, 'breeding': 11}[button_id]
+    def _show_legacy_route(self, button_id):
+        if button_id == 'diagnostics':
+            self._sync_diagnostics_console()
+            return
+        if button_id in {'about', 'settings'}:
+            return
+        if button_id == 'backups':
+            self._refresh_backups()
+            return
+        if (button_id == 'players'
+                and self.__dict__.get('players_page') is not None):
+            return
+        if (button_id == 'guilds'
+                and self.__dict__.get('guilds_page') is not None):
+            return
+        if (button_id == 'bases'
+                and self.__dict__.get('bases_page') is not None):
+            return
+        if (button_id == 'map'
+                and self.__dict__.get('map_tab') is not None):
+            return
+        if (button_id == 'exclusions'
+                and self.__dict__.get('exclusions_page') is not None):
+            return
+        page_index = self._LEGACY_PAGE_INDEX.get(button_id)
+        if page_index is None:
+            return
         if page_index not in self._tab_created:
             self._ensure_tab(page_index)
             if constants.loaded_level_json:
                 self._refresh_tab(page_index)
         self.stacked_widget.setCurrentIndex(page_index)
-        # keep the nav strip in step with programmatic navigation
-        if getattr(self, 'nav_strip', None) is not None and self.nav_strip.active_id() != button_id:
+
+    def _refresh_backups(self):
+        from palworld_aio.application.backup_catalog import discover_backups
+        page = self.__dict__.get('backups_page')
+        if page is None:
+            return
+        try:
+            page.set_backups(discover_backups())
+        except Exception as error:
+            page.set_backups(())
+            page.set_result(False, t(
+                'ui.backups.restore_failed',
+                default='Restore failed. {detail}', detail=str(error)))
+
+    def _reveal_backup_folder(self, backup_path):
+        path = os.path.abspath(str(backup_path))
+        if not os.path.isdir(path):
+            self._show_error(
+                t('error.title'),
+                t('ui.overview.file_not_found', default='File not found'))
+            return
+        try:
+            if sys.platform == 'win32':
+                os.startfile(path)
+            elif sys.platform == 'darwin':
+                import subprocess
+                subprocess.Popen(['open', path])
+            else:
+                import subprocess
+                subprocess.Popen(['xdg-open', path])
+        except Exception as error:
+            self._show_error(
+                t('error.title'), f'Could not open folder:\n{path}\n{error}')
+
+    def _confirm_backup_restore(self, backup):
+        from palworld_aio.ui.chrome.components import BaseDialog
+        dialog = BaseDialog(
+            t('ui.backups.confirm_title', default='Restore this backup?'),
+            self, min_size=(480, 250), danger=True, kicker='Backups')
+        message = QLabel(t(
+            'ui.backups.confirm_message',
+            default='Current save will be backed up before restoration.'), dialog)
+        message.setWordWrap(True)
+        dialog.content_layout.addWidget(message)
+        timestamp = QLabel(t(
+            'ui.backups.confirm_date', default='Backup date: {timestamp}',
+            timestamp=backup.created_at.strftime('%b %d, %Y %I:%M %p')),
+            dialog)
+        timestamp.setProperty('class', 'secondary')
+        dialog.content_layout.addWidget(timestamp)
+        dialog.add_confirm_button(
+            t('ui.backups.restore', default='Restore'), danger=True)
+        return dialog.exec() == QDialog.DialogCode.Accepted
+
+    def _restore_backup_record(self, backup):
+        from pathlib import Path
+        if not constants.current_save_path or not constants.loaded_level_json:
+            self._show_warning(
+                t('ui.backups.confirm_title', default='Restore this backup?'),
+                t('ui.backups.no_loaded_save',
+                  default='Load the save you want to restore before continuing.'))
+            return
+        if constants.xgp_loaded:
+            self._show_warning(
+                t('error.title'),
+                t('ui.backups.gamepass_unsupported',
+                  default='Full-save restore is not available for a loaded Game Pass container.'))
+            return
+        if constants.dirty:
+            self._show_warning(
+                t('inventory.unsaved.title', default='Unsaved Changes'),
+                t('ui.backups.unsaved_changes',
+                  default='Save or discard pending changes before restoring a backup.'))
+            return
+        if not self._confirm_backup_restore(backup):
+            return
+
+        from palworld_aio.application.backup_catalog import (
+            default_backups_root, restore_backup,
+        )
+        page = self.backups_page
+        timestamp = backup.created_at.strftime('%b %d, %Y %I:%M %p')
+        page.set_loading(t(
+            'ui.backups.restoring',
+            default='Backing up the current save, then restoring {timestamp}…',
+            timestamp=timestamp))
+        current_save = Path(constants.current_save_path)
+        safety_root = default_backups_root() / 'Restore Safety'
+
+        def task():
+            try:
+                return restore_backup(backup, current_save, safety_root)
+            except Exception as error:
+                return error
+
+        def on_finished(result):
+            from palworld_aio.ui.operation_journal import (
+                ActivityKind, ActivityStatus,
+            )
+            if isinstance(result, Exception):
+                detail = str(result)
+                page.set_result(False, t(
+                    'ui.backups.restore_failed',
+                    default='Restore failed. {detail}', detail=detail))
+                self._record_activity(
+                    ActivityKind.FAILURE,
+                    t('ui.activity.backup_restore_failed',
+                      default='Backup restore failed'),
+                    status=ActivityStatus.FAILED, detail=detail)
+                return
+            try:
+                save_manager.reload_current_save()
+                self.refresh_all()
+                self._refresh_global_search_index()
+                constants.dirty = False
+                self._set_dirty(False)
+                self._populate_loaded_overview()
+            except Exception as error:
+                detail = t(
+                    'ui.backups.reload_failed',
+                    default='The files were restored, but the save could not be reloaded: {detail}',
+                    detail=str(error))
+                page.set_result(False, detail)
+                self._record_activity(
+                    ActivityKind.FAILURE,
+                    t('ui.activity.backup_reload_failed',
+                      default='Restored save reload failed'),
+                    status=ActivityStatus.FAILED, detail=detail)
+                return
+            self._refresh_backups()
+            message = t(
+                'ui.backups.restore_result',
+                default='Backup restored. The previous save is preserved at {safety_path}.',
+                safety_path=str(result.safety_backup_path))
+            page.set_result(True, message)
+            self._record_activity(
+                ActivityKind.BACKUP,
+                t('ui.activity.backup_restored', default='Backup restored'),
+                detail=message)
+
+        run_with_loading(on_finished, task, parent=self)
+
+    def _on_nav_changed(self, button_id):
+        shell = self.__dict__.get('workspace_shell')
+        if shell is not None and shell.router.current_route_id != button_id:
+            shell.navigate(button_id)
+            return
+        self._show_legacy_route(button_id)
+        # Characterization compatibility for isolated legacy-nav fakes.
+        if self.__dict__.get('nav_strip') is not None and self.nav_strip.active_id() != button_id:
             self.nav_strip.set_active(button_id)
     def _load_user_settings(self):
         from boot_paths import CONFIG_DIR, USER_CONFIG_DIR
+        from palworld_aio.ui.user_preferences import normalize_user_settings
         user_cfg_path = str(USER_CONFIG_DIR / 'user.cfg')
         if not os.path.exists(user_cfg_path):
             user_cfg_path = os.path.join(str(CONFIG_DIR), 'user.cfg')
-        default_settings = {'language': 'en_US', 'show_icons': True, 'boot_preference': 'menu', 'console_detached': False, 'console_window_geometry': None, 'loading_screen_mode': 'overlay', 'tray_expanded': False}
         if os.path.exists(user_cfg_path):
             try:
-                self.user_settings = json_tools.load(user_cfg_path)
-                for key, value in default_settings.items():
-                    if key not in self.user_settings:
-                        self.user_settings[key] = value
+                self.user_settings = normalize_user_settings(
+                    json_tools.load(user_cfg_path))
             except Exception as e:
                 print(f'Failed to load user settings: {e}')
-                self.user_settings = default_settings.copy()
+                self.user_settings = normalize_user_settings(None)
         else:
-            self.user_settings = default_settings.copy()
+            self.user_settings = normalize_user_settings(None)
             os.makedirs(os.path.dirname(user_cfg_path), exist_ok=True)
             self._save_user_settings()
         constants.loading_screen_mode = self.user_settings.get('loading_screen_mode', 'overlay')
+        constants.reduced_motion = self.user_settings.get('reduced_motion', False)
+        constants.automatic_backup_on_load = self.user_settings.get(
+            'automatic_backup_on_load', True)
+        constants.warn_unsaved_exit = self.user_settings.get(
+            'warn_unsaved_exit', True)
         constants.pal_creation_name_mode = self.user_settings.get('pal_creation_name_mode', 'new')
         constants.bulk_sync_apply_nickname = self.user_settings.get('bulk_sync_apply_nickname', False)
+    def _apply_preferences(self, patch):
+        from palworld_aio.ui.user_preferences import UserPreferences
+        merged = dict(self.user_settings)
+        if isinstance(patch, dict):
+            merged.update(patch)
+        preferences = UserPreferences.from_mapping(merged)
+        values = preferences.to_mapping()
+        old_language = self.user_settings.get('language', 'en_US')
+        language = preferences.language
+        values.pop('language')
+        self.user_settings.update(values)
+        constants.loading_screen_mode = preferences.loading_screen_mode
+        constants.reduced_motion = preferences.reduced_motion
+        constants.automatic_backup_on_load = preferences.automatic_backup_on_load
+        constants.warn_unsaved_exit = preferences.warn_unsaved_exit
+        constants.pal_creation_name_mode = preferences.pal_creation_name_mode
+        constants.bulk_sync_apply_nickname = preferences.bulk_sync_apply_nickname
+        stream = self.__dict__.get('status_stream')
+        if stream is not None and preferences.console_detached != stream.detached:
+            stream.detach() if preferences.console_detached else stream.attach()
+        if old_language != language:
+            self._change_language(language)
+        else:
+            self.user_settings['language'] = language
+            self._save_user_settings()
     def _save_user_settings(self):
         from boot_paths import USER_CONFIG_DIR
+        shell = self.__dict__.get('workspace_shell')
+        workspace_settings = self.__dict__.get('workspace_settings')
+        if shell is not None and workspace_settings is not None:
+            sidebar = shell.sidebar.export_settings()
+            router_state = shell.router.export_persistent_state()
+            workspace_settings.sidebar_collapsed = bool(sidebar['collapsed'])
+            workspace_settings.sidebar_width = int(sidebar['expanded_width'])
+            workspace_settings.splitter_sizes = shell.splitter_sizes()
+            workspace_settings.current_route = str(router_state['current_route'])
+            workspace_settings.last_routes = dict(router_state['last_routes'])
+            workspace_settings.page_view_state = dict(router_state['page_view_state'])
+            if self.workspace_context.snapshot.save is not None:
+                workspace_settings.capture_context(self.workspace_context)
+            self.user_settings['workspace_ui'] = workspace_settings.to_mapping()
         user_cfg_path = str(USER_CONFIG_DIR / 'user.cfg')
         self.user_settings['pal_creation_name_mode'] = constants.pal_creation_name_mode
         self.user_settings['bulk_sync_apply_nickname'] = constants.bulk_sync_apply_nickname
@@ -984,8 +1524,31 @@ class MainWindow(QMainWindow):
         self.user_settings['console_detached'] = self.status_stream.detached if self.status_stream else False
         self._save_user_settings()
     def _on_detach_state_changed(self, detached):
-        self.app_bar.set_console_visible(detached)
+        self._set_console_action_state(detached)
+        page = self.__dict__.get('diagnostics_page')
+        if page is not None:
+            page.set_console_detached(bool(detached))
+        if self.user_settings.get('console_detached') != bool(detached):
+            self.user_settings['console_detached'] = bool(detached)
+            self._save_user_settings()
+
+    def _set_console_action_state(self, detached):
+        button = self.__dict__.get('_shell_console_button')
+        if button is not None:
+            button.setProperty('active', bool(detached))
+            button.style().unpolish(button)
+            button.style().polish(button)
+            return
+        app_bar = self.__dict__.get('app_bar')
+        if app_bar is not None:
+            app_bar.set_console_visible(detached)
     def _check_update(self):
+        current = self.__dict__.get('update_checker')
+        if current is not None and current.isRunning():
+            return
+        about = self.__dict__.get('about_page')
+        if about is not None:
+            about.set_update_state('checking')
         self.update_checker = UpdateChecker()
         self.update_checker.update_checked.connect(self._on_update_checked)
         self.update_checker.start()
@@ -993,34 +1556,144 @@ class MainWindow(QMainWindow):
         try:
             if not ok and latest:
                 tools_version = get_display_version()
-                self.app_bar.set_update_pulse(True)
+                self._set_update_action_state(True)
                 branch_text = f' ({branch})' if branch else ''
                 self.status_bar.showMessage(f"{(t('update.current') if t else 'Current')}: {tools_version}{branch_text} | {(t('update.latest') if t else 'Latest')}: {latest} - Click version chip to update", 0)
             else:
-                self.app_bar.set_update_pulse(False)
+                self._set_update_action_state(False)
+            about = self.__dict__.get('about_page')
+            diagnostics = self.__dict__.get('diagnostics_page')
+            if not ok and latest:
+                if about is not None:
+                    about.set_update_state(
+                        'available', current=get_display_version(),
+                        latest=str(latest))
+                if diagnostics is not None:
+                    diagnostics.set_update_warning(t(
+                        'ui.about.update_available',
+                        default='Update available: {current} → {latest}',
+                        current=get_display_version(), latest=str(latest)))
+            elif ok:
+                if about is not None:
+                    about.set_update_state(
+                        'current', current=get_display_version())
+            else:
+                detail = t(
+                    'status.update_check_failed',
+                    default='Update check failed — open Warnings for details')
+                if about is not None:
+                    about.set_update_state('error', detail=detail)
+                if diagnostics is not None:
+                    diagnostics.set_update_warning(detail)
             # uiux-audit-remediation 2.2: a failed update check raises the
             # warning affordance (tri-state) instead of pinning raw error
             # text in the strip; any successful check — up-to-date (ok) or
             # update-available (latest set) — resolves it.
             if ok or latest is not None:
-                self.app_bar.resolve_warning()
+                self._warning_detail = ''
+                app_bar = self.__dict__.get('app_bar')
+                if app_bar is not None:
+                    app_bar.resolve_warning()
             else:
-                self.app_bar.raise_warning(
-                    t('status.update_check_failed') if t else 'Update check failed — click the warning for details')
+                self._warning_detail = (
+                    t('status.update_check_failed') if t
+                    else 'Update check failed — open Warnings for details')
+                app_bar = self.__dict__.get('app_bar')
+                if app_bar is not None:
+                    app_bar.raise_warning(self._warning_detail)
         except Exception as e:
             print(f'Update check callback error: {e}')
+
+    def _set_update_action_state(self, available):
+        button = self.__dict__.get('_shell_save_button')
+        if button is not None:
+            button.setProperty('updateAvailable', bool(available))
+            button.style().unpolish(button)
+            button.style().polish(button)
+            return
+        app_bar = self.__dict__.get('app_bar')
+        if app_bar is not None:
+            app_bar.set_update_pulse(available)
     def _lock_ui(self):
         pass
     def _unlock_ui(self):
         pass
     def _on_load_finished(self, success):
         self.shell_state.finish_load(success)
-        try:
-            from palworld_aio.shell_state import ShellState
-            state = ShellState.LOADED if success else ShellState.ERROR
-            self.app_bar.save_chip.set_shell_state(state)
-        except (RuntimeError, AttributeError, ImportError):
-            pass
+        workspace_context = self.__dict__.get('workspace_context')
+        if workspace_context is not None:
+            from datetime import datetime
+            from pathlib import Path
+            from palworld_aio.ui.workspace_context import (
+                BackupState, SaveIdentity, SavePlatform,
+            )
+            save_path = str(constants.current_save_path or '')
+            identity = None
+            if success:
+                path = Path(save_path) if save_path else None
+                is_level_file = bool(path and path.name.lower() == 'level.sav')
+                level_path = path if is_level_file else (path / 'Level.sav' if path else None)
+                modified_at = None
+                modified_timestamp = constants.loaded_level_mtime
+                if modified_timestamp is None and level_path is not None:
+                    try:
+                        modified_timestamp = level_path.stat().st_mtime
+                    except OSError:
+                        modified_timestamp = None
+                if modified_timestamp is not None:
+                    modified_at = datetime.fromtimestamp(modified_timestamp).strftime(
+                        '%b %d, %Y %I:%M %p')
+                platform = (SavePlatform.XBOX if constants.xgp_loaded
+                            else SavePlatform.STEAM)
+                display_name = (
+                    str(constants.xgp_save_id or 'Game Pass World')
+                    if platform is SavePlatform.XBOX else
+                    ((path.parent.name if is_level_file else path.name)
+                     if path else 'Loaded Save')
+                )
+                identity = SaveIdentity(
+                    save_id=(str(path.parent if is_level_file else path)
+                             if path else 'loaded-save'),
+                    display_name=display_name,
+                    path=save_path,
+                    platform=platform,
+                    modified_at=modified_at,
+                )
+            backup = None
+            if success:
+                backup = BackupState(
+                    count=0 if constants.xgp_loaded else 1,
+                    latest_label=(None if constants.xgp_loaded else t(
+                        'ui.overview.backup.created', default='Automatic backup created')),
+                    recommended=bool(constants.xgp_loaded),
+                )
+            workspace_context.finish_load(identity, success=success, backup=backup)
+            if success:
+                from palworld_aio.ui.operation_journal import ActivityKind
+                self.workspace_settings.remember_save(identity)
+                self._record_activity(
+                    ActivityKind.LOAD,
+                    t('ui.activity.save_loaded', default='Save loaded'),
+                    detail=identity.path,
+                )
+                if backup is not None and backup.count:
+                    self._record_activity(
+                        ActivityKind.BACKUP,
+                        t('ui.activity.backup_created', default='Backup created'),
+                        detail=(backup.latest_label or ''),
+                    )
+                self._populate_loaded_overview()
+                self.workspace_shell.router.reset_for_save(route_id='overview')
+                workspace_settings = self.__dict__.get('workspace_settings')
+                if workspace_settings is not None:
+                    workspace_settings.restore_context(workspace_context)
+        else:
+            try:
+                from palworld_aio.shell_state import ShellState
+                state = ShellState.LOADED if success else ShellState.ERROR
+                self.app_bar.save_chip.set_shell_state(state)
+            except (RuntimeError, AttributeError, ImportError):
+                pass
         if success:
             if 'inventory_tab' in self.__dict__:
                 self.inventory_tab.clear_player()
@@ -1030,16 +1703,25 @@ class MainWindow(QMainWindow):
             if 'base_inventory_tab' in self.__dict__:
                 self.base_inventory_tab._clear_guild_selection()
             self.refresh_all()
+            self._refresh_global_search_index()
             constants.dirty = False
             self._set_dirty(False)
-            self.app_bar.context.clear_selection()
-            # uiux-audit-remediation 2.5: the context indicator only exists
-            # while a save is loaded (placeholder rows cover the
-            # loaded-but-unselected state).
-            self.app_bar.context.setVisible(True)
+            app_bar = self.__dict__.get('app_bar')
+            if app_bar is not None:
+                app_bar.context.clear_selection()
+                app_bar.context.setVisible(True)
             self._refresh_stats_all_before()
             self.status_bar.showMessage(t('status.loaded') if t else 'Save loaded successfully', 5000)
         else:
+            from palworld_aio.ui.operation_journal import (
+                ActivityKind, ActivityStatus,
+            )
+            self._record_activity(
+                ActivityKind.FAILURE,
+                t('ui.activity.load_failed', default='Save load failed'),
+                status=ActivityStatus.FAILED,
+                detail=t('save.load_failed', default='The selected save could not be loaded.'),
+            )
             self.status_bar.showMessage(t('status.load_failed') if t else 'Failed to load save', 5000)
             msg_box = self._create_message_box(QMessageBox.Critical)
             msg_box.setWindowTitle(t('error.title'))
@@ -1053,11 +1735,23 @@ class MainWindow(QMainWindow):
         self.shell_state.finish_save(True)
         constants.dirty = False
         self._set_dirty(False)
-        try:
-            from palworld_aio.shell_state import ShellState
-            self.app_bar.save_chip.set_shell_state(ShellState.LOADED)
-        except (RuntimeError, AttributeError, ImportError):
-            pass
+        workspace_context = self.__dict__.get('workspace_context')
+        if workspace_context is not None:
+            workspace_context.finish_save(True)
+            from palworld_aio.ui.operation_journal import ActivityKind
+            self._record_activity(
+                ActivityKind.SAVE,
+                t('ui.activity.save_completed', default='Changes saved'),
+                detail=t(
+                    'ui.activity.save_duration',
+                    default='Completed in {duration:.2f}s', duration=duration),
+            )
+        else:
+            try:
+                from palworld_aio.shell_state import ShellState
+                self.app_bar.save_chip.set_shell_state(ShellState.LOADED)
+            except (RuntimeError, AttributeError, ImportError):
+                pass
         self.status_bar.showMessage(f"{(t('status.saved') if t else 'Save completed')}({duration:.2f}s)", 5000)
         if constants.xgp_loaded:
             return
@@ -1120,80 +1814,108 @@ class MainWindow(QMainWindow):
     def _refresh_stats(self):
         stats = save_manager.get_current_stats()
         self._update_stats_all(stats)
+
+    def _handle_world_state_action(self, action, retry):
+        if action == 'load_save':
+            self._load_save()
+        elif action == 'retry':
+            retry()
+
     def _refresh_players(self):
-        self.players_panel.clear()
-        players = save_manager.get_players()
-        for uid, name, gid, lastseen, level, elapsed in players:
-            pals = constants.PLAYER_PAL_COUNTS.get(uid.replace('-', '').lower(), 0)
-            gname = save_manager.get_guild_name_by_id(gid)
-            glevel = save_manager.get_guild_level_by_id(gid)
-            is_leader = save_manager.is_player_guild_leader(gid, uid)
-            display_name = f'[L]{name}' if is_leader else name
-            sort_keys = {1: elapsed if elapsed is not None else float('inf'), 2: int(level) if str(level).isdigit() else 0, 3: int(pals) if str(pals).isdigit() else 0, 7: int(glevel) if str(glevel).isdigit() else 0}
-            # modernize-tab-ui 5.2: UID column shows the short form with the
-            # full GUID in a tooltip; data/sort keys unchanged.
-            tooltips = {4: str(uid)}
-            self.players_panel.add_item([display_name, lastseen, level, pals, _short_guid(uid), gname, gid, glevel], sort_keys=sort_keys, tooltips=tooltips)
-        # uiux-audit-remediation 5.1 (additive): the refreshed table has no
-        # selection, so the inspector returns to its empty presentation.
-        try:
-            inspector = self._players_inspector
-        except (AttributeError, RuntimeError):
-            inspector = None
-        if inspector is not None:
-            inspector.show_empty(
-                t('players.inspector_empty') if t else 'Select a player to view their details')
-        self._cap_search_table_height(
-            self.players_panel, '_players_panel_chrome', self._players_table_cap)
-    def _refresh_guilds(self):
-        self.guilds_panel.clear()
-        self.guild_members_panel.clear()
-        guilds = get_guilds()
-        for g in guilds:
-            sort_keys = {2: int(g['level']) if str(g['level']).isdigit() else 0, 3: int(g['member_count'])}
-            # modernize-tab-ui 5.2: Guild ID column short form + full tooltip.
-            tooltips = {1: str(g['id'])}
-            self.guilds_panel.add_item([g['name'], _short_guid(g['id']), g['level'], g['member_count']], sort_keys=sort_keys, tooltips=tooltips)
-        # modernize-tab-ui 5.3: no-save keeps the plain load-save hint; with a
-        # save loaded the members pane shows the shared EmptyState instead.
+        from palworld_aio.ui.pages.players_page import PlayerRow
         if not constants.loaded_level_json:
-            self.guild_members_panel.set_empty_state_widget(None)
-        else:
-            self.guild_members_panel.set_empty_state_widget(self._members_empty_state)
-            # uiux-audit-remediation 6.2: row-level wording (matches the
-            # construction default in _setup_guilds_tab).
-            self._members_empty_state.setText(t('deletion.guild_members.row_hint') if t else 'Click a guild row to view its members')
-            self._members_empty_state.setHint(t('deletion.guild_members.row_hint_sub') if t else 'Members of the clicked guild appear in this list.')
-        # uiux-audit-remediation 6.1 (additive): the refreshed table has no
-        # selection, so the inspector returns to its empty presentation.
+            self.players_page.set_loaded(False)
+            return
+        self.players_page.set_loading()
         try:
-            inspector = self._guilds_inspector
-        except (AttributeError, RuntimeError):
-            inspector = None
-        if inspector is not None:
-            inspector.show_empty(
-                t('guilds.inspector_empty') if t else 'Select a guild to view its details')
-        self._cap_search_table_height(
-            self.guilds_panel, '_guilds_panel_chrome', self._guilds_table_cap)
+            players = save_manager.get_players()
+            records = []
+            for uid, name, gid, lastseen, level, elapsed in players:
+                pals = constants.PLAYER_PAL_COUNTS.get(uid.replace('-', '').lower(), 0)
+                gname = save_manager.get_guild_name_by_id(gid)
+                glevel = save_manager.get_guild_level_by_id(gid)
+                is_leader = save_manager.is_player_guild_leader(gid, uid)
+                records.append(PlayerRow(
+                    uid=str(uid),
+                    name=str(name),
+                    last_seen=str(lastseen),
+                    level=int(level) if str(level).isdigit() else 0,
+                    pals=int(pals) if str(pals).isdigit() else 0,
+                    guild_name=str(gname or ''),
+                    guild_id=str(gid or ''),
+                    guild_level=int(glevel) if str(glevel).isdigit() else 0,
+                    is_leader=bool(is_leader),
+                    last_seen_sort=(float(elapsed) if elapsed is not None else None),
+                ))
+            self.players_page.set_players(tuple(records))
+        except Exception:
+            logging.getLogger(__name__).exception('Could not refresh Players workspace')
+            self.players_page.set_error(t(
+                'ui.players.error_message',
+                default='Player records could not be read from this save.'))
+    def _refresh_guilds(self):
+        from collections import Counter
+        from palworld_aio.ui.pages.guilds_page import GuildRow
+        if not constants.loaded_level_json:
+            self.guilds_page.set_loaded(False)
+            return
+        self.guilds_page.set_loading()
+        try:
+            guilds = get_guilds()
+            base_counts = Counter(str(base['guild_id']) for base in get_bases())
+            records = []
+            for g in guilds:
+                guild_id = str(g['id'])
+                records.append(GuildRow(
+                    guild_id=guild_id,
+                    name=str(g['name'] or ''),
+                    level=(int(g['level']) if str(g['level']).isdigit() else 0),
+                    member_count=int(g['member_count']),
+                    base_count=base_counts[guild_id],
+                ))
+            self.guilds_page.set_guilds(tuple(records))
+        except Exception:
+            logging.getLogger(__name__).exception('Could not refresh Guilds workspace')
+            self.guilds_page.set_error(t(
+                'ui.guilds.error_message',
+                default='Guild records could not be read from this save.'))
     def _refresh_bases(self):
-        self.bases_panel.clear()
-        bases = get_bases()
-        for b in bases:
-            glevel = save_manager.get_guild_level_by_id(b['guild_id'])
-            sort_keys = {3: int(glevel) if str(glevel).isdigit() else 0}
-            # modernize-tab-ui 5.2: Base ID / Guild ID short form + full tooltip.
-            tooltips = {0: str(b['id']), 1: str(b['guild_id'])}
-            self.bases_panel.add_item([_short_guid(b['id']), _short_guid(b['guild_id']), b['guild_name'], glevel], sort_keys=sort_keys, tooltips=tooltips)
-        # uiux-audit-remediation 4.2 (additive): the refreshed table has no
-        # selection, so the inspector returns to its empty presentation.
+        from palworld_aio.managers.data_manager import get_base_coords
+        from palworld_aio.ui.pages.bases_page import BaseRow
+        if not constants.loaded_level_json:
+            self.bases_page.set_loaded(False)
+            return
+        self.bases_page.set_loading()
         try:
-            inspector = self._bases_inspector
-        except (AttributeError, RuntimeError):
-            inspector = None
-        if inspector is not None:
-            inspector.show_empty(
-                t('bases.inspector_empty') if t else 'Select a base to view its details')
-        self._cap_bases_table_height()
+            bases = get_bases()
+            guild_counts = {}
+            records = []
+            for b in bases:
+                glevel = save_manager.get_guild_level_by_id(b['guild_id'])
+                guild_id = str(b['guild_id'])
+                guild_counts[guild_id] = guild_counts.get(guild_id, 0) + 1
+                base_name = t(
+                    'ui.bases.generated_name', default='Base {number}',
+                    number=guild_counts[guild_id])
+                x_coord, y_coord = get_base_coords(str(b['id']))
+                location = ''
+                if x_coord is not None and y_coord is not None:
+                    location = f'X {float(x_coord):.0f}, Y {float(y_coord):.0f}'
+                records.append(BaseRow(
+                    base_id=str(b['id']),
+                    name=base_name,
+                    guild_id=guild_id,
+                    guild_name=str(b['guild_name'] or ''),
+                    guild_level=(int(glevel) if str(glevel).isdigit() else 0),
+                    location=location,
+                    status=t('ui.bases.status.in_save', default='In save'),
+                ))
+            self.bases_page.set_bases(tuple(records))
+        except Exception:
+            logging.getLogger(__name__).exception('Could not refresh Bases workspace')
+            self.bases_page.set_error(t(
+                'ui.bases.error_message',
+                default='Base records could not be read from this save.'))
 
     def _cap_search_table_height(self, panel, chrome_attr: str, content_cap: int,
                                  max_rows: int = 10, min_height: int = 180):
@@ -1238,6 +1960,10 @@ class MainWindow(QMainWindow):
     def _apply_excl_empty_states(self):
         """modernize-tab-ui 7.1: no-save keeps the plain load-save hint; with a
         save loaded the exclusions panes show the shared EmptyState."""
+        page = self.__dict__.get('exclusions_page')
+        if page is not None:
+            page.set_loaded(bool(constants.loaded_level_json))
+            return
         loaded = bool(constants.loaded_level_json)
         for key, empty in getattr(self, '_excl_empty_states', {}).items():
             panel = getattr(self, f'excl_{key}_panel', None)
@@ -1250,6 +1976,25 @@ class MainWindow(QMainWindow):
             else:
                 panel.set_empty_state_widget(None)
     def _refresh_exclusions(self):
+        page = self.__dict__.get('exclusions_page')
+        if page is not None:
+            if not constants.loaded_level_json:
+                page.set_loaded(False)
+                return
+            page.set_loading()
+            try:
+                page.set_exclusions({
+                    key: constants.exclusions.get(key, [])
+                    for key in ('players', 'guilds', 'bases')
+                })
+                self._apply_excl_empty_states()
+            except Exception:
+                logging.getLogger(__name__).exception(
+                    'Could not refresh Exclusions workspace')
+                page.set_error(t(
+                    'ui.exclusions.error_message',
+                    default='Exclusions could not be read from this save.'))
+            return
         self.excl_players_panel.clear()
         for uid in constants.exclusions.get('players', []):
             self.excl_players_panel.add_item([uid])
@@ -1264,54 +2009,23 @@ class MainWindow(QMainWindow):
         if 'base_inventory_tab' in self.__dict__:
             self.base_inventory_tab.refresh()
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            if self._hit_window_drag_zone(event):
-                if sys.platform == 'linux':
-                    self.windowHandle().startSystemMove()
-                else:
-                    self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-                event.accept()
-            else:
-                super().mousePressEvent(event)
-        else:
-            super().mousePressEvent(event)
+        # The new shell's dedicated WindowDragRegion owns frameless movement.
+        super().mousePressEvent(event)
     def _hit_window_drag_zone(self, event) -> bool:
-        """Frameless drag zone: the app bar (shell v3). Empty app-bar space
-        drags the window; interactive children never do."""
-        pos = event.position().toPoint()
-        bar = getattr(self, 'app_bar', None)
-        if bar is not None:
-            local = bar.mapFrom(self, pos)
-            if 0 <= local.y() < bar.height() and 0 <= local.x() < bar.width():
-                return bar.hit_drag_zone(local)
-            return False
-        # legacy fallback: top strip of the canvas
-        if pos.y() > 52:
-            return False
-        child = self.childAt(pos)
-        while child is not None:
-            if isinstance(child, (QPushButton, QComboBox, QLineEdit, QTextEdit)):
-                return False
-            if child is self.stacked_widget:
-                break
-            child = child.parentWidget()
-        return True
+        return False
     def mouseMoveEvent(self, event):
-        if sys.platform != 'linux' and event.buttons() == Qt.LeftButton and hasattr(self, 'drag_position'):
-            self.move(event.globalPosition().toPoint() - self.drag_position)
-            event.accept()
-        else:
-            super().mouseMoveEvent(event)
+        super().mouseMoveEvent(event)
     def mouseReleaseEvent(self, event):
-        if hasattr(self, 'drag_position'):
-            delattr(self, 'drag_position')
         super().mouseReleaseEvent(event)
     def _show_warnings(self):
         # uiux-audit-remediation 2.2 (design D4): click-to-reveal includes
         # the condition that raised the affordance (e.g. a failed update
         # check) ahead of the standing save-safety notices.
         lines = []
-        warn_detail = self.app_bar.warn_detail()
+        warn_detail = self.__dict__.get('_warning_detail', '')
+        app_bar = self.__dict__.get('app_bar')
+        if not warn_detail and app_bar is not None:
+            warn_detail = app_bar.warn_detail()
         if warn_detail:
             lines.append(warn_detail)
         warnings = [(t('notice.backup') if t else 'WARNING: ALWAYS BACKUP YOUR SAVES BEFORE USING THESE TOOLS!', {}), (t('notice.patch', game_version=get_versions()[1]) if t else 'MAKE SURE TO UPDATE YOUR SAVES AFTER EVERY GAME PATCH!', {}), (t('notice.errors') if t else 'IF YOU DO NOT UPDATE YOUR SAVES AFTER A PATCH,YOU MAY ENCOUNTER ERRORS!', {})]
@@ -1324,18 +2038,7 @@ class MainWindow(QMainWindow):
         msg_box.setText(combined)
         msg_box.exec()
     def _show_about(self):
-        tools_version, game_version = get_versions()
-        h2_color = '#4a90e2'
-        text_color = '#e0e0e0'
-        sub_color = '#888'
-        about_text = f'''<h2 style="color: {h2_color};">{(t('about.title') if t else 'PalTrainer')} v{tools_version}</h2>\n    <p style="color: {text_color};">{(t('about.description') if t else 'A comprehensive toolkit for managing Palworld save files.')}</p>\n    <p style="color: {text_color};"><b>{(t('about.features.label') if t else 'Features')}:</b></p>\n    <ul>\n    <li style="color: {text_color};">{(t('about.features.1') if t else 'Transfer saves between servers and co-op worlds')}</li>\n    <li style="color: {text_color};">{(t('about.features.2') if t else 'Fix host saves and manage player/guild data')}</li>\n    <li style="color: {text_color};">{(t('about.features.3') if t else 'Edit bases and manage save files')}</li>\n    <li style="color: {text_color};">{(t('about.features.4') if t else 'Convert between Steam and GamePass formats')}</li>\n    <li style="color: {text_color};">{(t('about.features.5') if t else 'Visualize and manage world maps')}</li>\n    </ul>\n    <p style="color: {text_color};"><b>{(t('about.game_version') if t else 'Game Version')}:</b> {game_version}</p>\n    <p style="color: {text_color};"><b>{(t('about.developer') if t else 'Developer')}:</b> PalTrainer Team</p>\n    <p style="color: {text_color};"><b>GitHub:</b> <a href="{GITHUB_LATEST_ZIP}" style="color: {h2_color};">{(t('about.github') if t else 'View on GitHub')}</a></p>\n    <p style="color: {sub_color};">© 2026 PalTrainer</p>'''
-        msg_box = self._create_message_box(QMessageBox.Information)
-        msg_box.setWindowTitle(t('About PalTrainer') if t else 'About PalTrainer')
-        msg_box.setTextFormat(Qt.RichText)
-        msg_box.setText(about_text)
-        msg_box.setStandardButtons(QMessageBox.Ok)
-        center_on_parent(msg_box)
-        msg_box.exec()
+        self._activate_nav('about')
     def _show_tab_guide(self):
         from .dialogs.tab_guide_dialog import TabGuideDialog
         dialog = TabGuideDialog(self)
@@ -1347,7 +2050,24 @@ class MainWindow(QMainWindow):
         finally:
             if dialog in self._active_dialogs:
                 self._active_dialogs.remove(dialog)
-    def _open_bulk_player_item_dialog(self):
+    @staticmethod
+    def _preselect_dialog_players(dialog, player_uids):
+        if not player_uids:
+            return
+        desired = {str(uid).replace('-', '').upper() for uid in player_uids}
+        player_list = getattr(dialog, 'player_list', None)
+        if player_list is None:
+            return
+        for index in range(player_list.count()):
+            item = player_list.item(index)
+            widget = player_list.itemWidget(item)
+            if widget is None:
+                continue
+            uid = str(widget.property('uid') or '').replace('-', '').upper()
+            if hasattr(widget, 'setChecked'):
+                widget.setChecked(uid in desired)
+
+    def _open_bulk_player_item_dialog(self, player_uids=None):
         dialog = PlayerItemActionDialog(self)
         dialog.item_action_selected.connect(self._on_player_item_action)
         dialog.add_all_key_items_requested.connect(self._on_bulk_add_all_key_items)
@@ -1355,13 +2075,16 @@ class MainWindow(QMainWindow):
         dialog.edit_abilities_requested.connect(self._on_bulk_edit_abilities)
         dialog.unlock_all_map_requested.connect(self._on_bulk_unlock_all_map)
         dialog.modify_slots_requested.connect(self._on_bulk_modify_slots)
+        self._preselect_dialog_players(dialog, player_uids)
         dialog.exec()
-    def _open_bulk_player_pal_dialog(self):
+    def _open_bulk_player_pal_dialog(self, _player_uids=None):
         dialog = PlayerPalActionDialog(self)
         dialog.pal_action_selected.connect(self._on_player_pal_action)
         dialog.exec()
-    def _open_bulk_technology_dialog(self):
+    def _open_bulk_technology_dialog(self, player_uids=None):
         dialog = PlayerTechnologyActionDialog(self)
+        QTimer.singleShot(
+            0, lambda: self._preselect_dialog_players(dialog, player_uids))
         if not hasattr(self, '_active_dialogs'):
             self._active_dialogs = []
         self._active_dialogs.append(dialog)
@@ -1630,9 +2353,42 @@ class MainWindow(QMainWindow):
         run_with_loading(on_finished, task)
     def _on_player_selected(self, data):
         if data:
-            self.app_bar.context.set_player(data[0])
-            self.app_bar.context.set_guild(data[5])
+            workspace_context = self.__dict__.get('workspace_context')
+            if workspace_context is not None:
+                from palworld_aio.ui.workspace_context import ContextSelection
+                player_id = str(data[4]) if len(data) > 4 else str(data[0])
+                workspace_context.set_player(ContextSelection(player_id, str(data[0])))
+                if len(data) > 6 and data[6]:
+                    workspace_context.set_guild(
+                        ContextSelection(str(data[6]), str(data[5])))
+            else:
+                self.app_bar.context.set_player(data[0])
+                self.app_bar.context.set_guild(data[5])
             self._populate_players_inspector(data)
+
+    def _on_player_record_selected(self, player):
+        workspace_context = self.__dict__.get('workspace_context')
+        if workspace_context is None:
+            return
+        from palworld_aio.ui.workspace_context import ContextSelection
+        workspace_context.set_player(ContextSelection(player.uid, player.name))
+        if player.guild_id:
+            workspace_context.set_guild(ContextSelection(
+                player.guild_id, player.guild_name))
+
+    def _open_player_pal_editor(self, uid, name):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        self._activate_contextual_nav(
+            'pal_editor', player=ContextSelection(str(uid), str(name)))
+        if 'pal_editor_tab' in self.__dict__:
+            self.pal_editor_tab.select_player(uid, name, name)
+
+    def _open_player_guild(self, guild_id):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        guild_name = save_manager.get_guild_name_by_id(guild_id)
+        guild = ContextSelection(str(guild_id), str(guild_name or guild_id))
+        self._activate_contextual_nav('guilds', guild=guild)
+        self.guilds_page.browser.search_input.setText(str(guild_id))
 
     def _populate_players_inspector(self, data):
         """uiux-audit-remediation 5.1: mirror the selected player row into
@@ -1649,16 +2405,29 @@ class MainWindow(QMainWindow):
         guild_id = str(item.data(6, _PLAYER_GUILD_ID_ROLE)) if item is not None and item.data(6, _PLAYER_GUILD_ID_ROLE) else str(data[6])
         title = str(data[0])
         inspector.show_details(title, {
-            0: str(data[1]),
-            1: str(data[2]),
+            0: str(data[2]),
+            1: str(data[1]),
             2: str(data[3]),
             3: str(data[5]),
-            4: uid,
-            5: guild_id,
+            4: '',
+            5: uid,
+            6: guild_id,
         })
     def _on_guild_selected(self, data):
+        modern_page = self.__dict__.get('guilds_page')
+        if modern_page is not None:
+            guild = modern_page.selected_guild()
+            if guild is not None:
+                self._on_guild_record_selected(guild)
+            return
         if data:
-            self.app_bar.context.set_guild(data[0])
+            workspace_context = self.__dict__.get('workspace_context')
+            if workspace_context is not None:
+                from palworld_aio.ui.workspace_context import ContextSelection
+                workspace_context.set_guild(
+                    ContextSelection(str(data[1]), str(data[0])))
+            else:
+                self.app_bar.context.set_guild(data[0])
             self._populate_guilds_inspector(data)
             self.guild_members_panel.clear()
             members = get_guild_members(data[1])
@@ -1668,6 +2437,47 @@ class MainWindow(QMainWindow):
                 rl = m.get('role_label', '')
                 sort_keys = {1: last_sort if last_sort is not None else float('inf'), 2: int(m['level']) if str(m['level']).isdigit() else 0, 3: int(m['pals']) if str(m['pals']).isdigit() else 0, 5: m.get('role', 3)}
                 self.guild_members_panel.add_item([prefix + m['name'], m['lastseen'], m['level'], m['pals'], m['uid'], rl], sort_keys=sort_keys)
+
+    def _on_guild_record_selected(self, guild):
+        from palworld_aio.ui.pages.guilds_page import GuildMemberRow
+        from palworld_aio.ui.workspace_context import ContextSelection
+        self.workspace_context.set_guild(ContextSelection(
+            guild.guild_id, guild.name))
+        members = []
+        for member in get_guild_members(guild.guild_id):
+            level = member.get('level', 0)
+            pals = member.get('pals', 0)
+            members.append(GuildMemberRow(
+                uid=str(member.get('uid', '')),
+                name=str(member.get('name', '')),
+                role=str(member.get('role_label', '')),
+                level=int(level) if str(level).isdigit() else 0,
+                pals=int(pals) if str(pals).isdigit() else 0,
+                last_seen=str(member.get('lastseen', '')),
+                is_leader=bool(member.get('is_leader', False)),
+                role_value=int(member.get('role', 3)),
+                last_seen_sort=(
+                    float(member['last_sort'])
+                    if member.get('last_sort') is not None else None),
+            ))
+        self.guilds_page.set_members(guild.guild_id, tuple(members))
+
+    def _on_guild_member_record_selected(self, member):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        self.workspace_context.set_player(ContextSelection(
+            member.uid, member.name))
+
+    def _open_guild_players(self, guild):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        selection = ContextSelection(guild.guild_id, guild.name)
+        self._activate_contextual_nav('players', guild=selection)
+        self.players_page.browser.search_input.setText(guild.guild_id)
+
+    def _open_guild_bases(self, guild):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        selection = ContextSelection(guild.guild_id, guild.name)
+        self._activate_contextual_nav('bases', guild=selection)
+        self.bases_page.browser.search_input.setText(guild.guild_id)
 
     def _populate_guilds_inspector(self, data):
         """uiux-audit-remediation 6.1: mirror the selected guild row into the
@@ -1689,12 +2499,101 @@ class MainWindow(QMainWindow):
     def _on_guild_member_selected(self, data):
         if data:
             name = data[0].replace('[L]', '')
-            self.app_bar.context.set_player(name)
+            workspace_context = self.__dict__.get('workspace_context')
+            if workspace_context is not None:
+                from palworld_aio.ui.workspace_context import ContextSelection
+                player_id = str(data[4]) if len(data) > 4 else name
+                workspace_context.set_player(ContextSelection(player_id, name))
+            else:
+                self.app_bar.context.set_player(name)
     def _on_base_selected(self, data):
         if data:
-            self.app_bar.context.set_base(data[0])
-            self.app_bar.context.set_guild(data[2])
+            workspace_context = self.__dict__.get('workspace_context')
+            if workspace_context is not None:
+                from palworld_aio.ui.workspace_context import ContextSelection
+                if len(data) > 2 and data[1]:
+                    workspace_context.set_guild(
+                        ContextSelection(str(data[1]), str(data[2])))
+                workspace_context.set_base(
+                    ContextSelection(str(data[0]), str(data[0])))
+            else:
+                self.app_bar.context.set_base(data[0])
+                self.app_bar.context.set_guild(data[2])
             self._populate_bases_inspector(data)
+
+    def _on_base_record_selected(self, base):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        self.workspace_context.set_guild(ContextSelection(
+            base.guild_id, base.guild_name))
+        self.workspace_context.set_base(ContextSelection(
+            base.base_id, base.name))
+
+    def _open_base_record_inventory(self, base):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        self._on_base_record_selected(base)
+        self._activate_contextual_nav(
+            'base_inventory',
+            guild=ContextSelection(base.guild_id, base.guild_name),
+            base=ContextSelection(base.base_id, base.name),
+        )
+        tab = getattr(self, 'base_inventory_tab', None)
+        if tab is not None and hasattr(tab, 'select_guild'):
+            tab.select_guild(base.guild_id)
+
+    def _open_base_record_map(self, base):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        self._on_base_record_selected(base)
+        self._activate_contextual_nav(
+            'map',
+            guild=ContextSelection(base.guild_id, base.guild_name),
+            base=ContextSelection(base.base_id, base.name),
+        )
+        self.map_tab.select_base(str(base.base_id))
+
+    def _open_map_base(self, base):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        base_id = str(base.get('base_id', ''))
+        guild_id = str(base.get('guild_id', ''))
+        guild_name = str(base.get('guild_name', '') or guild_id)
+        context = {
+            'base': ContextSelection(
+                base_id,
+                t('ui.map.base_number', number=base.get('base_position', 1))),
+        }
+        if guild_id:
+            context['guild'] = ContextSelection(guild_id, guild_name)
+        self._activate_contextual_nav('bases', **context)
+        self.bases_page.browser.search_input.setText(base_id)
+
+    def _open_map_player(self, player):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        uid = str(player.get('player_uid', ''))
+        name = str(player.get('player_name', '') or uid)
+        context = {'player': ContextSelection(uid, name)}
+        guild_id = str(player.get('guild_id', ''))
+        if guild_id:
+            guild_name = str(player.get('guild_name', '') or guild_id)
+            context['guild'] = ContextSelection(guild_id, guild_name)
+        self._activate_contextual_nav('players', **context)
+        self.players_page.browser.search_input.setText(uid)
+
+    def _open_map_guild(self, guild):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        guild_id = str(guild.get('guild_id', ''))
+        guild_name = str(guild.get('guild_name', '') or guild_id)
+        self._activate_contextual_nav(
+            'guilds', guild=ContextSelection(guild_id, guild_name))
+        self.guilds_page.browser.search_input.setText(guild_id)
+
+    def _open_base_record_guild(self, base):
+        from palworld_aio.ui.workspace_context import ContextSelection
+        self._on_base_record_selected(base)
+        self._activate_contextual_nav(
+            'guilds',
+            guild=ContextSelection(base.guild_id, base.guild_name),
+            base=ContextSelection(base.base_id, base.name),
+        )
+        self.guilds_page.browser.search_input.setText(base.guild_id)
 
     def _populate_bases_inspector(self, data):
         """uiux-audit-remediation 4.2: mirror the selected base row into the
@@ -1729,6 +2628,12 @@ class MainWindow(QMainWindow):
         """uiux-audit-remediation 4.5: navigate to the Base Inventory page
         and target the selected base's guild there (guild-level targeting —
         the Base Inventory component's selection scope)."""
+        bases_page = self.__dict__.get('bases_page')
+        if bases_page is not None:
+            base = bases_page.selected_base()
+            if base is not None:
+                self._open_base_record_inventory(base)
+            return
         if not getattr(self, '_bases_inspector', None):
             return
         item = self.bases_panel.get_selected_item() if hasattr(self, 'bases_panel') else None
@@ -1742,7 +2647,8 @@ class MainWindow(QMainWindow):
         if tab is not None and hasattr(tab, 'select_guild'):
             tab.select_guild(guild_id)
     def closeEvent(self, event: QCloseEvent):
-        if constants.dirty and constants.current_save_path:
+        if (constants.dirty and constants.current_save_path
+                and self.user_settings.get('warn_unsaved_exit', True)):
             self._set_dirty(False)
             msg = QMessageBox(self)
             msg.setWindowTitle(t('error.unsaved_title', default='Unsaved Changes'))
@@ -1769,6 +2675,7 @@ class MainWindow(QMainWindow):
                 self._save_user_settings()
             except (RuntimeError, AttributeError):
                 pass
+        self._save_user_settings()
         boot_preference = self.user_settings.get('boot_preference', 'menu')
         if boot_preference == 'palworld_aio':
             QApplication.quit()
@@ -1817,8 +2724,8 @@ class MainWindow(QMainWindow):
         item = self.players_panel.tree.itemAt(pos)
         if not item:
             return
-        uid = _item_value(item, 4)
-        gid = _item_value(item, 6)
+        uid = _item_value(item, 6)
+        gid = _item_value(item, 7)
         menu = ScrollableContextMenu(self)
         menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('players', uid)))
         menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('players', uid)))
@@ -1832,7 +2739,7 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
         menu.add_action(self._create_action(t('guild.ctx.make_leader'), lambda: self._make_leader(gid, uid)))
         menu.add_action(self._create_action(t('deletion.ctx.delete_guild'), lambda: self._delete_guild(gid)))
-        menu.add_action(self._create_action(t('guild.rename.menu'), lambda: self._rename_guild_action(gid, item.text(5))))
+        menu.add_action(self._create_action(t('guild.rename.menu'), lambda: self._rename_guild_action(gid, item.text(3))))
         menu.add_action(self._create_action(t('guild.unlock_lab_research.menu') if t else 'Unlock All Lab Research', lambda: self._unlock_all_lab_research_for_guild(gid)))
         menu.add_action(self._create_action(t('guild.menu.set_level'), lambda: self._set_guild_level(gid)))
         menu.add_action(self._create_action(t('button.import'), lambda: self._import_base_to_guild(gid)))
@@ -1841,7 +2748,7 @@ class MainWindow(QMainWindow):
         item = self.guilds_panel.tree.itemAt(pos)
         if not item:
             return
-        gid = _item_value(item, 1)
+        gid = _item_value(item, 4)
         menu = ScrollableContextMenu(self)
         menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('guilds', gid)))
         menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('guilds', gid)))
@@ -1860,9 +2767,12 @@ class MainWindow(QMainWindow):
         guild_data = self.guilds_panel.get_selected_data()
         if not guild_data:
             return
-        member_uid = _item_value(item, 4)
+        gid = str(guild_data[5])
+        member_uid = _item_value(item, 5)
+        member_record = self.guilds_page.selected_member()
+        member_name = member_record.name if member_record is not None else item.text(0)
         role = None
-        for pdata in (get_guild_members(guild_data[1]) or []):
+        for pdata in (get_guild_members(gid) or []):
             if str(pdata.get('uid', '')).replace('-', '').lower() == str(member_uid).replace('-', '').lower():
                 role = pdata.get('role', 3)
                 break
@@ -1874,31 +2784,31 @@ class MainWindow(QMainWindow):
             chk = '✓ ' if rv == role else '  '
             menu.add_item(f'role_{rv}', f'{chk}{label}')
         menu.add_sep()
-        menu.add_action(self._create_action(t('guild.ctx.make_leader'), lambda: self._make_leader(guild_data[1], member_uid)))
-        menu.add_action(self._create_action(t('guild.unlock_lab_research.menu') if t else 'Unlock All Lab Research', lambda: self._unlock_all_lab_research_for_guild(guild_data[1])))
+        menu.add_action(self._create_action(t('guild.ctx.make_leader'), lambda: self._make_leader(gid, member_uid)))
+        menu.add_action(self._create_action(t('guild.unlock_lab_research.menu') if t else 'Unlock All Lab Research', lambda: self._unlock_all_lab_research_for_guild(gid)))
         menu.add_sep()
         menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('players', member_uid)))
         menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('players', member_uid)))
         menu.add_action(self._create_action(t('deletion.ctx.delete_player'), lambda: self._delete_player(member_uid)))
-        menu.add_action(self._create_action(t('player.rename.menu'), lambda: self._rename_player(member_uid, item.text(0).replace('[L]', ''))))
+        menu.add_action(self._create_action(t('player.rename.menu'), lambda: self._rename_player(member_uid, member_name)))
         menu.add_action(self._create_action(t('player.reset_timestamp.menu') if t else 'Reset Timestamp', lambda: self._reset_player_timestamp(member_uid)))
         menu.add_sep()
         menu.add_action(self._create_action('Set Player Level' if not t else t('player.set_level'), lambda: self._set_player_level(member_uid)))
         result = menu.exec(self.guild_members_panel.tree.viewport().mapToGlobal(pos))
         if result and result.startswith('role_'):
             role_val = int(result.split('_')[1])
-            self._set_guild_member_role(guild_data[1], member_uid, role_val)
+            self._set_guild_member_role(gid, member_uid, role_val)
     def _show_base_context_menu(self, pos):
         item = self.bases_panel.tree.itemAt(pos)
         if not item:
             return
-        bid = _item_value(item, 0)
-        bgid = _item_value(item, 1)
+        bid = _item_value(item, 5)
+        bgid = _item_value(item, 7)
         menu = ScrollableContextMenu(self)
         menu.add_action(self._create_action(t('deletion.ctx.add_exclusion'), lambda: self._add_exclusion('bases', bid)))
         menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda: self._remove_exclusion('bases', bid)))
         menu.add_action(self._create_action(t('deletion.ctx.delete_base'), lambda: self._delete_base(bid, bgid)))
-        menu.add_action(self._create_action(t('guild.rename.menu'), lambda: self._rename_guild_action(bgid, item.text(2))))
+        menu.add_action(self._create_action(t('guild.rename.menu'), lambda: self._rename_guild_action(bgid, item.text(1))))
         menu.add_action(self._create_action(t('guild.menu.set_level'), lambda: self._set_guild_level(bgid)))
         menu.add_action(self._create_action(t('export.base'), lambda: self._export_base(bid)))
         menu.add_action(self._create_action(t('base.radius.menu') if t else 'Adjust Radius', lambda: self._adjust_base_radius(bid)))
@@ -1917,6 +2827,91 @@ class MainWindow(QMainWindow):
         menu.exec(panel.tree.viewport().mapToGlobal(pos))
     def _load_save(self):
         save_manager.load_save(parent=self)
+    def _load_save_folder(self):
+        from common import get_preferred_save_path
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            t('ui.overview.open_folder') if t else 'Open Save Folder',
+            get_preferred_save_path(),
+        )
+        if not folder:
+            return
+        level_path = os.path.join(folder, 'Level.sav')
+        players_path = os.path.join(folder, 'Players')
+        if not os.path.isfile(level_path) or not os.path.isdir(players_path):
+            self._show_warning(
+                t('error.title') if t else 'Invalid save folder',
+                t('ui.overview.invalid_folder', default=(
+                    'Choose a save folder containing Level.sav and a Players folder.')),
+            )
+            return
+        save_manager.load_save(path=level_path, parent=self)
+    def _load_recent_save(self, path):
+        from pathlib import Path
+        candidate = Path(path)
+        level_path = candidate if candidate.name.lower() == 'level.sav' else candidate / 'Level.sav'
+        if not level_path.is_file() or not (level_path.parent / 'Players').is_dir():
+            self._show_no_save_overview()
+            return
+        save_manager.load_save(path=str(level_path), parent=self)
+    def _locate_recent_save(self, save_id):
+        from common import get_preferred_save_path
+        level_path, _selected = QFileDialog.getOpenFileName(
+            self,
+            t('ui.overview.locate') if t else 'Locate Save',
+            get_preferred_save_path(),
+            'Level.sav (Level.sav)',
+        )
+        if not level_path:
+            return
+        folder = os.path.dirname(level_path)
+        if not os.path.isdir(os.path.join(folder, 'Players')):
+            self._show_warning(
+                t('error.title') if t else 'Invalid save folder',
+                t('ui.overview.invalid_folder', default=(
+                    'Choose a save folder containing Level.sav and a Players folder.')),
+            )
+            return
+        self.workspace_settings.relocate_recent_save(save_id, folder)
+        self._show_no_save_overview()
+        self._save_user_settings()
+    def _remove_recent_save(self, save_id):
+        if self.workspace_settings.remove_recent_save(save_id):
+            self._show_no_save_overview()
+            self._save_user_settings()
+    def _launch_overview_utility(self, tool_id):
+        self._activate_nav('tools')
+        self._launch_registered_tool(tool_id)
+    def _launch_registered_tool(self, tool_id):
+        from palworld_aio.ui.tool_registry import TOOLS
+        try:
+            tool = TOOLS.resolve(tool_id)
+        except KeyError:
+            return
+        self._ensure_tab(0)
+        tool.launch(self.tools_tab)
+        from palworld_aio.ui.operation_journal import (
+            ActivityKind, ActivityStatus,
+        )
+        self._record_activity(
+            ActivityKind.TOOL,
+            t(tool.title_key, default=tool.tool_id.replace('_', ' ').title()),
+            status=ActivityStatus.INFO,
+            detail=t('ui.activity.tool_opened', default='Tool opened'),
+        )
+    def _resolve_tool_prerequisite(self, context_kind):
+        routes = {
+            'player': 'players',
+            'guild': 'guilds',
+            'base': 'bases',
+            'container': 'base_inventory',
+        }
+        if context_kind == 'save':
+            self._load_save()
+            return
+        route = routes.get(context_kind)
+        if route is not None:
+            self._activate_nav(route)
     def _load_xgp_save(self):
         from palworld_xgp_import.gamepass_manager import pick_xgp_world
         pick = pick_xgp_world(self, 'Load GamePass Save')
@@ -1955,10 +2950,10 @@ class MainWindow(QMainWindow):
         if not items:
             show_warning(self, t('error.title'), t('backup.no_backups'))
             return
-        dlg = QDialog(self)
-        dlg.setWindowTitle(t('menu.file.load_backup'))
-        dlg.setMinimumWidth(600)
-        layout = QVBoxLayout(dlg)
+        dlg = BaseDialog(
+            t('menu.file.load_backup'), self, min_size=(600, 300),
+            kicker=t('ui.backups.kicker', default='Backups'))
+        layout = dlg.content_layout
         lst = QListWidget()
         lst.setSpacing(2)
         item_height = 24
@@ -1968,18 +2963,11 @@ class MainWindow(QMainWindow):
         for name, ts, world, pcount in items:
             lst.addItem(f'{ts} — {world} ({pcount} players)')
         layout.addWidget(lst)
-        btn_row = QHBoxLayout()
-        ok_btn = QPushButton(t('common.ok'))
+        ok_btn = dlg.add_confirm_button(t('common.ok'))
         ok_btn.setEnabled(False)
-        cancel_btn = QPushButton(t('common.cancel'))
+        dlg.cancel_btn.setText(t('common.cancel'))
         lst.itemClicked.connect(lambda: ok_btn.setEnabled(True))
         lst.itemDoubleClicked.connect(lambda: dlg.accept() if lst.currentItem() else None)
-        ok_btn.clicked.connect(dlg.accept)
-        cancel_btn.clicked.connect(dlg.reject)
-        btn_row.addStretch()
-        btn_row.addWidget(ok_btn)
-        btn_row.addWidget(cancel_btn)
-        layout.addLayout(btn_row)
         if dlg.exec() != QDialog.Accepted or not lst.currentItem():
             return
         idx = lst.currentRow()
@@ -2218,56 +3206,154 @@ class MainWindow(QMainWindow):
             self.refresh_all()
             self._show_info(t('Done'), t('deletion.chests_unlocked', count=unlocked))
         run_with_loading(on_finished, task)
+    def _run_loaded_save_repair(
+        self,
+        *,
+        title,
+        affected,
+        review,
+        operation,
+        result_message,
+        risk='',
+        confirm_text='',
+    ):
+        """Review and run a loaded-save repair with a durable recovery result."""
+        if not constants.loaded_level_json:
+            self._show_warning(t('Error'), t('error.no_save_loaded'))
+            return None
+        dialog = RepairWorkflowDialog(
+            loaded_save_repair_spec(
+                title,
+                affected,
+                review,
+                risk=risk,
+                confirm_text=confirm_text,
+            ),
+            operation,
+            result_message,
+            self,
+        )
+
+        def on_completed(result):
+            self.refresh_all()
+            from palworld_aio.ui.operation_journal import ActivityKind
+            dialog_text = result_message(result)
+            self._record_activity(
+                ActivityKind.MUTATION,
+                title,
+                detail=dialog_text,
+            )
+
+        dialog.completed.connect(on_completed)
+        dialog.exec()
+        return dialog
+    def _run_transfer_workflow(
+        self,
+        *,
+        title,
+        source,
+        target,
+        review,
+        operation,
+        result_message,
+        backup='',
+        risk='',
+        confirm_text='',
+        result_success=None,
+        on_completed=None,
+    ):
+        """Run a contextual import/export/clone callback behind shared review."""
+        dialog = TransferWorkflowDialog(
+            TransferWorkflowSpec(
+                title=title,
+                source=source,
+                target=target,
+                review=review,
+                backup=backup,
+                risk=risk,
+                confirm_text=confirm_text,
+            ),
+            operation,
+            result_message,
+            self,
+            result_success=result_success,
+        )
+        if on_completed is not None:
+            dialog.completed.connect(on_completed)
+        dialog.exec()
+        return dialog
     def _remove_invalid_items(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        def task():
-            return remove_invalid_items_from_save(self)
-        def on_finished(fixed):
-            self.refresh_all()
-            self._show_info(t('done'), t('fixed_files', fixed=fixed))
-        run_with_loading(on_finished, task)
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.delete_invalid_items'),
+            affected=t(
+                'repair.affected.invalid_items',
+                default='Invalid item references across the loaded save'),
+            review=t(
+                'repair.review.invalid_items',
+                default='Remove only item records that fail the existing validity checks.'),
+            operation=lambda: remove_invalid_items_from_save(self),
+            result_message=lambda fixed: t('fixed_files', fixed=fixed),
+        )
     def _remove_invalid_structures(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        def task():
-            return delete_invalid_structure_map_objects(self)
-        def on_finished(removed):
-            self.refresh_all()
-            self._show_info(t('Done'), t('invalid_structures_removed', removed=removed))
-        run_with_loading(on_finished, task)
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.delete_invalid_structures'),
+            affected=t(
+                'repair.affected.invalid_structures',
+                default='Invalid structure map objects in the loaded world'),
+            review=t(
+                'repair.review.invalid_structures',
+                default='Remove only structures rejected by the existing map-object validity checks.'),
+            risk=t(
+                'repair.risk.removal',
+                default='Records identified as invalid will be removed from the in-memory save.'),
+            operation=lambda: delete_invalid_structure_map_objects(self),
+            result_message=lambda removed: t(
+                'invalid_structures_removed', removed=removed),
+            confirm_text=t('repair.workflow.remove', default='Remove invalid data'),
+        )
     def _repair_structures(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        def task():
-            return repair_structures(self)
-        def on_finished(result):
-            self.refresh_all()
-            self._show_info(t('Done'), t('deletion.structures_repaired', repaired=result['repaired'], skipped=result['skipped']))
-        run_with_loading(on_finished, task)
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.fix_structures'),
+            affected=t(
+                'repair.affected.structures',
+                default='All repairable structures in the loaded world'),
+            review=t(
+                'repair.review.structures',
+                default='Restore structure durability using the existing structure repair rules.'),
+            operation=lambda: repair_structures(self),
+            result_message=lambda result: t(
+                'deletion.structures_repaired',
+                repaired=result['repaired'], skipped=result['skipped']),
+        )
     def _repair_items(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        def task():
-            return repair_items(self)
-        def on_finished(result):
-            self.refresh_all()
-            self._show_info(t('Done'), t('deletion.items_repaired', repaired=result['repaired']))
-        run_with_loading(on_finished, task)
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.fix_items'),
+            affected=t(
+                'repair.affected.items',
+                default='All repairable item durability records in the loaded save'),
+            review=t(
+                'repair.review.items',
+                default='Restore item durability using the existing item repair rules.'),
+            operation=lambda: repair_items(self),
+            result_message=lambda result: t(
+                'deletion.items_repaired', repaired=result['repaired']),
+        )
     def _remove_invalid_pals(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        def task():
-            return remove_invalid_pals_from_save(self)
-        def on_finished(removed):
-            self.refresh_all()
-            self._show_info(t('Done'), t('palclean.summary', removed=removed))
-        run_with_loading(on_finished, task)
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.delete_invalid_pals'),
+            affected=t(
+                'repair.affected.invalid_pals',
+                default='Invalid Pal records across all owners and containers'),
+            review=t(
+                'repair.review.invalid_pals',
+                default='Remove only Pal records rejected by the existing save validity checks.'),
+            risk=t(
+                'repair.risk.removal',
+                default='Records identified as invalid will be removed from the in-memory save.'),
+            operation=lambda: remove_invalid_pals_from_save(self),
+            result_message=lambda removed: t('palclean.summary', removed=removed),
+            confirm_text=t('repair.workflow.remove', default='Remove invalid data'),
+        )
     def _delete_imported_pals(self):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
@@ -2286,28 +3372,28 @@ class MainWindow(QMainWindow):
             self._show_info(t('Done'), t('deletion.imported_pals_removed', count=removed))
         run_with_loading(on_finished, task)
     def _remove_invalid_passives(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        def task():
-            return remove_invalid_passives_from_save(self)
-        def on_finished(removed):
-            self.refresh_all()
-            self._show_info(t('Done'), t('deletion.invalid_passives_removed', count=removed))
-        run_with_loading(on_finished, task)
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.delete_invalid_passives'),
+            affected=t(
+                'repair.affected.invalid_passives',
+                default='Invalid passive-skill references on Pals'),
+            review=t(
+                'repair.review.invalid_passives',
+                default='Remove passive skills rejected by the existing skill validity checks.'),
+            operation=lambda: remove_invalid_passives_from_save(self),
+            result_message=lambda removed: t(
+                'deletion.invalid_passives_removed', count=removed),
+        )
     def _fix_all_pals(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        reply = show_question(self, t('func_manager.fix_all_pals.title') if t else 'Fix All Pals', t('func_manager.fix_all_pals.confirm') if t else 'Fix all pals (restore HP/FullStomach/Sanity, remove sickness, assign unowned)?')
-        if not reply:
-            return
-        def task():
-            return fix_all_pals_combined(self)
-        def on_finished(count):
-            self.refresh_all()
-            self._show_info(t('func_manager.fix_all_pals.title') if t else 'Fix All Pals', t('func_manager.fix_all_pals.success', count=count) if t else f'Fixed {count} pals.')
-        run_with_loading(on_finished, task)
+        return self._run_loaded_save_repair(
+            title=t('func_manager.fix_all_pals.title'),
+            affected=t(
+                'repair.affected.all_pals', default='Every Pal in the loaded save'),
+            review=t('func_manager.fix_all_pals.confirm'),
+            operation=lambda: fix_all_pals_combined(self),
+            result_message=lambda count: t(
+                'func_manager.fix_all_pals.success', count=count),
+        )
     def _max_all_pals(self):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
@@ -2339,17 +3425,21 @@ class MainWindow(QMainWindow):
                 self._show_info(t('fix_illegal_pal.no_illegals_title') if t else 'No Illegal Pals', t('fix_illegal_pal.no_illegals_msg') if t else 'No illegal pals found in the save.')
                 return
             dlg = FixIllegalPalDialog(scan_data, self)
-            if dlg.exec() != QDialog.Accepted:
-                return
-            selected_uids = dlg._get_selected_uids()
-            if not selected_uids:
-                return
-            def fix_task():
-                return fix_illegal_pals_in_save(self, selected_uids=selected_uids)
-            def on_fix_done(fixed):
-                self.refresh_all()
-                self._show_info(t('Done') if t else 'Done', t('deletion.illegal_pals_fixed', count=fixed) if t else f'Fixed {fixed} illegal pals to legal maximums.')
-            run_with_loading(on_fix_done, fix_task)
+            def start_fix(selected_uids):
+                def fix_task():
+                    return fix_illegal_pals_in_save(
+                        self, selected_uids=selected_uids)
+                def on_fix_done(fixed):
+                    self.refresh_all()
+                    dlg.finish_repair(t(
+                        'deletion.illegal_pals_fixed', count=fixed))
+                def on_fix_error(error):
+                    dlg.fail_repair(str(error))
+                run_with_loading(
+                    on_fix_done, fix_task, parent=dlg,
+                    on_error=on_fix_error, local_state=True)
+            dlg.repair_requested.connect(start_fix)
+            dlg.exec()
         run_with_loading(on_scan_done, scan_task)
     def _fix_illegal_players(self):
         if not constants.loaded_level_json:
@@ -2363,99 +3453,154 @@ class MainWindow(QMainWindow):
                 self._show_info(t('fix_illegal_player.no_illegals_title') if t else 'No Illegal Players', t('fix_illegal_player.no_illegals_msg') if t else 'No players with illegal stats found in the save.')
                 return
             dlg = FixIllegalPlayerDialog(scan_data, self)
-            if dlg.exec() != QDialog.Accepted:
-                return
-            selected_uids = dlg._get_selected_uids()
-            if not selected_uids:
-                return
-            def fix_task():
-                return fix_illegal_player_stats(self, selected_uids=selected_uids)
-            def on_fix_done(fixed):
-                self.refresh_all()
-                self._show_info(t('Done') if t else 'Done', t('deletion.illegal_players_fixed', count=fixed) if t else f'Fixed {fixed} player(s) with illegal stats.')
-            run_with_loading(on_fix_done, fix_task)
+            def start_fix(selected_uids):
+                def fix_task():
+                    return fix_illegal_player_stats(
+                        self, selected_uids=selected_uids)
+                def on_fix_done(fixed):
+                    self.refresh_all()
+                    dlg.finish_repair(t(
+                        'deletion.illegal_players_fixed', count=fixed))
+                def on_fix_error(error):
+                    dlg.fail_repair(str(error))
+                run_with_loading(
+                    on_fix_done, fix_task, parent=dlg,
+                    on_error=on_fix_error, local_state=True)
+            dlg.fix_requested.connect(start_fix)
+            dlg.exec()
         run_with_loading(on_scan_done, scan_task)
     def _reset_missions(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        def task():
-            return fix_missions(self)
-        def on_finished(result):
-            self.refresh_all()
-            self._show_info(t('missions.reset_title'), t('missions.summary', **result))
-        run_with_loading(on_finished, task)
+        return self._run_loaded_save_repair(
+            title=t('missions.reset_title'),
+            affected=t(
+                'repair.affected.missions',
+                default='Mission state for every player in the loaded save'),
+            review=t(
+                'repair.review.missions',
+                default='Reset mission state using the existing mission repair rules.'),
+            operation=lambda: fix_missions(self),
+            result_message=lambda result: t('missions.summary', **result),
+        )
     def _reset_anti_air(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        count = reset_anti_air_turrets(self)
-        self.refresh_all()
-        self._show_info(t('Done'), t('anti_air_reset_all'))
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.reset_anti_air'),
+            affected=t(
+                'repair.affected.anti_air',
+                default='All anti-air turret reset state in the loaded world'),
+            review=t(
+                'repair.review.anti_air',
+                default='Reset anti-air turret state using the existing manager action.'),
+            operation=lambda: reset_anti_air_turrets(self),
+            result_message=lambda _count: t('anti_air_reset_all'),
+        )
     def _reset_dungeons(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        count = reset_dungeons(self)
-        self.refresh_all()
-        self._show_info(t('Done'), t('dungeons_reset_count', count=count))
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.reset_dungeons'),
+            affected=t(
+                'repair.affected.dungeons',
+                default='All dungeon reset state in the loaded world'),
+            review=t(
+                'repair.review.dungeons',
+                default='Reset dungeon state using the existing manager action.'),
+            operation=lambda: reset_dungeons(self),
+            result_message=lambda count: t('dungeons_reset_count', count=count),
+        )
     def _reset_oilrig(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        count = reset_oilrig(self)
-        self.refresh_all()
-        self._show_info(t('Done'), t('oilrig_reset_count', count=count))
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.reset_oilrig'),
+            affected=t(
+                'repair.affected.oilrig',
+                default='All oil-rig reset state in the loaded world'),
+            review=t(
+                'repair.review.oilrig',
+                default='Reset oil-rig state using the existing manager action.'),
+            operation=lambda: reset_oilrig(self),
+            result_message=lambda count: t('oilrig_reset_count', count=count),
+        )
     def _reset_invader(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        count = reset_invader(self)
-        self.refresh_all()
-        self._show_info(t('Done'), t('invader_reset_count', count=count))
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.reset_invader'),
+            affected=t(
+                'repair.affected.invaders',
+                default='All invader-event reset state in the loaded world'),
+            review=t(
+                'repair.review.invaders',
+                default='Reset invader-event state using the existing manager action.'),
+            operation=lambda: reset_invader(self),
+            result_message=lambda count: t('invader_reset_count', count=count),
+        )
     def _reset_supply(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        count = reset_supply(self)
-        self.refresh_all()
-        self._show_info(t('Done'), t('supply_reset_count', count=count))
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.reset_supply'),
+            affected=t(
+                'repair.affected.supply',
+                default='All supply-drop reset state in the loaded world'),
+            review=t(
+                'repair.review.supply',
+                default='Reset supply-drop state using the existing manager action.'),
+            operation=lambda: reset_supply(self),
+            result_message=lambda count: t('supply_reset_count', count=count),
+        )
     def _reset_lock_gimmick(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        count = reset_lock_gimmick(self)
-        self.refresh_all()
-        self._show_info(t('Done'), t('lock_gimmick_reset_count', count=count))
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.reset_lock_gimmick'),
+            affected=t(
+                'repair.affected.lock_gimmick',
+                default='All mini-game tower reset state in the loaded world'),
+            review=t(
+                'repair.review.lock_gimmick',
+                default='Reset mini-game tower state using the existing manager action.'),
+            operation=lambda: reset_lock_gimmick(self),
+            result_message=lambda count: t(
+                'lock_gimmick_reset_count', count=count),
+        )
     def _fix_invalid_active_skills(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error') if t else 'Error', t('guild.rebuild.no_save') if t else 'No save loaded!')
-            return
-        def task():
-            return fix_invalid_pal_active_skills(self)
-        def on_finished(result):
-            self.refresh_all()
+        def result_message(result):
             removed = result.get('removed', 0)
             pals = len(result.get('details', []))
             log_path = result.get('log_path')
             msg = t('deletion.invalid_active_skills_fixed', count=removed, pals=pals) if t else f'Removed {removed} invalid skills from {pals} pals'
             if log_path:
                 msg += f'\n\nReport saved to:\n{log_path}'
-            self._show_info(t('Done') if t else 'Done', msg)
-        run_with_loading(on_finished, task)
+            return msg
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.fix_invalid_active_skills'),
+            affected=t(
+                'repair.affected.active_skills',
+                default='Invalid active-skill references on every Pal'),
+            review=t(
+                'repair.review.active_skills',
+                default='Remove active skills that the existing legality rules reject.'),
+            operation=lambda: fix_invalid_pal_active_skills(self),
+            result_message=result_message,
+        )
     def _fix_all_timestamps(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error') if t else 'Error', t('guild.rebuild.no_save') if t else 'No save loaded!')
-            return
-        fixed = fix_all_negative_timestamps(self)
-        self.refresh_all()
-        self._show_info(t('Done') if t else 'Done', t('timestamps.fixed_count', count=fixed) if t else f'Fixed {fixed} player timestamps')
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.fix_timestamps'),
+            affected=t(
+                'repair.affected.timestamps',
+                default='Every player with a negative last-seen timestamp'),
+            review=t(
+                'repair.review.timestamps',
+                default='Normalize only negative player timestamps using the existing repair action.'),
+            operation=lambda: fix_all_negative_timestamps(self),
+            result_message=lambda fixed: t(
+                'timestamps.fixed_count', count=fixed),
+        )
     def _reset_player_timestamp(self, uid):
-        if reset_selected_player_timestamp(uid, self):
-            self.refresh_all()
-            self._show_info(t('Done') if t else 'Done', t('timestamps.player_reset') if t else 'Player timestamp reset to current time')
-        else:
-            self._show_warning(t('Error') if t else 'Error', t('timestamps.reset_failed') if t else 'Failed to reset player timestamp')
+        return self._run_loaded_save_repair(
+            title=t('player.reset_timestamp.menu'),
+            affected=t(
+                'repair.affected.player_timestamp',
+                default='Selected player: {uid}', uid=_short_guid(uid)),
+            review=t(
+                'repair.review.player_timestamp',
+                default='Reset this player timestamp to the current time.'),
+            operation=lambda: require_repair_success(
+                lambda: reset_selected_player_timestamp(uid, self),
+                t('timestamps.reset_failed')),
+            result_message=lambda _success: t('timestamps.player_reset'),
+        )
     def _open_paldefender(self):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
@@ -2463,23 +3608,24 @@ class MainWindow(QMainWindow):
         dialog = PalDefenderDialog(self)
         dialog.exec()
     def _rebuild_all_guilds(self):
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.fix_all_guilds'),
+            affected=t(
+                'repair.affected.guilds',
+                default='Every guild and its membership links'),
+            review=t(
+                'repair.review.guilds',
+                default='Rebuild guild relationships using the existing guild manager action.'),
+            operation=lambda: require_repair_success(
+                rebuild_all_guilds, t('guild.rebuild.failed')),
+            result_message=lambda _success: t('guild.rebuild.done'),
+        )
+    def _open_guild_assign_dialog(self, selected_player_uids=()):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
             return
-        def task():
-            return rebuild_all_guilds()
-        def on_finished(success):
-            if success:
-                self.refresh_all()
-                self._show_info(t('Done'), t('guild.rebuild.done'))
-            else:
-                self._show_warning(t('error.title'), t('guild.rebuild.failed'))
-        run_with_loading(on_finished, task)
-    def _open_guild_assign_dialog(self):
-        if not constants.loaded_level_json:
-            self._show_warning(t('Error'), t('error.no_save_loaded'))
-            return
-        dlg = GuildAssignDialog(self)
+        dlg = GuildAssignDialog(
+            self, selected_player_uids=selected_player_uids)
         dlg.exec()
         constants.invalidate_container_lookup()
         if 'base_inventory_tab' in self.__dict__:
@@ -2492,11 +3638,7 @@ class MainWindow(QMainWindow):
             return
         if 'map_tab' not in self.__dict__:
             return
-        for i in range(self.stacked_widget.count()):
-            if self.stacked_widget.widget(i) == self.map_tab:
-                self._activate_nav('map')
-                self.stacked_widget.setCurrentIndex(i)
-                return
+        self._activate_nav('map')
     def _generate_map(self):
         if not constants.loaded_level_json:
             self._show_warning(t('Error') if t else 'Error', t('error.no_save_loaded') if t else 'No save file loaded.')
@@ -2530,11 +3672,11 @@ class MainWindow(QMainWindow):
         self._save_user_settings()
     def _open_pal_name_settings(self):
         from palworld_aio.editor.pal_editor.pal_ops import get_name_mode, set_name_mode, set_sync_nickname
-        dialog = QDialog(self)
-        dialog.setWindowTitle(t('pal_name_settings.title') if t else 'Pal Name Settings')
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(10)
+        dialog = BaseDialog(
+            t('pal_name_settings.title') if t else 'Pal Name Settings',
+            self, min_size=(440, 280),
+            kicker=t('ui.settings.appearance', default='Appearance'))
+        layout = dialog.content_layout
         mode_label = QLabel(t('pal_name_settings.mode_label') if t else 'Name new pals with:')
         mode_label.setObjectName('bulkActionLabel')
         layout.addWidget(mode_label)
@@ -2552,16 +3694,8 @@ class MainWindow(QMainWindow):
         nickname_chk = ToggleCheckBtn(t('pal_name_settings.sync_nickname') if t else 'Apply nickname during Bulk Sync')
         nickname_chk.setChecked(bool(constants.bulk_sync_apply_nickname))
         layout.addWidget(nickname_chk)
-        buttons = QHBoxLayout()
-        buttons.addStretch()
-        ok_btn = QPushButton(t('button.ok') if t else 'OK')
-        ok_btn.clicked.connect(dialog.accept)
-        buttons.addWidget(ok_btn)
-        cancel_btn = QPushButton(t('button.cancel') if t else 'Cancel')
-        cancel_btn.clicked.connect(dialog.reject)
-        buttons.addWidget(cancel_btn)
-        layout.addLayout(buttons)
-        dialog.resize(360, 220)
+        dialog.add_confirm_button(t('button.ok') if t else 'OK')
+        dialog.cancel_btn.setText(t('button.cancel') if t else 'Cancel')
         if dialog.exec() == QDialog.Accepted:
             set_name_mode(combo.currentData())
             set_sync_nickname(nickname_chk.isChecked())
@@ -2578,11 +3712,19 @@ class MainWindow(QMainWindow):
             if self.status_stream.detach_window:
                 self.status_stream.detach_window.refresh_title()
             self.setWindowTitle(t('deletion.title') if t else 'All-in-One Tools')
-            self.nav_strip.refresh_labels()
+            shell = getattr(self, 'workspace_shell', None)
+            if shell is not None:
+                shell.sidebar.refresh_labels()
+                shell.title_bar.window_controls.refresh_labels()
+                shell.navigate(shell.router.current_route_id)
+            elif getattr(self, 'nav_strip', None) is not None:
+                self.nav_strip.refresh_labels()
             self._setup_menus()
             self._refresh_texts()
             self.tools_tab.refresh_labels()
-            self.app_bar.refresh_labels()
+            app_bar = getattr(self, 'app_bar', None)
+            if app_bar is not None:
+                app_bar.refresh_labels()
             if getattr(self, '_window_controls', None):
                 self._window_controls.refresh_labels()
             if getattr(self, '_menu_popup_v2', None):
@@ -2601,16 +3743,8 @@ class MainWindow(QMainWindow):
                 self.json_editor_tab.refresh_labels()
             if 'pal_editor_tab' in self.__dict__:
                 self.pal_editor_tab.refresh_labels()
-            if hasattr(self, 'bulk_label'):
-                self.bulk_label.setText(t('player.bulk_actions') if t else 'Bulk Actions:')
-            if hasattr(self, 'bulk_item_btn'):
-                self.bulk_item_btn.setText(t('player.bulk_item_management') if t else 'Bulk Item Management')
-            if hasattr(self, 'bulk_pal_btn'):
-                self.bulk_pal_btn.setText(t('player.bulk_pal_management') if t else 'Bulk Pal Management')
-            if hasattr(self, 'bulk_tech_btn'):
-                self.bulk_tech_btn.setText(t('player.bulk_technology_management') if t else 'Bulk Technology Management')
-            if hasattr(self, 'bulk_guild_btn'):
-                self.bulk_guild_btn.setText(t('guild.assign.btn_open') if t else 'Guild Assignments')
+            if hasattr(self, 'players_page'):
+                self.players_page.refresh_labels()
             if hasattr(self, '_active_dialogs'):
                 for dialog in self._active_dialogs:
                     if hasattr(dialog, 'refresh_labels'):
@@ -2622,20 +3756,26 @@ class MainWindow(QMainWindow):
             self._tray_drawer.stats_panel.refresh_labels()
         if hasattr(self, 'players_panel'):
             self.players_panel.refresh_labels()
-        if hasattr(self, 'guilds_panel'):
+        if hasattr(self, 'guilds_page'):
+            self.guilds_page.refresh_labels()
+        elif hasattr(self, 'guilds_panel'):
             self.guilds_panel.refresh_labels()
-        if hasattr(self, 'guild_members_panel'):
+        if not hasattr(self, 'guilds_page') and hasattr(self, 'guild_members_panel'):
             self.guild_members_panel.refresh_labels()
         if hasattr(self, '_members_empty_state'):
             self._members_empty_state.setText(t('deletion.guild_members.select_hint') if t else 'Select a guild to view its members')
             self._members_empty_state.setHint(t('deletion.guild_members.select_hint_sub') if t else 'Pick a guild in the list above.')
-        if hasattr(self, 'bases_panel'):
+        if hasattr(self, 'bases_page'):
+            self.bases_page.refresh_labels()
+        elif hasattr(self, 'bases_panel'):
             self.bases_panel.refresh_labels()
-        if hasattr(self, 'excl_players_panel'):
+        if hasattr(self, 'exclusions_page'):
+            self.exclusions_page.refresh_labels()
+        elif hasattr(self, 'excl_players_panel'):
             self.excl_players_panel.refresh_labels()
-        if hasattr(self, 'excl_guilds_panel'):
+        if not hasattr(self, 'exclusions_page') and hasattr(self, 'excl_guilds_panel'):
             self.excl_guilds_panel.refresh_labels()
-        if hasattr(self, 'excl_bases_panel'):
+        if not hasattr(self, 'exclusions_page') and hasattr(self, 'excl_bases_panel'):
             self.excl_bases_panel.refresh_labels()
         self._apply_excl_empty_states()
         if hasattr(self, 'menu_bar'):
@@ -2727,9 +3867,14 @@ class MainWindow(QMainWindow):
         from palworld_aio.managers.guild_manager import set_member_role
         set_member_role(gid, uid, role)
         self.refresh_all()
-        gdata = self.guilds_panel.get_selected_data()
-        if gdata:
-            self._on_guild_selected(gdata)
+        page = self.__dict__.get('guilds_page')
+        guild = page.selected_guild() if page is not None else None
+        if guild is not None:
+            self._on_guild_record_selected(guild)
+        else:
+            gdata = self.guilds_panel.get_selected_data()
+            if gdata:
+                self._on_guild_selected(gdata)
         self._show_info(t('Done'), t('guild.role_updated'))
     def _import_base_to_guild(self, gid):
         file_paths, _ = QFileDialog.getOpenFileNames(self, 'Select Base Files', '', 'Base Files (*.json *.pstbase)')
@@ -2755,21 +3900,43 @@ class MainWindow(QMainWindow):
                     failed_imports += 1
                     failed_files.append(os.path.basename(file_path) + f'(error: {str(e)})')
             return (successful_imports, failed_imports, failed_files)
-        def on_finished(result):
+        def result_message(result):
             successful_imports, failed_imports, failed_files = result
+            msg = f'Successfully imported {successful_imports} base(s).'
+            if failed_imports > 0:
+                msg += f'\nFailed to import {failed_imports} file(s):\n' + '\n'.join(failed_files)
+            return msg
+        def on_completed(result):
+            successful_imports, _failed_imports, _failed_files = result
             if successful_imports > 0:
                 constants.invalidate_container_lookup()
                 if 'base_inventory_tab' in self.__dict__:
                     self.base_inventory_tab.manager.invalidate_cache()
             self.refresh_all()
-            if successful_imports > 0:
-                msg = f'Successfully imported {successful_imports} base(s).'
-                if failed_imports > 0:
-                    msg += f'\nFailed to import {failed_imports} file(s):\n' + '\n'.join(failed_files)
-                self._show_info(t('success.title'), msg)
-            else:
-                self._show_warning(t('error.title'), f'Failed to import any bases.\n' + '\n'.join(failed_files))
-        run_with_loading(on_finished, task)
+        return self._run_transfer_workflow(
+            title=t('base.import_multi', default='Import Bases'),
+            source='\n'.join(os.path.basename(path) for path in file_paths),
+            target=t(
+                'transfer.base.guild_target',
+                default='Guild {guild}', guild=_short_guid(gid)),
+            review=t(
+                'transfer.base.import_review',
+                default='Import {count} selected base file(s) into the target guild.',
+                count=len(file_paths)),
+            backup=t(
+                'repair.workflow.loaded_backup',
+                default=(
+                    'Recovery: a full backup was created when this save was loaded. '
+                    'Imports remain in memory until Save Changes.')),
+            risk=t(
+                'transfer.base.import_risk',
+                default='Imported bases add structures, containers, and ownership links to the loaded save.'),
+            operation=task,
+            result_message=result_message,
+            result_success=lambda result: result[0] > 0,
+            on_completed=on_completed,
+            confirm_text=t('button.import', default='Import'),
+        )
     def _export_all_bases(self):
         if not constants.loaded_level_json:
             self._show_warning(t('Error') if t else 'Error', t('error.no_save_loaded') if t else 'No save file loaded.')
@@ -2812,16 +3979,32 @@ class MainWindow(QMainWindow):
                     failed_exports += 1
                     failed_bases.append(f'Base {bid}(error: {str(e)})')
             return (successful_exports, failed_exports, failed_bases, export_dir)
-        def on_finished(result):
+        def result_message(result):
             successful_exports, failed_exports, failed_bases, export_dir = result
             if successful_exports > 0:
                 msg = f'Successfully exported {successful_exports} base(s)to {export_dir}.'
                 if failed_exports > 0:
                     msg += f'\nFailed to export {failed_exports} base(s):\n' + '\n'.join(failed_bases)
-                self._show_info(t('success.title'), msg)
-            else:
-                self._show_warning(t('error.title'), f'Failed to export any bases.\n' + '\n'.join(failed_bases))
-        run_with_loading(on_finished, task)
+                return msg
+            return f'Failed to export any bases.\n' + '\n'.join(failed_bases)
+        return self._run_transfer_workflow(
+            title=t('base.export_all', default='Export All Bases'),
+            source=t(
+                'transfer.base.loaded_count',
+                default='{count} loaded base(s)', count=len(bases)),
+            target=export_dir,
+            review=t(
+                'transfer.base.export_review',
+                default='Export each base as {format}.',
+                format='.pstbase' if compressed else '.json'),
+            backup=t(
+                'transfer.export.read_only',
+                default='Read-only export: the loaded save is not changed.'),
+            operation=task,
+            result_message=result_message,
+            result_success=lambda result: result[0] > 0,
+            confirm_text=t('button.export', default='Export'),
+        )
     def _export_bases_for_guild(self, gid):
         if not constants.loaded_level_json:
             self._show_warning(t('Error') if t else 'Error', t('error.no_save_loaded') if t else 'No save file loaded.')
@@ -2869,16 +4052,33 @@ class MainWindow(QMainWindow):
                     failed_exports += 1
                     failed_bases.append(f'Base {bid}(error: {str(e)})')
             return (successful_exports, failed_exports, failed_bases)
-        def on_finished(result):
+        def result_message(result):
             successful_exports, failed_exports, failed_bases = result
             if successful_exports > 0:
                 msg = f'Successfully exported {successful_exports} base(s)for guild "{guild_name}" to {export_dir}.'
                 if failed_exports > 0:
                     msg += f'\nFailed to export {failed_exports} base(s):\n' + '\n'.join(failed_bases)
-                self._show_info(t('success.title'), msg)
-            else:
-                self._show_warning(t('error.title'), f'Failed to export any bases for guild "{guild_name}".\n' + '\n'.join(failed_bases))
-        run_with_loading(on_finished, task)
+                return msg
+            return f'Failed to export any bases for guild "{guild_name}".\n' + '\n'.join(failed_bases)
+        return self._run_transfer_workflow(
+            title=t('base.export_guild', default='Export Guild Bases'),
+            source=t(
+                'transfer.base.guild_source',
+                default='{guild}: {count} base(s)',
+                guild=guild_name, count=len(guild_bases)),
+            target=export_dir,
+            review=t(
+                'transfer.base.export_review',
+                default='Export each base as {format}.',
+                format='.pstbase' if compressed else '.json'),
+            backup=t(
+                'transfer.export.read_only',
+                default='Read-only export: the loaded save is not changed.'),
+            operation=task,
+            result_message=result_message,
+            result_success=lambda result: result[0] > 0,
+            confirm_text=t('button.export', default='Export'),
+        )
     def _export_base(self, bid):
         if not constants.loaded_level_json:
             self._show_warning(t('Error') if t else 'Error', t('error.no_save_loaded') if t else 'No save file loaded.')
@@ -2888,30 +4088,42 @@ class MainWindow(QMainWindow):
         if not file_path:
             return
         is_pstbase = 'pstbase' in selected_filter if selected_filter else file_path.endswith('.pstbase')
+        if is_pstbase and not file_path.endswith('.pstbase'):
+            file_path += '.pstbase'
+        elif not is_pstbase and not file_path.endswith('.json'):
+            file_path += '.json'
         def task():
-            nonlocal file_path
             data = export_base_json(constants.loaded_level_json, bid)
             if not data:
                 return (False, t('base.export.not_found') if t else f'Could not find base data for ID: {bid}')
             if is_pstbase:
-                if not file_path.endswith('.pstbase'):
-                    file_path += '.pstbase'
                 data['_base_id'] = bid
                 data['_version'] = 1
                 with open(file_path, 'wb') as f:
                     f.write(compress_to_pst3(data))
             else:
-                if not file_path.endswith('.json'):
-                    file_path += '.json'
                 json_tools.dump(data, file_path, cls=json_tools.CustomEncoder, indent=2)
             return (True, None)
-        def on_finished(result):
-            success, error = result
-            if success:
-                self._show_info(t('success.title') if t else 'Success', t('base.export.success') if t else 'Base exported successfully')
-            else:
-                self._show_error(t('error.title') if t else 'Error', error or 'Failed to export base')
-        run_with_loading(on_finished, task)
+        return self._run_transfer_workflow(
+            title=t('base.export.title', default='Export Base'),
+            source=t(
+                'transfer.base.single_source',
+                default='Base {base}', base=_short_guid(bid)),
+            target=file_path,
+            review=t(
+                'transfer.base.single_export_review',
+                default='Export this base as {format}.',
+                format='.pstbase' if is_pstbase else '.json'),
+            backup=t(
+                'transfer.export.read_only',
+                default='Read-only export: the loaded save is not changed.'),
+            operation=task,
+            result_message=lambda result: (
+                t('base.export.success') if result[0]
+                else (result[1] or t('base.export.not_found'))),
+            result_success=lambda result: bool(result[0]),
+            confirm_text=t('button.export', default='Export'),
+        )
     def _adjust_base_radius(self, bid):
         if not constants.loaded_level_json:
             self._show_warning(t('Error') if t else 'Error', t('error.no_save_loaded') if t else 'No save file loaded.')
@@ -2933,15 +4145,18 @@ class MainWindow(QMainWindow):
     def _import_base(self, gid):
         self._import_base_to_guild(gid)
     def _trim_overfilled_inventories(self):
-        if not constants.current_save_path:
-            self._show_warning(t('error.title') if t else 'Error', t('error.no_save_loaded') if t else 'No save file loaded.')
-            return
-        def task():
-            return detect_and_trim_overfilled_inventories(self)
-        def on_finished(fixed):
-            self.refresh_all()
-            self._show_info(t('done') if t else 'Done', t('deletion.trimmed_inventories', fixed=fixed) if t else f'Fixed {fixed} containers: filled underfilled inventories, trimmed overfilled inventories and pal containers')
-        run_with_loading(on_finished, task)
+        return self._run_loaded_save_repair(
+            title=t('deletion.menu.fix_overfilled_inventories'),
+            affected=t(
+                'repair.affected.containers',
+                default='Underfilled and overfilled item and Pal containers'),
+            review=t(
+                'repair.review.containers',
+                default='Normalize container sizes using the existing inventory repair action.'),
+            operation=lambda: detect_and_trim_overfilled_inventories(self),
+            result_message=lambda fixed: t(
+                'deletion.trimmed_inventories', fixed=fixed),
+        )
     def _nudge_palbox(self, bid):
         if not constants.loaded_level_json:
             self._show_warning(t('Error') if t else 'Error', t('error.no_save_loaded') if t else 'No save file loaded.')
@@ -2996,24 +4211,49 @@ class MainWindow(QMainWindow):
     def _clone_base(self, bid, gid):
         def task():
             return clone_base_complete(constants.loaded_level_json, bid, gid)
-        def on_finished(success):
+        def result_message(success):
             if success:
-                self.refresh_all()
-                self._show_info(t('success.title'), t('clone_base.msg'))
+                return t('clone_base.msg')
             else:
                 audit = get_last_import_audit() or {}
                 msg = 'Failed to clone base'
                 if audit.get('issues'):
                     msg += ': ' + '; '.join(audit['issues'])
-                self._show_warning(t('error.title'), msg)
-        run_with_loading(on_finished, task)
+                return msg
+        return self._run_transfer_workflow(
+            title=t('clone.base', default='Clone Base'),
+            source=t(
+                'transfer.base.single_source',
+                default='Base {base}', base=_short_guid(bid)),
+            target=t(
+                'transfer.base.guild_target',
+                default='Guild {guild}', guild=_short_guid(gid)),
+            review=t(
+                'transfer.base.clone_review',
+                default='Create a new base with copied structures, containers, and ownership links.'),
+            backup=t(
+                'repair.workflow.loaded_backup',
+                default=(
+                    'Recovery: a full backup was created when this save was loaded. '
+                    'The clone remains in memory until Save Changes.')),
+            risk=t(
+                'transfer.base.clone_risk',
+                default='Cloning adds a complete base and remapped identifiers to the loaded save.'),
+            operation=task,
+            result_message=result_message,
+            result_success=bool,
+            on_completed=lambda _success: self.refresh_all(),
+            confirm_text=t('clone.base', default='Clone Base'),
+        )
     def _edit_player_pals(self, uid, name):
         from ..editor.edit_pals import EditPalsDialog
         dialog = EditPalsDialog(uid, name, self)
         if dialog.exec() == QDialog.Accepted:
             QTimer.singleShot(0, self.refresh_all)
     def _edit_player_inventory(self, uid, name):
-        self._activate_nav('player_inventory')
+        from palworld_aio.ui.workspace_context import ContextSelection
+        self._activate_contextual_nav(
+            'player_inventory', player=ContextSelection(str(uid), str(name)))
         self.stacked_widget.setCurrentIndex(2)
         if 'inventory_tab' in self.__dict__:
             self.inventory_tab.load_player(uid, name)

@@ -1,6 +1,6 @@
 ﻿import os
 from palsav import json_tools
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QScrollArea, QGroupBox, QMessageBox, QAbstractItemView, QListView, QWidget, QFrame
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QScrollArea, QGroupBox, QAbstractItemView, QListView, QWidget, QFrame
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QEvent
 from PyQt6.QtGui import QShowEvent
@@ -10,7 +10,11 @@ from palworld_aio import constants
 from palworld_aio.utils import sav_to_gvasfile, gvasfile_to_sav
 from palworld_aio.managers.data_manager import get_guilds, get_guild_members
 from palworld_aio.editor.edit_pals import _clean_desc_for_tooltip
-from palworld_aio.ui.chrome.components import BaseDialog, make_button
+from palworld_aio.ui.chrome.components import (
+    BaseDialog,
+    MessageDialog as QMessageBox,
+    make_button,
+)
 from palworld_aio.ui.chrome import tokens as ui_tokens
 from palworld_aio.ui.chrome.styles import wrap_tooltip_text
 from resource_resolver import resource_path

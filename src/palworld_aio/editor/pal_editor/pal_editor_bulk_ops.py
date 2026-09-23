@@ -3,6 +3,7 @@ from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from PyQt6.QtCore import Qt
 from i18n import t
 from loading_manager import show_information, show_warning
+from palworld_aio.ui.chrome.components import BulkWorkflowReview
 from palworld_aio.ui.chrome import tokens as _chrome_tokens
 _P = _chrome_tokens.resolve()
 from palworld_aio.utils import extract_value, safe_nested_get, calculate_max_hp, resolve_name
@@ -12,7 +13,7 @@ from .icons import _strip_prefix_label
 from .legacy_frame import PalFrame
 from .data import _ensure_friendship_thresholds
 from .pal_ops import _get_raw_from_item, _set_work_suitability
-from .widgets import FramelessDialog
+from .widgets import PalEditorDialog
 from .create_dialogs import BulkSyncAllDialog
 
 
@@ -81,7 +82,7 @@ class BulkOperationMixin:
         raw = _get_raw_from_item(candidates[0])
         cid = extract_value(raw, 'CharacterID', '') if raw else ''
         pal_name = _strip_prefix_label(resolve_name(cid, PalFrame._NAMEMAP) or cid)
-        dlg = FramelessDialog('edit_pals.ctx.bulk_rename', self)
+        dlg = PalEditorDialog('edit_pals.ctx.bulk_rename', self)
         dlg.setWindowTitle(f"{t('edit_pals.bulk_rename_title', name=pal_name)}")
         dlg.setModal(True)
         dlg.setMinimumSize(500, 450)
@@ -89,6 +90,18 @@ class BulkOperationMixin:
         il = QVBoxLayout(inner)
         il.setContentsMargins(8, 4, 8, 8)
         il.setSpacing(6)
+        workflow_review = BulkWorkflowReview(
+            source=pal_name,
+            target=t('ui.bulk.pal_target_count',
+                     default='{count} matching Pals', count=len(candidates)),
+            review=t('ui.bulk.rename_review',
+                     default='Set one nickname on every checked Pal.'),
+            parent=inner,
+        )
+        workflow_review.set_risk('', t(
+            'ui.bulk.backup_guidance',
+            default='Create or verify a backup before applying broad save changes.'))
+        il.addWidget(workflow_review)
         rename_lbl = QLabel(t('edit_pals.bulk_rename_label'))
         rename_lbl.setStyleSheet(f'font-size: 11px; font-weight: 600; color: {_P["info"]}; background: transparent; border: none;')
         il.addWidget(rename_lbl)
@@ -158,11 +171,15 @@ class BulkOperationMixin:
                 show_warning(dlg, t('edit_pals.bulk_rename_title', name=pal_name), t('edit_pals.bulk_no_selection'))
                 return
             count = 0
+            workflow_review.set_progress(
+                0, len(selected),
+                t('ui.bulk.applying', default='Applying changes…'))
             for pi in selected:
                 tr = _get_raw_from_item(pi)
                 if tr:
                     tr['NickName'] = {'id': None, 'type': 'StrProperty', 'value': text}
                     count += 1
+                    workflow_review.set_progress(count, len(selected))
             self._update_party_slots()
             self._update_palbox_page()
             if hasattr(self, '_update_dps_slots'):
@@ -171,6 +188,8 @@ class BulkOperationMixin:
             if self.dps_pals and hasattr(self, '_save_dps'):
                 self._save_dps(force=True)
             result['applied'] = True
+            workflow_review.set_result(t(
+                'edit_pals.bulk_rename_success', count=count, name=pal_name))
             show_information(dlg, t('edit_pals.ctx.bulk_rename'), t('edit_pals.bulk_rename_success', count=count, name=pal_name))
             dlg.accept()
         apply_btn.clicked.connect(on_apply)
@@ -188,7 +207,7 @@ class BulkOperationMixin:
             return
         cid = extract_value(raw_orig, 'CharacterID', '')
         pal_name = _strip_prefix_label(resolve_name(cid, PalFrame._NAMEMAP) or cid)
-        dlg = FramelessDialog('edit_pals.ctx.bulk_heal', self)
+        dlg = PalEditorDialog('edit_pals.ctx.bulk_heal', self)
         dlg.setWindowTitle(f"{t('edit_pals.bulk_heal_title', name=pal_name)}")
         dlg.setModal(True)
         dlg.setMinimumSize(500, 450)
@@ -196,6 +215,18 @@ class BulkOperationMixin:
         il = QVBoxLayout(inner)
         il.setContentsMargins(8, 4, 8, 8)
         il.setSpacing(6)
+        workflow_review = BulkWorkflowReview(
+            source=pal_name,
+            target=t('ui.bulk.pal_target_count',
+                     default='{count} matching Pals', count=len(candidates)),
+            review=t('ui.bulk.heal_review', default=(
+                'Restore HP, hunger, sanity, and clear ailments for checked Pals.')),
+            parent=inner,
+        )
+        workflow_review.set_risk('', t(
+            'ui.bulk.backup_guidance',
+            default='Create or verify a backup before applying broad save changes.'))
+        il.addWidget(workflow_review)
         info_lbl = QLabel(t('edit_pals.bulk_heal_desc'))
         info_lbl.setStyleSheet('font-size: 11px; color: #94A3B8; background: transparent; border: none; padding: 4px 0;')
         il.addWidget(info_lbl)
@@ -256,6 +287,9 @@ class BulkOperationMixin:
                 show_warning(dlg, t('edit_pals.bulk_heal_title', name=pal_name), t('edit_pals.bulk_no_selection'))
                 return
             count = 0
+            workflow_review.set_progress(
+                0, len(selected),
+                t('ui.bulk.applying', default='Applying changes…'))
             for pi in selected:
                 tr = _get_raw_from_item(pi)
                 if not tr:
@@ -293,6 +327,7 @@ class BulkOperationMixin:
                 tr.pop('Tiemr_FoodWithStatusEffect', None)
                 tr.pop('FoodRegeneEffectInfo', None)
                 count += 1
+                workflow_review.set_progress(count, len(selected))
             self._update_party_slots()
             self._update_palbox_page()
             if hasattr(self, '_update_dps_slots'):
@@ -300,6 +335,8 @@ class BulkOperationMixin:
             self.pal_info._refresh()
             if self.dps_pals and hasattr(self, '_save_dps'):
                 self._save_dps(force=True)
+            workflow_review.set_result(t(
+                'edit_pals.bulk_heal_success', count=count, name=pal_name))
             show_information(dlg, t('edit_pals.ctx.bulk_heal'), t('edit_pals.bulk_heal_success', count=count, name=pal_name))
             dlg.accept()
         apply_btn.clicked.connect(on_apply)
@@ -317,7 +354,7 @@ class BulkOperationMixin:
         food_id = food_dlg.selected_food
         cid = extract_value(raw_orig, 'CharacterID', '')
         pal_name = _strip_prefix_label(resolve_name(cid, PalFrame._NAMEMAP) or cid)
-        dlg = FramelessDialog('edit_pals.ctx.bulk_max_buff', self)
+        dlg = PalEditorDialog('edit_pals.ctx.bulk_max_buff', self)
         dlg.setWindowTitle(f"{t('edit_pals.bulk_max_buff_title', name=pal_name)}")
         dlg.setModal(True)
         dlg.setMinimumSize(500, 450)
@@ -325,6 +362,21 @@ class BulkOperationMixin:
         il = QVBoxLayout(inner)
         il.setContentsMargins(8, 4, 8, 8)
         il.setSpacing(6)
+        workflow_review = BulkWorkflowReview(
+            source=food_id,
+            target=t('ui.bulk.pal_target_count',
+                     default='{count} matching Pals', count=len(candidates)),
+            review=t('ui.bulk.buff_review',
+                     default='Replace the food buff on every checked Pal.'),
+            parent=inner,
+        )
+        workflow_review.set_risk(
+            t('ui.bulk.buff_risk', default=(
+                'Existing food buffs on target Pals will be overwritten.')),
+            t('ui.bulk.backup_guidance', default=(
+                'Create or verify a backup before applying broad save changes.')),
+        )
+        il.addWidget(workflow_review)
         info_lbl = QLabel(t('edit_pals.bulk_max_buff_desc', food=food_id))
         info_lbl.setStyleSheet('font-size: 11px; color: #94A3B8; background: transparent; border: none; padding: 4px 0;')
         il.addWidget(info_lbl)
@@ -385,12 +437,16 @@ class BulkOperationMixin:
                 show_warning(dlg, t('edit_pals.bulk_max_buff_title', name=pal_name), t('edit_pals.bulk_no_selection'))
                 return
             count = 0
+            workflow_review.set_progress(
+                0, len(selected),
+                t('ui.bulk.applying', default='Applying changes…'))
             for pi in selected:
                 tr = _get_raw_from_item(pi)
                 if not tr:
                     continue
                 _apply_food_buff(tr, food_id)
                 count += 1
+                workflow_review.set_progress(count, len(selected))
             self._update_party_slots()
             self._update_palbox_page()
             if hasattr(self, '_update_dps_slots'):
@@ -398,6 +454,8 @@ class BulkOperationMixin:
             self.pal_info._refresh()
             if self.dps_pals and hasattr(self, '_save_dps'):
                 self._save_dps(force=True)
+            workflow_review.set_result(t(
+                'edit_pals.bulk_max_buff_success', count=count, name=pal_name))
             show_information(dlg, t('edit_pals.ctx.bulk_max_buff'), t('edit_pals.bulk_max_buff_success', count=count, name=pal_name))
             dlg.accept()
         apply_btn.clicked.connect(on_apply)

@@ -1,6 +1,6 @@
 import sys, os, shutil, copy, tempfile
 import logging
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QFileDialog, QApplication, QFrame, QGridLayout, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QSpinBox, QGroupBox, QWidget, QScrollArea, QProgressBar, QInputDialog
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QFileDialog, QApplication, QFrame, QGridLayout, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QSpinBox, QGroupBox, QWidget, QScrollArea, QProgressBar
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from PyQt6.QtGui import QIcon, QFont, QPixmap, QColor, QPalette
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
@@ -14,6 +14,13 @@ from palsav.core import decompress_sav_to_gvas, compress_gvas_to_sav
 from import_libs import backup_whole_directory
 from loading_manager import show_information, show_critical, run_with_loading
 from palworld_aio.ui.chrome.styles import ThemeManager
+from palworld_aio.ui.chrome.components import (
+    BulkWorkflowReview,
+    InputPromptDialog as QInputDialog,
+    MessageDialog as QMessageBox,
+    make_button,
+)
+from palworld_aio.ui.chrome.icons import get_pixmap
 from palworld_aio import constants
 logger = logging.getLogger(__name__)
 _SORT_ROLE = Qt.UserRole + 1
@@ -192,15 +199,12 @@ class SlotNumUpdaterApp(QDialog):
         file_group.setObjectName('glass')
         file_layout = QHBoxLayout(file_group)
         file_layout.setContentsMargins(12, 8, 12, 8)
-        import nerdfont as nf
-        _nf_font = QFont(constants.FONT_FAMILY_NERD, 10)
-        self.browse_button = QPushButton(f"{nf.icons['nf-fa-steam']} " + t('browse'))
-        self.browse_button.setFont(_nf_font)
+        self.browse_button = make_button(t('browse'), 'secondary')
         self.browse_button.setMinimumWidth(110)
         self.browse_button.setMaximumWidth(150)
         self.browse_button.clicked.connect(self.browse_file)
-        self.xgp_load_btn = QPushButton(f"{nf.icons['nf-fa-xbox']} " + t('browse'))
-        self.xgp_load_btn.setFont(_nf_font)
+        self.xgp_load_btn = make_button(
+            t('slotinjector.browse_xgp', default='Browse Game Pass'), 'secondary')
         self.xgp_load_btn.setMinimumWidth(110)
         self.xgp_load_btn.setMaximumWidth(150)
         self.xgp_load_btn.setToolTip('Load a GamePass save from the container')
@@ -212,6 +216,25 @@ class SlotNumUpdaterApp(QDialog):
         file_layout.addWidget(self.browse_button)
         file_layout.addWidget(self.xgp_load_btn)
         file_layout.addWidget(self.file_entry)
+        self.workflow_review = BulkWorkflowReview(
+            source=t(
+                'slotinjector.source_missing', default='Choose a Level.sav file'),
+            target=t(
+                'slotinjector.target_missing',
+                default='Load a save to select Pal storage containers'),
+            review=t(
+                'slotinjector.review_missing',
+                default='Load a save and review the affected containers before applying slot changes.'),
+            parent=self,
+        )
+        self.workflow_review.set_risk(
+            '',
+            t(
+                'slotinjector.backup',
+                default=(
+                    'A full Backups/Slot Injector copy is created when the save '
+                    'is loaded. Applied slot changes remain in memory until Save Changes.')),
+        )
         controls_group = QGroupBox(t('slotinjector.slot_configuration'))
         controls_group.setObjectName('glass')
         controls_layout = QHBoxLayout(controls_group)
@@ -229,13 +252,16 @@ class SlotNumUpdaterApp(QDialog):
         slots_layout.addWidget(self.new_slots_entry)
         slots_layout.addStretch()
         buttons_layout = QVBoxLayout()
-        self.apply_selected_btn = QPushButton('✅ ' + t('slotinjector.apply_selected'))
+        self.apply_selected_btn = make_button(
+            t('slotinjector.apply_selected'), 'primary')
         self.apply_selected_btn.setObjectName('ApplyButton')
         self.apply_selected_btn.clicked.connect(self.apply_selected)
-        self.apply_all_btn = QPushButton('🎯 ' + t('slotinjector.apply_all'))
+        self.apply_all_btn = make_button(
+            t('slotinjector.apply_all'), 'secondary')
         self.apply_all_btn.setObjectName('ApplyButton')
         self.apply_all_btn.clicked.connect(self.apply_all)
-        self.save_changes_btn = QPushButton('💾 ' + t('menu.file.save_changes'))
+        self.save_changes_btn = make_button(
+            t('menu.file.save_changes'), 'warning')
         self.save_changes_btn.setObjectName('ApplyButton')
         self.save_changes_btn.clicked.connect(self.save_changes)
         buttons_layout.addWidget(self.apply_selected_btn)
@@ -249,13 +275,18 @@ class SlotNumUpdaterApp(QDialog):
         search_layout = QHBoxLayout(search_frame)
         search_layout.setContentsMargins(12, 8, 12, 8)
         search_layout.setSpacing(12)
-        search_icon_label = QLabel('🔍')
-        search_icon_label.setFont(QFont(constants.FONT_FAMILY, 14))
+        search_icon_label = QLabel()
+        search_icon_label.setFixedSize(20, 32)
+        search_icon_label.setAlignment(Qt.AlignCenter)
+        search_pixmap = get_pixmap('search', size=16, role='text_secondary')
+        if search_pixmap is not None:
+            search_icon_label.setPixmap(search_pixmap)
         self.search_entry = QLineEdit()
         self.search_entry.setPlaceholderText(t('slotinjector.search_placeholder'))
         self.search_entry.textChanged.connect(self.filter_table)
         self.search_entry.setFixedHeight(32)
-        self.clear_search_btn = QPushButton('🗑️ ' + t('slotinjector.clear'))
+        self.clear_search_btn = make_button(
+            t('slotinjector.clear'), 'tertiary')
         self.clear_search_btn.setFixedHeight(32)
         self.clear_search_btn.clicked.connect(self.clear_search)
         search_layout.addWidget(search_icon_label)
@@ -266,9 +297,11 @@ class SlotNumUpdaterApp(QDialog):
         table_layout = QVBoxLayout(table_frame)
         table_layout.setContentsMargins(12, 8, 12, 8)
         selection_layout = QHBoxLayout()
-        self.select_all_btn = QPushButton('✓ ' + t('slotinjector.select_all'))
+        self.select_all_btn = make_button(
+            t('slotinjector.select_all'), 'tertiary')
         self.select_all_btn.clicked.connect(self.select_all)
-        self.select_none_btn = QPushButton('✗ ' + t('slotinjector.select_none'))
+        self.select_none_btn = make_button(
+            t('slotinjector.select_none'), 'tertiary')
         self.select_none_btn.clicked.connect(self.select_none)
         selection_layout.addWidget(self.select_all_btn)
         selection_layout.addWidget(self.select_none_btn)
@@ -324,19 +357,22 @@ class SlotNumUpdaterApp(QDialog):
         table_layout.addWidget(self.table)
         main_layout.addWidget(header_frame)
         main_layout.addWidget(file_group)
+        main_layout.addWidget(self.workflow_review)
         main_layout.addWidget(controls_group)
         main_layout.addWidget(search_frame)
         main_layout.addWidget(table_frame)
         self.has_changes = False
         self.pending_new_value = None
+        self.new_slots_entry.valueChanged.connect(self._sync_workflow_review)
         try:
             if ICON_PATH and os.path.exists(ICON_PATH):
                 self.setWindowIcon(QIcon(ICON_PATH))
         except Exception:
             pass
-    def showEvent(self, event):
-        super().showEvent(event)
-        if not event.spontaneous():
+        self._sync_workflow_review()
+    def showEvent(self, a0):
+        super().showEvent(a0)
+        if not a0.spontaneous():
             self.activateWindow()
             self.raise_()
             self._update_xgp_button_state()
@@ -361,6 +397,7 @@ class SlotNumUpdaterApp(QDialog):
         self._xgp_save_id = save_id
         self.file_entry.setText(level_path)
         self.save_folder = tmp
+        backup_whole_directory(tmp, 'Backups/Slot Injector')
         self.load_selected_save()
     def browse_file(self):
         from common import get_preferred_save_path
@@ -389,11 +426,19 @@ class SlotNumUpdaterApp(QDialog):
             self.player_containers = get_player_containers(self.gvas_file, players_folder)
             self.populate_table()
             self.set_loading_state(False)
-            show_information(self, t('slot.loaded_title'), t('slotinjector.loaded_msg', count=len(self.player_containers)))
+            self.workflow_review.set_result(t(
+                'slotinjector.loaded_msg', count=len(self.player_containers)),
+                success=True)
+            self._sync_workflow_review()
         def on_error(error_msg):
             self.set_loading_state(False)
-            show_critical(self, t('error.title'), f'Failed to load save file: {error_msg}')
-        run_with_loading(on_finished, task, parent=self)
+            self._set_workflow_result(t(
+                'slotinjector.load_failed',
+                default='Failed to load the save. No slot data changed. {detail}',
+                detail=str(error_msg).strip()), success=False)
+        run_with_loading(
+            on_finished, task, parent=self, on_error=on_error,
+            local_state=True)
     def set_loading_state(self, loading, message='Processing...'):
         if loading:
             self.browse_button.setEnabled(False)
@@ -415,11 +460,13 @@ class SlotNumUpdaterApp(QDialog):
             self.clear_search_btn.setEnabled(True)
             self.select_all_btn.setEnabled(True)
             self.select_none_btn.setEnabled(True)
+            self._sync_workflow_review()
     def populate_table(self):
         self.table.setRowCount(len(self.player_containers))
         for row, container in enumerate(self.player_containers):
             checkbox = ToggleCheckBtn('')
             checkbox.setChecked(True)
+            checkbox.toggled.connect(self._sync_workflow_review)
             wrapper = QWidget()
             wrapper_layout = QHBoxLayout(wrapper)
             wrapper_layout.addWidget(checkbox)
@@ -446,6 +493,7 @@ class SlotNumUpdaterApp(QDialog):
             new_item = QTableWidgetItem('-')
             new_item.setFlags(new_item.flags() & ~Qt.ItemIsEditable)
             self.table.setItem(row, 6, new_item)
+        self._sync_workflow_review()
     def filter_table(self, text):
         search_text = text.lower().strip()
         for row in range(self.table.rowCount()):
@@ -476,6 +524,7 @@ class SlotNumUpdaterApp(QDialog):
                 checkbox = wrapper.findChild(ToggleCheckBtn)
                 if checkbox:
                     checkbox.setChecked(False)
+        self._sync_workflow_review()
     def get_selected_containers(self):
         selected = []
         for row in range(self.table.rowCount()):
@@ -497,7 +546,7 @@ class SlotNumUpdaterApp(QDialog):
             return
         self._apply_to_containers(self.player_containers)
     def _apply_to_containers(self, containers):
-        if not hasattr(self, 'gvas_file'):
+        if self.gvas_file is None:
             show_critical(self, t('error.title'), t('slot.load_first'))
             return
         new_value = self.new_slots_entry.value()
@@ -530,8 +579,13 @@ class SlotNumUpdaterApp(QDialog):
         confirm_msg = t('slotinjector.update_confirmation', count=len(containers), parts=', '.join(msg_parts), new=new_value)
         reply = QMessageBox.question(self, t('slot.confirm_title'), confirm_msg, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply != QMessageBox.Yes:
+            self.workflow_review.set_result(t(
+                'slotinjector.cancelled',
+                default='Cancelled. No container slot values were changed.'),
+                success=True)
             return
-        self.set_loading_state(True, 'Updating containers...')
+        self._set_workflow_running(t(
+            'slotinjector.applying', default='Updating container slot values…'))
         def task():
             reduction_cids = set()
             for container in containers:
@@ -609,11 +663,20 @@ class SlotNumUpdaterApp(QDialog):
                     used_item.setFlags(used_item.flags() & ~Qt.ItemIsEditable)
                     self.table.setItem(row, 5, used_item)
             self.set_loading_state(False)
-            show_information(self, t('success.title'), t('slotinjector.applied_in_memory', count=len(containers), new=new_value))
+            self._set_workflow_result(t(
+                'slotinjector.applied_in_memory',
+                count=len(containers), new=new_value), success=True)
         def on_error(error_msg):
             self.set_loading_state(False)
-            show_critical(self, t('error.title'), f'Failed to update containers: {error_msg}')
-        run_with_loading(on_finished, task, parent=self)
+            self._set_workflow_result(t(
+                'slotinjector.apply_failed',
+                default=(
+                    'Container updates failed in memory. Reload the save before '
+                    'retrying. Details: {detail}'),
+                detail=str(error_msg).strip()), success=False)
+        run_with_loading(
+            on_finished, task, parent=self, on_error=on_error,
+            local_state=True)
     def _cleanup_excess_slots(self, container, new_slot_count):
         try:
             import copy
@@ -716,7 +779,7 @@ class SlotNumUpdaterApp(QDialog):
             logger.error(f'Error during comprehensive slot cleanup: {e}')
             raise
     def save_changes(self):
-        if not hasattr(self, 'gvas_file'):
+        if self.gvas_file is None:
             show_critical(self, t('error.title'), t('slot.load_first'))
             return
         if not self.has_changes:
@@ -743,7 +806,7 @@ class SlotNumUpdaterApp(QDialog):
                     old_name = sav_to_gvasfile(meta_p).properties.get('SaveData', {}).get('value', {}).get('WorldName', {}).get('value', 'World')
                 except Exception:
                     pass
-            from PyQt6.QtWidgets import QInputDialog, QLineEdit
+            from PyQt6.QtWidgets import QLineEdit
             new_name, ok = QInputDialog.getText(self, t('xgp.save.title', default='Save to World'),
                 t('xgp.save.msg', default='Changes will be saved back to the world "{name}".\nLeave the name unchanged to keep it, or edit to rename.', name=old_name),
                 QLineEdit.Normal, old_name)
@@ -751,6 +814,8 @@ class SlotNumUpdaterApp(QDialog):
                 return
             new_name = new_name.strip()
         self.set_loading_state(True, 'Saving changes...')
+        self._set_workflow_running(t(
+            'slotinjector.saving', default='Writing the updated target save…'))
         def task():
             if xgp_path and filepath.startswith(xgp_path):
                 level_dst = os.path.join(xgp_path, 'Level.sav')
@@ -771,19 +836,77 @@ class SlotNumUpdaterApp(QDialog):
                 from palworld_xgp_import.gamepass_manager import restore_network
                 restore_network(result, self)
             self.file_mtime = os.path.getmtime(filepath)
-            show_information(self, t('success.title'), t('slotinjector.saved_success'))
-            self.accept()
+            self.has_changes = False
+            self._set_workflow_result(t('slotinjector.saved_success'), success=True)
         def on_error(error_msg):
             self.set_loading_state(False)
-            show_critical(self, t('error.title'), f'Failed to save changes: {error_msg}')
-        run_with_loading(on_finished, task, parent=self)
-    def closeEvent(self, event):
+            self._set_workflow_result(t(
+                'slotinjector.save_failed',
+                default=(
+                    'The updated target could not be saved. Restore the Slot '
+                    'Injector backup if any partial write occurred. Details: {detail}'),
+                detail=str(error_msg).strip()), success=False)
+        run_with_loading(
+            on_finished, task, parent=self, on_error=on_error,
+            local_state=True)
+    def _sync_workflow_review(self):
+        if not hasattr(self, 'workflow_review'):
+            return
+        selected = self.get_selected_containers() if self.player_containers else []
+        new_value = self.new_slots_entry.value()
+        reductions = [
+            item for item in selected if item.get('slot_num', 0) > new_value]
+        destructive = any(
+            item.get('used_slots', 0) > new_value for item in reductions)
+        source = self.file_entry.text().strip() or t(
+            'slotinjector.source_missing', default='Choose a Level.sav file')
+        target = t(
+            'slotinjector.target_count',
+            default='{count} selected container(s)', count=len(selected))
+        review = t(
+            'slotinjector.review_ready' if self.gvas_file is not None and selected
+            else 'slotinjector.review_missing',
+            default=(
+                'Set {count} selected container(s) to {slots} slots, then save '
+                'the staged target changes.' if self.gvas_file is not None and selected
+                else 'Load a save and select containers before applying slot changes.'),
+            count=len(selected), slots=new_value)
+        self.workflow_review.set_context(
+            source=source, target=target, review=review)
+        self.workflow_review.set_risk(
+            t(
+                'slotinjector.reduction_risk',
+                default=(
+                    'Reducing below current usage removes excess slots and their '
+                    'associated Pals.')) if destructive else '',
+            t(
+                'slotinjector.backup',
+                default=(
+                    'A full Backups/Slot Injector copy is created when the save '
+                    'is loaded. Applied slot changes remain in memory until Save Changes.')))
+        ready = self.gvas_file is not None and bool(selected)
+        self.apply_selected_btn.setEnabled(ready)
+        self.apply_all_btn.setEnabled(self.gvas_file is not None and bool(self.player_containers))
+        self.save_changes_btn.setEnabled(self.gvas_file is not None and self.has_changes)
+    def _set_workflow_running(self, message):
+        self.set_loading_state(True, message)
+        self.workflow_review.progress.setRange(0, 0)
+        self.workflow_review.progress.setFormat(message)
+        self.workflow_review.progress.show()
+    def _set_workflow_result(self, message, success=True):
+        self.workflow_review.set_progress(
+            1, 1,
+            t('ui.bulk.complete', default='Complete') if success
+            else t('repair.workflow.failed_short', default='Operation failed'))
+        self.workflow_review.set_result(message, success=success)
+        self._sync_workflow_review()
+    def closeEvent(self, a0):
         if self.has_changes:
             reply = QMessageBox.question(self, t('warning.title'), t('slotinjector.unsaved_changes'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.No:
-                event.ignore()
+                a0.ignore()
                 return
-        event.accept()
+        a0.accept()
     def load_styles(self):
         ThemeManager.load_styles(self)
 def slot_injector():

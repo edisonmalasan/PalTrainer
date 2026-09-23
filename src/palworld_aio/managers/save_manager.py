@@ -107,7 +107,8 @@ class SaveManager(QObject):
         constants.backup_save_path = constants.current_save_path
         from common import set_last_save_path
         set_last_save_path(d)
-        save_session.make_backup('AllinOneTools')
+        if constants.automatic_backup_on_load:
+            save_session.make_backup('AllinOneTools')
         def load_task():
             try:
                 ok = self._load_from_path(p, parent)
@@ -165,7 +166,10 @@ class SaveManager(QObject):
                 return
         self._xgp_new_world_name = None
         if constants.xgp_loaded and parent:
-            from PyQt6.QtWidgets import QInputDialog, QLineEdit
+            from PyQt6.QtWidgets import QLineEdit
+            from palworld_aio.ui.chrome.components import (
+                InputPromptDialog as QInputDialog,
+            )
             _old_name = 'World'
             try:
                 _meta_path = os.path.join(constants.current_save_path, 'LevelMeta.sav')

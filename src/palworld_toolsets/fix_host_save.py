@@ -1,6 +1,6 @@
 import sys, os, shutil, tempfile, traceback, struct, io
 from typing import Any, Callable
-from PyQt6.QtWidgets import QHeaderView, QMainWindow, QWidget, QLineEdit, QTreeWidget, QTreeWidgetItem, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QFrame, QApplication, QDialog, QInputDialog
+from PyQt6.QtWidgets import QHeaderView, QMainWindow, QWidget, QLineEdit, QTreeWidget, QTreeWidgetItem, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QFrame, QApplication
 from PyQt6.QtGui import QIcon, QFont
 from PyQt6.QtCore import Qt, QTimer
 from i18n import t
@@ -14,6 +14,12 @@ from palsav.archive import FArchiveReader, FArchiveWriter
 from palsav.paltypes import PALWORLD_TYPE_HINTS
 from palobject import SKP_PALWORLD_CUSTOM_PROPERTIES
 from palworld_aio.ui.chrome.styles import ThemeManager
+from palworld_aio.ui.chrome.components import (
+    BulkWorkflowReview,
+    InputPromptDialog as QInputDialog,
+    MessageDialog as QMessageBox,
+    make_button,
+)
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from palworld_aio import constants
 player_list_cache = []
@@ -332,38 +338,18 @@ def copy_dps_file(src_folder, src_uid, tgt_folder, tgt_uid, target_pal_storage_i
         shutil.copy2(src_file, tgt_file)
         print(f'[DPS] Copied without container ID update')
 def ask_string_with_icon(title, prompt, icon_path):
-    class CustomDialog(QDialog):
-        def __init__(self, parent):
-            super().__init__(parent)
-            ThemeManager.load_styles(self)
-            self.setWindowTitle(title)
-            try:
-                self.setWindowIcon(QIcon(icon_path))
-            except:
-                pass
-            self.setFixedSize(400, 120)
-            layout = QVBoxLayout(self)
-            label = QLabel(prompt)
-            layout.addWidget(label)
-            self.entry = QLineEdit()
-            layout.addWidget(self.entry)
-            button_layout = QHBoxLayout()
-            ok_button = QPushButton(t('OK'))
-            ok_button.clicked.connect(self.accept)
-            cancel_button = QPushButton(t('Cancel'))
-            cancel_button.clicked.connect(self.reject)
-            button_layout.addWidget(ok_button)
-            button_layout.addWidget(cancel_button)
-            layout.addLayout(button_layout)
-            self.entry.setFocus()
-        def showEvent(self, event):
-            super().showEvent(event)
-            if not event.spontaneous():
-                self.activateWindow()
-                self.raise_()
-    dialog = CustomDialog(None)
+    dialog = QInputDialog(None)
+    dialog.setWindowTitle(title)
+    dialog.setLabelText(prompt)
+    dialog.setInputMode(QInputDialog.TextInput)
+    dialog.setOkButtonText(t('OK'))
+    dialog.setCancelButtonText(t('Cancel'))
+    try:
+        dialog.setWindowIcon(QIcon(icon_path))
+    except (OSError, TypeError):
+        pass
     result = dialog.exec()
-    return dialog.entry.text() if result == QDialog.Accepted else None
+    return dialog.textValue() if result == dialog.DialogCode.Accepted else None
 def sav_to_json(filepath):
     from palsav.io import load_sav
     return load_sav(filepath, custom_properties=SKP_PALWORLD_CUSTOM_PROPERTIES).dump()
@@ -491,7 +477,8 @@ def fix_save_wrapper(window, level_sav_entry, old_tree, new_tree):
             msg.setDefaultButton(QMessageBox.No)
             if msg.exec() != QMessageBox.Yes:
                 return
-    # Single run_with_loading: fix + XGP save-back
+    window._begin_repair(old_guid, new_guid)
+    # Single run_with_loading: preserve the existing fix + XGP save-back call chain.
     def combined_task():
         fmt = lambda g: '{}-{}-{}-{}-{}'.format(g[:8], g[8:12], g[12:16], g[16:20], g[20:]).lower()
         f_old_uid, f_new_uid = (fmt(old_guid), fmt(new_guid))
@@ -598,20 +585,30 @@ def fix_save_wrapper(window, level_sav_entry, old_tree, new_tree):
                     player_list_cache[i] = (old_guid, name, guild, level, pals_count, last_seen, sort_key)
             populate_player_tree(old_tree, folder_path)
             populate_player_tree(new_tree, folder_path)
-            show_information(window, t('Success'), t('Fix has been applied! Have fun!'))
-    run_with_loading(on_combined_done, combined_task)
+            window._finish_repair(t(
+                'fix_host_save.result',
+                default=(
+                    'Host identity repair completed. The two player GUIDs, '
+                    'player files, ownership links, guild links, and DPS storage '
+                    'references were updated.')))
+        else:
+            window._fail_repair(t(
+                'fix_host_save.failed',
+                default='Host identity repair could not be applied. Restore the Fix Host Save backup if needed.'))
+    run_with_loading(
+        on_combined_done, combined_task, parent=window,
+        on_error=window._fail_repair, local_state=True)
 def load_save_with_fix(path, backup_label='Backups/Fix Host Save'):
+    """Back up and inspect a host save without mutating it.
+
+    Host repair used to run ``fix_all_pals_in_save`` and write ``Level.sav``
+    during file selection. That made cancelling the workspace destructive.
+    The actual GUID migration remains in ``fix_save_wrapper``; selection is a
+    read-only prerequisite step.
+    """
     folder = os.path.dirname(path)
     backup_whole_directory(folder, backup_label)
     level_json = sav_to_json(path)
-    try:
-        from palworld_aio.managers.func_manager import fix_all_pals_in_save
-        count = fix_all_pals_in_save(level_json, folder, include_dps=False)
-        if count:
-            json_to_sav(level_json, os.path.join(folder, 'Level.sav'))
-        print(f'[FIX_ALL_PALS] Fixed {count} pals on load.')
-    except Exception as e:
-        print(f'[FIX_ALL_PALS] Error: {e}')
     player_files, _ = _build_player_list_from_level(level_json)
     return (player_files, level_json)
 def center_window(win):
@@ -645,25 +642,48 @@ class FixHostSaveWindow(QWidget):
         self.level_sav_entry = QLineEdit()
         self.level_sav_entry.setPlaceholderText(t('fix_host_save.path_to_level_sav'))
         file_row.addWidget(self.level_sav_entry, 1)
-        import nerdfont as nf
-        _nf_font = QFont(constants.FONT_FAMILY_NERD, 10)
-        self.browse_button = QPushButton(f"{nf.icons['nf-fa-steam']} " + t('Browse'))
-        self.browse_button.setFont(_nf_font)
+        self.browse_button = make_button(t('Browse'), 'secondary')
         self.browse_button.setMinimumWidth(110)
         self.browse_button.setMaximumWidth(150)
         file_row.addWidget(self.browse_button)
-        self.xgp_browse_btn = QPushButton(f"{nf.icons['nf-fa-xbox']} " + t('Browse'))
-        self.xgp_browse_btn.setFont(_nf_font)
+        self.xgp_browse_btn = make_button(
+            t('fix_host_save.browse_xgp', default='Browse Game Pass'), 'secondary')
         self.xgp_browse_btn.setMinimumWidth(110)
         self.xgp_browse_btn.setMaximumWidth(150)
         self.xgp_browse_btn.setToolTip('Load a GamePass save from the container')
         self.xgp_browse_btn.setEnabled(True)
         file_row.addWidget(self.xgp_browse_btn)
-        self.migrate_button = QPushButton(t('Migrate'))
+        self.migrate_button = make_button(t('Migrate'), 'primary')
         self.migrate_button.setObjectName('MigrateButton')
         self.migrate_button.setFixedWidth(140)
+        self.migrate_button.setEnabled(False)
         file_row.addWidget(self.migrate_button)
         glass_layout.addLayout(file_row)
+        self.workflow_review = BulkWorkflowReview(
+            source=t(
+                'fix_host_save.source_missing',
+                default='Choose Level.sav and a source player'),
+            target=t(
+                'fix_host_save.target_missing',
+                default='Choose a different target player'),
+            review=t(
+                'fix_host_save.review',
+                default=(
+                    'Swap the two player GUID identities and update their player '
+                    'files, ownership, guild, and DPS storage references.')),
+            parent=self,
+        )
+        self.workflow_review.set_risk(
+            t(
+                'fix_host_save.risk',
+                default='This repair writes directly to the selected save folder.'),
+            t(
+                'fix_host_save.backup',
+                default=(
+                    'A full Backups/Fix Host Save copy is created when Level.sav '
+                    'is loaded, before repair data is changed.')),
+        )
+        glass_layout.addWidget(self.workflow_review)
         trees_layout = QHBoxLayout()
         trees_layout.setSpacing(14)
         old_panel = QFrame()
@@ -827,22 +847,23 @@ class FixHostSaveWindow(QWidget):
         self.xgp_browse_btn.clicked.connect(self._load_xgp_save)
         self.browse_button.clicked.connect(lambda: choose_level_file(self, self.level_sav_entry, self.old_tree, self.new_tree))
         self.migrate_button.clicked.connect(lambda: fix_save_wrapper(self, self.level_sav_entry, self.old_tree, self.new_tree))
+        self.level_sav_entry.textChanged.connect(self._sync_repair_review)
         self.old_search_entry.textChanged.connect(lambda: filter_treeview(self.old_tree, self.old_search_entry.text()))
         self.new_search_entry.textChanged.connect(lambda: filter_treeview(self.new_tree, self.new_search_entry.text()))
         self.old_tree.itemSelectionChanged.connect(self.update_source_selection)
         self.new_tree.itemSelectionChanged.connect(self.update_target_selection)
         QTimer.singleShot(0, lambda w=self: center_window(w) if w.isVisible() else None)
-    def showEvent(self, event):
-        super().showEvent(event)
-        if not event.spontaneous():
+    def showEvent(self, a0):
+        super().showEvent(a0)
+        if not a0.spontaneous():
             self.activateWindow()
             self.raise_()
             self.xgp_browse_btn.setEnabled(True)
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
+    def keyPressEvent(self, a0):
+        if a0.key() == Qt.Key_Escape:
             self.close()
         else:
-            super().keyPressEvent(event)
+            super().keyPressEvent(a0)
     def _load_xgp_save(self):
         from palworld_xgp_import.gamepass_manager import (
             pick_xgp_world, extract_save_to_temp, _is_elevated, relaunch_elevated,
@@ -933,6 +954,7 @@ class FixHostSaveWindow(QWidget):
             self.source_result_label.setText(t('Source Player: {name}({guid})', name=values[1], guid=player_guid))
         else:
             self.source_result_label.setText(t('Source Player: N/A'))
+        self._sync_repair_review()
     def update_target_selection(self):
         selected = self.new_tree.selectedItems()
         if selected:
@@ -946,6 +968,65 @@ class FixHostSaveWindow(QWidget):
             self.target_result_label.setText(t('Target Player: {name}({guid})', name=values[1], guid=player_guid))
         else:
             self.target_result_label.setText(t('Target Player: N/A'))
+        self._sync_repair_review()
+    def _sync_repair_review(self):
+        old_item = self.old_tree.selectedItems()
+        new_item = self.new_tree.selectedItems()
+        old_guid = old_item[0].text(0) if old_item else ''
+        new_guid = new_item[0].text(0) if new_item else ''
+        path = self.level_sav_entry.text().strip()
+        ready = bool(path and old_guid and new_guid and old_guid != new_guid)
+        source = (
+            f'{old_item[0].text(1)} ({old_guid})' if old_item
+            else t('fix_host_save.source_missing', default='Choose a source player'))
+        target = (
+            f'{new_item[0].text(1)} ({new_guid})' if new_item
+            else t('fix_host_save.target_missing', default='Choose a target player'))
+        self.workflow_review.set_context(
+            source=source,
+            target=target,
+            review=t(
+                'fix_host_save.review_ready' if ready else 'fix_host_save.review',
+                default=(
+                    'Ready to swap both player identities and update all existing '
+                    'ownership, guild, player-file, and DPS storage references.'
+                    if ready else
+                    'Choose Level.sav and two different players before running the repair.')),
+        )
+        self.migrate_button.setEnabled(ready)
+    def _begin_repair(self, old_guid, new_guid):
+        self.migrate_button.setEnabled(False)
+        self.browse_button.setEnabled(False)
+        self.xgp_browse_btn.setEnabled(False)
+        self.workflow_review.set_context(
+            source=old_guid,
+            target=new_guid,
+            review=t(
+                'fix_host_save.running',
+                default='Repairing player identities and linked save records…'))
+        self.workflow_review.progress.setRange(0, 0)
+        self.workflow_review.progress.setFormat(t(
+            'repair.workflow.running', default='Repair in progress…'))
+        self.workflow_review.progress.show()
+    def _finish_repair(self, message):
+        self.workflow_review.set_progress(
+            1, 1, t('repair.workflow.complete', default='Repair complete'))
+        self.workflow_review.set_result(message, success=True)
+        self.browse_button.setEnabled(True)
+        self.xgp_browse_btn.setEnabled(True)
+        self._sync_repair_review()
+    def _fail_repair(self, error):
+        self.workflow_review.set_progress(
+            1, 1, t('repair.workflow.failed_short', default='Repair failed'))
+        self.workflow_review.set_result(t(
+            'fix_host_save.failure_recovery',
+            default=(
+                'The repair did not complete. Restore the selected save from '
+                'Backups/Fix Host Save before retrying. Details: {detail}'),
+            detail=str(error).strip()), success=False)
+        self.browse_button.setEnabled(True)
+        self.xgp_browse_btn.setEnabled(True)
+        self._sync_repair_review()
     def load_styles(self):
         ThemeManager.load_styles(self)
 def fix_host_save():

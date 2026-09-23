@@ -10,6 +10,8 @@ from PyQt6.QtGui import QPixmap, QIcon, QCursor, QPainter, QColor, QBrush
 from i18n import t
 from palworld_aio import constants
 from palworld_aio.ui.chrome import tokens as _chrome_tokens
+from palworld_aio.ui.chrome.components import make_filter_button, make_search_field
+from palworld_aio.ui.chrome.state_views import ConfiguredEmptyState, ErrorState, NoResultState
 _P = _chrome_tokens.resolve()
 from palworld_aio.editor.pal_editor.icons import _get_element_pixmap
 from palworld_aio.editor.pal_editor.data import get_paldeck_pals
@@ -24,6 +26,8 @@ _CATEGORIES = [
     ('technologies', 'docs.wiki.technologies', 'world.json', 'technology'),
     ('elements', 'docs.wiki.elements', 'skills.json', 'elements'),
     ('work_suitability', 'docs.wiki.work_suitability', 'work_suitability.json', 'work_types'),
+    ('world_data', 'docs.wiki.world_data', 'world.json', 'lab_research'),
+    ('internal_ids', 'docs.wiki.internal_ids', 'uidata.json', 'ui_icons'),
 ]
 
 _CATEGORY_CONFIG = {
@@ -99,6 +103,18 @@ _CATEGORY_CONFIG = {
         ],
         'filter_groups': [],
     },
+    'world_data': {
+        'sort_fields': [
+            ('name', 'docs.wiki.sort.name', lambda d: str(d.get('name') or d.get('id') or '').lower()),
+        ],
+        'filter_groups': [],
+    },
+    'internal_ids': {
+        'sort_fields': [
+            ('name', 'docs.wiki.sort.name', lambda d: str(d.get('name') or d.get('id') or '').lower()),
+        ],
+        'filter_groups': [],
+    },
 }
 
 # modernize-tab-ui 8.2: chrome styled from the shared token palette —
@@ -135,7 +151,31 @@ def _load_json(filename, key):
         return []
     with open(fp, 'r', encoding='utf-8') as f:
         data = json.load(f)
-    return data.get(key, [])
+    values = data.get(key, []) if isinstance(data, dict) else []
+    if isinstance(values, list):
+        return [value for value in values if isinstance(value, dict)]
+    if isinstance(values, dict):
+        records = []
+        for identifier, value in values.items():
+            if isinstance(value, dict):
+                record = dict(value)
+                record.setdefault('id', str(identifier))
+                record.setdefault('name', record.get('display_name') or str(identifier))
+            else:
+                record = {
+                    'id': str(identifier),
+                    'name': str(identifier),
+                    'value': value,
+                }
+                if isinstance(value, str) and ('/' in value or '\\' in value):
+                    record['icon'] = value
+            records.append(record)
+        return records
+    return []
+
+
+def _record_identifier(record):
+    return str(record.get('asset') or record.get('id') or record.get('name') or '')
 
 def _icon(icon_path, size=_LIST_ICON):
     if icon_path:
@@ -366,7 +406,9 @@ class WikiDetailPanel(QScrollArea):
     def __init__(self, category_id, parent=None):
         super().__init__(parent)
         self.setWidgetResizable(True)
-        self.setStyleSheet(_DETAIL_S)
+        self.setObjectName('referenceInspector')
+        self.setProperty('class', 'inspectorPanel')
+        self.setAccessibleName(t('docs.wiki.inspector', default='Reference details'))
         self._cat = category_id
         self._cached_data = None
         self._pal_sort_by = 'name'
@@ -1229,11 +1271,12 @@ class WikiCategoryPage(QWidget):
         ll.setContentsMargins(6, 6, 4, 6)
         ll.setSpacing(4)
 
-        self._search = QLineEdit()
-        self._search.setPlaceholderText(t('docs.wiki.search') if t else 'Search...')
-        self._search.setStyleSheet(_SEARCH_S)
-        self._search.textChanged.connect(lambda: self._apply_sort_filter() if self._loaded else None)
-        ll.addWidget(self._search)
+        self._search_frame, self._search = make_search_field(
+            t('docs.wiki.search') if t else 'Search...',
+            lambda _text: self._apply_sort_filter() if self._loaded else None,
+            lp,
+        )
+        ll.addWidget(self._search_frame)
 
         sort_cfg = self._config.get('sort_fields', [])
         if sort_cfg:
@@ -1269,12 +1312,37 @@ class WikiCategoryPage(QWidget):
         if fg_configs:
             ll.addWidget(self._filter_section)
 
+        self._result_count = QLabel('')
+        self._result_count.setProperty('class', 'secondary')
+        self._result_count.setAccessibleName(t(
+            'docs.wiki.result_count_accessible', default='Reference result count'))
+        ll.addWidget(self._result_count)
+
         self._list = QListWidget()
-        self._list.setStyleSheet(_LIST_S)
+        self._list.setObjectName('referenceResults')
+        self._list.setProperty('class', 'browserList')
         self._list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._list.currentItemChanged.connect(self._on_sel)
         self._list.setSpacing(0)
-        ll.addWidget(self._list, 1)
+        self._list_stack = QStackedWidget()
+        self._list_stack.addWidget(self._list)
+        self._empty_state = ConfiguredEmptyState(
+            t('docs.wiki.empty_title', default='No reference records'),
+            t('docs.wiki.empty_message', default='This bundled data category has no records.'),
+        )
+        self._no_result_state = NoResultState(
+            t('docs.wiki.no_results', default='No results found'),
+            t('docs.wiki.no_results_message', default='Try a different name or identifier.'),
+        )
+        self._no_result_state.actionTriggered.connect(self._clear_filters)
+        self._error_state = ErrorState(
+            t('docs.wiki.error_title', default='Reference data unavailable'),
+            t('docs.wiki.error_message', default='The bundled reference file could not be read.'),
+        )
+        self._error_state.actionTriggered.connect(self.load)
+        for state in (self._empty_state, self._no_result_state, self._error_state):
+            self._list_stack.addWidget(state)
+        ll.addWidget(self._list_stack, 1)
 
         lp.setMinimumWidth(180)
         sp.addWidget(lp)
@@ -1337,9 +1405,8 @@ class WikiCategoryPage(QWidget):
             btn.setIconSize(QSize(20, 20))
             btn.setToolTip(display)
         else:
-            btn = QPushButton(display)
+            btn = make_filter_button(display)
             btn.setFixedHeight(22)
-            btn.setStyleSheet(_FILTER_BTN_S)
             btn.setToolTip(display)
         btn.setProperty('active', False)
         btn.setCursor(QCursor(Qt.PointingHandCursor))
@@ -1348,17 +1415,24 @@ class WikiCategoryPage(QWidget):
         return btn
 
     def load(self):
-        if self._cat == 'pals':
-            items = get_paldeck_pals()
-        else:
-            idx = [c[0] for c in _CATEGORIES].index(self._cat)
-            _, _, fname, data_key = _CATEGORIES[idx]
-            items = _load_json(fname, data_key)
-            if self._cat == 'work_suitability':
-                for item in items:
-                    fixed = _work_icon(item.get('id', ''))
-                    if fixed:
-                        item['icon'] = fixed
+        try:
+            if self._cat == 'pals':
+                items = get_paldeck_pals()
+            else:
+                idx = [c[0] for c in _CATEGORIES].index(self._cat)
+                _, _, fname, data_key = _CATEGORIES[idx]
+                items = _load_json(fname, data_key)
+                if self._cat == 'work_suitability':
+                    for item in items:
+                        fixed = _work_icon(item.get('id', ''))
+                        if fixed:
+                            item['icon'] = fixed
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            self._loaded = False
+            self._all_data = []
+            self._result_count.setText('')
+            self._list_stack.setCurrentWidget(self._error_state)
+            return
         self._all_data = items
         self._loaded = True
         self._active_filters = {}
@@ -1381,7 +1455,16 @@ class WikiCategoryPage(QWidget):
         self._apply_sort_filter()
 
     def _apply_sort_filter(self):
-        if not self._loaded or not self._all_data:
+        if not self._loaded:
+            return
+
+        if not self._all_data:
+            self._filtered_indices = []
+            self._list.clear()
+            self._result_count.setText(t(
+                'docs.wiki.result_count', default='{visible} of {total}',
+                visible=0, total=0))
+            self._list_stack.setCurrentWidget(self._empty_state)
             return
 
         q = self._search.text().lower()
@@ -1407,6 +1490,11 @@ class WikiCategoryPage(QWidget):
 
         self._filtered_indices = indices
         self._rebuild_list()
+        self._result_count.setText(t(
+            'docs.wiki.result_count', default='{visible} of {total}',
+            visible=len(indices), total=len(self._all_data)))
+        self._list_stack.setCurrentWidget(
+            self._list if indices else self._no_result_state)
         if self._list.count() > 0:
             self._list.setCurrentRow(0)
             it = self._list.item(0)
@@ -1414,6 +1502,39 @@ class WikiCategoryPage(QWidget):
                 idx = it.data(Qt.UserRole)
                 if idx is not None and idx < len(self._all_data):
                     self._detail.show_item(self._all_data[idx])
+
+    def _clear_filters(self):
+        self._search.clear()
+        self._active_filters = {}
+        for buttons in self._filter_btns.values():
+            for button in buttons.values():
+                button.setProperty('active', False)
+                button.setChecked(False)
+                button.style().unpolish(button)
+                button.style().polish(button)
+        self._apply_sort_filter()
+
+    def select_identifier(self, identifier: str) -> bool:
+        """Select a record by asset/id/name, independent of active filtering."""
+        if not self._loaded:
+            self.load()
+        target = str(identifier).casefold()
+        for index, record in enumerate(self._all_data):
+            candidates = {
+                _record_identifier(record).casefold(),
+                str(record.get('asset') or '').casefold(),
+                str(record.get('id') or '').casefold(),
+                str(record.get('name') or '').casefold(),
+            }
+            if target in candidates:
+                self._clear_filters()
+                for row in range(self._list.count()):
+                    item = self._list.item(row)
+                    if item is not None and item.data(Qt.UserRole) == index:
+                        self._list.setCurrentRow(row)
+                        self._list.scrollToItem(item)
+                        return True
+        return False
 
     def _item_matches_filter(self, item, fg, active_val):
         ftype = fg['type']
@@ -1563,6 +1684,16 @@ class WikiCategoryPage(QWidget):
 
 
 class WikiTab(QWidget):
+    _CATEGORY_ALIASES = {
+        'pal': 'pals', 'pals': 'pals',
+        'item': 'items', 'items': 'items',
+        'skill': 'active_skills', 'skills': 'active_skills',
+        'active_skill': 'active_skills', 'passive_skill': 'passive_skills',
+        'technology': 'technologies', 'technologies': 'technologies',
+        'world': 'world_data', 'world_data': 'world_data',
+        'ids': 'internal_ids', 'internal': 'internal_ids',
+        'internal_ids': 'internal_ids',
+    }
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
@@ -1632,6 +1763,13 @@ class WikiTab(QWidget):
 
     def refresh(self):
         pass
+
+    def open_reference(self, category: str, identifier: str) -> bool:
+        category_id = self._CATEGORY_ALIASES.get(category, category)
+        if category_id not in self._pages:
+            return False
+        self._switch_category(category_id)
+        return self._pages[category_id].select_identifier(identifier)
 
     def refresh_labels(self):
         for cat_id, i18n_key, *_ in _CATEGORIES:

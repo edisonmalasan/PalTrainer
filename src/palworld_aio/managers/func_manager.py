@@ -6,7 +6,10 @@ import shutil
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from palsav.archive import UUID
-from PyQt6.QtWidgets import QMessageBox, QInputDialog
+from palworld_aio.ui.chrome.components import (
+    InputPromptDialog as QInputDialog,
+    MessageDialog as QMessageBox,
+)
 from i18n import t
 from palworld_aio import constants
 from palworld_aio.application.derived_state import (
@@ -2045,7 +2048,6 @@ def modify_container_slots(new_slot_num, parent=None, container_id=None):
                     current_items = len([s for s in slots if s.get('RawData', {}).get('value', {})])
                     if new_slot_num < current_items:
                         if parent:
-                            from PyQt6.QtWidgets import QMessageBox
                             QMessageBox.warning(parent, 'Invalid Operation', f'Cannot reduce container slots below current item count ({current_items})')
                         return 0
                     if current_slot_num == new_slot_num:
@@ -2073,7 +2075,6 @@ def modify_container_slots(new_slot_num, parent=None, container_id=None):
                     return 0
             else:
                 if parent:
-                    from PyQt6.QtWidgets import QMessageBox
                     QMessageBox.warning(parent, 'Container Not Found', f'Container with ID {container_id} not found')
                 return 0
         else:
@@ -2395,7 +2396,6 @@ def check_dynamic_containers_with_reporting(parent=None):
     try:
         report = gather_update_dynamic_containers_with_reporting()
         if parent:
-            from PyQt6.QtWidgets import QMessageBox
             import textwrap
             message = f"\n📊 Dynamic Container Analysis Report\n{'=' * 50}\n\n🔍 Items Found in Containers: {report['total_items_in_containers']}\n📦 Items in Registry: {report['total_items_in_registry']}\n\n❌ Missing Items (referenced but not in registry): {report['total_missing']}\n{(chr(10).join((f'   • {item}' for item in report['missing_items'])) if report['missing_items'] else '   None')}\n\n🗑️  Orphaned Items (in registry but not referenced): {report['total_orphaned']}\n{(chr(10).join((f'   • {item}' for item in report['orphaned_items'])) if report['orphaned_items'] else '   None')}\n\n✅ Status: {('SUCCESS' if report['success'] else 'FAILED')}\n{('All dynamic items are properly synchronized!' if report['success'] else 'Some dynamic items may be missing or orphaned.')}\n"
             msg_box = QMessageBox(parent)
@@ -2407,7 +2407,6 @@ def check_dynamic_containers_with_reporting(parent=None):
         return report['success']
     except Exception as e:
         if parent:
-            from PyQt6.QtWidgets import QMessageBox
             QMessageBox.warning(parent, 'Error', f'Failed to analyze dynamic containers: {str(e)}')
         return False
 def _process_dps_file_worker(args):

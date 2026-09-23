@@ -7,16 +7,52 @@ from i18n import t
 from loading_manager import show_critical
 from palworld_aio import constants
 from palworld_aio.utils import sav_to_json, extract_value, get_pal_data, calculate_max_hp, calculate_attack, calculate_defense, format_character_key
-from palworld_aio.ui.chrome.styles import DIALOG_STYLE as DARK_THEME_STYLESHEET, PICKER_SEARCH_STYLE
-class ThemedDialog(QDialog):
+from palworld_aio.ui.chrome.styles import ThemeManager, PICKER_SEARCH_STYLE
+from palworld_aio.ui.chrome.components import BaseDialog
+class ThemedDialog(BaseDialog):
+    """Compatibility adapter that gives legacy editor dialogs the shared shell."""
+
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__('', parent, min_size=(400, 0))
+        self.cancel_btn.hide()
         self._apply_theme()
+
+    def setWindowTitle(self, a0):
+        super().setWindowTitle(a0)
+        if hasattr(self, 'title_label'):
+            title = a0 or ''
+            self.title_label.setText(title)
+            self.setAccessibleName(title)
+
     def _apply_theme(self):
-        self.setStyleSheet(DARK_THEME_STYLESHEET)
-    def showEvent(self, event):
-        super().showEvent(event)
-        if not event.spontaneous():
+        ThemeManager.load_styles(self)
+    def _adopt_legacy_controls(self):
+        """Assign shared component roles without changing legacy return contracts."""
+        for button in self.findChildren(QPushButton):
+            label = button.text().strip().lower()
+            if not button.property('controlRole'):
+                if any(word in label for word in ('delete', 'clear', 'remove')):
+                    role = 'destructive'
+                elif 'reset' in label:
+                    role = 'warning'
+                elif label in {'cancel', 'no', 'close'}:
+                    role = 'tertiary'
+                elif label in {'ok', 'yes', 'apply', 'save'}:
+                    role = 'primary'
+                else:
+                    role = 'secondary'
+                button.setProperty('class', role)
+                button.setProperty('controlRole', role)
+            if not button.accessibleName():
+                button.setAccessibleName(
+                    button.text() or button.toolTip() or 'Toggle option')
+            button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            button.style().unpolish(button)
+            button.style().polish(button)
+    def showEvent(self, a0):
+        self._adopt_legacy_controls()
+        super().showEvent(a0)
+        if not a0.spontaneous():
             effective_parent = self._get_effective_parent()
             if effective_parent:
                 self._center_on_effective_parent(effective_parent)
@@ -77,7 +113,7 @@ class InputDialog(ThemedDialog):
         self.setMinimumWidth(400)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         label = QLabel(prompt)
         layout.addWidget(label)
         self.input_field = QLineEdit()
@@ -110,7 +146,7 @@ class DaysInputDialog(ThemedDialog):
         self.setMinimumWidth(300)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         label = QLabel(prompt)
         layout.addWidget(label)
         self.spin_box = QSpinBox()
@@ -147,7 +183,7 @@ class InactiveFilterDialog(ThemedDialog):
         self.setMinimumWidth(400)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         layout.setSpacing(12)
         mode_label = QLabel(t('deletion.inactive_filter.mode') if t else 'Filter mode:')
         mode_label.setFont(QFont(constants.FONT_FAMILY, constants.FONT_SIZE, QFont.Bold))
@@ -211,7 +247,7 @@ class LevelInputDialog(ThemedDialog):
         self.setMinimumWidth(300)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         label = QLabel(prompt)
         layout.addWidget(label)
         self.spin_box = QSpinBox()
@@ -245,7 +281,7 @@ class GameDaysInputDialog(ThemedDialog):
         self.setMinimumWidth(300)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         label = QLabel(prompt)
         layout.addWidget(label)
         self.spin_box = QSpinBox()
@@ -280,7 +316,7 @@ class KillNearestBaseDialog(ThemedDialog):
         self.setMinimumHeight(400)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         form_group = QGroupBox(t('kill_nearest_base.settings') if t else 'Settings')
         form_layout = QFormLayout()
         self.coord_x = QSpinBox()
@@ -339,7 +375,7 @@ class ConfirmDialog(ThemedDialog):
         self.setMinimumWidth(350)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         label = QLabel(message)
         label.setWordWrap(True)
         layout.addWidget(label)
@@ -365,7 +401,7 @@ class RadiusInputDialog(ThemedDialog):
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
         self.current_actual_radius = current_radius
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         label = QLabel(prompt)
         layout.addWidget(label)
         input_layout = QHBoxLayout()
@@ -432,7 +468,7 @@ class RadiusPreviewDialog(ThemedDialog):
         self._setup_ui(prompt_text)
         self._connect_signals()
     def _setup_ui(self, prompt_text):
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
         title_label = QLabel(t('base.radius.preview.title') if t else 'Adjust Base Radius')
@@ -673,9 +709,9 @@ class PalDefenderDialog(ThemedDialog):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
         self._guild_data = []
         self._setup_ui()
-    def showEvent(self, event):
-        super().showEvent(event)
-        if not event.spontaneous():
+    def showEvent(self, a0):
+        super().showEvent(a0)
+        if not a0.spontaneous():
             parent = self._get_effective_parent()
             if parent:
                 pw = parent.geometry()
@@ -686,7 +722,7 @@ class PalDefenderDialog(ThemedDialog):
                 self.raise_()
     def _setup_ui(self):
         from PyQt6.QtWidgets import QRadioButton, QButtonGroup, QFrame, QHeaderView
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         layout.setSpacing(12)
         layout.setContentsMargins(20, 20, 20, 20)
         filter_frame = QFrame()
@@ -1032,7 +1068,7 @@ class ScrollableGuildSelectionDialog(ThemedDialog):
         self.guild_buttons = []
         self._setup_ui()
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(10)
         label = QLabel(t('base.import.select_guild_prompt') if t else 'Select a guild to import the base(s) to:')
@@ -1162,7 +1198,7 @@ class GuildSelectionDialog(ThemedDialog):
         self.setMinimumWidth(400)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         label = QLabel(t('base.import.select_guild_prompt') if t else 'Select a guild to import the base(s) to:')
         label.setWordWrap(True)
         layout.addWidget(label)
@@ -1202,7 +1238,7 @@ class ZoneManagementDialog(ThemedDialog):
         self.setMinimumWidth(400)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         label = QLabel(t('zone_management.prompt') if t else f'Found {zone_count} protection zone(s) from previous session.\nWhat would you like to do?')
         label.setWordWrap(True)
         layout.addWidget(label)
@@ -1243,7 +1279,7 @@ class NudgeInputDialog(ThemedDialog):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
         self.result_value = None
         self.current_coords = current_coords
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         layout.setSpacing(12)
         label = QLabel((t('base.nudge.prompt') if t else 'Enter offset values for each axis.\nPositive = right/up/raise, Negative = left/down/lower.\nRotation angle rotates the base camp around its center (Z axis).'))
         label.setWordWrap(True)

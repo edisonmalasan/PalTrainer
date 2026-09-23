@@ -1,3 +1,5 @@
+from typing import Callable, Optional
+
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTreeWidget, QTreeWidgetItem, QHeaderView, QFrame, QAbstractItemView, QApplication
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QColor, QCursor, QKeySequence
@@ -71,6 +73,11 @@ class SearchPanel(QWidget):
         self._selection_mode = selection_mode
         self._copyable_columns: set[int] = set()
         self._mono_columns: set[int] = set()
+        self._filter_predicates: dict[str, Callable[[QTreeWidgetItem], bool]] = {}
+        self._selection_key: Callable[[QTreeWidgetItem], object] = self._default_selection_key
+        self._empty_widget = None
+        self._no_result_widget = None
+        self._forced_state_widget = None
         self._setup_ui()
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -80,6 +87,7 @@ class SearchPanel(QWidget):
         # Window controls live in the app bar (shell v3), so rows span the
         # full canvas width — no right reserve needed.
         search_layout = QHBoxLayout()
+        self.search_layout = search_layout
         search_layout.setContentsMargins(12, 8, 12, 8)
         search_layout.setSpacing(8)
         self.search_label = QLabel(t(self.label_key) if t else self.label_key)
@@ -91,6 +99,9 @@ class SearchPanel(QWidget):
         self.search_input.setClearButtonEnabled(True)
         self.search_input.textChanged.connect(self._on_search)
         search_layout.addWidget(self.search_input, stretch=1)
+        self.filter_slot = QHBoxLayout()
+        self.filter_slot.setSpacing(8)
+        search_layout.addLayout(self.filter_slot)
         self.count_label = QLabel('0')
         self.count_label.setObjectName('searchCount')
         search_layout.addWidget(self.count_label)
@@ -133,8 +144,7 @@ class SearchPanel(QWidget):
             _label.setGeometry(_tree.viewport().rect())
             # the viewport is a C++-created widget, so its resizeEvent cannot
             # be overridden from Python; track the empty-state overlay here
-            widget = getattr(_panel, '_empty_widget', None)
-            if widget is not None:
+            for widget in _panel._state_widgets():
                 widget.setGeometry(_tree.viewport().rect())
             if _orig:
                 _orig(event)
@@ -171,6 +181,25 @@ class SearchPanel(QWidget):
         these columns."""
         self._copyable_columns = set(columns)
 
+    def add_filter_widget(self, widget: QWidget) -> None:
+        """Place a shared filter control beside search without page-local layout."""
+        self.filter_slot.addWidget(widget)
+
+    def set_filter(
+        self,
+        name: str,
+        predicate: Optional[Callable[[QTreeWidgetItem], bool]],
+    ) -> None:
+        """Install or clear a named row predicate and refresh the visible count."""
+        if predicate is None:
+            self._filter_predicates.pop(name, None)
+        else:
+            self._filter_predicates[name] = predicate
+        self._apply_filters()
+
+    def set_selection_key(self, key: Callable[[QTreeWidgetItem], object]) -> None:
+        self._selection_key = key
+
     def set_mono_columns(self, columns: set[int]) -> None:
         """uiux-audit-remedination 4.3: render these columns' values in the
         mono token family (identifier cells); per-column via item fonts, so
@@ -190,47 +219,84 @@ class SearchPanel(QWidget):
         """modernize-tab-ui 5.3: rich EmptyState overlay replacing the plain
         hint for this panel's no-rows state (e.g. Guilds members pane).
         Pass None to detach and fall back to the plain hint."""
-        previous = getattr(self, '_empty_widget', None)
-        self._empty_widget = widget
+        self._set_state_widget('_empty_widget', widget)
+
+    def set_no_result_state_widget(self, widget) -> None:
+        """Use a distinct rich state when filters hide a populated collection."""
+        self._set_state_widget('_no_result_widget', widget)
+
+    def set_forced_state_widget(self, widget) -> None:
+        """Temporarily replace table content with loading, prerequisite, or error."""
+        self._set_state_widget('_forced_state_widget', widget)
+
+    def _set_state_widget(self, attribute: str, widget) -> None:
+        previous = getattr(self, attribute, None)
+        setattr(self, attribute, widget)
         if widget is not None:
             widget.setParent(self.tree.viewport())
             widget.setGeometry(self.tree.viewport().rect())
         if previous is not None and previous is not widget:
             previous.hide()
-        # re-evaluate: the previous overlay (if any) may have been visible
         self._refresh_empty_state()
 
-    def _show_empty_overlay(self, message: str) -> None:
-        widget = getattr(self, '_empty_widget', None)
+    def _state_widgets(self):
+        widgets = []
+        for attribute in (
+            '_empty_widget', '_no_result_widget', '_forced_state_widget',
+        ):
+            widget = getattr(self, attribute, None)
+            if widget is not None and widget not in widgets:
+                widgets.append(widget)
+        return widgets
+
+    def _show_empty_overlay(self, message: str, widget=None) -> None:
         if widget is not None:
             self._empty_label.hide()
+            for candidate in self._state_widgets():
+                candidate.setVisible(candidate is widget)
             widget.setGeometry(self.tree.viewport().rect())
+            widget.raise_()
             widget.show()
         else:
+            for candidate in self._state_widgets():
+                candidate.hide()
             self._empty_label.setText(message)
             self._empty_label.setGeometry(self.tree.viewport().rect())
             self._empty_label.show()
 
     def _hide_empty_overlay(self) -> None:
         self._empty_label.hide()
-        widget = getattr(self, '_empty_widget', None)
-        if widget is not None:
+        for widget in self._state_widgets():
             widget.hide()
 
     def _refresh_empty_state(self) -> None:
+        forced = getattr(self, '_forced_state_widget', None)
+        if forced is not None:
+            self._show_empty_overlay('', forced)
+            return
         visible = sum(0 if self.tree.topLevelItem(i).isHidden() else 1
                       for i in range(self.tree.topLevelItemCount()))
         if visible == 0:
             searched = self.search_input.text().strip()
-            if searched and self.tree.topLevelItemCount() > 0:
+            has_filter = bool(searched or self._filter_predicates)
+            if has_filter and self.tree.topLevelItemCount() > 0:
                 message = t('search.no_matches') if t else 'No matches'
+                widget = getattr(self, '_no_result_widget', None)
             elif self.tree.topLevelItemCount() == 0:
                 message = getattr(self, '_empty_message', '') or (t('status.no_save_data') if t else 'No data — load a save first.')
+                widget = getattr(self, '_empty_widget', None)
             else:
                 message = t('search.no_matches') if t else 'No matches'
-            self._show_empty_overlay(message)
+                widget = getattr(self, '_no_result_widget', None)
+            self._show_empty_overlay(message, widget)
         else:
             self._hide_empty_overlay()
+
+    def clear_filters(self) -> None:
+        """Clear shared text and predicate filters from a no-result action."""
+        self._filter_predicates.clear()
+        self.search_input.clear()
+        self._apply_filters()
     def _update_count(self):
         total = self.tree.topLevelItemCount()
         visible = sum(0 if self.tree.topLevelItem(i).isHidden() else 1 for i in range(total))
@@ -247,17 +313,63 @@ class SearchPanel(QWidget):
         self.count_label.setText(text)
         if hasattr(self, '_empty_label'):
             self._refresh_empty_state()
-    def _on_search(self, text):
-        text = text.lower()
+    def _apply_filters(self) -> None:
+        text = self.search_input.text().strip().lower()
         for i in range(self.tree.topLevelItemCount()):
             item = self.tree.topLevelItem(i)
-            match = False
+            search_match = not text
             for col in range(item.columnCount()):
-                if text in item.text(col).lower() or text in item.toolTip(col).lower():
-                    match = True
+                searchable = (
+                    item.text(col),
+                    item.toolTip(col),
+                    str(item.data(col, GUID_ROLE) or ''),
+                )
+                if any(text in value.lower() for value in searchable):
+                    search_match = True
                     break
-            item.setHidden(not match)
+            predicate_match = all(predicate(item) for predicate in self._filter_predicates.values())
+            item.setHidden(not (search_match and predicate_match))
         self._update_count()
+
+    def _on_search(self, text):
+        # Preserve the long-standing direct-call contract used by page code and
+        # tests while keeping one filtering path for textChanged emissions.
+        if text != self.search_input.text():
+            self.search_input.setText(text)
+            return
+        self._apply_filters()
+        self.search_requested.emit(text)
+
+    @staticmethod
+    def _default_selection_key(item: QTreeWidgetItem) -> object:
+        data = item.data(0, Qt.UserRole)
+        return data if isinstance(data, (str, int, float, tuple)) else _display_value(item, 0)
+
+    def capture_view_state(self) -> dict[str, object]:
+        """Capture serializable browser state for route-history restoration."""
+        selected = [self._selection_key(item) for item in self.tree.selectedItems()]
+        return {
+            'search': self.search_input.text(),
+            'sort_column': self.tree.sortColumn(),
+            'sort_order': self.tree.header().sortIndicatorOrder().value,
+            'selected': selected,
+            'scroll': self.tree.verticalScrollBar().value(),
+        }
+
+    def restore_view_state(self, state: dict[str, object]) -> None:
+        self.search_input.setText(str(state.get('search', '')))
+        column = int(state.get('sort_column', 0))
+        try:
+            order = Qt.SortOrder(int(state.get('sort_order', Qt.SortOrder.AscendingOrder.value)))
+        except (TypeError, ValueError):
+            order = Qt.SortOrder.AscendingOrder
+        if 0 <= column < self.tree.columnCount():
+            self.tree.sortItems(column, order)
+        selected = set(state.get('selected', []))
+        for index in range(self.tree.topLevelItemCount()):
+            item = self.tree.topLevelItem(index)
+            item.setSelected(self._selection_key(item) in selected and not item.isHidden())
+        self.tree.verticalScrollBar().setValue(max(0, int(state.get('scroll', 0))))
     def _on_selection_changed(self):
         items = self.tree.selectedItems()
         if items:
@@ -290,7 +402,7 @@ class SearchPanel(QWidget):
         self._apply_mono_fonts(item)
         self.tree.addTopLevelItem(item)
         self._all_items.append(item)
-        self._update_count()
+        self._apply_filters()
         return item
     def get_selected_items(self):
         return self.tree.selectedItems()

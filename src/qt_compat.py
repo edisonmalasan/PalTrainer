@@ -14,11 +14,9 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
     QHeaderView,
-    QInputDialog,
     QLineEdit,
     QListView,
     QListWidget,
-    QMessageBox,
     QSizePolicy,
     QSlider,
     QStyle,
@@ -26,6 +24,10 @@ from PyQt6.QtWidgets import (
     QGraphicsView,
 )
 from PyQt6.QtGui import QFontDatabase, QImage
+from palworld_aio.ui.chrome.components import (
+    InputPromptDialog as QInputDialog,
+    MessageDialog as QMessageBox,
+)
 
 
 def _alias(owner, name, value):

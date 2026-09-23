@@ -2,7 +2,7 @@ import os
 import math
 import re
 
-from PyQt6.QtWidgets import QApplication, QDialog, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QListWidget, QListWidgetItem, QProgressBar, QPushButton, QScrollArea, QScrollBar, QSizePolicy, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QDialog, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QProgressBar, QPushButton, QScrollArea, QScrollBar, QSizePolicy, QVBoxLayout, QWidget
 from PyQt6.QtCore import Qt, QEvent, QObject, QPoint, QSize, QTimer, pyqtSignal
 from PyQt6.QtGui import QFontMetrics, QIcon, QShortcut, QKeySequence, QFont
 from i18n import t
@@ -11,11 +11,11 @@ import nerdfont as nf
 from palworld_aio import constants
 from resource_resolver import resource_path
 from palworld_aio.ui.chrome import icons as app_icons
+from palworld_aio.ui.chrome.components import make_tool_button
 from palworld_aio.ui.chrome import tokens as _chrome_tokens
 _P = _chrome_tokens.resolve()
 from palworld_aio.utils import extract_value, safe_nested_get, calculate_max_hp, calculate_shot_attack
 from palworld_aio.ui.chrome.styles import slot_full, slot_selected, TOOLTIP_STYLE
-from palworld_aio.ui.chrome.components import NerdBtn
 from palworld_aio.ui.dialogs.skill_picker import SkillPicker
 from . import data as _data
 from . import icons as _icons
@@ -40,9 +40,72 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self._hovered_data = None
         self.setObjectName('palInfoPanel')
         self._raw = None
+        self._reference_pal_asset = ''
         self._fanout_snapshot = None
         self._build()
         self.installEventFilter(self)
+
+    def _section_title(self, key, default):
+        label = QLabel(t(key, default=default))
+        label.setObjectName('palInspectorSectionTitle')
+        return label
+
+    def _workspace_action(self, name: str):
+        widget = self
+        while widget is not None:
+            callback = getattr(widget, name, None)
+            if callable(callback):
+                return callback
+            widget = widget.parentWidget()
+        return None
+
+    def _open_pal_reference(self):
+        callback = self._workspace_action('open_reference')
+        if callback and self._reference_pal_asset:
+            callback('pals', self._reference_pal_asset)
+
+    def _open_pal_breeding(self):
+        callback = self._workspace_action('open_breeding')
+        if callback and self._reference_pal_asset:
+            callback(self._reference_pal_asset)
+
+    def _apply_inspector_semantics(self):
+        editable_controls = (
+            (self.name_lbl, 'Pal name', '_on_name_click'),
+            (self.level_num_lbl, 'Level', '_on_level_click'),
+            (self.ivs_hp_lbl, 'HP potential', '_on_talent_click'),
+            (self.ivs_atk_lbl, 'Attack potential', '_on_talent_click'),
+            (self.ivs_def_lbl, 'Defense potential', '_on_talent_click'),
+            (self.soul_hp_lbl, 'HP souls', '_on_soul_click'),
+            (self.soul_atk_lbl, 'Attack souls', '_on_soul_click'),
+            (self.soul_def_lbl, 'Defense souls', '_on_soul_click'),
+            (self.soul_craft_lbl, 'Work-speed souls', '_on_soul_click'),
+            (self.trust_bar, 'Friendship', '_on_trust_click'),
+        )
+        for control, name, handler in editable_controls:
+            if isinstance(control, QLabel):
+                control.setStyleSheet('')
+            control.setProperty('editableValue', 'true')
+            control.setProperty('editHandler', handler)
+            control.setAccessibleName(name)
+            control.setAccessibleDescription(t(
+                'ui.pal_editor.click_to_edit',
+                default='Click to edit this value.',
+            ))
+
+        computed_hint = t(
+            'pal_editor.computed_hint',
+            default='Calculated from level, IVs and passives; read-only.',
+        )
+        for control, name in (
+            (self.atk_lbl, 'Attack points'),
+            (self.def_lbl, 'Defense points'),
+            (self.wspd_lbl, 'Work-speed points'),
+        ):
+            control.setStyleSheet('')
+            control.setAccessibleName(name)
+            control.setAccessibleDescription(computed_hint)
+            control.setToolTip(f'{name}. {computed_hint}')
     def set_hover_pal(self, pal_data):
         self._as_page = 0
         self._ps_page = 0
@@ -80,6 +143,9 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
             self._no_data_overlay.hide()
             self._data_scroll.show()
     def _clear_display(self):
+        self._reference_pal_asset = ''
+        self.reference_pal_btn.setEnabled(False)
+        self.breeding_pal_btn.setEnabled(False)
         self.name_lbl.setText('--')
         self.level_num_lbl.setText('--')
         self.next_lbl.setText('0')
@@ -175,7 +241,8 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self._data_scroll = scroll
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setObjectName('palInspectorScroll')
         scroll.setStyleSheet('QScrollArea { background: transparent; border: none; }')
         inner = QWidget()
         inner.setObjectName('palInfoInner')
@@ -186,6 +253,7 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self._build_header(inner_layout)
         self._build_body(inner_layout)
         self._build_skills(inner_layout)
+        self._apply_inspector_semantics()
         scroll.setWidget(inner)
         layout.addWidget(scroll)
         self._no_data_overlay = QLabel(t('pal_editor.no_pal_data') if t else 'No Pal Data', self)
@@ -215,8 +283,11 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self.active_skills_frame.setVisible(self._showing_active_skills)
         self.partner_frame.setVisible(not self._showing_active_skills)
     def _build_header(self, parent):
-        header = QWidget()
-        header.setStyleSheet('background: transparent; border: none;')
+        header = QFrame()
+        self.identity_section = header
+        header.setObjectName('palInspectorIdentitySection')
+        header.setAccessibleName(
+            t('ui.pal_editor.identity_section', default='Identity'))
         hrow = QHBoxLayout()
         hrow.setContentsMargins(0, 0, 0, 0)
         hrow.setSpacing(2)
@@ -272,7 +343,17 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self.next_lbl.setStyleSheet(f'font-size: 11px; font-weight: 600; color: {_P["text"]}; background: transparent; border: none;')
         next_row.addWidget(self.next_lbl)
         next_row.addStretch()
-        self.gender_icon = NerdBtn('')
+        self.reference_pal_btn = make_tool_button(
+            'info', t('pal_editor.open_reference', default='Open Pal Reference'), self)
+        self.reference_pal_btn.setEnabled(False)
+        self.reference_pal_btn.clicked.connect(self._open_pal_reference)
+        next_row.addWidget(self.reference_pal_btn)
+        self.breeding_pal_btn = make_tool_button(
+            'breeding', t('pal_editor.open_breeding', default='Open Breeding'), self)
+        self.breeding_pal_btn.setEnabled(False)
+        self.breeding_pal_btn.clicked.connect(self._open_pal_breeding)
+        next_row.addWidget(self.breeding_pal_btn)
+        self.gender_icon = QPushButton('')
         self.gender_icon.setCheckable(True)
         self.gender_icon.setFixedSize(18, 18)
         self.gender_icon.setIconSize(QSize(14, 14))
@@ -369,7 +450,7 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self.info_dna_btn.setToolTip(t('edit_pals.tooltip.dna'))
         self.info_dna_btn.clicked.connect(self._on_dna_toggle)
         next_row.addWidget(self.info_dna_btn)
-        self.info_fav_btn = NerdBtn('')
+        self.info_fav_btn = QPushButton('')
         self.info_fav_btn.setCheckable(True)
         self.info_fav_btn.setFixedSize(18, 18)
         self.info_fav_btn.setIconSize(QSize(14, 14))
@@ -391,7 +472,6 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self.instance_id_lbl.setCursor(Qt.PointingHandCursor)
         self.instance_id_lbl.setToolTip(t('pal_editor.click_copy_id') if t else 'Click to copy ID')
         self.instance_id_lbl.clicked.connect(lambda: (QApplication.clipboard().setText(getattr(self.instance_id_lbl, '_instance_id', '') or self.instance_id_lbl.text()), None))
-        buff_row.addWidget(self.instance_id_lbl)
         buff_row.addStretch()
         self.buff_icons = {}
         for key, icon_name in [('atk', 'buff_buff_02'), ('def', 'buff_buff_03'), ('ws', 'buff_buff_05'), ('hunger', 'buff_buff_08'), ('exp', 'buff_buff_11')]:
@@ -409,6 +489,8 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         header_layout = QVBoxLayout(header)
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(1)
+        header_layout.addWidget(self._section_title(
+            'ui.pal_editor.identity_section', 'Identity'))
         header_layout.addLayout(hrow)
         self.exp_header_bar = QProgressBar()
         self.exp_header_bar.setFixedHeight(3)
@@ -434,11 +516,16 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self._raw['FavoriteIndex'] = {'id': None, 'type': 'ByteProperty', 'value': {'type': 'None', 'value': idx}}
         self._refresh()
     def _build_body(self, parent):
-        body = QWidget()
-        body.setStyleSheet('background: transparent; border: none;')
+        body = QFrame()
+        self.editable_section = body
+        body.setObjectName('palInspectorEditableSection')
+        body.setAccessibleName(
+            t('ui.pal_editor.editable_section', default='Editable values'))
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(2)
+        body_layout.addWidget(self._section_title(
+            'ui.pal_editor.editable_section', 'Editable values'))
         columns = QHBoxLayout()
         columns.setContentsMargins(0, 0, 0, 0)
         columns.setSpacing(4)
@@ -722,8 +809,17 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         san_row.addWidget(self.san_bar, 1)
         right_layout.addLayout(san_row, 1)
         stats_q = QFrame()
-        stats_q.setStyleSheet('background: transparent; border: none;')
-        stats_grid = QGridLayout(stats_q)
+        self.computed_section = stats_q
+        stats_q.setObjectName('palInspectorComputedSection')
+        stats_q.setAccessibleName(
+            t('ui.pal_editor.computed_section', default='Computed stats'))
+        computed_layout = QVBoxLayout(stats_q)
+        computed_layout.setContentsMargins(0, 0, 0, 0)
+        computed_layout.setSpacing(2)
+        computed_layout.addWidget(self._section_title(
+            'ui.pal_editor.computed_section', 'Computed stats'))
+        stats_content = QWidget()
+        stats_grid = QGridLayout(stats_content)
         stats_grid.setContentsMargins(4, 1, 4, 1)
         stats_grid.setSpacing(2)
         # modernize-tab-ui 4.1: clean text stat labels (mojibake glyphs retired).
@@ -774,15 +870,22 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self.wspd_lbl.setProperty('computedValue', 'true')
         self.wspd_lbl.setToolTip(t('pal_editor.computed_hint') if t else 'Calculated from level, IVs and passives')
         stats_grid.addWidget(self.wspd_lbl, 2, 2, Qt.AlignVCenter)
+        computed_layout.addWidget(stats_content)
         right_layout.addWidget(stats_q)
         columns.addWidget(right_col, 1)
         body_layout.addLayout(columns)
         suit_card = QFrame()
+        self.work_section = suit_card
         suit_card.setObjectName('suitFoodCard')
+        suit_card.setProperty('inspectorSection', 'work')
+        suit_card.setAccessibleName(
+            t('ui.pal_editor.work_section', default='Work and food'))
         suit_card.setStyleSheet(f'QFrame#suitFoodCard {{ background: rgba(255,255,255,0.02); border: 1px solid {_P["info_border"]}; border-radius: 4px; }}')
         card_layout = QVBoxLayout(suit_card)
         card_layout.setContentsMargins(4, 1, 4, 1)
         card_layout.setSpacing(1)
+        card_layout.addWidget(self._section_title(
+            'ui.pal_editor.work_section', 'Work and food'))
         self.work_icons_container = QWidget()
         self.work_icons_container.setObjectName('wsIcons')
         self.work_icons_container.setStyleSheet('background: transparent; border: none;')
@@ -852,10 +955,32 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
             self.food_icon_labels.append(fc)
         card_layout.addLayout(food_row)
         body_layout.addWidget(suit_card)
+        technical_section = QFrame()
+        self.technical_section = technical_section
+        technical_section.setObjectName('palInspectorTechnicalSection')
+        technical_section.setAccessibleName(
+            t('ui.pal_editor.technical_section', default='Technical details'))
+        technical_layout = QVBoxLayout(technical_section)
+        technical_layout.setContentsMargins(4, 2, 4, 2)
+        technical_layout.setSpacing(2)
+        technical_layout.addWidget(self._section_title(
+            'ui.pal_editor.technical_section', 'Technical details'))
+        technical_row = QHBoxLayout()
+        technical_label = QLabel(t(
+            'ui.pal_editor.instance_id', default='Instance ID'))
+        technical_label.setObjectName('palTechnicalLabel')
+        technical_row.addWidget(technical_label)
+        technical_row.addStretch()
+        technical_row.addWidget(self.instance_id_lbl)
+        technical_layout.addLayout(technical_row)
+        body_layout.addWidget(technical_section)
         parent.addWidget(body, 1)
     def _build_skills(self, parent):
         skill_box = QFrame()
         skill_box.setObjectName('skillBox')
+        skill_box.setProperty('inspectorSection', 'skills')
+        skill_box.setAccessibleName(
+            t('ui.pal_editor.skills_section', default='Skills'))
         skill_box.setStyleSheet(f'QFrame#skillBox {{ background: rgba(10,16,24,0.95); border: 1.5px solid {_P["info_border"]}; border-radius: 5px; }}')
         sb_layout = QVBoxLayout(skill_box)
         sb_layout.setContentsMargins(4, 2, 4, 2)
@@ -890,6 +1015,10 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         partner_layout.addWidget(self.partner_desc_lbl)
         self.active_skills_frame = QFrame()
         self.active_skills_frame.setObjectName('activeSkillsBox')
+        self.active_skills_frame.setProperty(
+            'inspectorSection', 'active-skills')
+        self.active_skills_frame.setAccessibleName(
+            t('pal_editor.active_skills', default='Active Skills'))
         self.active_skills_frame.setStyleSheet('QFrame#activeSkillsBox { background: transparent; border: none; }')
         self.active_skills_frame.installEventFilter(self)
         as_layout = QVBoxLayout(self.active_skills_frame)
@@ -977,8 +1106,11 @@ class PalInfoWidget(PalInfoDisplayMixin, PalInfoHandlerMixin, QFrame):
         self._l_icon.clicked.connect(lambda: self.last_clicked_data is not None and self._on_passive_loadout())
         passive_header.addWidget(self._l_icon)
         sb_layout.addLayout(passive_header)
-        pg = QWidget()
-        pg.setStyleSheet('background: transparent; border: none;')
+        pg = QFrame()
+        pg.setObjectName('passiveSkillsBox')
+        pg.setProperty('inspectorSection', 'passive-skills')
+        pg.setAccessibleName(
+            t('pal_editor.passive_skills', default='Passive Skills'))
         self.passive_container = pg
         pg.installEventFilter(self)
         pg_layout = QGridLayout(pg)

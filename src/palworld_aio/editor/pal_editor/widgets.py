@@ -1,11 +1,11 @@
 import math
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QWidget, QLayout
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QWidget, QLayout
 from PyQt6.QtCore import Qt, QTimer, QEvent, QPoint, QPointF, QRectF, QRect, QSize, pyqtSignal
 from PyQt6.QtGui import QFont, QPixmap, QPainter, QPainterPath, QPen, QBrush, QFontMetrics, QColor, QLinearGradient
 from i18n import t
 from palworld_aio import constants
 from resource_resolver import resource_path
-from palworld_aio.ui.chrome.styles import TOOLTIP_STYLE
+from palworld_aio.ui.chrome.components import BaseDialog
 from palworld_aio.ui.chrome import tokens as _chrome_tokens
 _P = _chrome_tokens.resolve()
 
@@ -95,58 +95,38 @@ class FlowLayout(QLayout):
         return y + line_height - rect.y() + margins.bottom()
 
 
-class FramelessDialog(QDialog):
+class PalEditorDialog(BaseDialog):
+    """Shared scaffold for Pal-editor dialogs with legacy title-key input.
+
+    Existing Pal workflows build their specialized controls in ``content_layout``;
+    this adapter supplies the common header, focus containment/restoration,
+    Escape behavior, minimum sizing, and token-driven chrome without changing
+    their accepted values or mutation callbacks.
+    """
 
     def __init__(self, title_key='edit_pals.title', parent=None):
+        title = t(title_key, default=title_key)
+        super().__init__(title, parent, min_size=(400, 300))
+        self.setProperty('dialogFamily', 'palEditor')
+        self.setAccessibleDescription(
+            t('ui.dialog.pal_workflow_description',
+              default='Review and apply a Pal editor action.'))
+        # Existing workflows retain their own action rows until their mutation
+        # controllers are separated. The shared close control remains available.
+        self.cancel_btn.hide()
 
-        super().__init__(parent)
+    def _focus_initial(self):
+        self.focusNextPrevChild(True)
 
-        self.setWindowTitle(t(title_key))
+    def setWindowTitle(self, title):
+        super().setWindowTitle(title)
+        self.setAccessibleName(title)
+        if hasattr(self, 'title_label'):
+            self.title_label.setText(title)
 
-        self.setMinimumSize(400, 300)
 
-        self.container = QWidget(self)
-
-        self.container.setObjectName('editPalsContainer')
-
-        main_layout = QVBoxLayout(self)
-
-        main_layout.setContentsMargins(0, 0, 0, 0)
-
-        main_layout.addWidget(self.container)
-
-        container_layout = QVBoxLayout(self.container)
-
-        container_layout.setContentsMargins(0, 0, 0, 0)
-
-        container_layout.setSpacing(0)
-
-        self.content_widget = QWidget(self.container)
-
-        self.content_widget.setObjectName('editPalsContent')
-
-        self.content_layout = QVBoxLayout(self.content_widget)
-
-        self.content_layout.setContentsMargins(16, 12, 16, 16)
-
-        container_layout.addWidget(self.content_widget)
-
-        self._apply_styles()
-
-    def _apply_styles(self):
-
-        # modernize-tab-ui 4.2: gradient flattened to opaque token surface.
-        self.setStyleSheet(TOOLTIP_STYLE + '''
-            QWidget#editPalsContainer {
-                background: rgba(27,25,23,0.98);
-                border: 1px solid rgba(147,183,221,0.30);
-                border-radius: 12px;
-            }
-            QWidget#editPalsContent {
-                background: transparent;
-                border: none;
-            }
-        ''')
+# Compatibility for non-Pal-editor consumers awaiting their task-8 migration.
+FramelessDialog = PalEditorDialog
 
 class StarButton(QPushButton):
 

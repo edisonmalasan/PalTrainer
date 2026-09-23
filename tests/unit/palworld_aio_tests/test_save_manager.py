@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tests.dynamic_importer import import_from
+import common
 
 constants = import_from('palworld_aio.constants')
 save_manager_module = import_from('palworld_aio.managers.save_manager')
@@ -81,6 +82,36 @@ def test_save_manager_query_contracts_use_world_projections():
     finally:
         constants.loaded_level_json = old_document
         constants.player_levels = old_player_levels
+
+
+def test_load_backup_preference_controls_the_existing_safety_snapshot(
+    monkeypatch, tmp_path,
+):
+    manager = save_manager_module.SaveManager()
+    level_path = tmp_path / 'Level.sav'
+    level_path.write_bytes(b'fixture')
+    backups = []
+    monkeypatch.setattr(manager, '_reset_state', lambda: None)
+    monkeypatch.setattr(manager, '_load_from_path', lambda *_args: True)
+    monkeypatch.setattr(
+        save_manager_module.save_session, 'approve_save_path',
+        lambda path: str(path))
+    monkeypatch.setattr(
+        save_manager_module.save_session, 'make_backup', backups.append)
+    monkeypatch.setattr(common, 'set_last_save_path', lambda _path: None)
+    monkeypatch.setattr(
+        save_manager_module, 'run_with_loading',
+        lambda callback, task, *args, **kwargs: callback(task()))
+    previous = constants.automatic_backup_on_load
+    try:
+        constants.automatic_backup_on_load = False
+        manager.load_save(str(level_path))
+        assert backups == []
+        constants.automatic_backup_on_load = True
+        manager.load_save(str(level_path))
+        assert backups == ['AllinOneTools']
+    finally:
+        constants.automatic_backup_on_load = previous
 
 
 def test_player_manager_info_preserves_legacy_display_contract():

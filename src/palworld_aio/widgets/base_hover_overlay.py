@@ -7,6 +7,7 @@ class BaseHoverOverlay(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName('baseHoverOverlay')
+        self.setAccessibleName(t('ui.hover.base', default='Base details'))
         self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
@@ -68,7 +69,6 @@ class BaseHoverOverlay(QWidget):
         shadow.setOffset(2, 2)
         shadow.setColor(QColor(0, 0, 0, 100))
         self.container.setGraphicsEffect(shadow)
-        self.container.setStyleSheet('\n            QFrame#hoverOverlayContainer {\n                background: rgba(18,20,24,0.95);\n                border: 1px solid rgba(125,211,252,0.3);\n                border-radius: 8px;\n            }\n            QLabel#hoverGuildLabel {\n                color: #7DD3FC;\n            }\n            QLabel#hoverDetailLabel {\n                color: #a0aec0;\n            }\n        ')
     def show_for_base(self, base_data: dict, global_pos: QPoint):
         self._hide_timer.stop()
         guild_name = base_data.get('guild_name', 'Unknown')
@@ -98,6 +98,9 @@ class BaseHoverOverlay(QWidget):
         self.coords_label.show()
         self.uid_label.hide()
         self.guild_id_label.hide()
+        self.setAccessibleDescription(
+            f'{guild_name}. Level {guild_level}. {leader_name}. '
+            f'{pal_count} Pals. X {int(coords[0])}, Y {int(coords[1])}.')
         self.adjustSize()
         offset_x = 20
         offset_y = -self.height() // 2
@@ -135,6 +138,9 @@ class BaseHoverOverlay(QWidget):
         self.uid_label.hide()
         self.guild_id_label.hide()
         self.base_pals_label.hide()
+        self.setAccessibleDescription(
+            f'{player_name}. Level {player_level}. {pal_count} Pals. '
+            f'X {int(coords[0])}, Y {int(coords[1])}.')
         self.adjustSize()
         offset_x = 20
         offset_y = -self.height() // 2

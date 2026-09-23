@@ -55,13 +55,20 @@ def delete_pal_from_all(pal_id):
             if container_id:
                 container_id_norm = str(container_id).replace('-', '').lower()
                 owner_info = container_to_owner.get(container_id_norm)
-            instances_to_remove.append((idx, instance_id, owner_info))
+            instances_to_remove.append((
+                idx,
+                instance_id,
+                owner_info,
+                str(container_id).replace('-', '').lower()
+                if container_id else '',
+            ))
         except:
             continue
-    for remove_idx, (cmap_idx, instance_id, owner_info) in enumerate(instances_to_remove):
+    for remove_idx, (
+            cmap_idx, instance_id, owner_info,
+            container_id_norm) in enumerate(instances_to_remove):
         try:
-            if owner_info and container_id:
-                container_id_norm = str(container_id).replace('-', '').lower()
+            if owner_info and container_id_norm:
                 container_data = container_lookup.get(container_id_norm)
                 if container_data:
                     slots = container_data.get('value', {}).get('Slots', {}).get('value', {}).get('values', [])

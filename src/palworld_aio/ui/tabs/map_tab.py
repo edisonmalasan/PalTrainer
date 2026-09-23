@@ -1,8 +1,10 @@
 ﻿import os
+import logging
+
 from palsav import json_tools
 from palsav.archive import UUID
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGraphicsScene, QGraphicsPixmapItem, QMenu, QLineEdit, QTreeWidget, QTreeWidgetItem, QSplitter, QLabel, QFileDialog, QCheckBox, QStackedWidget, QDialog, QPushButton, QSizePolicy, QHeaderView, QApplication
-from PyQt6.QtCore import Qt, QRectF, QPointF, QPoint, QSize, QTimer, QPropertyAnimation, QEasingCurve
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGraphicsScene, QGraphicsPixmapItem, QMenu, QLineEdit, QTreeWidget, QTreeWidgetItem, QSplitter, QLabel, QFileDialog, QCheckBox, QStackedWidget, QDialog, QPushButton, QSizePolicy, QHeaderView, QApplication, QFrame
+from PyQt6.QtCore import Qt, QRectF, QPointF, QPoint, QSize, QTimer, QPropertyAnimation, QEasingCurve, pyqtSignal
 from PyQt6.QtGui import QPixmap, QPen, QBrush, QColor, QPainter, QFont, QIcon
 from i18n import t
 from resource_resolver import resource_path
@@ -21,8 +23,31 @@ from ..map_view.map_markers import BaseMarker, PlayerMarker
 from ..map_view.map_effects import ImportEffect, SwapSourceEffect, CalibrationEffect
 from ..map_view.map_items import ExclusionZoneItem, PolygonExclusionZoneItem, BaseRadiusRing, ZonePreviewItem
 from ..map_view.map_view import MapGraphicsView
-from palworld_aio.ui.chrome.styles import MENU_STYLE
 from palworld_aio.ui.chrome import tokens as _chrome_tokens
+from palworld_aio.ui.chrome.components import (
+    Drawer,
+    MessageDialog as QMessageBox,
+    InspectorPanel,
+    SegmentedControl,
+    make_button,
+    make_filter_button,
+    make_label,
+    make_tool_button,
+    make_vdivider,
+)
+from palworld_aio.ui.chrome.localization import tr
+from palworld_aio.ui.chrome.state_views import (
+    ConfiguredEmptyState,
+    ErrorState,
+    NoResultState,
+    PrerequisiteState,
+    SkeletonView,
+)
+from palworld_aio.ui.chrome.tokens import LAYOUT, SPACING
+from palworld_aio.ui.dialogs.transfer_workflow_dialog import (
+    TransferWorkflowDialog,
+    TransferWorkflowSpec,
+)
 _P = _chrome_tokens.resolve()
 _SORT_ROLE = Qt.UserRole + 1
 class _SortableItem(QTreeWidgetItem):
@@ -36,6 +61,14 @@ class _SortableItem(QTreeWidgetItem):
         return self.text(col) < other.text(col)
 
 class MapTab(QWidget):
+    """Map-first World workspace preserving the established map operations."""
+
+    openBaseRequested = pyqtSignal(object)
+    openPlayerRequested = pyqtSignal(object)
+    openGuildRequested = pyqtSignal(object)
+    loadSaveRequested = pyqtSignal()
+    retryRequested = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
@@ -61,6 +94,12 @@ class MapTab(QWidget):
         self._zone_drawing_mode = False
         self._zone_shape_type = 'rect'
         self._zone_count = 0
+        self._selected_entity_type = ''
+        self._selected_entity_id = ''
+        self._selected_entity_data = None
+        self._compact_inspector = False
+        self._view_initialized = False
+        self._pending_view_geometry = None
         self._load_config()
         self.current_map = 'world'
         self.map_width = 2048
@@ -70,9 +109,27 @@ class MapTab(QWidget):
         self._setup_ui()
         self._setup_animation()
         self._update_zone_items()
-    def showEvent(self, event):
-        super().showEvent(event)
-        QTimer.singleShot(200, self._fit_map_to_viewport)
+    def _run_transfer_workflow(
+        self, *, title, source, target, review, operation, result_message,
+        backup='', risk='', confirm_text='', result_success=None,
+        on_completed=None,
+    ):
+        dialog = TransferWorkflowDialog(
+            TransferWorkflowSpec(
+                title, source, target, review, backup, risk, confirm_text),
+            operation,
+            result_message,
+            self,
+            result_success=result_success,
+        )
+        if on_completed is not None:
+            dialog.completed.connect(on_completed)
+        dialog.exec()
+        return dialog
+    def showEvent(self, a0):
+        super().showEvent(a0)
+        if not self._view_initialized:
+            QTimer.singleShot(0, self._fit_map_to_viewport)
     def _fit_map_to_viewport(self):
         if self.scene and self.map_width > 0 and (self.map_height > 0):
             viewport = self.view.viewport()
@@ -83,22 +140,36 @@ class MapTab(QWidget):
                 self.view.current_zoom = 1.0
                 self.view.zoom_label.setText((t('zoom') if t else 'Zoom') + f': {int(1.0 * 100)}%')
                 self.view.zoom_changed.emit(1.0)
+                self.view._update_zoom_buttons_enabled()
+                self._view_initialized = True
+                if self._pending_view_geometry is not None:
+                    zoom, center = self._pending_view_geometry
+                    self._pending_view_geometry = None
+                    self._apply_view_geometry(zoom, center)
     def refresh_labels(self):
         if hasattr(self, 'sidebar_label'):
             self.sidebar_label.setText(t('map.sidebar.label') if t else 'Map Browser')
         if hasattr(self, 'search_input'):
             self.search_input.setPlaceholderText(t('map.search.placeholder') if t else 'Search guilds,leaders,bases...')
         if hasattr(self, 'toggle_map_bases'):
-            self.toggle_map_bases.setToolTip(t('map.toggle.bases') if t else 'Bases')
+            self.toggle_map_bases.setText(tr('map.toggle.bases', 'Bases'))
+            self.toggle_map_bases.setToolTip(tr(
+                'ui.map.bases_tooltip', 'Show base markers'))
             self.toggle_map_bases.setAccessibleName(self.toggle_map_bases.toolTip())
         if hasattr(self, 'toggle_map_players'):
-            self.toggle_map_players.setToolTip(t('map.toggle.players') if t else 'Players')
+            self.toggle_map_players.setText(tr('map.toggle.players', 'Players'))
+            self.toggle_map_players.setToolTip(tr(
+                'ui.map.players_tooltip', 'Show player markers'))
             self.toggle_map_players.setAccessibleName(self.toggle_map_players.toolTip())
         if hasattr(self, 'toggle_base_radius_rings'):
+            self.toggle_base_radius_rings.setText(tr(
+                'ui.map.radius_layer', 'Radius'))
             self.toggle_base_radius_rings.setToolTip(t('map.toggle.base_radius_rings') if t else 'Base Radius Rings')
             self.toggle_base_radius_rings.setAccessibleName(self.toggle_base_radius_rings.toolTip())
         if hasattr(self, 'toggle_map_zones'):
-            self.toggle_map_zones.setToolTip(t('map.toggle.zones') if t else 'Zones')
+            self.toggle_map_zones.setText(tr('map.toggle.zones', 'Zones'))
+            self.toggle_map_zones.setToolTip(tr(
+                'ui.map.zones_tooltip', 'Show exclusion zones'))
             self.toggle_map_zones.setAccessibleName(self.toggle_map_zones.toolTip())
         if hasattr(self, 'toggle_map_type'):
             self.toggle_map_type.setToolTip(t('map.toggle.world_map') if self.current_map == 'tree' else t('map.toggle.tree_map'))
@@ -127,13 +198,81 @@ class MapTab(QWidget):
             self.bases_tab_btn.setText(t('map.toggle.bases') if t else 'Bases')
         if hasattr(self, 'players_tab_btn'):
             self.players_tab_btn.setText(t('map.toggle.players') if t else 'Players')
+        if hasattr(self, 'map_type_control'):
+            self.map_type_control._buttons['world'].setText(tr(
+                'ui.map.world', 'World'))
+            self.map_type_control._buttons['tree'].setText(tr(
+                'ui.map.tree', 'Tree'))
+        if hasattr(self, 'details_button'):
+            self.details_button.setText(tr('ui.map.details', 'Marker details'))
         if hasattr(self, 'info_label'):
-            self.info_label.setText(t('map.info.select_base') if t else 'Click on a base marker or list item to view details')
+            if self._selected_entity_type == 'player':
+                self.info_label.setText(tr(
+                    'ui.map.player_selected_hint',
+                    'Player selected. Double-click to center or use the details actions.'))
+            elif self._selected_entity_type == 'base':
+                self.info_label.setText(tr(
+                    'ui.map.base_selected_hint',
+                    'Base selected. Double-click to center or use the details actions.'))
+            else:
+                self.info_label.setText(
+                    t('map.info.select_base') if t else
+                    'Click on a base marker or list item to view details')
         if hasattr(self, 'view'):
             if hasattr(self.view, 'coords_label'):
                 self.view.coords_label.setText(f"{(t('cursor_coords') if t else 'Cursor')}: 0,0")
             if hasattr(self.view, 'zoom_label'):
-                self.view.zoom_label.setText((t('zoom') if t else 'Zoom') + ': 100%')
+                self.view._update_zoom_label()
+        if hasattr(self, 'no_save_state'):
+            self._update_state_copy(
+                self.no_save_state,
+                tr('ui.world.no_save_title', 'Load a save first'),
+                tr('ui.world.no_save_message',
+                   'Open a Palworld save to view this World workspace.'))
+            self.no_save_state.action_button.setText(tr(
+                'ui.world.open_save', 'Open save'))
+            loading = tr('ui.map.loading', 'Loading map entities…')
+            self.loading_state.status_label.setText(loading)
+            self.loading_state.setAccessibleName(loading)
+            self._update_state_copy(
+                self.error_state,
+                tr('ui.map.error_title', 'Could not load map entities'),
+                tr('ui.map.error_message',
+                   'Map entities could not be read from this save. Try again.'))
+            self.error_state.action_button.setText(tr('ui.state.retry', 'Retry'))
+            explorer_copy = {
+                'bases': (
+                    tr('ui.map.empty_bases_title', 'No bases on this map'),
+                    tr('ui.map.empty_bases_message',
+                       'This loaded save does not contain any mapped bases.'),
+                    tr('ui.map.no_result_bases_title', 'No matching bases'),
+                    tr('ui.map.no_result_bases_message',
+                       'No mapped bases match the current search.')),
+                'players': (
+                    tr('ui.map.empty_players_title', 'No players on this map'),
+                    tr('ui.map.empty_players_message',
+                       'This loaded save does not contain any mapped players.'),
+                    tr('ui.map.no_result_players_title', 'No matching players'),
+                    tr('ui.map.no_result_players_message',
+                       'No mapped players match the current search.')),
+            }
+            for key, (empty_title, empty_message,
+                      no_result_title, no_result_message) in explorer_copy.items():
+                self._update_state_copy(
+                    self._explorer_empty_states[key],
+                    empty_title, empty_message)
+                no_result = self._explorer_no_result_states[key]
+                self._update_state_copy(
+                    no_result, no_result_title, no_result_message)
+                no_result.action_button.setText(tr(
+                    'ui.state.clear_filters', 'Clear filters'))
+
+    @staticmethod
+    def _update_state_copy(state, title, message):
+        state.title_label.setText(title)
+        state.message_label.setText(message)
+        state.setAccessibleName(title)
+        state.setAccessibleDescription(message)
     def _load_config(self):
         self.config = {'marker': {'type': 'icon', 'dot': {'size': 24, 'color': [255, 0, 0], 'border_width': 3, 'border_color': [180, 0, 0], 'size_min': 24, 'size_max': 24, 'dynamic_sizing': False, 'dynamic_sizing_formula': 'sqrt'}, 'icon': {'path': 'baseicon.webp', 'size_min': 32, 'size_max': 64, 'base_size': 48, 'dynamic_sizing': True, 'dynamic_sizing_formula': 'sqrt'}}, 'glow': {'enabled': True, 'color': [59, 142, 208], 'selected_alpha_min': 80, 'selected_alpha_max': 180, 'animation_speed': 8, 'hover_alpha': 80, 'radius_multiplier': 1.5}, 'zoom': {'factor': 1.15, 'min': 1.0, 'max': 30.0, 'double_click_target': 26.0, 'animation_speed': 0.2, 'animation_fps': 60}, 'effects': {'delete': {'enabled': True, 'duration': 1000, 'max_radius': 150, 'colors': {'outer': [255, 80, 80], 'inner': [255, 150, 0], 'flash': [255, 200, 0]}}, 'import': {'enabled': True, 'duration': 1000, 'pulse_count': 3, 'color': [0, 255, 150], 'sparkle_color': [100, 255, 200]}, 'export': {'enabled': True, 'duration': 1000, 'color': [100, 200, 255]}}}
         return self.config
@@ -176,17 +315,97 @@ class MapTab(QWidget):
                 return
         self.player_icon_pixmap = None
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon
-        # Single installed root layout: ribbon on top, canvas body below.
-        # (Was two competing `*_Layout(self)` installs; the second orphaned
-        # the canvas, leaving the ribbon floating mid-page.)
         root_v = QVBoxLayout(self)
         root_v.setContentsMargins(0, 0, 0, 0)
-        root_v.setSpacing(0)
-        root_v.addWidget(create_page_ribbon(t('map.viewer') if t else 'Map', (t('sidebar.section.world') if t else 'World Data').upper(), self))
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        self._map_widget = QWidget()
+        root_v.setSpacing(SPACING['sm'])
+
+        self.map_control_bar = QFrame(self)
+        self.map_control_bar.setObjectName('mapControlBar')
+        controls = QHBoxLayout(self.map_control_bar)
+        self._map_control_layout = controls
+        controls.setContentsMargins(
+            SPACING['md'], SPACING['sm'], SPACING['md'], SPACING['sm'])
+        controls.setSpacing(SPACING['sm'])
+        controls.addWidget(make_label(
+            tr('ui.map.view_label', 'Map'), 'micro', self.map_control_bar))
+        self.map_type_control = SegmentedControl(
+            (
+                ('world', tr('ui.map.world', 'World')),
+                ('tree', tr('ui.map.tree', 'Tree')),
+            ),
+            current='world',
+            accessible_name=tr('ui.map.view_accessible', 'Map view'),
+            parent=self.map_control_bar,
+        )
+        self.map_type_control.currentChanged.connect(self._on_map_mode_changed)
+        controls.addWidget(self.map_type_control)
+        controls.addWidget(make_vdivider())
+        controls.addWidget(make_label(
+            tr('ui.map.layers', 'Layers'), 'micro', self.map_control_bar))
+
+        self.toggle_map_bases = make_filter_button(
+            tr('map.toggle.bases', 'Bases'), checked=True,
+            parent=self.map_control_bar)
+        self.toggle_map_players = make_filter_button(
+            tr('map.toggle.players', 'Players'), checked=False,
+            parent=self.map_control_bar)
+        self.toggle_base_radius_rings = make_filter_button(
+            tr('ui.map.radius_layer', 'Radius'), checked=True,
+            parent=self.map_control_bar)
+        self.toggle_map_zones = make_filter_button(
+            tr('map.toggle.zones', 'Zones'), checked=False,
+            parent=self.map_control_bar)
+        for button, tooltip in (
+            (self.toggle_map_bases, tr(
+                'ui.map.bases_tooltip', 'Show base markers')),
+            (self.toggle_map_players, tr(
+                'ui.map.players_tooltip', 'Show player markers')),
+            (self.toggle_base_radius_rings, tr(
+                'map.toggle.base_radius_rings', 'Base Radius Rings')),
+            (self.toggle_map_zones, tr(
+                'ui.map.zones_tooltip', 'Show exclusion zones')),
+        ):
+            button.setObjectName('mapLayerButton')
+            button.setToolTip(tooltip)
+            button.setAccessibleName(tooltip)
+            button.setAccessibleDescription(tooltip)
+            controls.addWidget(button)
+        self.toggle_map_bases.clicked.connect(self._on_toggle_changed)
+        self.toggle_map_players.clicked.connect(self._on_toggle_changed)
+        self.toggle_base_radius_rings.clicked.connect(
+            self._on_radius_rings_toggle)
+        self.toggle_map_zones.clicked.connect(self._on_zones_toggle)
+
+        controls.addStretch(1)
+        base_dir = constants.get_base_path()
+        self.btn_calibrate = make_tool_button(
+            'target', tr('calibrate.button', 'Calibrate world map'),
+            self.map_control_bar)
+        self.btn_calibrate.setIcon(
+            QIcon(resource_path(base_dir, 'calibrate.webp')))
+        self.btn_calibrate.setCheckable(True)
+        self.btn_calibrate.clicked.connect(self._on_calibrate_toggle)
+        controls.addWidget(self.btn_calibrate)
+        self.btn_calibrate_tree = make_tool_button(
+            'target', tr('calibrate.tree_button', 'Calibrate tree map'),
+            self.map_control_bar)
+        self.btn_calibrate_tree.setIcon(
+            QIcon(resource_path(base_dir, 'calibrate.webp')))
+        self.btn_calibrate_tree.setCheckable(True)
+        self.btn_calibrate_tree.clicked.connect(self._on_calibrate_tree_toggle)
+        controls.addWidget(self.btn_calibrate_tree)
+        self.details_button = make_button(
+            tr('ui.map.details', 'Details'), 'secondary',
+            tooltip=tr('ui.map.details_tooltip', 'Open selected marker details'),
+            parent=self.map_control_bar)
+        self.details_button.clicked.connect(self._open_inspector)
+        self.details_button.setEnabled(False)
+        self.details_button.hide()
+        controls.addWidget(self.details_button)
+        root_v.addWidget(self.map_control_bar)
+
+        self._map_widget = QFrame(self)
+        self._map_widget.setObjectName('mapCanvasFrame')
         self._map_widget.setMinimumSize(0, 0)
         map_layout = QVBoxLayout(self._map_widget)
         map_layout.setContentsMargins(0, 0, 0, 0)
@@ -215,98 +434,20 @@ class MapTab(QWidget):
         self.view.marker_hover_left.connect(self._on_marker_hover_leave)
         self._load_map()
         map_layout.addWidget(self.view)
-        self.map_overlay = QWidget(self.view)
-        self.map_overlay.setStyleSheet('background: transparent;')
-        self.map_overlay.setAttribute(Qt.WA_TransparentForMouseEvents, False)
-        self.map_overlay.raise_()
-        overlay_layout = QHBoxLayout(self.map_overlay)
-        overlay_layout.setContentsMargins(0, 0, 0, 0)
-        overlay_layout.setSpacing(3)
-        overlay_layout.addStretch()
-        base_dir = constants.get_base_path()
-        # modernize-tab-ui 6.1: overlay toggles ride the shared `mapToggleBtn`
-        # theme-builder rule (accent checked state); inline cyan styles retired.
-        # No widget-level stylesheet here: a widget QSS block would override
-        # the application rule (widget stylesheets win over app styles in Qt).
-        self.btn_calibrate = QPushButton()
-        self.btn_calibrate.setIcon(QIcon(resource_path(base_dir, 'calibrate.webp')))
-        self.btn_calibrate.setIconSize(QSize(22, 22))
-        self.btn_calibrate.setToolTip(t('calibrate.button'))
-        self.btn_calibrate.setAccessibleName(self.btn_calibrate.toolTip())
-        self.btn_calibrate.setCheckable(True)
-        self.btn_calibrate.setChecked(False)
-        self.btn_calibrate.clicked.connect(self._on_calibrate_toggle)
-        self.btn_calibrate.setObjectName('mapToggleBtn')
-        overlay_layout.addWidget(self.btn_calibrate)
-        self.btn_calibrate_tree = QPushButton()
-        self.btn_calibrate_tree.setIcon(QIcon(resource_path(base_dir, 'calibrate.webp')))
-        self.btn_calibrate_tree.setIconSize(QSize(22, 22))
-        self.btn_calibrate_tree.setToolTip(t('calibrate.tree_button'))
-        self.btn_calibrate_tree.setAccessibleName(self.btn_calibrate_tree.toolTip())
-        self.btn_calibrate_tree.setCheckable(True)
-        self.btn_calibrate_tree.setChecked(False)
-        self.btn_calibrate_tree.clicked.connect(self._on_calibrate_tree_toggle)
-        self.btn_calibrate_tree.setObjectName('mapToggleBtn')
-        overlay_layout.addWidget(self.btn_calibrate_tree)
-        self.toggle_map_bases = QPushButton()
-        self.toggle_map_bases.setIcon(QIcon(resource_path(base_dir, 'baseicon.webp')))
-        self.toggle_map_bases.setIconSize(QSize(22, 22))
-        self.toggle_map_bases.setToolTip(t('map.toggle.bases') if t else 'Bases')
-        self.toggle_map_bases.setAccessibleName(self.toggle_map_bases.toolTip())
-        self.toggle_map_bases.setCheckable(True)
-        self.toggle_map_bases.setChecked(True)
-        self.toggle_map_bases.clicked.connect(self._on_toggle_changed)
-        self.toggle_map_bases.setObjectName('mapToggleBtn')
-        overlay_layout.addWidget(self.toggle_map_bases)
-        self.toggle_map_players = QPushButton()
-        self.toggle_map_players.setIcon(QIcon(resource_path(base_dir, 'playericon.webp')))
-        self.toggle_map_players.setIconSize(QSize(22, 22))
-        self.toggle_map_players.setToolTip(t('map.toggle.players') if t else 'Players')
-        self.toggle_map_players.setAccessibleName(self.toggle_map_players.toolTip())
-        self.toggle_map_players.setCheckable(True)
-        self.toggle_map_players.setChecked(False)
-        self.toggle_map_players.clicked.connect(self._on_toggle_changed)
-        self.toggle_map_players.setObjectName('mapToggleBtn')
-        overlay_layout.addWidget(self.toggle_map_players)
-        self.toggle_base_radius_rings = QPushButton()
-        self.toggle_base_radius_rings.setIcon(QIcon(resource_path(base_dir, 'ring.webp')))
-        self.toggle_base_radius_rings.setIconSize(QSize(22, 22))
-        self.toggle_base_radius_rings.setToolTip(t('map.toggle.base_radius_rings') if t else 'Base Radius Rings')
-        self.toggle_base_radius_rings.setAccessibleName(self.toggle_base_radius_rings.toolTip())
-        self.toggle_base_radius_rings.setCheckable(True)
-        self.toggle_base_radius_rings.setChecked(True)
-        self.toggle_base_radius_rings.clicked.connect(self._on_radius_rings_toggle)
-        self.toggle_base_radius_rings.setObjectName('mapToggleBtn')
-        overlay_layout.addWidget(self.toggle_base_radius_rings)
-        self.toggle_map_zones = QPushButton()
-        self.toggle_map_zones.setIcon(QIcon(resource_path(base_dir, 'zones.webp')))
-        self.toggle_map_zones.setIconSize(QSize(22, 22))
-        self.toggle_map_zones.setToolTip(t('map.toggle.zones') if t else 'Zones')
-        self.toggle_map_zones.setAccessibleName(self.toggle_map_zones.toolTip())
-        self.toggle_map_zones.setCheckable(True)
-        self.toggle_map_zones.setChecked(False)
-        self.toggle_map_zones.clicked.connect(self._on_zones_toggle)
-        self.toggle_map_zones.setObjectName('mapToggleBtn')
-        overlay_layout.addWidget(self.toggle_map_zones)
-        self.toggle_map_type = QPushButton()
-        self.toggle_map_type.setIcon(QIcon(resource_path(base_dir, 'T_TreeMap.webp')))
-        self.toggle_map_type.setIconSize(QSize(26, 26))
-        self.toggle_map_type.setToolTip(t('map.toggle.tree_map') if t else 'Tree Map')
-        self.toggle_map_type.setAccessibleName(self.toggle_map_type.toolTip())
-        self.toggle_map_type.setCheckable(True)
-        self.toggle_map_type.setChecked(False)
-        self.toggle_map_type.clicked.connect(self._on_map_type_toggle)
-        self.toggle_map_type.setObjectName('mapToggleBtn')
-        self.toggle_map_type.setProperty('wide', True)
-        overlay_layout.addWidget(self.toggle_map_type)
-        overlay_layout.addStretch()
-        self.view.overlay_position_callback = self._reposition_map_overlay
+        self.toggle_map_type = self.map_type_control._buttons['tree']
+        self.toggle_map_type.setToolTip(
+            tr('map.toggle.tree_map', 'Tree Map'))
+        self.toggle_map_type.setAccessibleName(
+            self.toggle_map_type.toolTip())
+        self.toggle_map_type.setAccessibleDescription(
+            self.toggle_map_type.toolTip())
+        self.map_overlay = self.map_control_bar
+        self.view.overlay_position_callback = None
         self._calibration_points = []
         self._calibration_bases = []
         self._calibration_markers = []
         self._calibration_label = QLabel('', self.view)
-        # modernize-tab-ui 6.5: info token (was hardcoded cyan #7dd3fc).
-        self._calibration_label.setStyleSheet(f'background: {_P["tooltip_bg"]}; color: {_P["info"]}; padding: 6px 12px; border-radius: 4px; font-size: 12px;')
+        self._calibration_label.setObjectName('mapCalibrationNotice')
         self._calibration_effect = None
         self._calibration_label.move(10, 50)
         self._calibration_label.setVisible(False)
@@ -314,49 +455,51 @@ class MapTab(QWidget):
         self._tree_cal_players = []
         self._tree_cal_markers = []
         self._tree_cal_label = QLabel('', self.view)
-        self._tree_cal_label.setStyleSheet('background: rgba(0,0,0,180); color: #ffcc00; padding: 6px 12px; border-radius: 4px; font-size: 12px;')
+        self._tree_cal_label.setObjectName('mapCalibrationWarning')
         self._tree_cal_effect = None
         self._tree_cal_label.move(10, 50)
         self._tree_cal_label.setVisible(False)
         self._undo_tree_cal = None
-        self._sidebar_widget = QWidget()
-        # modernize-tab-ui 6.3: 360px so the browser tree columns fit at the
-        # 1200px minimum window width without truncating headers.
-        self._sidebar_widget.setMinimumWidth(360)
+        self._sidebar_widget = QFrame(self)
+        self._sidebar_widget.setMinimumWidth(320)
+        self._sidebar_widget.setMaximumWidth(340)
         self._sidebar_widget.setAttribute(Qt.WA_StyledBackground, True)
-        # 008-r02: sidebar is now a floating legend card over the canvas
-        self._sidebar_widget.setObjectName('mapLegendCard')
+        self._sidebar_widget.setObjectName('mapExplorerPanel')
         sidebar_layout = QVBoxLayout(self._sidebar_widget)
-        sidebar_layout.setContentsMargins(8, 8, 8, 8)
-        sidebar_layout.setSpacing(8)
+        sidebar_layout.setContentsMargins(
+            SPACING['md'], SPACING['md'], SPACING['md'], SPACING['md'])
+        sidebar_layout.setSpacing(SPACING['sm'])
+        explorer_heading = QHBoxLayout()
         self.sidebar_label = QLabel(t('map.sidebar.label') if t else 'Map Browser')
         self.sidebar_label.setObjectName('dialogTitle')
         self.sidebar_label.setAlignment(Qt.AlignLeft)
-        sidebar_layout.addWidget(self.sidebar_label)
-        search_tab_layout = QHBoxLayout()
-        search_tab_layout.setContentsMargins(0, 0, 0, 0)
-        search_tab_layout.setSpacing(4)
+        explorer_heading.addWidget(self.sidebar_label, 1)
+        self.explorer_count_label = make_label(
+            tr('ui.map.count', '0 shown'), 'micro', self._sidebar_widget)
+        self.explorer_count_label.setObjectName('mapExplorerCount')
+        explorer_heading.addWidget(self.explorer_count_label)
+        sidebar_layout.addLayout(explorer_heading)
         self.search_input = QLineEdit()
         self.search_input.setObjectName('searchInput')
         self.search_input.setPlaceholderText(t('map.search.placeholder') if t else 'Search guilds,leaders,bases...')
+        self.search_input.setAccessibleName(
+            tr('ui.map.search_accessible', 'Search map explorer'))
         self.search_input.textChanged.connect(self._on_search_changed)
-        search_tab_layout.addWidget(self.search_input, 1)
-        self.bases_tab_btn = QPushButton(t('map.toggle.bases') if t else 'Bases')
-        self.bases_tab_btn.setObjectName('pageSwitchBtn')
-        self.bases_tab_btn.setCheckable(True)
-        self.bases_tab_btn.setChecked(True)
-        self.bases_tab_btn.setFixedHeight(28)
-        self.bases_tab_btn.setCursor(Qt.PointingHandCursor)
-        self.bases_tab_btn.clicked.connect(lambda: self._switch_map_tab(0))
-        search_tab_layout.addWidget(self.bases_tab_btn)
-        self.players_tab_btn = QPushButton(t('map.toggle.players') if t else 'Players')
-        self.players_tab_btn.setObjectName('pageSwitchBtn')
-        self.players_tab_btn.setCheckable(True)
-        self.players_tab_btn.setFixedHeight(28)
-        self.players_tab_btn.setCursor(Qt.PointingHandCursor)
-        self.players_tab_btn.clicked.connect(lambda: self._switch_map_tab(1))
-        search_tab_layout.addWidget(self.players_tab_btn)
-        sidebar_layout.addLayout(search_tab_layout)
+        sidebar_layout.addWidget(self.search_input)
+        self.explorer_type_control = SegmentedControl(
+            (
+                ('bases', tr('map.toggle.bases', 'Bases')),
+                ('players', tr('map.toggle.players', 'Players')),
+            ),
+            current='bases',
+            accessible_name=tr('ui.map.explorer_type', 'Explorer entity type'),
+            parent=self._sidebar_widget,
+        )
+        self.explorer_type_control.currentChanged.connect(
+            lambda key: self._switch_map_tab(0 if key == 'bases' else 1))
+        self.bases_tab_btn = self.explorer_type_control._buttons['bases']
+        self.players_tab_btn = self.explorer_type_control._buttons['players']
+        sidebar_layout.addWidget(self.explorer_type_control)
         self.map_tab_stack = QStackedWidget()
         self.base_tree = QTreeWidget()
         self.base_tree.setObjectName('baseTree')
@@ -374,11 +517,9 @@ class MapTab(QWidget):
         self.base_tree.header().setSectionsClickable(True)
         self.base_tree.header().setStretchLastSection(True)
         self.base_tree.header().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.base_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        # modernize-tab-ui 6.3: explicit widths so the five headers (Guild,
-        # Leader, Last Seen, Bases, Base Pals) fit the 360px sidebar at the
-        # 1200px minimum window width (QHeaderView section padding consumes
-        # ~16px per column); last section keeps the stretch.
+        self.base_tree.setAccessibleName(
+            tr('ui.map.bases_table', 'Bases map explorer'))
+        self.base_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         for col, width in enumerate((78, 56, 66, 52, 84)):
             self.base_tree.setColumnWidth(col, width)
         self.player_tree = QTreeWidget()
@@ -396,13 +537,44 @@ class MapTab(QWidget):
         self.player_tree.header().setSectionsClickable(True)
         self.player_tree.header().setStretchLastSection(True)
         self.player_tree.header().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.player_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        # modernize-tab-ui 6.3: Player/Level/Last Seen/Pals sized for the
-        # 360px sidebar; last section keeps the stretch.
+        self.player_tree.setAccessibleName(
+            tr('ui.map.players_table', 'Players map explorer'))
+        self.player_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         for col, width in enumerate((108, 46, 66, 60)):
             self.player_tree.setColumnWidth(col, width)
         self.map_tab_stack.addWidget(self.base_tree)
         self.map_tab_stack.addWidget(self.player_tree)
+        self._explorer_empty_states = {
+            'bases': ConfiguredEmptyState(
+                tr('ui.map.empty_bases_title', 'No bases on this map'),
+                tr('ui.map.empty_bases_message',
+                   'This loaded save does not contain any mapped bases.'),
+                parent=self.base_tree.viewport()),
+            'players': ConfiguredEmptyState(
+                tr('ui.map.empty_players_title', 'No players on this map'),
+                tr('ui.map.empty_players_message',
+                   'This loaded save does not contain any mapped players.'),
+                parent=self.player_tree.viewport()),
+        }
+        self._explorer_no_result_states = {
+            'bases': NoResultState(
+                tr('ui.map.no_result_bases_title', 'No matching bases'),
+                tr('ui.map.no_result_bases_message',
+                   'No mapped bases match the current search.'),
+                parent=self.base_tree.viewport()),
+            'players': NoResultState(
+                tr('ui.map.no_result_players_title', 'No matching players'),
+                tr('ui.map.no_result_players_message',
+                   'No mapped players match the current search.'),
+                parent=self.player_tree.viewport()),
+        }
+        for state in (
+            *self._explorer_empty_states.values(),
+            *self._explorer_no_result_states.values(),
+        ):
+            state.hide()
+        for state in self._explorer_no_result_states.values():
+            state.actionTriggered.connect(self.search_input.clear)
         sidebar_layout.addWidget(self.map_tab_stack, 1)
         self.info_label = QLabel(t('map.info.select_base') if t else 'Click on a base marker or list item to view details')
         self.info_label.setWordWrap(True)
@@ -412,36 +584,97 @@ class MapTab(QWidget):
         self.info_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.info_label.linkActivated.connect(self._on_info_link_clicked)
         sidebar_layout.addWidget(self.info_label)
-        body_layout = QHBoxLayout()
-        body_layout.setContentsMargins(0, 0, 0, 0)
-        body_layout.setSpacing(0)
-        # canvas-first: the map takes the full page; the legend card floats
-        body_layout.addWidget(self._map_widget, stretch=1)
-        layout.addLayout(body_layout)
-        root_v.addLayout(layout, stretch=1)
-        self._sidebar_widget.setParent(self.view)
-        self._sidebar_widget.move(10, 44)
-        self._sidebar_widget.raise_()
-        self._sidebar_widget.show()
+
+        self.inspector_host = QFrame(self)
+        self.inspector_host.setObjectName('mapInspectorHost')
+        self.inspector_host.setMinimumWidth(280)
+        self.inspector_host.setMaximumWidth(320)
+        inspector_layout = QVBoxLayout(self.inspector_host)
+        self._inspector_side_layout = inspector_layout
+        inspector_layout.setContentsMargins(0, 0, 0, 0)
+        self.inspector = InspectorPanel(self.inspector_host)
+        self._inspector_fields = [
+            self.inspector.add_row(label, monospace=monospace)
+            for label, monospace in (
+                (tr('ui.map.detail.type', 'Type'), False),
+                (tr('ui.map.detail.guild', 'Guild'), False),
+                (tr('ui.map.detail.role', 'Role / Level'), False),
+                (tr('ui.map.detail.activity', 'Last Seen'), False),
+                (tr('ui.map.detail.pals', 'Pals'), False),
+                (tr('ui.map.detail.location', 'Location'), False),
+                (tr('ui.map.detail.identifier', 'Identifier'), True),
+            )
+        ]
+        self.center_selection_button = make_button(
+            tr('ui.map.center', 'Center'), 'secondary',
+            tooltip=tr('ui.map.center_tooltip', 'Center and zoom the selected marker'))
+        self.open_entity_button = make_button(
+            tr('ui.map.open_entity', 'Open entity'), 'primary')
+        self.open_guild_button = make_button(
+            tr('ui.map.open_guild', 'Open guild'), 'tertiary')
+        self.center_selection_button.clicked.connect(self._center_selected_entity)
+        self.open_entity_button.clicked.connect(self._open_selected_entity)
+        self.open_guild_button.clicked.connect(self._open_selected_guild)
+        self.inspector.add_action(self.center_selection_button)
+        self.inspector.add_action(self.open_entity_button)
+        self.inspector.add_action(self.open_guild_button)
+        self.center_selection_button.setEnabled(False)
+        self.open_entity_button.setEnabled(False)
+        self.open_guild_button.setEnabled(False)
+        self.inspector.show_empty(tr(
+            'ui.map.inspector_empty',
+            'Select a base or player marker to inspect it.'))
+        inspector_layout.addWidget(self.inspector, 1)
+
+        self.map_splitter = QSplitter(Qt.Orientation.Horizontal, self)
+        self.map_splitter.setObjectName('mapWorkspaceSplitter')
+        self.map_splitter.addWidget(self._sidebar_widget)
+        self.map_splitter.addWidget(self._map_widget)
+        self.map_splitter.addWidget(self.inspector_host)
+        self.map_splitter.setStretchFactor(0, 0)
+        self.map_splitter.setStretchFactor(1, 1)
+        self.map_splitter.setStretchFactor(2, 0)
+        self.map_splitter.setCollapsible(0, False)
+        self.map_splitter.setCollapsible(1, False)
+        self.map_splitter.setCollapsible(2, False)
+        self.map_splitter.setSizes([280, 620, 300])
+        self.map_content_stack = QStackedWidget(self)
+        self.map_content_stack.setObjectName('mapContentStack')
+        self.map_content_stack.addWidget(self.map_splitter)
+        self.no_save_state = PrerequisiteState(
+            tr('ui.world.no_save_title', 'Load a save first'),
+            tr('ui.world.no_save_message',
+               'Open a Palworld save to view this World workspace.'),
+            tr('ui.world.open_save', 'Open save'), self.map_content_stack)
+        self.loading_state = SkeletonView(
+            tr('ui.map.loading', 'Loading map entities…'),
+            parent=self.map_content_stack)
+        self.error_state = ErrorState(
+            tr('ui.map.error_title', 'Could not load map entities'),
+            tr('ui.map.error_message',
+               'Map entities could not be read from this save. Try again.'),
+            parent=self.map_content_stack)
+        self.no_save_state.actionTriggered.connect(self.loadSaveRequested.emit)
+        self.error_state.actionTriggered.connect(self.retryRequested.emit)
+        self.map_content_stack.addWidget(self.no_save_state)
+        self.map_content_stack.addWidget(self.loading_state)
+        self.map_content_stack.addWidget(self.error_state)
+        self.map_content_stack.setCurrentWidget(self.map_splitter)
+        root_v.addWidget(self.map_content_stack, 1)
+
+        self.inspector_drawer = Drawer(
+            tr('ui.map.details', 'Marker details'), self, min_width=300)
+        self.inspector_drawer.closeRequested.connect(
+            lambda: self.details_button.setProperty('active', False))
         QTimer.singleShot(100, self._fix_initial_layout)
 
     def _reposition_legend_card(self):
-        if hasattr(self, '_sidebar_widget') and self._sidebar_widget:
-            self._sidebar_widget.raise_()
-            self._sidebar_widget.move(10, 44)
+        # The explorer is now a real splitter pane rather than a floating card.
+        return
     def _fix_initial_layout(self):
         self.updateGeometry()
-        if self.scene and self.map_width > 0 and (self.map_height > 0):
-            self.view.resetTransform()
-            self.view.fitInView(self.map_item, Qt.IgnoreAspectRatio)
-            self.view.base_scale = self.view.transform().m11()
-        self.view.current_zoom = 1.0
-        self.view.zoom_label.setText((t('zoom') if t else 'Zoom') + f': {int(1.0 * 100)}%')
-        self.view.zoom_changed.emit(1.0)
-        if hasattr(self, 'map_overlay'):
-            self.map_overlay.adjustSize()
-            sh = self.map_overlay.sizeHint()
-            self.map_overlay.setGeometry(self.view.width() - sh.width() - 10, 6, sh.width(), sh.height())
+        if not self._view_initialized:
+            self._fit_map_to_viewport()
     def _on_marker_hover_enter(self, data, global_pos):
         if 'base_id' in data:
             self.hover_overlay.show_for_base(data, QPoint(int(global_pos.x()), int(global_pos.y())))
@@ -477,20 +710,100 @@ class MapTab(QWidget):
             self.view.zoom_label.setText((t('zoom') if t else 'Zoom') + f': {int(1.0 * 100)}%')
             self.view.zoom_changed.emit(1.0)
     def _reposition_map_overlay(self):
-        if hasattr(self, 'map_overlay'):
-            self.map_overlay.adjustSize()
-            sh = self.map_overlay.sizeHint()
-            self.map_overlay.setGeometry(self.view.width() - sh.width() - 10, 6, sh.width(), sh.height())
-            self.map_overlay.raise_()
-            # keep each toggle above the composite layers (map pixmap z-hides
-            # token surfaces otherwise)
-            for btn in self.map_overlay.findChildren(type(self.btn_calibrate)):
-                btn.raise_()
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._reposition_map_overlay()
-        self._reposition_legend_card()
-        QTimer.singleShot(100, self._fit_map_to_viewport)
+        # Layer controls live in the fixed workspace toolbar now.
+        return
+    def resizeEvent(self, a0):
+        compact = a0.size().width() < 1100
+        if compact != self._compact_inspector:
+            self._compact_inspector = compact
+            self._place_inspector()
+        if self.inspector_drawer.isVisible():
+            self._position_inspector_drawer()
+        self._position_explorer_states()
+        super().resizeEvent(a0)
+
+    def set_loaded(self, loaded: bool) -> None:
+        if loaded:
+            self.map_content_stack.setCurrentWidget(self.map_splitter)
+            self._refresh_explorer_states()
+            return
+        self._clear_selected_entity()
+        self.map_content_stack.setCurrentWidget(self.no_save_state)
+
+    def set_loading(self) -> None:
+        self.map_content_stack.setCurrentWidget(self.loading_state)
+
+    def set_error(self, message: str = '') -> None:
+        if message:
+            self.error_state.message_label.setText(message)
+            self.error_state.setAccessibleDescription(message)
+        self.map_content_stack.setCurrentWidget(self.error_state)
+
+    def _position_explorer_states(self) -> None:
+        for tree, states in (
+            (self.base_tree, (
+                self._explorer_empty_states['bases'],
+                self._explorer_no_result_states['bases'])),
+            (self.player_tree, (
+                self._explorer_empty_states['players'],
+                self._explorer_no_result_states['players'])),
+        ):
+            bounds = tree.viewport().rect()
+            for state in states:
+                state.setGeometry(bounds)
+
+    def _refresh_explorer_states(self) -> None:
+        totals = {
+            'bases': sum(
+                len(guild.get('bases', ()))
+                for guild in self.guilds_data.values()),
+            'players': len(self.players_data),
+        }
+        for key, tree in (
+            ('bases', self.base_tree), ('players', self.player_tree),
+        ):
+            empty = self._explorer_empty_states[key]
+            no_result = self._explorer_no_result_states[key]
+            empty.hide()
+            no_result.hide()
+            if tree.topLevelItemCount() > 0:
+                continue
+            state = no_result if self.search_text and totals[key] else empty
+            state.setGeometry(tree.viewport().rect())
+            state.raise_()
+            state.show()
+
+    def _place_inspector(self):
+        if self._compact_inspector:
+            self._inspector_side_layout.removeWidget(self.inspector)
+            self.inspector.setParent(self.inspector_drawer)
+            self.inspector_drawer.content_layout.addWidget(self.inspector)
+            self.inspector_host.hide()
+            self.details_button.show()
+            self.inspector_drawer.hide()
+        else:
+            self.inspector_drawer.content_layout.removeWidget(self.inspector)
+            self.inspector.setParent(self.inspector_host)
+            self._inspector_side_layout.addWidget(self.inspector)
+            self.inspector_drawer.hide()
+            self.inspector_host.show()
+            self.details_button.hide()
+            self.inspector.show()
+
+    def _position_inspector_drawer(self):
+        width = min(LAYOUT['inspector_width'], self.width())
+        top = self.map_control_bar.height() + SPACING['sm']
+        self.inspector_drawer.setGeometry(
+            max(0, self.width() - width), top,
+            width, max(0, self.height() - top))
+
+    def _open_inspector(self):
+        if not self._compact_inspector or not self._selected_entity_data:
+            return
+        self._position_inspector_drawer()
+        self.details_button.setProperty('active', True)
+        self.inspector_drawer.open(self.details_button)
+        self.inspector.show()
     def _setup_animation(self):
         self.anim_timer = QTimer(self)
         self.anim_timer.timeout.connect(self._update_animations)
@@ -505,14 +818,19 @@ class MapTab(QWidget):
         show_base_markers = hasattr(self, 'toggle_map_bases') and self.toggle_map_bases.isChecked()
         if not show_base_markers:
             self._hide_all_radius_rings()
+
+    def _on_map_mode_changed(self, map_type):
+        self._on_map_type_toggle(map_type == 'tree')
+
     def _on_map_type_toggle(self, checked):
         self._hide_all_radius_rings()
         self.current_map = 'tree' if checked else 'world'
-        base_dir = constants.get_base_path()
-        icon = 'T_WorldMap.webp' if checked else 'T_TreeMap.webp'
-        self.toggle_map_type.setIcon(QIcon(resource_path(base_dir, icon)))
+        self.map_type_control._buttons['tree'].setChecked(checked)
+        self.map_type_control._buttons['world'].setChecked(not checked)
         self.toggle_map_type.setToolTip(t('map.toggle.world_map') if checked else t('map.toggle.tree_map'))
         self.toggle_map_type.setAccessibleName(self.toggle_map_type.toolTip())
+        self.map_type_control._buttons['world'].setAccessibleName(
+            tr('ui.map.world', 'World'))
         self.view.set_map_type(self.current_map, palworld_coord.get_treemap_coord_range() if checked else 1000)
         self._recalc_img_coords()
         self._load_map(self.current_map)
@@ -610,7 +928,6 @@ class MapTab(QWidget):
         self._calibration_markers.append(label)
         self._update_calibration_label()
     def _compute_calibration(self):
-        from PyQt6.QtWidgets import QMessageBox
         pts = self._calibration_points
         if len(pts) < 1:
             show_information(self, t('calibrate.complete_title'), t('calibrate.need_points'))
@@ -779,7 +1096,6 @@ class MapTab(QWidget):
         self._tree_cal_markers.append(label)
         self._update_tree_cal_label()
     def _compute_tree_calibration(self):
-        from PyQt6.QtWidgets import QMessageBox
         pts = self._tree_cal_points
         if len(pts) < 1:
             show_information(self, t('calibrate.complete_title'), t('calibrate.need_points'))
@@ -872,27 +1188,208 @@ class MapTab(QWidget):
                 player['img_coords'] = (ix, iy)
     def _switch_map_tab(self, index):
         self.map_tab_stack.setCurrentIndex(index)
-        # modernize-tab-ui 6.5: active tab state rides the shared
-        # pageSwitchBtn checked rule (accent); inline cyan styles retired.
         self.bases_tab_btn.setChecked(index == 0)
         self.players_tab_btn.setChecked(index == 1)
         if index == 0:
             self.info_label.setText(t('map.info.select_base') if t else 'Click on a base marker or list item to view details')
         else:
             self.info_label.setText(t('map.info.select_player') if t else 'Click on a player marker or list item to view details')
+        self._update_explorer_count()
+
+    def capture_view_state(self):
+        center = self.view.mapToScene(self.view.viewport().rect().center())
+        expanded_guilds = []
+        for index in range(self.base_tree.topLevelItemCount()):
+            item = self.base_tree.topLevelItem(index)
+            data = item.data(0, Qt.UserRole)
+            if item.isExpanded() and data and data[0] == 'guild':
+                expanded_guilds.append(str(data[1]))
+        active_tree = self.base_tree if self.map_tab_stack.currentIndex() == 0 else self.player_tree
+        return {
+            'search': self.search_input.text(),
+            'explorer': 'bases' if self.map_tab_stack.currentIndex() == 0 else 'players',
+            'map_type': self.current_map,
+            'layers': {
+                'bases': self.toggle_map_bases.isChecked(),
+                'players': self.toggle_map_players.isChecked(),
+                'radius': self.toggle_base_radius_rings.isChecked(),
+                'zones': self.toggle_map_zones.isChecked(),
+            },
+            'zoom': float(self.view.current_zoom),
+            'center': [float(center.x()), float(center.y())],
+            'selected_type': self._selected_entity_type,
+            'selected_id': self._selected_entity_id,
+            'expanded_guilds': expanded_guilds,
+            'sort_column': active_tree.sortColumn(),
+            'sort_order': active_tree.header().sortIndicatorOrder().value,
+            'scroll': active_tree.verticalScrollBar().value(),
+            'splitter_sizes': self.map_splitter.sizes(),
+            'inspector_open': self.inspector_drawer.isVisible(),
+        }
+
+    def restore_view_state(self, state):
+        if not isinstance(state, dict):
+            return
+        map_type = str(state.get('map_type', 'world'))
+        if map_type not in {'world', 'tree'}:
+            map_type = 'world'
+        if map_type != self.current_map:
+            self._on_map_type_toggle(map_type == 'tree')
+
+        layers = state.get('layers', {})
+        if isinstance(layers, dict):
+            self.toggle_map_bases.setChecked(bool(layers.get('bases', True)))
+            self.toggle_map_players.setChecked(bool(layers.get('players', False)))
+            self.toggle_base_radius_rings.setChecked(bool(layers.get('radius', True)))
+            self.toggle_map_zones.setChecked(bool(layers.get('zones', False)))
+            self._on_toggle_changed()
+            self._on_zones_toggle(self.toggle_map_zones.isChecked())
+            self._update_radius_rings_visibility()
+
+        self.search_input.setText(str(state.get('search', '')))
+        explorer = str(state.get('explorer', 'bases'))
+        self._switch_map_tab(1 if explorer == 'players' else 0)
+
+        active_tree = self.base_tree if self.map_tab_stack.currentIndex() == 0 else self.player_tree
+        try:
+            sort_order = Qt.SortOrder(int(state.get(
+                'sort_order', Qt.SortOrder.AscendingOrder.value)))
+        except (TypeError, ValueError):
+            sort_order = Qt.SortOrder.AscendingOrder
+        try:
+            sort_column = int(state.get('sort_column', 0))
+        except (TypeError, ValueError):
+            sort_column = 0
+        if 0 <= sort_column < active_tree.columnCount():
+            active_tree.sortItems(sort_column, sort_order)
+
+        expanded_values = state.get('expanded_guilds', [])
+        expanded = ({str(value) for value in expanded_values}
+                    if isinstance(expanded_values, (list, tuple)) else set())
+        for index in range(self.base_tree.topLevelItemCount()):
+            item = self.base_tree.topLevelItem(index)
+            data = item.data(0, Qt.UserRole)
+            item.setExpanded(bool(data and str(data[1]) in expanded))
+
+        try:
+            requested_zoom = float(state.get('zoom', 1.0))
+        except (TypeError, ValueError):
+            requested_zoom = 1.0
+        zoom = max(self.view.min_zoom, min(
+            requested_zoom, self.view.max_zoom))
+        center = state.get('center', [])
+        if self._view_initialized:
+            self._apply_view_geometry(zoom, center)
+        else:
+            self._pending_view_geometry = (zoom, center)
+
+        splitter_sizes = state.get('splitter_sizes')
+        if (not self._compact_inspector and isinstance(splitter_sizes, list)
+                and len(splitter_sizes) == 3
+                and all(isinstance(value, int) and value >= 0
+                        for value in splitter_sizes)):
+            self.map_splitter.setSizes(splitter_sizes)
+
+        self._restore_entity_selection(
+            str(state.get('selected_type', '')),
+            str(state.get('selected_id', '')),
+        )
+        try:
+            scroll = max(0, int(state.get('scroll', 0)))
+        except (TypeError, ValueError):
+            scroll = 0
+        active_tree.verticalScrollBar().setValue(scroll)
+        if (self._compact_inspector and bool(state.get('inspector_open', False))
+                and self._selected_entity_data):
+            self._open_inspector()
+
+    def _apply_view_geometry(self, zoom, center):
+        self.view.resetTransform()
+        self.view.scale(self.view.base_scale * zoom, self.view.base_scale * zoom)
+        self.view.current_zoom = zoom
+        self.view._update_zoom_label()
+        self.view._update_zoom_buttons_enabled()
+        self.view.zoom_changed.emit(zoom)
+        if isinstance(center, (list, tuple)) and len(center) == 2:
+            try:
+                self.view.centerOn(float(center[0]), float(center[1]))
+            except (TypeError, ValueError):
+                pass
+        self._view_initialized = True
+
+    def _restore_entity_selection(self, entity_type, identifier):
+        if not identifier or entity_type not in {'base', 'player'}:
+            return
+        tree = self.base_tree if entity_type == 'base' else self.player_tree
+        pending = [tree.topLevelItem(index)
+                   for index in range(tree.topLevelItemCount())]
+        while pending:
+            item = pending.pop(0)
+            data = item.data(0, Qt.UserRole)
+            if data:
+                item_type, item_data = data
+                item_id = (str(item_data.get('base_id', ''))
+                           if item_type == 'base' else
+                           str(item_data.get('player_uid', ''))
+                           if item_type == 'player' else '')
+                if item_type == entity_type and item_id == identifier:
+                    tree.setCurrentItem(item)
+                    item.setSelected(True)
+                    tree.scrollToItem(item)
+                    self._on_tree_item_clicked(item, 0)
+                    return
+            pending.extend(item.child(index) for index in range(item.childCount()))
+        self._clear_selected_entity()
+
+    def select_base(self, base_id):
+        """Select a base marker/list row from a contextual World link."""
+        self._switch_map_tab(0)
+        self._restore_entity_selection('base', str(base_id))
+
+    def select_player(self, player_uid):
+        """Select a player marker/list row from a contextual World link."""
+        self._switch_map_tab(1)
+        self._restore_entity_selection('player', str(player_uid))
+
+    def _update_explorer_count(self):
+        if not hasattr(self, 'explorer_count_label'):
+            return
+        if self.map_tab_stack.currentIndex() == 0:
+            visible = sum(len(guild['bases']) for guild in self.filtered_guilds.values())
+            total = sum(len(guild['bases']) for guild in self.guilds_data.values())
+        else:
+            visible = len(self.filtered_players_data)
+            total = len(self.players_data)
+        self.explorer_count_label.setText(tr(
+            'ui.map.count_visible', '{visible} of {total}',
+            visible=visible, total=total))
+
     def refresh(self):
         if not constants.loaded_level_json:
+            self.set_loaded(False)
             return
-        self._hide_all_radius_rings()
-        self.guilds_data = self._get_guild_bases()
-        self.filtered_guilds = self.guilds_data
-        self.players_data = self._get_players()
-        self.filtered_players_data = self.players_data
-        self._recalc_img_coords()
-        self._update_markers()
-        self._update_tree()
-        if hasattr(self, 'toggle_base_radius_rings') and self.toggle_base_radius_rings.isChecked():
-            self._show_all_radius_rings()
+        state = self.capture_view_state()
+        self.set_loading()
+        try:
+            self._hide_all_radius_rings()
+            self.guilds_data = self._get_guild_bases()
+            self.filtered_guilds = self.guilds_data
+            self.players_data = self._get_players()
+            self.filtered_players_data = self.players_data
+            self._recalc_img_coords()
+            self._update_markers()
+            self._update_tree()
+            if (hasattr(self, 'toggle_base_radius_rings')
+                    and self.toggle_base_radius_rings.isChecked()):
+                self._show_all_radius_rings()
+            self.set_loaded(True)
+            self.restore_view_state(state)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                'Could not refresh Map workspace')
+            self.set_error(tr(
+                'ui.map.error_message',
+                'Map entities could not be read from this save. Try again.'))
     def _get_guild_bases(self):
         guilds = {}
         try:
@@ -927,8 +1424,10 @@ class MapTab(QWidget):
                 if leader_name == (t('map.unknown.leader') if t else 'Unknown'):
                     continue
                 times = [p.get('player_info', {}).get('last_online_real_time') for p in g_val['RawData']['value'].get('players', []) if p.get('player_info', {}).get('last_online_real_time')]
+                last_seen_sort = float('inf')
                 if times:
-                    diff = (tick - max(times)) / 10000000.0
+                    last_seen_sort = (tick - max(times)) / 10000000.0
+                    diff = last_seen_sort
                     days = int(diff // 86400)
                     hours = int(diff % 86400 // 3600)
                     mins = int(diff % 3600 // 60)
@@ -972,9 +1471,9 @@ class MapTab(QWidget):
                                 base_position += 1
                         except:
                             pass
-                guilds[gid] = {'guild_name': g_val['RawData']['value'].get('guild_name', t('map.unknown.guild') if t else 'Unknown'), 'leader_name': leader_name, 'last_seen': last_seen, 'last_seen_sort': diff if times else float('inf'), 'bases': valid_bases}
-        except Exception as e:
-            print(f'Error getting guild bases: {e}')
+                guilds[gid] = {'guild_name': g_val['RawData']['value'].get('guild_name', t('map.unknown.guild') if t else 'Unknown'), 'leader_name': leader_name, 'last_seen': last_seen, 'last_seen_sort': last_seen_sort, 'bases': valid_bases}
+        except Exception as error:
+            raise RuntimeError('could not read map guild and base data') from error
         return guilds
     def _get_players(self):
         players = []
@@ -982,6 +1481,8 @@ class MapTab(QWidget):
             return players
         players_data = save_manager.get_players()
         if not players_data:
+            return players
+        if not constants.current_save_path:
             return players
         players_dir = os.path.join(constants.current_save_path, 'Players')
         if not os.path.exists(players_dir):
@@ -1088,7 +1589,7 @@ class MapTab(QWidget):
                     base_item.setData(0, Qt.UserRole, ('base', base))
                     base_item.setData(0, _SORT_ROLE, (int(base['coords'][0]), int(base['coords'][1])))
                     base_item.setData(4, _SORT_ROLE, base.get('pal_count', 0))
-                    base_item.setForeground(0, QColor(0, 180, 255))
+                    base_item.setForeground(0, QColor(_P['info']))
                     guild_item.addChild(base_item)
                 self.base_tree.addTopLevelItem(guild_item)
         if hasattr(self, 'player_tree'):
@@ -1104,8 +1605,10 @@ class MapTab(QWidget):
                 player_item.setData(1, _SORT_ROLE, player.get('level', 0))
                 player_item.setData(2, _SORT_ROLE, player.get('last_seen_sort', float('inf')))
                 player_item.setData(3, _SORT_ROLE, player.get('pal_count', 0))
-                player_item.setForeground(0, QColor(0, 200, 120))
+                player_item.setForeground(0, QColor(_P['success']))
                 self.player_tree.addTopLevelItem(player_item)
+        self._update_explorer_count()
+        self._refresh_explorer_states()
     def _filter_players(self, search_text):
         if not search_text:
             return self.players_data
@@ -1185,20 +1688,10 @@ class MapTab(QWidget):
                 self.view.animate_to_marker(marker, zoom_level=zoom_level)
                 break
     def _update_player_info(self, player_data):
-        player_name = player_data.get('player_name', 'Unknown')
-        level = player_data.get('level', 1)
-        last_seen = player_data.get('last_seen', 'Unknown')
-        pal_count = player_data.get('pal_count', 0)
-        guild_name = player_data.get('guild_name', '')
-        guild_id = player_data.get('guild_id', '')
-        coords = player_data.get('coords', (0, 0))
-        save_coords = player_data.get('save_coords', (0, 0, 0))
-        player_uid = player_data.get('player_uid', '')
-        info_lines = [f'<b>{player_name}</b>', f"{(t('player.hover.uid') if t else 'UID:')} {player_uid}", f"{(t('player.hover.level') if t else 'Level:')} {level}"]
-        if guild_name:
-            info_lines.append(f"{(t('player.hover.guild') if t else 'Guild:')} {guild_name}")
-        info_lines.extend([f"{(t('player.hover.pals') if t else 'Pals:')} {pal_count}", f"{(t('player.hover.last_seen') if t else 'Last Seen:')} {last_seen}", f"{(t('player.hover.location') if t else 'Location:')} X:{int(coords[0])},Y:{int(coords[1])}"])
-        self.info_label.setText('<br>'.join(info_lines))
+        self._set_selected_entity('player', player_data)
+        self.info_label.setText(tr(
+            'ui.map.player_selected_hint',
+            'Player selected. Double-click to center or use the details actions.'))
     def _highlight_player(self, player_data):
         for marker in self.player_markers:
             if marker.player_data == player_data:
@@ -1231,17 +1724,102 @@ class MapTab(QWidget):
         anim.start()
         effect._animation = anim
     def _update_info(self, base_data):
-        guild_name = base_data.get('guild_name', 'Unknown')
-        guild_level = base_data.get('guild_level', 1)
-        leader_name = base_data.get('leader_name', 'Unknown')
-        member_count = base_data.get('member_count', 0)
-        total_bases = base_data.get('total_bases', 0)
-        base_position = base_data.get('base_position', 1)
-        base_id = str(base_data.get('base_id', ''))
-        pal_count = base_data.get('pal_count', 0)
-        coords = base_data.get('coords', (0, 0))
-        info = f"\n        <b>{guild_name}</b><br>\n        {(t('map.info.level') if t else 'Level')}: {guild_level}<br>\n        {(t('map.info.admin') if t else 'Admin:')} {leader_name}<br>\n        {(t('map.info.members') if t else 'Members:')} {member_count}<br>\n        {(t('map.info.base_camps') if t else 'Base Camps:')} {base_position}/{total_bases}<br>\n        {(t('map.info.base_id') if t else 'Base ID:')} <a href=\"copy://{base_id}\" style=\"color: #e0e0e0; text-decoration: none;\">{base_id}</a><br>\n        {(t('map.info.base_pals') if t else 'Base Pals:')} {pal_count}<br>\n        {(t('map.info.location') if t else 'Location:')} X:{int(coords[0])},Y:{int(coords[1])}\n        "
-        self.info_label.setText(info.strip())
+        self._set_selected_entity('base', base_data)
+        self.info_label.setText(tr(
+            'ui.map.base_selected_hint',
+            'Base selected. Double-click to center or use the details actions.'))
+
+    def _set_selected_entity(self, entity_type, data):
+        self._selected_entity_type = entity_type
+        self._selected_entity_data = data
+        if entity_type == 'player':
+            self._selected_entity_id = str(data.get('player_uid', ''))
+            title = str(data.get('player_name') or tr(
+                'ui.map.unknown_player', 'Unknown player'))
+            values = {
+                0: tr('ui.map.player_type', 'Player'),
+                1: str(data.get('guild_name', '')),
+                2: str(data.get('level', '')),
+                3: str(data.get('last_seen', '')),
+                4: str(data.get('pal_count', 0)),
+                5: self._format_location(data.get('coords')),
+                6: self._selected_entity_id,
+            }
+            self.open_entity_button.setText(tr(
+                'ui.map.open_player', 'Open Player'))
+        else:
+            self._selected_entity_id = str(data.get('base_id', ''))
+            position = int(data.get('base_position', 0) or 0)
+            title = (tr('ui.map.base_number', 'Base {number}', number=position)
+                     if position else tr('ui.map.base_type', 'Base'))
+            values = {
+                0: tr('ui.map.base_type', 'Base'),
+                1: str(data.get('guild_name', '')),
+                2: str(data.get('leader_name', '')),
+                3: '',
+                4: str(data.get('pal_count', 0)),
+                5: self._format_location(data.get('coords')),
+                6: self._selected_entity_id,
+            }
+            self.open_entity_button.setText(tr(
+                'ui.map.open_base', 'Open Base'))
+        self.inspector.show_details(title, values)
+        has_guild = bool(data.get('guild_id'))
+        self.open_guild_button.setEnabled(has_guild)
+        self.open_entity_button.setEnabled(bool(self._selected_entity_id))
+        self.center_selection_button.setEnabled(bool(self._selected_entity_id))
+        self.details_button.setEnabled(True)
+        if self._compact_inspector:
+            self._open_inspector()
+
+    @staticmethod
+    def _format_location(coords):
+        if not isinstance(coords, (list, tuple)) or len(coords) < 2:
+            return ''
+        try:
+            return f"X {int(coords[0])}, Y {int(coords[1])}"
+        except (TypeError, ValueError):
+            return ''
+
+    def _clear_selected_entity(self):
+        self._selected_entity_type = ''
+        self._selected_entity_id = ''
+        self._selected_entity_data = None
+        self.details_button.setEnabled(False)
+        self.center_selection_button.setEnabled(False)
+        self.open_entity_button.setEnabled(False)
+        self.open_guild_button.setEnabled(False)
+        self.inspector.show_empty(tr(
+            'ui.map.inspector_empty',
+            'Select a base or player marker to inspect it.'))
+        if self.inspector_drawer.isVisible():
+            self.inspector_drawer.close_drawer()
+
+    def _center_selected_entity(self):
+        data = self._selected_entity_data
+        if not data:
+            return
+        if self._selected_entity_type == 'player':
+            self._zoom_to_player(data)
+        elif self._selected_entity_type == 'base':
+            self._zoom_to_base(data)
+
+    def _open_selected_entity(self):
+        data = self._selected_entity_data
+        if not data:
+            return
+        if self._selected_entity_type == 'player':
+            self.openPlayerRequested.emit(data)
+        elif self._selected_entity_type == 'base':
+            self.openBaseRequested.emit(data)
+
+    def _open_selected_guild(self):
+        data = self._selected_entity_data
+        if data and data.get('guild_id'):
+            self.openGuildRequested.emit({
+                'guild_id': str(data.get('guild_id', '')),
+                'guild_name': str(data.get('guild_name', '')),
+            })
     def _on_info_link_clicked(self, url):
         if url.startswith('copy://'):
             QApplication.clipboard().setText(url[7:])
@@ -1308,12 +1886,18 @@ class MapTab(QWidget):
                             self.all_radius_rings.append(ring)
         else:
             self._show_all_radius_rings()
+    def _create_context_menu(self):
+        menu = QMenu(self)
+        menu.setObjectName('appContextMenu')
+        menu.setAccessibleName(tr(
+            'ui.menu.context_actions', 'Context actions'))
+        return menu
+
     def _on_marker_right_clicked(self, data, global_pos):
         if self._swap_picker_active and 'player_uid' not in data:
             self._on_swap_picker_click(data)
             return
-        menu = QMenu(self)
-        menu.setStyleSheet(MENU_STYLE)
+        menu = self._create_context_menu()
         if 'player_uid' in data:
             delete_action = menu.addAction(t('deletion.ctx.delete_player') if t else 'Delete Player')
             menu.addSeparator()
@@ -1364,8 +1948,7 @@ class MapTab(QWidget):
                 self._swap_base_guild(data)
     def _on_empty_space_right_clicked(self, global_pos):
         from palworld_aio.editor.dialogs import ScrollableGuildSelectionDialog
-        menu = QMenu(self)
-        menu.setStyleSheet(MENU_STYLE)
+        menu = self._create_context_menu()
         if self._zone_drawing_mode:
             stop_drawing_action = menu.addAction(t('zone_exclusion.stop_drawing') if t else 'Stop Drawing Zones')
             action = menu.exec(global_pos.toPoint())
@@ -1478,8 +2061,7 @@ class MapTab(QWidget):
         if not data:
             return
         item_type, item_data = data
-        menu = QMenu(self)
-        menu.setStyleSheet(MENU_STYLE)
+        menu = self._create_context_menu()
         if item_type == 'base':
             delete_action = menu.addAction(t('delete.base') if t else 'Delete Base')
             export_action = menu.addAction(t('button.export') if t else 'Export Base')
@@ -1576,33 +2158,49 @@ class MapTab(QWidget):
             return
         is_pstbase = 'pstbase' in selected_filter if selected_filter else file_path.endswith('.pstbase')
         fp = file_path
+        if is_pstbase and not fp.endswith('.pstbase'):
+            fp += '.pstbase'
+        elif not is_pstbase and not fp.endswith('.json'):
+            fp += '.json'
         def task():
-            nonlocal fp
             data = export_base_json(constants.loaded_level_json, bid)
             if not data:
                 return (False, t('base.export.not_found') if t else 'Base data not found')
             if is_pstbase:
-                if not fp.endswith('.pstbase'):
-                    fp += '.pstbase'
                 data['_base_id'] = bid
                 data['_version'] = 1
                 compressed = compress_to_pst3(data)
                 with open(fp, 'wb') as f:
                     f.write(compressed)
             else:
-                if not fp.endswith('.json'):
-                    fp += '.json'
                 json_tools.dump(data, fp, cls=json_tools.CustomEncoder, indent=2)
             return (True, None)
-        def on_finished(result):
-            success, error = result
+        def on_completed(result):
+            success, _error = result
             if success:
                 img_x, img_y = base_data['img_coords']
                 self._play_effect(ImportEffect, img_x, img_y)
-                show_information(self, t('success.title') if t else 'Success', t('base.export.success') if t else 'Base exported successfully')
-            else:
-                show_critical(self, t('error.title') if t else 'Error', error or 'Failed to export base')
-        run_with_loading(on_finished, task)
+        return self._run_transfer_workflow(
+            title=t('base.export.title', default='Export Base'),
+            source=t(
+                'transfer.base.single_source',
+                default='Base {base}', base=bid[:8]),
+            target=fp,
+            review=t(
+                'transfer.base.single_export_review',
+                default='Export this base as {format}.',
+                format='.pstbase' if is_pstbase else '.json'),
+            backup=t(
+                'transfer.export.read_only',
+                default='Read-only export: the loaded save is not changed.'),
+            operation=task,
+            result_message=lambda result: (
+                t('base.export.success') if result[0]
+                else (result[1] or t('base.export.not_found'))),
+            result_success=lambda result: bool(result[0]),
+            on_completed=on_completed,
+            confirm_text=t('button.export', default='Export'),
+        )
     def _clone_base(self, base_data):
         bid = str(base_data['base_id'])
         gid = str(base_data.get('guild_id', ''))
@@ -1611,21 +2209,45 @@ class MapTab(QWidget):
             return
         def task():
             return clone_base_complete(constants.loaded_level_json, bid, gid)
-        def on_finished(success):
+        def result_message(success):
             if success:
-                self.refresh()
-                if self.parent_window:
-                    self.parent_window.refresh_all()
-                img_x, img_y = base_data['img_coords']
-                self._play_effect(ImportEffect, img_x, img_y)
-                show_information(self, t('success.title') if t else 'Success', t('clone_base.msg') if t else 'Base cloned successfully')
-            else:
-                audit = get_last_import_audit() or {}
-                msg = 'Failed to clone base'
-                if audit.get('issues'):
-                    msg += ': ' + '; '.join(audit['issues'])
-                show_warning(self, t('error.title') if t else 'Error', msg)
-        run_with_loading(on_finished, task)
+                return t('clone_base.msg')
+            audit = get_last_import_audit() or {}
+            msg = 'Failed to clone base'
+            if audit.get('issues'):
+                msg += ': ' + '; '.join(audit['issues'])
+            return msg
+        def on_completed(_success):
+            self.refresh()
+            if self.parent_window:
+                self.parent_window.refresh_all()
+            img_x, img_y = base_data['img_coords']
+            self._play_effect(ImportEffect, img_x, img_y)
+        return self._run_transfer_workflow(
+            title=t('clone.base', default='Clone Base'),
+            source=t(
+                'transfer.base.single_source',
+                default='Base {base}', base=bid[:8]),
+            target=t(
+                'transfer.base.guild_target',
+                default='Guild {guild}', guild=gid[:8]),
+            review=t(
+                'transfer.base.clone_review',
+                default='Create a new base with copied structures, containers, and ownership links.'),
+            backup=t(
+                'repair.workflow.loaded_backup',
+                default=(
+                    'Recovery: a full backup was created when this save was loaded. '
+                    'The clone remains in memory until Save Changes.')),
+            risk=t(
+                'transfer.base.clone_risk',
+                default='Cloning adds a complete base and remapped identifiers to the loaded save.'),
+            operation=task,
+            result_message=result_message,
+            result_success=bool,
+            on_completed=on_completed,
+            confirm_text=t('clone.base', default='Clone Base'),
+        )
     def _adjust_base_radius(self, base_data):
         bid = str(base_data['base_id'])
         wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
@@ -2050,7 +2672,10 @@ class MapTab(QWidget):
         dialog = NudgeInputDialog(self, current_coords=(base_data['raw_x'], base_data['raw_y'], base_data['z']))
         if dialog.exec() != QDialog.Accepted:
             return
-        dx, dy, dz, angle = dialog.result_value
+        result = dialog.result_value
+        if result is None:
+            return
+        dx, dy, dz, angle = result
         if dx == 0 and dy == 0 and dz == 0 and angle == 0:
             return
         import math
@@ -2166,7 +2791,10 @@ class MapTab(QWidget):
         dialog.setWindowTitle(t('base.palbox_nudge') if t else 'Nudge Palbox')
         if dialog.exec() != QDialog.Accepted:
             return
-        dx, dy, dz, _ = dialog.result_value
+        result = dialog.result_value
+        if result is None:
+            return
+        dx, dy, dz, _ = result
         if dx == 0 and dy == 0 and dz == 0:
             return
         def task():
@@ -2307,8 +2935,16 @@ class MapTab(QWidget):
                     failed_imports += 1
                     failed_files.append(os.path.basename(file_path) + f'(error: {str(e)})')
             return (successful_imports, failed_imports, failed_files, imported_coords_list)
-        def on_finished(result):
+        def result_message(result):
             successful_imports, failed_imports, failed_files, imported_coords_list = result
+            if successful_imports > 0:
+                msg = f'Successfully imported {successful_imports} base(s).'
+                if failed_imports > 0:
+                    msg += f'\nFailed to import {failed_imports} file(s):\n' + '\n'.join(failed_files)
+                return msg
+            return f'Failed to import any bases.\n' + '\n'.join(failed_files)
+        def on_completed(result):
+            _successful_imports, _failed_imports, _failed_files, imported_coords_list = result
             if self.parent_window and hasattr(self.parent_window, 'base_inventory_tab'):
                 self.parent_window.base_inventory_tab.manager.invalidate_cache()
             self.refresh()
@@ -2319,16 +2955,32 @@ class MapTab(QWidget):
                 self.view.animate_to_coords(img_x, img_y, zoom_level=self.config['zoom']['double_click_target'])
             if hasattr(self, 'toggle_base_radius_rings') and self.toggle_base_radius_rings.isChecked():
                 self._show_all_radius_rings()
-            if successful_imports > 0:
-                msg = f'Successfully imported {successful_imports} base(s).'
-                if failed_imports > 0:
-                    msg += f'\nFailed to import {failed_imports} file(s):\n' + '\n'.join(failed_files)
-                show_information(self, t('success.title') if t else 'Success', msg)
-            else:
-                show_warning(self, t('error.title') if t else 'Error', f'Failed to import any bases.\n' + '\n'.join(failed_files))
             for _, _, img_x, img_y in imported_coords_list:
                 self._play_effect(ImportEffect, img_x, img_y)
-        run_with_loading(on_finished, task)
+        return self._run_transfer_workflow(
+            title=t('base.import_multi', default='Import Bases'),
+            source='\n'.join(os.path.basename(path) for path in file_paths),
+            target=t(
+                'transfer.base.guild_target',
+                default='Guild {guild}', guild=str(guild_id)[:8]),
+            review=t(
+                'transfer.base.import_review',
+                default='Import {count} selected base file(s) into the target guild.',
+                count=len(file_paths)),
+            backup=t(
+                'repair.workflow.loaded_backup',
+                default=(
+                    'Recovery: a full backup was created when this save was loaded. '
+                    'Imports remain in memory until Save Changes.')),
+            risk=t(
+                'transfer.base.import_risk',
+                default='Imported bases add structures, containers, and ownership links to the loaded save.'),
+            operation=task,
+            result_message=result_message,
+            result_success=lambda result: result[0] > 0,
+            on_completed=on_completed,
+            confirm_text=t('button.import', default='Import'),
+        )
     def _export_bases_for_guild(self, guild_id):
         guild_name = self.guilds_data.get(guild_id, {}).get('guild_name', '')
         if not guild_name:
@@ -2373,18 +3025,38 @@ class MapTab(QWidget):
                     failed_exports += 1
                     failed_bases.append(f'Base {bid}(error: {str(e)})')
             return (successful_exports, failed_exports, failed_bases, exported_coords)
-        def on_finished(result):
+        def result_message(result):
             successful_exports, failed_exports, failed_bases, exported_coords = result
             if successful_exports > 0:
                 msg = f'Successfully exported {successful_exports} base(s)for guild "{guild_name}" to {export_dir}.'
                 if failed_exports > 0:
                     msg += f'\nFailed to export {failed_exports} base(s):\n' + '\n'.join(failed_bases)
-                show_information(self, t('success.title'), msg)
-            else:
-                show_warning(self, t('error.title'), f'Failed to export any bases for guild "{guild_name}".\n' + '\n'.join(failed_bases))
+                return msg
+            return f'Failed to export any bases for guild "{guild_name}".\n' + '\n'.join(failed_bases)
+        def on_completed(result):
+            _successful_exports, _failed_exports, _failed_bases, exported_coords = result
             for img_x, img_y in exported_coords:
                 self._play_effect(ImportEffect, img_x, img_y)
-        run_with_loading(on_finished, task)
+        return self._run_transfer_workflow(
+            title=t('base.export_guild', default='Export Guild Bases'),
+            source=t(
+                'transfer.base.guild_source',
+                default='{guild}: {count} base(s)',
+                guild=guild_name, count=len(guild_bases)),
+            target=export_dir,
+            review=t(
+                'transfer.base.export_review',
+                default='Export each base as {format}.',
+                format='.pstbase' if compressed else '.json'),
+            backup=t(
+                'transfer.export.read_only',
+                default='Read-only export: the loaded save is not changed.'),
+            operation=task,
+            result_message=result_message,
+            result_success=lambda result: result[0] > 0,
+            on_completed=on_completed,
+            confirm_text=t('button.export', default='Export'),
+        )
     def _delete_player(self, player_data):
         from ...managers.data_manager import load_exclusions, delete_player
         player_uid = player_data.get('player_uid', '')
@@ -2492,8 +3164,7 @@ class MapTab(QWidget):
         from palworld_aio.managers import zone_manager
         zone_id = zone_item.zone_data.get('id')
         zone_name = zone_item.zone_data.get('name', 'Unknown Zone')
-        menu = QMenu(self)
-        menu.setStyleSheet(MENU_STYLE)
+        menu = self._create_context_menu()
         delete_action = menu.addAction(t('zone_exclusion.delete_zone') if t else 'Delete Zone')
         rename_action = menu.addAction(t('zone_exclusion.rename_zone') if t else 'Rename Zone')
         stop_drawing_action = None
@@ -2592,27 +3263,24 @@ class MapTab(QWidget):
     def _create_zone_shape_buttons(self):
         if hasattr(self, '_zone_shape_btn_rect') and self._zone_shape_btn_rect is not None:
             return
-        self._zone_shape_btn_rect = QPushButton()
-        self._zone_shape_btn_rect.setFixedSize(36, 36)
-        self._zone_shape_btn_rect.setStyleSheet('\n            QPushButton {\n                background-color: rgba(30, 35, 45, 0.9);\n                border: 2px solid rgba(125, 211, 252, 0.5);\n                border-radius: 4px;\n                color: white;\n                font-size: 18px;\n            }\n            QPushButton:hover {\n                background-color: rgba(59, 142, 208, 0.5);\n                border-color: rgba(125, 211, 252, 0.8);\n            }\n            QPushButton:pressed {\n                background-color: rgba(59, 142, 208, 0.7);\n            }\n        ')
-        self._zone_shape_btn_rect.setText('â—»')
-        self._zone_shape_btn_rect.setToolTip('Rectangle Zone')
-        self._zone_shape_btn_rect.clicked.connect(lambda: self._on_zone_shape_selected('rect'))
-        self._zone_shape_btn_poly = QPushButton()
-        self._zone_shape_btn_poly.setFixedSize(36, 36)
-        self._zone_shape_btn_poly.setStyleSheet('\n            QPushButton {\n                background-color: rgba(30, 35, 45, 0.9);\n                border: 2px solid rgba(125, 211, 252, 0.5);\n                border-radius: 4px;\n                color: white;\n                font-size: 18px;\n            }\n            QPushButton:hover {\n                background-color: rgba(59, 142, 208, 0.5);\n                border-color: rgba(125, 211, 252, 0.8);\n            }\n            QPushButton:pressed {\n                background-color: rgba(59, 142, 208, 0.7);\n            }\n        ')
-        self._zone_shape_btn_poly.setText('â¬¡')
-        self._zone_shape_btn_poly.setToolTip('Polygon Zone')
-        self._zone_shape_btn_poly.clicked.connect(lambda: self._on_zone_shape_selected('polygon'))
-        self._zone_shape_buttons_container = QWidget(self.view)
-        self._zone_shape_buttons_container.setFixedSize(44, 80)
-        zone_shape_layout = QVBoxLayout(self._zone_shape_buttons_container)
-        zone_shape_layout.setContentsMargins(4, 4, 4, 4)
-        zone_shape_layout.setSpacing(4)
-        zone_shape_layout.addWidget(self._zone_shape_btn_rect)
-        zone_shape_layout.addWidget(self._zone_shape_btn_poly)
-        self._zone_shape_buttons_container.setStyleSheet('background: transparent;')
-        self._zone_shape_buttons_container.move(10, 40)
+        self._zone_shape_buttons_container = SegmentedControl(
+            (
+                ('rect', tr('map.zone_shape.rect', 'Rectangle Zone')),
+                ('polygon', tr('map.zone_shape.polygon', 'Polygon Zone')),
+            ),
+            current=self._zone_shape_type,
+            accessible_name=tr('ui.map.zone_shape', 'Zone shape'),
+            parent=self.map_control_bar,
+        )
+        self._zone_shape_buttons_container.currentChanged.connect(
+            self._on_zone_shape_selected)
+        self._zone_shape_btn_rect = (
+            self._zone_shape_buttons_container._buttons['rect'])
+        self._zone_shape_btn_poly = (
+            self._zone_shape_buttons_container._buttons['polygon'])
+        insert_at = self._map_control_layout.indexOf(self.btn_calibrate)
+        self._map_control_layout.insertWidget(
+            max(0, insert_at), self._zone_shape_buttons_container)
         self._zone_shape_buttons_container.show()
     def _on_zone_shape_selected(self, shape_type):
         self._zone_shape_type = shape_type
@@ -2623,15 +3291,13 @@ class MapTab(QWidget):
         else:
             self.info_label.setText(t('zone_exclusion.drawing_mode_polygon') if t else 'Polygon Mode: Double-click to start, single-click to add points, double-click to close.')
     def _update_zone_shape_buttons(self):
-        if self._zone_shape_type == 'rect':
-            self._zone_shape_btn_rect.setStyleSheet('\n                QPushButton {\n                    background-color: rgba(59, 142, 208, 0.8);\n                    border: 2px solid rgba(125, 211, 252, 1.0);\n                    border-radius: 4px;\n                    color: white;\n                    font-size: 18px;\n                }\n            ')
-            self._zone_shape_btn_poly.setStyleSheet('\n                QPushButton {\n                    background-color: rgba(30, 35, 45, 0.9);\n                    border: 2px solid rgba(125, 211, 252, 0.5);\n                    border-radius: 4px;\n                    color: white;\n                    font-size: 18px;\n                }\n                QPushButton:hover {\n                    background-color: rgba(59, 142, 208, 0.5);\n                    border-color: rgba(125, 211, 252, 0.8);\n                }\n            ')
-        else:
-            self._zone_shape_btn_rect.setStyleSheet('\n                QPushButton {\n                    background-color: rgba(30, 35, 45, 0.9);\n                    border: 2px solid rgba(125, 211, 252, 0.5);\n                    border-radius: 4px;\n                    color: white;\n                    font-size: 18px;\n                }\n                QPushButton:hover {\n                    background-color: rgba(59, 142, 208, 0.5);\n                    border-color: rgba(125, 211, 252, 0.8);\n                }\n            ')
-            self._zone_shape_btn_poly.setStyleSheet('\n                QPushButton {\n                    background-color: rgba(59, 142, 208, 0.8);\n                    border: 2px solid rgba(125, 211, 252, 1.0);\n                    border-radius: 4px;\n                    color: white;\n                    font-size: 18px;\n                }\n            ')
+        self._zone_shape_btn_rect.setChecked(self._zone_shape_type == 'rect')
+        self._zone_shape_btn_poly.setChecked(self._zone_shape_type == 'polygon')
     def _hide_zone_shape_buttons(self):
         if hasattr(self, '_zone_shape_buttons_container') and self._zone_shape_buttons_container is not None:
             self._zone_shape_buttons_container.hide()
+            self._map_control_layout.removeWidget(
+                self._zone_shape_buttons_container)
             self._zone_shape_buttons_container.setParent(None)
             self._zone_shape_buttons_container = None
             self._zone_shape_btn_rect = None

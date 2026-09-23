@@ -6,11 +6,16 @@ from palworld_toolsets.fix_host_save import ask_string_with_icon
 from resource_resolver import get_data_base
 from palworld_aio.ui.chrome.styles import ThemeManager
 from loading_manager import run_with_loading, show_information, show_critical, show_warning
-import nerdfont as nf
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QFrame, QMessageBox, QFileDialog, QStyleFactory, QApplication, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QFrame, QFileDialog, QStyleFactory, QApplication, QLabel
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer, QMetaObject, Q_ARG
 from PyQt6.QtGui import QIcon, QFont
 from palworld_aio import constants
+from palworld_aio.ui.chrome.components import (
+    BulkWorkflowReview,
+    MessageDialog as QMessageBox,
+    make_button,
+)
+from palworld_aio.ui.chrome.state_views import ConfiguredEmptyState
 saves = []
 save_info_map = {}
 save_extractor_done = threading.Event()
@@ -41,7 +46,7 @@ class GamePassSaveFixWidget(QWidget):
         main_layout.setContentsMargins(14, 14, 14, 14)
         main_layout.setSpacing(12)
         glass_frame = QFrame()
-        glass_frame.setObjectName('glass')
+        glass_frame.setObjectName('conversionSurface')
         glass_layout = QVBoxLayout(glass_frame)
         glass_layout.setContentsMargins(12, 12, 12, 12)
         title_label = QLabel(t('xgp.title.converter'))
@@ -53,27 +58,38 @@ class GamePassSaveFixWidget(QWidget):
         desc_label.setAlignment(Qt.AlignCenter)
         desc_label.setWordWrap(True)
         glass_layout.addWidget(desc_label)
+        self.workflow_review = BulkWorkflowReview(
+            source=t('xgp.ui.source_missing', default='Choose a Game Pass or Steam save folder'),
+            target=t('xgp.ui.target_missing', default='Target platform and folder are selected during the flow'),
+            review=t('xgp.ui.review', default='Validate the source and destination before conversion.'),
+            parent=self,
+        )
+        self.workflow_review.set_risk(
+            t('warning.world_id'),
+            t('xgp.ui.backup_guidance', default='Keep an external backup before importing into Game Pass or copying over an existing Steam world.'),
+        )
+        glass_layout.addWidget(self.workflow_review)
         warning_label = QLabel(t('warning.world_id'))
         warning_label.setFont(QFont(constants.FONT_FAMILY, 9))
-        warning_label.setStyleSheet('color: #ffaa00;')
+        warning_label.setProperty('class', 'warning')
         warning_label.setAlignment(Qt.AlignCenter)
         warning_label.setWordWrap(True)
         glass_layout.addWidget(warning_label)
         panels_layout = QHBoxLayout()
         panels_layout.setSpacing(12)
         left_frame = QFrame()
-        left_frame.setObjectName('glass')
+        left_frame.setObjectName('conversionPanel')
         left_layout = QVBoxLayout(left_frame)
         left_layout.setContentsMargins(10, 10, 10, 10)
         left_header = QLabel(t('xgp.ui.section_xgp_to_steam'))
         left_header.setFont(QFont(constants.FONT_FAMILY, 14, QFont.Bold))
         left_header.setAlignment(Qt.AlignCenter)
         left_layout.addWidget(left_header)
-        self.xgp_browse_btn = QPushButton(f"{nf.icons['nf-fa-xbox']}  {t('xgp.ui.btn_xgp_folder')}")
-        self.xgp_browse_btn.setFont(QFont(constants.FONT_FAMILY, 12))
+        self.xgp_browse_btn = make_button(
+            t('xgp.ui.btn_xgp_folder'), 'secondary', icon='gamepass', parent=self)
         left_layout.addWidget(self.xgp_browse_btn, alignment=Qt.AlignCenter)
         self.xgp_save_frame = QFrame()
-        self.xgp_save_frame.setStyleSheet('QFrame { background-color: transparent; }')
+        self.xgp_save_frame.setObjectName('conversionResults')
         xgp_save_layout = QVBoxLayout(self.xgp_save_frame)
         xgp_save_layout.setContentsMargins(0, 0, 0, 0)
         xgp_save_layout.setSpacing(12)
@@ -81,15 +97,15 @@ class GamePassSaveFixWidget(QWidget):
         left_layout.addStretch()
         panels_layout.addWidget(left_frame, 1)
         right_frame = QFrame()
-        right_frame.setObjectName('glass')
+        right_frame.setObjectName('conversionPanel')
         right_layout = QVBoxLayout(right_frame)
         right_layout.setContentsMargins(10, 10, 10, 10)
         right_header = QLabel(t('xgp.ui.section_steam_to_xgp'))
         right_header.setFont(QFont(constants.FONT_FAMILY, 14, QFont.Bold))
         right_header.setAlignment(Qt.AlignCenter)
         right_layout.addWidget(right_header)
-        self.steam_browse_btn = QPushButton(f"{nf.icons['nf-fa-steam']}  {t('xgp.ui.btn_steam_folder')}")
-        self.steam_browse_btn.setFont(QFont(constants.FONT_FAMILY, 12))
+        self.steam_browse_btn = make_button(
+            t('xgp.ui.btn_steam_folder'), 'secondary', icon='steam', parent=self)
         right_layout.addWidget(self.steam_browse_btn, alignment=Qt.AlignCenter)
         self.steam_status_label = QLabel('')
         self.steam_status_label.setFont(QFont(constants.FONT_FAMILY, 10))
@@ -103,9 +119,9 @@ class GamePassSaveFixWidget(QWidget):
         self.xgp_browse_btn.clicked.connect(self.get_save_game_pass)
         self.steam_browse_btn.clicked.connect(self.get_save_steam)
         center_window(self)
-    def showEvent(self, event):
-        super().showEvent(event)
-        if not event.spontaneous():
+    def showEvent(self, a0):
+        super().showEvent(a0)
+        if not a0.spontaneous():
             self.activateWindow()
             self.raise_()
     def find_valid_saves(self, base_path):
@@ -124,6 +140,9 @@ class GamePassSaveFixWidget(QWidget):
                         valid.append(save_root)
         return valid
     def handle_message(self, message_type: str, title: str, text: str):
+        self.workflow_review.set_progress(
+            1, 1, t('xgp.ui.complete', default='Operation complete'))
+        self.workflow_review.set_result(text, success=message_type == 'info')
         if message_type == 'info':
             show_information(self, title, text)
         elif message_type == 'warning':
@@ -135,14 +154,14 @@ class GamePassSaveFixWidget(QWidget):
         threading.Thread(target=self.convert_save_files, daemon=True).start()
     def update_combobox_slot(self, saveList):
         self.update_combobox(saveList)
-    def closeEvent(self, event):
+    def closeEvent(self, a0):
         shutil.rmtree(os.path.join(root_dir, 'saves'), ignore_errors=True)
-        event.accept()
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
+        a0.accept()
+    def keyPressEvent(self, a0):
+        if a0.key() == Qt.Key_Escape:
             self.close()
         else:
-            super().keyPressEvent(event)
+            super().keyPressEvent(a0)
     def get_save_game_pass(self):
         global save_info_map
         default = os.path.expandvars('%LOCALAPPDATA%\\Packages\\PocketpairInc.Palworld_ad4psfrxyesvt\\SystemAppData\\wgs')
@@ -150,9 +169,19 @@ class GamePassSaveFixWidget(QWidget):
         self.activateWindow()
         folder = QFileDialog.getExistingDirectory(self, t('xgp.ui.select_xgp_folder'), default)
         if not folder:
+            self.workflow_review.set_result(t(
+                'tool.convert.cancelled', default='Cancelled. No files were changed.'),
+                success=True)
             return
         self.conversion_direction = 'xgp_to_steam'
         self.xgp_source_folder = folder
+        self.workflow_review.set_context(
+            source=folder,
+            target=t('xgp.ui.steam_destination_pending', default='Steam destination folder (chosen after validation)'),
+            review=t('xgp.ui.xgp_to_steam_review', default='Game Pass data will be extracted and copied to a separate Steam save folder.'),
+        )
+        self.workflow_review.set_progress(
+            0, 1, t('xgp.ui.validating', default='Validating source…'))
         def is_xgp_container(path):
             for root, _, files in os.walk(path):
                 if any((f.lower().startswith('container.') for f in files)):
@@ -201,8 +230,18 @@ class GamePassSaveFixWidget(QWidget):
         from common import get_preferred_save_path
         folder = QFileDialog.getExistingDirectory(self, t('xgp.ui.select_steam_folder'), get_preferred_save_path())
         if not folder:
+            self.workflow_review.set_result(t(
+                'tool.convert.cancelled', default='Cancelled. No files were changed.'),
+                success=True)
             return
         self.conversion_direction = 'steam_to_xgp'
+        self.workflow_review.set_context(
+            source=folder,
+            target=t('xgp.ui.gamepass_target', default='Selected Game Pass container'),
+            review=t('xgp.ui.steam_to_xgp_review', default='The Steam world will be validated before it is imported into Game Pass.'),
+        )
+        self.workflow_review.set_progress(
+            0, 1, t('xgp.ui.validating', default='Validating source…'))
         from palworld_xgp_import.gamepass_manager import validate_steam_save
         missing = validate_steam_save(folder)
         if missing:
@@ -341,7 +380,6 @@ class GamePassSaveFixWidget(QWidget):
             return None
         def task():
             try:
-                import logging
                 logging.disable(logging.CRITICAL)
                 from palsav.commands import convert
                 old_argv = sys.argv
@@ -397,7 +435,6 @@ class GamePassSaveFixWidget(QWidget):
             return
         def run_conversion():
             try:
-                import logging
                 logging.disable(logging.CRITICAL)
                 from palsav.commands import convert
                 if os.path.exists(sav_path) and (not os.path.exists(json_path)):
@@ -441,7 +478,17 @@ class GamePassSaveFixWidget(QWidget):
         self.activateWindow()
         destination = QFileDialog.getExistingDirectory(self, t('xgp.ui.select_destination'), initial)
         if not destination:
+            self.workflow_review.set_result(t(
+                'tool.convert.cancelled', default='Cancelled. No files were changed.'),
+                success=True)
             return
+        review_source = getattr(self, 'direct_saves_map', {}).get(
+            saveName, str(saveName))
+        self.workflow_review.set_context(
+            source=review_source,
+            target=destination,
+            review=t('xgp.ui.xgp_to_steam_review', default='Game Pass data will be extracted and copied to a separate Steam save folder.'),
+        )
         def task():
             if hasattr(self, 'direct_saves_map') and saveName in self.direct_saves_map:
                 source_base = self.direct_saves_map[saveName]
@@ -570,9 +617,8 @@ class GamePassSaveFixWidget(QWidget):
             layout.addLayout(combo_layout)
             button_layout = QHBoxLayout()
             button_layout.addStretch()
-            button = QPushButton(t('xgp.ui.convert'))
-            button.setFont(QFont(constants.FONT_FAMILY, 10))
-            button.setFixedWidth(250)
+            button = make_button(t('xgp.ui.convert'), 'primary', parent=self)
+            button.setMinimumWidth(200)
             button.setEnabled(combobox.currentIndex() >= 0)
             button.clicked.connect(lambda: self.convert_JSON_sav(combobox.currentData()))
             combobox.currentIndexChanged.connect(lambda index: button.setEnabled(index >= 0))
@@ -591,10 +637,10 @@ def center_window(win):
     win.move((screen.width() - size.width()) // 2, (screen.height() - size.height()) // 2)
 def game_pass_save_fix():
     if os.name != 'nt':
-        msg = QLabel(t('xgp.err.not_windows'))
-        msg.setAlignment(Qt.AlignCenter)
-        msg.setStyleSheet('font-size: 14px; padding: 40px; color: #888;')
-        return msg
+        return ConfiguredEmptyState(
+            t('xgp.err.not_windows', default='Game Pass conversion is unavailable'),
+            t('xgp.err.windows_required', default='This workflow requires Windows and a local Game Pass installation.'),
+        )
     saves_folder = os.path.join(root_dir, 'saves')
     xgp_folder = os.path.join(root_dir, 'XGP_converted_saves')
     if os.path.exists(saves_folder):

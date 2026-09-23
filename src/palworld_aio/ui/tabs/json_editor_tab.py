@@ -1,17 +1,19 @@
 import os
 import json
-import traceback
+import copy
+import math
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
-    QPushButton, QLabel, QLineEdit, QFileDialog, QMessageBox,
-    QHeaderView, QTreeWidgetItemIterator, QFrame
+    QLabel, QLineEdit, QFileDialog,
+    QHeaderView, QAbstractItemView, QFrame, QStyledItemDelegate,
+    QStackedWidget, QPlainTextEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QFontDatabase, QColor, QCursor, QBrush
-from palworld_aio.ui.chrome import icons as app_icons
 from i18n import t
 from palworld_aio import constants
 from palsav import json_tools
+from palworld_aio.ui.chrome.components import MessageDialog as QMessageBox
 
 _JSON_KEY = 'json_editor'
 
@@ -79,13 +81,19 @@ class LazyJsonItem(QTreeWidgetItem):
         self._value = value
         self._children_loaded = False
         self._is_container = isinstance(value, (dict, list))
-        self.setText(0, str(key) if key is not None else '')
+        if (isinstance(parent, LazyJsonItem)
+                and isinstance(parent.raw_value, list)):
+            self.setText(0, f'[{key}]')
+        else:
+            self.setText(0, str(key) if key is not None else '')
         self.setText(2, _type_label(value))
         if self._is_container:
             self.setText(1, _format_value(value))
             self._add_placeholder()
         else:
             self.setText(1, _format_value(value))
+            if isinstance(value, (str, int, float, bool)):
+                self.setFlags(self.flags() | Qt.ItemFlag.ItemIsEditable)
 
     def _add_placeholder(self):
         p = QTreeWidgetItem()
@@ -103,11 +111,25 @@ class LazyJsonItem(QTreeWidgetItem):
                 self.addChild(LazyJsonItem(self, k, v))
         elif isinstance(self._value, list):
             for i, v in enumerate(self._value):
-                self.addChild(LazyJsonItem(self, f'[{i}]', v))
+                self.addChild(LazyJsonItem(self, i, v))
 
     @property
     def raw_value(self):
         return self._value
+
+
+class _JsonValueDelegate(QStyledItemDelegate):
+    """Allow edits only in the Value column of supported scalar rows."""
+
+    def createEditor(self, parent, option, index):
+        tree = self.parent()
+        item = tree.itemFromIndex(index) if isinstance(
+            tree, QTreeWidget) else None
+        if (index.column() != 1 or not isinstance(item, LazyJsonItem)
+                or isinstance(item.raw_value, (dict, list, tuple, bytes,
+                                               bytearray, type(None)))):
+            return None
+        return super().createEditor(parent, option, index)
 
 
 class JsonEditorTab(QWidget):
@@ -123,16 +145,34 @@ class JsonEditorTab(QWidget):
         self._search_timer.setSingleShot(True)
         self._search_timer.setInterval(250)
         self._search_timer.timeout.connect(self._do_search)
+        self._updating_item = False
         self._setup_ui()
 
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon, create_page_footer, set_content_margins
-        from palworld_aio.ui.chrome.styles import ThemeManager
+        from palworld_aio.ui.chrome.components import (
+            SegmentedControl, create_page_footer, make_button, make_tool_button,
+            set_content_margins,
+        )
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        layout.addWidget(create_page_ribbon(t(f'{_JSON_KEY}.tab') if t else 'JSON Editor', (t('sidebar.section.editing') if t else 'Editing').upper(), self))
+        view_row = QHBoxLayout()
+        set_content_margins(view_row, top=8, bottom=4)
+        view_row.addStretch(1)
+        self._view_control = SegmentedControl(
+            (
+                ('tree', t(f'{_JSON_KEY}.view_tree', default='Tree')),
+                ('raw', t(f'{_JSON_KEY}.view_raw', default='Raw JSON')),
+            ),
+            current='tree',
+            accessible_name=t(
+                f'{_JSON_KEY}.view_mode', default='JSON editor view'),
+            parent=self,
+        )
+        self._view_control.currentChanged.connect(self._on_view_changed)
+        view_row.addWidget(self._view_control)
+        layout.addLayout(view_row)
 
         search_bar = QHBoxLayout()
         set_content_margins(search_bar, top=8, bottom=8)
@@ -143,28 +183,28 @@ class JsonEditorTab(QWidget):
         self._search_input.textChanged.connect(self._on_search_changed)
         search_bar.addWidget(self._search_input, 1)
 
-        self._search_prev_btn = QPushButton()
-        self._search_prev_btn.setIcon(
-            app_icons.get_qicon('chevron_up', role='text_secondary'))
-        self._search_prev_btn.setObjectName('toolButton')
+        self._search_prev_btn = make_tool_button(
+            'chevron_up',
+            t(f'{_JSON_KEY}.search_prev') if t else 'Previous match')
         self._search_prev_btn.setFixedSize(28, 28)
-        self._search_prev_btn.setToolTip(t(f'{_JSON_KEY}.search_prev') if t else 'Previous match')
         self._search_prev_btn.clicked.connect(self._search_prev)
+        self._search_prev_btn.setEnabled(False)
         search_bar.addWidget(self._search_prev_btn)
 
-        self._search_next_btn = QPushButton()
-        self._search_next_btn.setIcon(
-            app_icons.get_qicon('chevron_down', role='text_secondary'))
-        self._search_next_btn.setObjectName('toolButton')
+        self._search_next_btn = make_tool_button(
+            'chevron_down',
+            t(f'{_JSON_KEY}.search_next') if t else 'Next match')
         self._search_next_btn.setFixedSize(28, 28)
-        self._search_next_btn.setToolTip(t(f'{_JSON_KEY}.search_next') if t else 'Next match')
         self._search_next_btn.clicked.connect(self._search_next)
+        self._search_next_btn.setEnabled(False)
         search_bar.addWidget(self._search_next_btn)
 
         self._search_count_label = QLabel('')
         self._search_count_label.setObjectName('searchCount')
         search_bar.addWidget(self._search_count_label)
-        layout.addLayout(search_bar)
+        self._search_host = QWidget(self)
+        self._search_host.setLayout(search_bar)
+        layout.addWidget(self._search_host)
 
         # uiux-audit-remediation 11.1 (D12): persistent clickable path
         # breadcrumb tracking the current/last-visited tree item; clicking a
@@ -206,8 +246,15 @@ class JsonEditorTab(QWidget):
         mono = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         mono.setPointSize(10)
         self._tree.setFont(mono)
+        self._tree.setItemDelegate(_JsonValueDelegate(self._tree))
         self._tree.itemExpanded.connect(self._on_item_expanded)
         self._tree.itemSelectionChanged.connect(self._update_breadcrumb)
+        self._tree.itemChanged.connect(self._on_item_changed)
+        self._tree.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.SelectedClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed)
+        self._tree.setUniformRowHeights(True)
         self._tree.setWordWrap(False)
         # no-save empty state (top-nav-shell 4.3): overlay hint on the tree
         hint_text = t(f'{_JSON_KEY}.no_save') if t else 'No save loaded'
@@ -215,7 +262,48 @@ class JsonEditorTab(QWidget):
         self._empty_hint.setObjectName('tableEmptyHint')
         self._empty_hint.setAlignment(Qt.AlignCenter)
         self._empty_hint.setAttribute(Qt.WA_TransparentForMouseEvents)
-        layout.addWidget(self._tree, 1)
+        self._view_stack = QStackedWidget(self)
+        self._view_stack.setObjectName('jsonViewStack')
+        self._view_stack.addWidget(self._tree)
+
+        self._raw_page = QWidget(self)
+        raw_layout = QVBoxLayout(self._raw_page)
+        raw_layout.setContentsMargins(12, 8, 12, 8)
+        raw_layout.setSpacing(8)
+        raw_notice = QLabel(t(
+            f'{_JSON_KEY}.raw_notice',
+            default=('Raw mode replaces the full in-memory save only after '
+                     'JSON and GVAS validation. Saving later creates the '
+                     'on-disk backup.')))
+        raw_notice.setObjectName('jsonRawNotice')
+        raw_notice.setProperty('role', 'warning')
+        raw_notice.setWordWrap(True)
+        raw_layout.addWidget(raw_notice)
+        self._raw_editor = QPlainTextEdit(self._raw_page)
+        self._raw_editor.setObjectName('jsonRawEditor')
+        self._raw_editor.setLineWrapMode(
+            QPlainTextEdit.LineWrapMode.NoWrap)
+        self._raw_editor.setAccessibleName(t(
+            f'{_JSON_KEY}.raw_editor_name', default='Raw JSON document'))
+        self._raw_editor.textChanged.connect(self._on_raw_text_changed)
+        raw_layout.addWidget(self._raw_editor, 1)
+        raw_actions = QHBoxLayout()
+        self._raw_validation_label = QLabel('')
+        self._raw_validation_label.setObjectName('jsonRawValidation')
+        raw_actions.addWidget(self._raw_validation_label, 1)
+        self._raw_apply_btn = make_button(
+            t(f'{_JSON_KEY}.raw_apply', default='Validate & Apply'),
+            'warning',
+            tooltip=t(
+                f'{_JSON_KEY}.raw_apply_help',
+                default=('Validate the complete document before replacing '
+                         'the in-memory save.')))
+        self._raw_apply_btn.setEnabled(False)
+        self._raw_apply_btn.clicked.connect(self._apply_raw_json)
+        raw_actions.addWidget(self._raw_apply_btn)
+        raw_layout.addLayout(raw_actions)
+        self._view_stack.addWidget(self._raw_page)
+        layout.addWidget(self._view_stack, 1)
         self._empty_hint.setParent(self._tree.viewport())
         self._empty_hint.setGeometry(self._tree.viewport().rect())
         self._tree.resizeEvent = self._tree_resized  # type: ignore[method-assign]
@@ -223,21 +311,31 @@ class JsonEditorTab(QWidget):
         # shared page footer (top-nav-shell 4.1): actions left, status right
         footer = create_page_footer()
         footer_lay = footer.actions
-        self._refresh_btn = QPushButton(t(f'{_JSON_KEY}.refresh') if t else 'Refresh from Save')
-        self._refresh_btn.setObjectName('ghostBtn')
+        self._refresh_btn = make_button(
+            t(f'{_JSON_KEY}.refresh') if t else 'Refresh from Save',
+            'tertiary',
+            tooltip=t(f'{_JSON_KEY}.refresh_help',
+                      default='Reload the tree from the in-memory save.'))
         self._refresh_btn.clicked.connect(self._load_from_save)
         footer_lay.addWidget(self._refresh_btn)
-        self._export_btn = QPushButton(t(f'{_JSON_KEY}.export') if t else 'Export JSON')
-        self._export_btn.setObjectName('ghostBtn')
+        self._export_btn = make_button(
+            t(f'{_JSON_KEY}.export') if t else 'Export JSON',
+            'secondary',
+            tooltip=t(f'{_JSON_KEY}.export_help',
+                      default='Write the current in-memory save as JSON.'))
         self._export_btn.clicked.connect(self._export_json)
         footer_lay.addWidget(self._export_btn)
-        self._import_btn = QPushButton(t(f'{_JSON_KEY}.import') if t else 'Import JSON')
-        self._import_btn.setObjectName('ghostBtn')
+        self._import_btn = make_button(
+            t(f'{_JSON_KEY}.import') if t else 'Import JSON',
+            'warning',
+            tooltip=t(f'{_JSON_KEY}.import_help',
+                      default='Validate JSON before replacing the in-memory save.'))
         self._import_btn.clicked.connect(self._import_json)
         footer_lay.addWidget(self._import_btn)
         self._status_label = footer.status_label
         self._status_label.setText(t(f'{_JSON_KEY}.no_save') if t else 'No save loaded')
         layout.addWidget(footer)
+        self._raw_source_text = ''
         # theme application is global (ThemeManager); per-tab styles removed
 
     def _tree_resized(self, event):
@@ -246,6 +344,124 @@ class JsonEditorTab(QWidget):
 
     def _set_empty_hint(self, show: bool) -> None:
         self._empty_hint.setVisible(show)
+
+    @staticmethod
+    def _serialize_raw(data) -> str:
+        return json.dumps(
+            data,
+            cls=json_tools.CustomEncoder,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=2,
+        )
+
+    def _sync_raw_text(self) -> None:
+        root = self._tree.topLevelItem(0)
+        if not isinstance(root, LazyJsonItem):
+            text = ''
+        else:
+            try:
+                text = self._serialize_raw(root.raw_value)
+            except (TypeError, ValueError, OverflowError) as exc:
+                self._raw_validation_label.setProperty('role', 'danger')
+                self._raw_validation_label.setText(t(
+                    f'{_JSON_KEY}.raw_render_error',
+                    default='Unable to render raw JSON: {error}',
+                    error=str(exc)))
+                text = ''
+        self._raw_editor.blockSignals(True)
+        self._raw_editor.setPlainText(text)
+        self._raw_editor.blockSignals(False)
+        self._raw_source_text = text
+        self._raw_apply_btn.setEnabled(False)
+        if text:
+            self._raw_validation_label.setProperty('role', 'secondary')
+            self._raw_validation_label.setText(t(
+                f'{_JSON_KEY}.raw_ready',
+                default='Edit the document, then validate before applying.'))
+
+    def _on_view_changed(self, view_id: str) -> None:
+        raw = view_id == 'raw'
+        self._view_stack.setCurrentWidget(
+            self._raw_page if raw else self._tree)
+        self._search_host.setVisible(not raw)
+        self._breadcrumb_host.setVisible(not raw)
+        if raw:
+            self._sync_raw_text()
+
+    def _on_raw_text_changed(self) -> None:
+        dirty = self._raw_editor.toPlainText() != self._raw_source_text
+        loaded = constants.loaded_level_json
+        has_validation_boundary = (
+            loaded is not None and hasattr(loaded, '_gvas_file'))
+        self._raw_apply_btn.setEnabled(dirty and has_validation_boundary)
+        if dirty and not has_validation_boundary:
+            self._raw_validation_label.setProperty('role', 'warning')
+            self._raw_validation_label.setText(t(
+                f'{_JSON_KEY}.raw_requires_save',
+                default='Load a save before raw changes can be applied.'))
+        elif dirty:
+            self._raw_validation_label.setProperty('role', 'warning')
+            self._raw_validation_label.setText(t(
+                f'{_JSON_KEY}.raw_pending',
+                default='Raw changes have not been validated or applied.'))
+
+    def _confirm_raw_apply(self) -> bool:
+        from palworld_aio.ui.chrome.components import confirm
+        return confirm(
+            self,
+            t(f'{_JSON_KEY}.raw_confirm_title',
+              default='Replace in-memory save?'),
+            t(
+                f'{_JSON_KEY}.raw_confirm_message',
+                default=('The complete in-memory save will be replaced by '
+                         'this validated JSON. Disk data is unchanged until '
+                         'you save, when the normal backup flow applies.')),
+            kind='danger',
+            confirm_text=t(
+                f'{_JSON_KEY}.raw_confirm', default='Replace in-memory save'),
+        )
+
+    def _apply_raw_json(self) -> None:
+        loaded = constants.loaded_level_json
+        if loaded is None or not hasattr(loaded, '_gvas_file'):
+            self._raw_validation_label.setProperty('role', 'danger')
+            self._raw_validation_label.setText(t(
+                f'{_JSON_KEY}.raw_requires_save',
+                default='Load a save before raw changes can be applied.'))
+            self._raw_apply_btn.setEnabled(False)
+            return
+        try:
+            parsed = json.loads(self._raw_editor.toPlainText())
+            candidate = json_tools._decode_byte_tags(parsed)
+            new_gvas = self._validate_candidate(candidate)
+            if new_gvas is None:
+                raise ValueError('GVAS validation is unavailable.')
+        except Exception as exc:
+            self._raw_validation_label.setProperty('role', 'danger')
+            self._raw_validation_label.setText(t(
+                f'{_JSON_KEY}.raw_invalid',
+                default='Raw JSON was not applied: {error}',
+                error=str(exc)))
+            return
+        if not self._confirm_raw_apply():
+            self._raw_validation_label.setProperty('role', 'warning')
+            self._raw_validation_label.setText(t(
+                f'{_JSON_KEY}.raw_cancelled',
+                default='Apply cancelled; the in-memory save is unchanged.'))
+            return
+        loaded._gvas_file = new_gvas
+        self._populate_tree(candidate)
+        self._sync_raw_text()
+        self._raw_validation_label.setProperty('role', 'success')
+        self._raw_validation_label.setText(t(
+            f'{_JSON_KEY}.raw_applied',
+            default='Validated JSON applied to the in-memory save.'))
+        self._status_label.setProperty('role', 'success')
+        self._status_label.setText(t(
+            f'{_JSON_KEY}.raw_applied',
+            default='Validated JSON applied to the in-memory save.'))
+        self.save_applied.emit()
 
     def _on_item_expanded(self, item):
         if isinstance(item, LazyJsonItem):
@@ -346,41 +562,94 @@ class JsonEditorTab(QWidget):
         text = self._search_input.text().strip().lower()
         if not text:
             self._search_count_label.setText('')
+            self._set_search_navigation_enabled(False)
             return
-        it = QTreeWidgetItemIterator(self._tree)
-        while it.value():
-            item = it.value()
-            for col in range(2):
-                if text in item.text(col).lower():
+        root = self._tree.topLevelItem(0)
+        if isinstance(root, LazyJsonItem):
+            for path in self._matching_paths(root.raw_value, text):
+                item = self._item_for_path(path)
+                if item is not None:
                     self._search_matches.append(item)
                     self._highlight_item(item, True)
-                    break
-            it += 1
         count = len(self._search_matches)
         if count:
             self._search_idx = 0
             self._jump_to_match(0)
-            self._search_count_label.setText(
-                t(f'{_JSON_KEY}.search_count', count=count) if t else f'{count} matches'
-            )
+            self._set_search_navigation_enabled(True)
         else:
             self._search_count_label.setText(
                 t(f'{_JSON_KEY}.search_no_matches') if t else 'No matches'
             )
+            self._set_search_navigation_enabled(False)
+
+    def _matching_paths(self, value, text, path=()):
+        matches = []
+        if isinstance(value, dict):
+            entries = value.items()
+        elif isinstance(value, list):
+            entries = enumerate(value)
+        else:
+            return matches
+        for key, child in entries:
+            child_path = (*path, key)
+            display_key = f'[{key}]' if isinstance(value, list) else str(key)
+            value_text = '' if isinstance(child, (dict, list)) else str(child)
+            if text in display_key.lower() or text in value_text.lower():
+                matches.append(child_path)
+            if isinstance(child, (dict, list)):
+                matches.extend(self._matching_paths(child, text, child_path))
+        return matches
+
+    def _item_for_path(self, path):
+        item = self._tree.topLevelItem(0)
+        if not isinstance(item, LazyJsonItem):
+            return None
+        for key in path:
+            item.load_children()
+            match = next(
+                (item.child(i) for i in range(item.childCount())
+                 if getattr(item.child(i), '_key', object()) == key),
+                None,
+            )
+            if not isinstance(match, LazyJsonItem):
+                return None
+            item.setExpanded(True)
+            item = match
+        return item
+
+    def _set_search_navigation_enabled(self, enabled):
+        self._search_prev_btn.setEnabled(enabled)
+        self._search_next_btn.setEnabled(enabled)
+
+    def _update_search_position(self):
+        if not self._search_matches or self._search_idx < 0:
+            return
+        count = len(self._search_matches)
+        key = ('search_position_one' if count == 1 else 'search_position')
+        default = ('{current} of {count} match' if count == 1
+                   else '{current} of {count} matches')
+        self._search_count_label.setText(t(
+            f'{_JSON_KEY}.{key}', default=default,
+            current=self._search_idx + 1, count=count))
 
     def _highlight_item(self, item, on):
         # token amber tint (top-nav-shell 4.3): replaced the raw yellow QColor
-        if on:
-            from palworld_aio.ui.chrome.tokens import resolve as _resolve
-            tint = QColor(_resolve()['accent'])
-            tint.setAlpha(50)
-            item.setBackground(0, tint)
-            item.setBackground(1, tint)
-            item.setBackground(2, tint)
-        else:
-            item.setBackground(0, QBrush())
-            item.setBackground(1, QBrush())
-            item.setBackground(2, QBrush())
+        previous = self._updating_item
+        self._updating_item = True
+        try:
+            if on:
+                from palworld_aio.ui.chrome.tokens import resolve as _resolve
+                tint = QColor(_resolve()['accent'])
+                tint.setAlpha(50)
+                item.setBackground(0, tint)
+                item.setBackground(1, tint)
+                item.setBackground(2, tint)
+            else:
+                item.setBackground(0, QBrush())
+                item.setBackground(1, QBrush())
+                item.setBackground(2, QBrush())
+        finally:
+            self._updating_item = previous
 
     def _clear_search_highlights(self):
         for item in self._search_matches:
@@ -392,6 +661,7 @@ class JsonEditorTab(QWidget):
         item = self._search_matches[idx]
         self._tree.scrollToItem(item)
         self._tree.setCurrentItem(item)
+        self._update_search_position()
 
     def _search_next(self):
         if not self._search_matches:
@@ -405,6 +675,95 @@ class JsonEditorTab(QWidget):
         self._search_idx = (self._search_idx - 1) % len(self._search_matches)
         self._jump_to_match(self._search_idx)
 
+    @staticmethod
+    def _parse_scalar(text, original):
+        if isinstance(original, bool):
+            lowered = text.strip().lower()
+            if lowered not in {'true', 'false'}:
+                raise ValueError('Boolean values must be true or false.')
+            return lowered == 'true'
+        if isinstance(original, int):
+            try:
+                return int(text.strip())
+            except ValueError as exc:
+                raise ValueError('Enter a whole number.') from exc
+        if isinstance(original, float):
+            try:
+                value = float(text.strip())
+            except ValueError as exc:
+                raise ValueError('Enter a number.') from exc
+            if not math.isfinite(value):
+                raise ValueError('The number must be finite.')
+            return value
+        if isinstance(original, str):
+            return text
+        raise ValueError('This JSON value is read-only.')
+
+    @staticmethod
+    def _replace_path_value(data, path, value):
+        target = data
+        for key in path[:-1]:
+            target = target[key]
+        target[path[-1]] = value
+
+    @staticmethod
+    def _path_for_item(item):
+        path = []
+        while isinstance(item, LazyJsonItem) and item.parent() is not None:
+            path.append(item._key)
+            item = item.parent()
+        path.reverse()
+        return tuple(path)
+
+    def _validate_candidate(self, data):
+        self._serialize_raw(data)
+        loaded = constants.loaded_level_json
+        if loaded is None or not hasattr(loaded, '_gvas_file'):
+            return None
+        from palsav.gvas import GvasFile
+        return GvasFile.load(data)
+
+    def _on_item_changed(self, item, column):
+        if self._updating_item or column != 1 or not isinstance(
+                item, LazyJsonItem):
+            return
+        original = item.raw_value
+        if isinstance(original, (dict, list, tuple, bytes, bytearray,
+                                 type(None))):
+            return
+        path = self._path_for_item(item)
+        root = self._tree.topLevelItem(0)
+        if not path or not isinstance(root, LazyJsonItem):
+            return
+        try:
+            value = self._parse_scalar(item.text(1), original)
+            candidate = copy.deepcopy(root.raw_value)
+            self._replace_path_value(candidate, path, value)
+            new_gvas = self._validate_candidate(candidate)
+        except Exception as exc:
+            self._updating_item = True
+            item.setText(1, _format_value(original))
+            self._updating_item = False
+            self._status_label.setProperty('role', 'danger')
+            self._status_label.setText(t(
+                f'{_JSON_KEY}.validation_error',
+                default='Invalid value: {error}', error=str(exc)))
+            return
+        loaded = constants.loaded_level_json
+        if new_gvas is not None and loaded is not None:
+            loaded._gvas_file = new_gvas
+        self._populate_tree(candidate)
+        selected = self._item_for_path(path)
+        if selected is not None:
+            self._tree.setCurrentItem(selected)
+        self._status_label.setProperty('role', 'success')
+        self._status_label.setText(t(
+            f'{_JSON_KEY}.value_applied',
+            default='Validated and applied {path}.', path=' › '.join(
+                str(part) for part in path)))
+        if new_gvas is not None:
+            self.save_applied.emit()
+
     def _get_gvas_dict(self):
         if constants.loaded_level_json is None:
             return None
@@ -415,12 +774,21 @@ class JsonEditorTab(QWidget):
 
     def _populate_tree(self, data):
         # drop the breadcrumb reference before clear() detaches the items
+        self._clear_search_highlights()
+        self._search_matches.clear()
+        self._search_idx = -1
+        self._set_search_navigation_enabled(False)
+        self._search_count_label.setText('')
         self._breadcrumb_current = None
-        self._tree.clear()
-        root = LazyJsonItem(self._tree, None, data)
-        root.load_children()
-        self._tree.addTopLevelItem(root)
-        root.setExpanded(True)
+        self._updating_item = True
+        try:
+            self._tree.clear()
+            root = LazyJsonItem(self._tree, None, data)
+            root.load_children()
+            self._tree.addTopLevelItem(root)
+            root.setExpanded(True)
+        finally:
+            self._updating_item = False
 
     def _load_from_save(self):
         data = self._get_gvas_dict()
@@ -430,6 +798,8 @@ class JsonEditorTab(QWidget):
             return
         try:
             self._populate_tree(data)
+            if self._view_control.current() == 'raw':
+                self._sync_raw_text()
             self._set_empty_hint(False)
             self._status_label.setText(
                 t(f'{_JSON_KEY}.loaded') if t else 'JSON loaded from save'
@@ -485,6 +855,8 @@ class JsonEditorTab(QWidget):
         try:
             constants.loaded_level_json._gvas_file = new_gvas
             self._populate_tree(data)
+            if self._view_control.current() == 'raw':
+                self._sync_raw_text()
             self._loaded_once = True
             self._status_label.setText(
                 t(f'{_JSON_KEY}.imported', path=os.path.basename(path)) if t else f'Imported {path}'

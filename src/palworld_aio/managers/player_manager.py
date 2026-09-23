@@ -1,6 +1,6 @@
 import os
 from palsav import json_tools
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication
 from i18n import t
 from palworld_aio import constants
 from resource_resolver import resource_path

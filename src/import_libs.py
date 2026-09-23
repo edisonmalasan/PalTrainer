@@ -4,7 +4,7 @@ import sys, argparse, collections, copy, ctypes, datetime, gc, json, shutil, glo
 import logging, multiprocessing, platform, re, subprocess, threading, pickle, zipfile, string, palworld_coord
 import time, traceback, uuid, io, pathlib, urllib.request, tempfile, random
 from multiprocessing import shared_memory
-from PyQt6.QtWidgets import QApplication, QWidget, QMainWindow, QDialog, QMessageBox, QFileDialog, QInputDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QTextEdit, QTreeWidget, QTreeWidgetItem, QProgressBar, QCheckBox, QRadioButton, QGroupBox, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QSplitter, QScrollArea, QFrame, QMenuBar, QMenu, QStatusBar, QSystemTrayIcon, QStyle, QCommonStyle, QStylePainter, QStyleOptionButton
+from PyQt6.QtWidgets import QApplication, QWidget, QMainWindow, QDialog, QFileDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QTextEdit, QTreeWidget, QTreeWidgetItem, QProgressBar, QCheckBox, QRadioButton, QGroupBox, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QSplitter, QScrollArea, QFrame, QMenuBar, QMenu, QStatusBar, QSystemTrayIcon, QStyle, QCommonStyle, QStylePainter, QStyleOptionButton
 from PyQt6.QtGui import QPixmap, QIcon, QFont, QPainter, QPen, QBrush, QColor, QAction, QFontMetrics
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QObject, QEvent, QSize, QPoint, QRect
 from i18n import init_language, t, set_language, get_language, load_resources
