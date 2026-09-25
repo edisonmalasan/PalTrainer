@@ -386,6 +386,7 @@ class MainWindow(QMainWindow):
         from .chrome.tokens import LAYOUT
         from .chrome.workspace_shell import WorkspaceShell
         from palworld_aio.ui.operation_journal import OperationJournal
+        from palworld_aio.ui.pending_changes import PendingChangeJournal
         from palworld_aio.ui.pages.activity_page import ActivityPage
         from palworld_aio.ui.pages.about_page import AboutPage
         from palworld_aio.ui.pages.backups_page import BackupsPage
@@ -400,6 +401,9 @@ class MainWindow(QMainWindow):
             self.user_settings.get('workspace_ui'))
         self.workspace_context = WorkspaceContext()
         self.operation_journal = OperationJournal(parent=self)
+        self.pending_journal = PendingChangeJournal(parent=self)
+        self.pending_journal.changed.connect(
+            self.workspace_context.set_pending_changes)
         self.workspace_shell = WorkspaceShell(self.workspace_context)
         self.workspace_shell.minimizeRequested.connect(self.showMinimized)
         self.workspace_shell.maximizeRequested.connect(self._toggle_maximize)
@@ -408,6 +412,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.workspace_shell, stretch=1)
 
         header = self.workspace_shell.header
+        header.pending_changes.clicked.connect(self._show_pending_changes)
         self._shell_save_button = header.add_action(
             'save', t('menu.file.save_changes') if t else 'Save Changes',
             self._save_changes, primary=True, icon='save')
@@ -866,6 +871,10 @@ class MainWindow(QMainWindow):
         save_manager.save_started.connect(self.shell_state.begin_save)
         save_manager.save_started.connect(self._on_shell_saving)
         save_manager.save_finished.connect(self._on_save_finished)
+        save_manager.save_failed.connect(self._on_save_failed)
+        self._dirty_sync_timer = QTimer(self)
+        self._dirty_sync_timer.timeout.connect(self._sync_dirty_from_runtime)
+        self._dirty_sync_timer.start(250)
         self._setup_global_shortcuts()
 
     def _setup_global_shortcuts(self):
@@ -1063,6 +1072,26 @@ class MainWindow(QMainWindow):
     def _set_dirty(self, dirty):
         workspace_context = self.__dict__.get('workspace_context')
         if workspace_context is not None:
+            journal = self.__dict__.get('pending_journal')
+            if journal is not None:
+                if dirty and workspace_context.snapshot.save is not None:
+                    journal.record(t(
+                        'ui.activity.change_detail',
+                        default='The current save has in-memory changes.'),
+                        context=workspace_context.snapshot.current_route)
+                    from palworld_aio.ui.operation_journal import (
+                        ActivityKind, ActivityStatus,
+                    )
+                    self._record_activity(
+                        ActivityKind.MUTATION,
+                        t('ui.activity.change_recorded',
+                          default='Unsaved change recorded'),
+                        status=ActivityStatus.WARNING,
+                        detail=journal.summary.latest_label or '',
+                    )
+                elif not dirty:
+                    journal.clear()
+                return
             from palworld_aio.ui.workspace_context import PendingChangesSummary
             current = workspace_context.snapshot.pending_changes
             if dirty and current.count == 0:
@@ -1087,6 +1116,37 @@ class MainWindow(QMainWindow):
         app_bar = self.__dict__.get('app_bar')
         if app_bar is not None:
             app_bar.save_chip.set_dirty(dirty)
+
+    def _sync_dirty_from_runtime(self):
+        context = self.__dict__.get('workspace_context')
+        journal = self.__dict__.get('pending_journal')
+        if (context is not None and journal is not None
+                and context.snapshot.save is not None
+                and constants.dirty and not journal.changes):
+            self._set_dirty(True)
+
+    def _show_pending_changes(self):
+        button = self.workspace_shell.header.pending_changes
+        menu = QMenu(button)
+        menu.setObjectName('appContextMenu')
+        menu.setAccessibleName(t(
+            'ui.pending.review', default='Review pending changes'))
+        changes = self.pending_journal.changes
+        if not changes:
+            action = menu.addAction(t(
+                'ui.pending.none', default='No pending changes'))
+            action.setEnabled(False)
+        else:
+            menu.addSection(t(
+                'ui.pending.review', default='Review pending changes'))
+            for change in changes:
+                label = change.label
+                if change.affected_count is not None:
+                    label = f'{label} ({change.affected_count})'
+                action = menu.addAction(label)
+                action.setToolTip(change.context or change.label)
+                action.setEnabled(False)
+        menu.exec(button.mapToGlobal(button.rect().bottomLeft()))
 
     def _set_menu_actions(self, actions_dict):
         self._menu_actions_dict = actions_dict
@@ -1395,7 +1455,7 @@ class MainWindow(QMainWindow):
                 return
             try:
                 save_manager.reload_current_save()
-                self.refresh_all()
+                self.refresh_all(mark_dirty=False)
                 self._refresh_global_search_index()
                 constants.dirty = False
                 self._set_dirty(False)
@@ -1658,6 +1718,8 @@ class MainWindow(QMainWindow):
                     path=save_path,
                     platform=platform,
                     modified_at=modified_at,
+                    read_only=bool(level_path and level_path.is_file()
+                                   and not os.access(level_path, os.W_OK)),
                 )
             backup = None
             if success:
@@ -1702,7 +1764,7 @@ class MainWindow(QMainWindow):
                 self.pal_editor_tab.current_player_uid = None
             if 'base_inventory_tab' in self.__dict__:
                 self.base_inventory_tab._clear_guild_selection()
-            self.refresh_all()
+            self.refresh_all(mark_dirty=False)
             self._refresh_global_search_index()
             constants.dirty = False
             self._set_dirty(False)
@@ -1760,6 +1822,19 @@ class MainWindow(QMainWindow):
         msg_box.setText(t('Changes saved successfully.'))
         msg_box.addButton(t('button.ok'), QMessageBox.AcceptRole)
         msg_box.exec()
+    def _on_save_failed(self, _detail):
+        self.shell_state.finish_save(False)
+        workspace_context = self.__dict__.get('workspace_context')
+        if workspace_context is not None:
+            workspace_context.finish_save(False)
+        from palworld_aio.ui.operation_journal import ActivityKind, ActivityStatus
+        self._record_activity(
+            ActivityKind.FAILURE,
+            t('ui.activity.save_failed', default='Save failed'),
+            status=ActivityStatus.FAILED,
+            detail=t('ui.activity.save_failed_detail',
+                     default='Changes remain in memory. Check Diagnostics before retrying.'),
+        )
     _TAB_REFRESH = {
         0: None,
         1: '_refresh_base_inventory',
@@ -1787,11 +1862,12 @@ class MainWindow(QMainWindow):
     def _refresh_breeding(self):
         if 'breeding_tab' in self.__dict__:
             self.breeding_tab.refresh()
-    def refresh_all(self):
+    def refresh_all(self, *, mark_dirty=True):
         if self._is_refreshing:
             return
-        constants.dirty = True
-        self._set_dirty(True)
+        if mark_dirty:
+            constants.dirty = True
+            self._set_dirty(True)
         self._is_refreshing = True
         try:
             self._refresh_players()
@@ -2982,6 +3058,15 @@ class MainWindow(QMainWindow):
     def _save_changes(self):
         if not constants.loaded_level_json:
             self._show_warning(t('error.title'), t('guild.rebuild.no_save'))
+            return
+        self._sync_dirty_from_runtime()
+        context = self.__dict__.get('workspace_context')
+        if (context is not None
+                and context.snapshot.save_state.value == 'read_only'):
+            self._show_warning(
+                t('error.title', default='Cannot save'),
+                t('ui.save.read_only_message',
+                  default='This save is read only. Choose a writable copy before saving.'))
             return
         save_manager.save_changes(parent=self)
     def _rename_world(self):

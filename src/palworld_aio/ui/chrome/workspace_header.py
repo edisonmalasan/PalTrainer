@@ -23,7 +23,10 @@ from palworld_aio.ui.chrome.localization import tr
 from palworld_aio.ui.chrome.tokens import HEIGHT, SPACING
 
 
-_SAVE_STATES = {'no_save', 'loading', 'loaded', 'dirty', 'saving', 'error'}
+_SAVE_STATES = {
+    'no_save', 'loading', 'loaded', 'dirty', 'saving', 'error',
+    'read_only', 'backup_recommended',
+}
 _SAVE_ICONS = {
     'no_save': 'save_state',
     'loading': 'spinner',
@@ -31,6 +34,8 @@ _SAVE_ICONS = {
     'dirty': 'warning',
     'saving': 'spinner',
     'error': 'warning',
+    'read_only': 'warning',
+    'backup_recommended': 'warning',
 }
 
 
@@ -53,6 +58,7 @@ class SaveContextControl(QPushButton):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMinimumHeight(HEIGHT['comfortable'])
         self._state = 'no_save'
+        self._state_before_loading = 'no_save'
         self._title = tr('ui.save.no_save_title', 'No save loaded')
         self._detail = tr('ui.save.no_save_detail', 'Open or drop a save to begin')
         self.set_context('no_save', self._title, self._detail)
@@ -68,13 +74,14 @@ class SaveContextControl(QPushButton):
         self._title = title.strip() or tr('ui.save.no_save_title', 'No save loaded')
         self._detail = detail.strip()
         self.setProperty('saveState', state)
-        self.setText(self._title if not self._detail else f'{self._title}\n{self._detail}')
+        self.set_compact(bool(self.property('compact')))
         self.setAccessibleName(tr(
             'ui.save.context_accessible', 'Save context: {title}', title=self._title))
         self.setAccessibleDescription(self._detail)
         self.setToolTip(self._detail or self._title)
         icon = app_icons.get_qicon(_SAVE_ICONS[state], role={
             'loaded': 'success', 'dirty': 'warning', 'error': 'danger',
+            'read_only': 'warning', 'backup_recommended': 'warning',
             'loading': 'info', 'saving': 'info',
         }.get(state, 'text_secondary'))
         if icon is not None:
@@ -84,15 +91,22 @@ class SaveContextControl(QPushButton):
 
     def set_compact(self, compact: bool) -> None:
         self.setProperty('compact', compact)
-        self.setText(self._title if compact or not self._detail else f'{self._title}\n{self._detail}')
+        if compact and ' · ' in self._detail:
+            state_label = self._detail.rsplit(' · ', 1)[-1]
+            self.setText(f'{state_label} · {self._title}')
+        else:
+            self.setText(self._title if compact or not self._detail
+                         else f'{self._title}\n{self._detail}')
 
     def set_loading_state(self, state: str) -> None:
         """Compatibility contract used by the existing loading manager."""
         if state == 'loading':
+            if self._state != 'loading':
+                self._state_before_loading = self._state
             self.set_context('loading', self._title, self._detail)
         elif state == 'idle' and self._state in {'loading', 'saving'}:
-            target = 'loaded' if self._title != tr(
-                'ui.save.no_save_title', 'No save loaded') else 'no_save'
+            target = (self._state_before_loading if self._state == 'loading'
+                      else 'loaded')
             self.set_context(target, self._title, self._detail)
 
 

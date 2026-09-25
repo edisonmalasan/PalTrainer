@@ -960,7 +960,7 @@ QPushButton#workspaceSaveContext:pressed {{ background: {p['surface_active']}; }
 QPushButton#workspaceSaveContext:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
 QPushButton#workspaceSaveContext:disabled {{ color: {p['text_disabled']}; border-color: {p['border']}; }}
 QPushButton#workspaceSaveContext[saveState="loaded"] {{ border-color: {p['success_border']}; }}
-QPushButton#workspaceSaveContext[saveState="dirty"] {{ border-color: {p['warning_border']}; }}
+QPushButton#workspaceSaveContext[saveState="dirty"], QPushButton#workspaceSaveContext[saveState="read_only"], QPushButton#workspaceSaveContext[saveState="backup_recommended"] {{ border-color: {p['warning_border']}; }}
 QPushButton#workspaceSaveContext[saveState="error"] {{ border-color: {p['danger_border']}; }}
 QPushButton#workspaceSaveContext[saveState="loading"], QPushButton#workspaceSaveContext[saveState="saving"] {{ border-color: {p['info_border']}; }}
 QPushButton#pendingChangesButton {{

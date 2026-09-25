@@ -20,7 +20,8 @@ def app():
 
 def test_save_context_states_and_accessibility(app):
     control = header_mod.SaveContextControl()
-    for state in ('no_save', 'loading', 'loaded', 'dirty', 'saving', 'error'):
+    for state in ('no_save', 'loading', 'loaded', 'dirty', 'saving', 'error',
+                  'read_only', 'backup_recommended'):
         control.set_context(state, 'Local World', 'Steam')
         assert control.state == state
         assert control.property('saveState') == state
@@ -29,6 +30,16 @@ def test_save_context_states_and_accessibility(app):
         assert not control.icon().isNull()
     with pytest.raises(ValueError):
         control.set_context('unknown', 'World')
+
+
+def test_compact_save_context_keeps_state_label_visible(app):
+    control = header_mod.SaveContextControl()
+    control.set_compact(True)
+    control.set_context('dirty', 'Island', 'Steam · Unsaved')
+    assert control.text() == 'Unsaved · Island'
+    control.set_loading_state('loading')
+    control.set_loading_state('idle')
+    assert control.state == 'dirty'
 
 
 def test_breadcrumb_context_emits_stable_identifier(app):

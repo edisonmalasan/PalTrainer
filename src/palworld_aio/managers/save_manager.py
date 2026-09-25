@@ -42,6 +42,7 @@ class SaveManager(QObject):
     load_finished = pyqtSignal(bool)
     save_started = pyqtSignal()
     save_finished = pyqtSignal(float)
+    save_failed = pyqtSignal(str)
     stats_updated = pyqtSignal(str)
     def __init__(self):
         super().__init__()
@@ -193,9 +194,10 @@ class SaveManager(QObject):
                 save_session.save()
                 if constants.xgp_loaded:
                     self._save_xgp_container()
-            except Exception:
+            except Exception as error:
                 import traceback
                 traceback.print_exc()
+                self.save_failed.emit(str(error))
                 raise
             duration = time.perf_counter() - t0
             self.save_finished.emit(duration)

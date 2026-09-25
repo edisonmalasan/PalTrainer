@@ -27,6 +27,7 @@ class SaveIdentity:
     path: str
     platform: SavePlatform = SavePlatform.UNKNOWN
     modified_at: str | None = None
+    read_only: bool = False
 
     def __post_init__(self) -> None:
         if not self.save_id.strip():
@@ -153,8 +154,14 @@ class WorkspaceContext:
     ) -> WorkspaceContextSnapshot:
         if success and save is None:
             raise ValueError('a successful load requires a save identity')
+        resting_state = (
+            ShellState.READ_ONLY if save is not None and save.read_only
+            else ShellState.BACKUP_RECOMMENDED
+            if backup is not None and backup.recommended
+            else ShellState.LOADED
+        )
         return self._update(
-            save_state=ShellState.LOADED if success else ShellState.ERROR,
+            save_state=resting_state if success else ShellState.ERROR,
             save=save if success else None,
             backup=backup or BackupState(),
             player=None,
@@ -202,16 +209,22 @@ class WorkspaceContext:
         return self._update(container=selection)
 
     def set_backup_state(self, state: BackupState) -> WorkspaceContextSnapshot:
-        return self._update(backup=state)
+        current = self._snapshot.save_state
+        if current in (ShellState.LOADED, ShellState.BACKUP_RECOMMENDED):
+            current = (ShellState.BACKUP_RECOMMENDED if state.recommended
+                       else ShellState.LOADED)
+        return self._update(backup=state, save_state=current)
 
     def set_pending_changes(
         self, summary: PendingChangesSummary,
     ) -> WorkspaceContextSnapshot:
         state = self._snapshot.save_state
-        if summary.count and state in (ShellState.LOADED, ShellState.DIRTY):
+        if summary.count and state in (ShellState.LOADED, ShellState.DIRTY,
+                                       ShellState.BACKUP_RECOMMENDED):
             state = ShellState.DIRTY
         elif not summary.count and state is ShellState.DIRTY:
-            state = ShellState.LOADED
+            state = (ShellState.BACKUP_RECOMMENDED
+                     if self._snapshot.backup.recommended else ShellState.LOADED)
         return self._update(pending_changes=summary, save_state=state)
 
     def begin_save(self) -> WorkspaceContextSnapshot:
@@ -221,7 +234,9 @@ class WorkspaceContext:
 
     def finish_save(self, success: bool) -> WorkspaceContextSnapshot:
         return self._update(
-            save_state=ShellState.LOADED if success else ShellState.ERROR,
+            save_state=(ShellState.BACKUP_RECOMMENDED
+                        if success and self._snapshot.backup.recommended
+                        else ShellState.LOADED if success else ShellState.ERROR),
             pending_changes=(
                 PendingChangesSummary()
                 if success else self._snapshot.pending_changes

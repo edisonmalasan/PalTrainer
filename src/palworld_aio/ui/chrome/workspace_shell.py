@@ -284,10 +284,23 @@ class WorkspaceShell(QFrame):
                 tr('ui.save.no_save_detail', 'Open or drop a save to begin'),
             )
         else:
+            state_labels = {
+                'loaded': ('ui.save.state.saved', 'Saved'),
+                'dirty': ('ui.save.state.unsaved', 'Unsaved'),
+                'saving': ('ui.save.state.saving', 'Saving'),
+                'error': ('ui.save.state.failed', 'Save failed'),
+                'read_only': ('ui.save.state.read_only', 'Read only'),
+                'backup_recommended': (
+                    'ui.save.state.backup_recommended', 'Backup recommended'),
+            }
+            state_key, state_fallback = state_labels.get(
+                snapshot.save_state.value,
+                ('ui.save.state.loading', 'Loading'))
             self.header.save_context.set_context(
                 snapshot.save_state.value,
                 snapshot.save.display_name,
-                snapshot.save.platform.value.title(),
+                f'{snapshot.save.platform.value.title()} · '
+                f'{tr(state_key, state_fallback)}',
             )
         self.header.pending_changes.set_count(snapshot.pending_changes.count)
         items = [ContextItem(snapshot.current_route, snapshot.current_route.replace('_', ' ').title(), 'route')]
