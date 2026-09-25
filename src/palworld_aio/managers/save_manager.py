@@ -149,22 +149,22 @@ class SaveManager(QObject):
         return True
     def is_save_stale(self, level_sav_path=None) -> bool:
         return save_session.is_stale()
-    def save_changes(self, parent=None):
+    def save_changes(self, parent=None) -> bool:
         if is_loading_active():
             if parent:
                 show_question(parent, t('error.title'),
                     t('error.load_in_progress', default='A save is still loading. Please wait for it to finish, then try again.'))
-            return
+            return False
         if not constants.current_save_path or not constants.loaded_level_json:
-            return
+            return False
         if constants.xgp_loaded and not __import__('ctypes').windll.shell32.IsUserAnAdmin():
             show_critical(parent, t('error.title'),
                 'Administrator privileges required to write XGP containers.')
-            return
+            return False
         if not constants.xgp_loaded and self.is_save_stale():
             if not show_question(parent, t('error.save_stale_title', default='Save File Changed'),
                     t('error.save_stale_msg', default='Level.sav on disk has changed since it was loaded (it may have been re-saved by the game). Saving now will overwrite those changes with your in-memory edits.\n\nSave anyway?')):
-                return
+                return False
         self._xgp_new_world_name = None
         if constants.xgp_loaded and parent:
             from PyQt6.QtWidgets import QLineEdit
@@ -184,7 +184,7 @@ class SaveManager(QObject):
                 t('xgp.save.msg', default='Changes will be saved back to the world "{name}".\nLeave the name unchanged to keep it, or edit to rename.', name=_old_name),
                 QLineEdit.Normal, _old_name)
             if not _ok or not _name.strip():
-                return
+                return False
             self._xgp_new_world_name = _name.strip()
         self.save_started.emit()
         level_sav_path = os.path.join(constants.current_save_path, 'Level.sav')
@@ -203,6 +203,7 @@ class SaveManager(QObject):
             self.save_finished.emit(duration)
             return duration
         run_with_loading(lambda _: self._on_save_finished(parent), save_task, parent=parent)
+        return True
     def load_xgp_save(self, container_path, save_id, parent=None):
         from palworld_xgp_import.gamepass_manager import (
             read_container_index, extract_save_to_temp,

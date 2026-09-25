@@ -73,6 +73,16 @@ def test_context_snapshot_updates_save_pending_and_breadcrumbs(app):
     assert [item.label for item in shell.header.context_bar.items][-1] == 'Ada'
 
 
+def test_failed_load_has_explicit_header_state_without_a_save(app):
+    context = context_mod.WorkspaceContext()
+    shell = shell_mod.WorkspaceShell(context)
+    context.finish_load(None, success=False)
+
+    assert shell.header.save_context.state == 'error'
+    assert shell.header.save_context._title == 'Save load failed'
+    assert 'try again' in shell.header.save_context._detail
+
+
 def test_only_dedicated_drag_region_starts_shell_drag(app):
     shell = shell_mod.WorkspaceShell(context_mod.WorkspaceContext())
     shell.resize(1024, 700)

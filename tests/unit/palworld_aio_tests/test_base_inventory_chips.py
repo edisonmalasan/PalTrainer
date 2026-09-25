@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import inspect
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -22,6 +23,25 @@ bi_mod = import_from('palworld_aio.ui.tabs.base_inventory_tab')
 qss_mod = import_from('palworld_aio.ui.chrome.qss_builder')
 
 _app = None
+
+
+def test_memory_autosave_records_pending_base_inventory_change():
+    recorded = []
+    tab = SimpleNamespace(
+        manager=SimpleNamespace(
+            inventory_container=object(), save_changes=lambda: True),
+        _main_window=SimpleNamespace(
+            record_pending_change=lambda *args, **kwargs: recorded.append(
+                (args, kwargs))),
+        _current_base_name='Coastal Base',
+        _current_guild_name='Guild',
+    )
+
+    bi_mod.BaseInventoryTab._auto_save_changes(tab)
+
+    assert recorded == [
+        (('Base inventory updated',), {'context': 'Coastal Base'}),
+    ]
 
 
 def _app_instance():

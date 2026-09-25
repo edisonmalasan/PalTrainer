@@ -969,6 +969,13 @@ class PalInfoHandlerMixin:
         parent = self.parent()
         while parent:
             if hasattr(parent, 'tools_tab'):
+                recorder = getattr(parent, 'record_pending_change', None)
+                if callable(recorder):
+                    recorder(
+                        t('ui.pending.pal_details',
+                          default='Pal details updated'),
+                        affected_count=fanned or 1,
+                    )
                 parent.tools_tab.refresh()
                 break
             if hasattr(parent, '_update_party_slots'):

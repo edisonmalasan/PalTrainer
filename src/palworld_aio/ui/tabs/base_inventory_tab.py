@@ -4901,6 +4901,13 @@ class BaseInventoryTab(QWidget):
             return
         try:
             if self.manager.save_changes():
+                recorder = getattr(self._main_window, 'record_pending_change', None)
+                if callable(recorder):
+                    recorder(
+                        t('ui.pending.base_inventory',
+                          default='Base inventory updated'),
+                        context=self._current_base_name or self._current_guild_name,
+                    )
                 if hasattr(self._main_window, 'status_bar'):
                     self._main_window.status_bar.showMessage(t('base_inventory.auto_save_success') if t else 'Auto-saved changes', 2000)
             else:

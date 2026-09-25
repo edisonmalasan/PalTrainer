@@ -9,6 +9,7 @@ import collections
 import threading
 from functools import partial
 import logging
+from typing import Callable
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QMenuBar, QMenu, QStatusBar, QSplitter, QFileDialog, QDialog, QComboBox, QApplication, QStackedWidget, QTextEdit, QLineEdit
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject, QPoint, QPropertyAnimation, QEasingCurve, QByteArray, QThread
 
@@ -1075,20 +1076,10 @@ class MainWindow(QMainWindow):
             journal = self.__dict__.get('pending_journal')
             if journal is not None:
                 if dirty and workspace_context.snapshot.save is not None:
-                    journal.record(t(
+                    MainWindow.record_pending_change(self, t(
                         'ui.activity.change_detail',
                         default='The current save has in-memory changes.'),
                         context=workspace_context.snapshot.current_route)
-                    from palworld_aio.ui.operation_journal import (
-                        ActivityKind, ActivityStatus,
-                    )
-                    self._record_activity(
-                        ActivityKind.MUTATION,
-                        t('ui.activity.change_recorded',
-                          default='Unsaved change recorded'),
-                        status=ActivityStatus.WARNING,
-                        detail=journal.summary.latest_label or '',
-                    )
                 elif not dirty:
                     journal.clear()
                 return
@@ -1117,6 +1108,29 @@ class MainWindow(QMainWindow):
         if app_bar is not None:
             app_bar.save_chip.set_dirty(dirty)
 
+    def record_pending_change(
+        self, label: str, *, context: str = '',
+        affected_count: int | None = None, high_risk: bool = False,
+        undo: Callable[[], None] | None = None,
+        redo: Callable[[], None] | None = None,
+    ) -> None:
+        workspace_context = self.__dict__.get('workspace_context')
+        journal = self.__dict__.get('pending_journal')
+        if (workspace_context is None or journal is None
+                or workspace_context.snapshot.save is None):
+            return
+        journal.record(
+            label, context=context, affected_count=affected_count,
+            high_risk=high_risk, undo=undo, redo=redo)
+        constants.dirty = True
+        from palworld_aio.ui.operation_journal import ActivityKind, ActivityStatus
+        self._record_activity(
+            ActivityKind.MUTATION,
+            t('ui.activity.change_recorded', default='Unsaved change recorded'),
+            status=ActivityStatus.WARNING,
+            detail=label,
+        )
+
     def _sync_dirty_from_runtime(self):
         context = self.__dict__.get('workspace_context')
         journal = self.__dict__.get('pending_journal')
@@ -1141,12 +1155,42 @@ class MainWindow(QMainWindow):
                 'ui.pending.review', default='Review pending changes'))
             for change in changes:
                 label = change.label
+                if change.high_risk:
+                    label = f"{t('ui.pending.high_risk', default='High risk')} · {label}"
                 if change.affected_count is not None:
                     label = f'{label} ({change.affected_count})'
                 action = menu.addAction(label)
                 action.setToolTip(change.context or change.label)
                 action.setEnabled(False)
+        if self.pending_journal.can_undo:
+            undo_action = menu.addAction(t(
+                'ui.pending.undo_last', default='Undo last change'))
+            undo_action.triggered.connect(self._undo_pending_change)
+        if self.pending_journal.can_redo:
+            redo_action = menu.addAction(t(
+                'ui.pending.redo_last', default='Redo last change'))
+            redo_action.triggered.connect(self._redo_pending_change)
         menu.exec(button.mapToGlobal(button.rect().bottomLeft()))
+
+    def _undo_pending_change(self) -> None:
+        try:
+            if not self.pending_journal.undo_last():
+                return
+        except Exception as error:
+            self._show_error(t('ui.pending.undo_failed',
+                               default='Undo failed'), str(error))
+            return
+        constants.dirty = bool(self.pending_journal.changes)
+
+    def _redo_pending_change(self) -> None:
+        try:
+            if not self.pending_journal.redo_last():
+                return
+        except Exception as error:
+            self._show_error(t('ui.pending.redo_failed',
+                               default='Redo failed'), str(error))
+            return
+        constants.dirty = True
 
     def _set_menu_actions(self, actions_dict):
         self._menu_actions_dict = actions_dict
@@ -1455,7 +1499,11 @@ class MainWindow(QMainWindow):
                 return
             try:
                 save_manager.reload_current_save()
-                self.refresh_all(mark_dirty=False)
+                self._suppress_dirty_refresh = True
+                try:
+                    self.refresh_all()
+                finally:
+                    self._suppress_dirty_refresh = False
                 self._refresh_global_search_index()
                 constants.dirty = False
                 self._set_dirty(False)
@@ -1764,7 +1812,11 @@ class MainWindow(QMainWindow):
                 self.pal_editor_tab.current_player_uid = None
             if 'base_inventory_tab' in self.__dict__:
                 self.base_inventory_tab._clear_guild_selection()
-            self.refresh_all(mark_dirty=False)
+            self._suppress_dirty_refresh = True
+            try:
+                self.refresh_all()
+            finally:
+                self._suppress_dirty_refresh = False
             self._refresh_global_search_index()
             constants.dirty = False
             self._set_dirty(False)
@@ -1862,10 +1914,10 @@ class MainWindow(QMainWindow):
     def _refresh_breeding(self):
         if 'breeding_tab' in self.__dict__:
             self.breeding_tab.refresh()
-    def refresh_all(self, *, mark_dirty=True):
+    def refresh_all(self):
         if self._is_refreshing:
             return
-        if mark_dirty:
+        if not getattr(self, '_suppress_dirty_refresh', False):
             constants.dirty = True
             self._set_dirty(True)
         self._is_refreshing = True
@@ -2725,24 +2777,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event: QCloseEvent):
         if (constants.dirty and constants.current_save_path
                 and self.user_settings.get('warn_unsaved_exit', True)):
-            self._set_dirty(False)
-            msg = QMessageBox(self)
-            msg.setWindowTitle(t('error.unsaved_title', default='Unsaved Changes'))
-            msg.setText(t('error.unsaved_msg', default='You have unsaved changes. Save before exiting?'))
-            save_btn = msg.addButton(t('button.save', default='Save'), QMessageBox.AcceptRole)
-            msg.addButton(t('button.dont_save', default="Don't Save"), QMessageBox.DestructiveRole)
-            cancel_btn = msg.addButton(t('button.cancel', default='Cancel'), QMessageBox.RejectRole)
-            msg.setIcon(QMessageBox.Question)
-            msg.setDefaultButton(cancel_btn)
-            msg.exec()
-            if msg.clickedButton() == save_btn:
-                from PyQt6.QtCore import QEventLoop
-                loop = QEventLoop()
-                save_manager.save_finished.connect(loop.quit)
-                save_manager.save_changes(parent=self)
-                loop.exec()
-                save_manager.save_finished.disconnect(loop.quit)
-            elif msg.clickedButton() == cancel_btn:
+            if not self._confirm_close_with_pending_changes():
                 event.ignore()
                 return
         if self.status_stream and self.status_stream.detach_window:
@@ -2758,6 +2793,58 @@ class MainWindow(QMainWindow):
             event.accept()
         else:
             event.accept()
+
+    def _confirm_close_with_pending_changes(self) -> bool:
+        self._sync_dirty_from_runtime()
+        summary = self.workspace_context.snapshot.pending_changes
+        detail = t(
+            'ui.pending.close_summary',
+            default='{count} pending changes remain in memory. Save before exiting?',
+            count=summary.count,
+        )
+        if summary.latest_label:
+            detail = f'{detail}\n{summary.latest_label}'
+        msg = QMessageBox(self)
+        msg.setWindowTitle(t('error.unsaved_title', default='Unsaved Changes'))
+        msg.setText(detail)
+        save_btn = msg.addButton(t('button.save', default='Save'), QMessageBox.AcceptRole)
+        discard_btn = msg.addButton(
+            t('button.dont_save', default="Don't Save"), QMessageBox.DestructiveRole)
+        cancel_btn = msg.addButton(t('button.cancel', default='Cancel'), QMessageBox.RejectRole)
+        msg.setIcon(QMessageBox.Question)
+        msg.setDefaultButton(cancel_btn)
+        msg.exec()
+        if msg.clickedButton() == save_btn:
+            return self._save_before_close()
+        return msg.clickedButton() == discard_btn
+
+    def _save_before_close(self) -> bool:
+        from PyQt6.QtCore import QEventLoop
+        loop = QEventLoop()
+        completed = {'done': False, 'success': False}
+
+        def on_success(_duration):
+            completed.update(done=True, success=True)
+            loop.quit()
+
+        def on_failure(_detail):
+            completed['done'] = True
+            loop.quit()
+
+        save_manager.save_finished.connect(on_success)
+        save_manager.save_failed.connect(on_failure)
+        try:
+            started = save_manager.save_changes(parent=self)
+            if started and not completed['done']:
+                loop.exec()
+        except Exception as error:
+            self._show_error(t('ui.activity.save_failed',
+                               default='Save failed'), str(error))
+            return False
+        finally:
+            save_manager.save_finished.disconnect(on_success)
+            save_manager.save_failed.disconnect(on_failure)
+        return bool(completed['success'])
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, '_drop_overlay'):

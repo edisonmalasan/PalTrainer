@@ -114,6 +114,43 @@ def test_load_backup_preference_controls_the_existing_safety_snapshot(
         constants.automatic_backup_on_load = previous
 
 
+def test_save_start_result_and_failure_signal_keep_close_guard_decidable(
+    monkeypatch, tmp_path,
+):
+    manager = save_manager_module.SaveManager()
+    old_path = constants.current_save_path
+    old_document = constants.loaded_level_json
+    old_xgp = constants.xgp_loaded
+    failures = []
+    manager.save_failed.connect(failures.append)
+    monkeypatch.setattr(save_manager_module, 'is_loading_active', lambda: False)
+    monkeypatch.setattr(manager, 'is_save_stale', lambda: False)
+    monkeypatch.setattr(save_manager_module.save_session, 'save',
+                        lambda: (_ for _ in ()).throw(OSError('disk failed')))
+
+    def run_task(_callback, task, **_kwargs):
+        try:
+            task()
+        except OSError:
+            pass
+
+    monkeypatch.setattr(save_manager_module, 'run_with_loading', run_task)
+    try:
+        constants.current_save_path = None
+        constants.loaded_level_json = None
+        assert manager.save_changes() is False
+
+        constants.current_save_path = str(tmp_path)
+        constants.loaded_level_json = {'loaded': True}
+        constants.xgp_loaded = False
+        assert manager.save_changes() is True
+        assert failures == ['disk failed']
+    finally:
+        constants.current_save_path = old_path
+        constants.loaded_level_json = old_document
+        constants.xgp_loaded = old_xgp
+
+
 def test_player_manager_info_preserves_legacy_display_contract():
     old_document = constants.loaded_level_json
     old_player_levels = constants.player_levels

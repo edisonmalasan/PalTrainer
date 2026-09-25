@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -15,6 +16,69 @@ qss_mod = import_from('palworld_aio.ui.chrome.qss_builder')
 i18n_mod = import_from('i18n')
 
 _app = None
+
+
+def test_failed_inventory_memory_save_does_not_record_pending_change():
+    recorded = []
+    errors = []
+    emitted = []
+    tab = SimpleNamespace(
+        inventory=SimpleNamespace(save=lambda: False),
+        current_player_uid='player-1',
+        parent_window=SimpleNamespace(
+            record_pending_change=lambda *args, **kwargs: recorded.append(
+                (args, kwargs))),
+        _save_stats_to_raw_data=lambda: None,
+        _show_error=errors.append,
+        saved=SimpleNamespace(emit=lambda: emitted.append(True)),
+    )
+
+    inventory_mod.PlayerInventoryTab._save_changes(tab)
+
+    assert errors
+    assert not recorded
+    assert not emitted
+
+
+def test_successful_inventory_memory_save_records_pending_change(monkeypatch):
+    recorded = []
+    emitted = []
+    monkeypatch.setattr(inventory_mod.QMessageBox, 'information',
+                        lambda *args, **kwargs: None)
+    tab = SimpleNamespace(
+        inventory=SimpleNamespace(save=lambda: True),
+        current_player_uid='player-1',
+        parent_window=SimpleNamespace(
+            record_pending_change=lambda *args, **kwargs: recorded.append(
+                (args, kwargs))),
+        _save_stats_to_raw_data=lambda: None,
+        saved=SimpleNamespace(emit=lambda: emitted.append(True)),
+    )
+
+    inventory_mod.PlayerInventoryTab._save_changes(tab)
+
+    assert recorded == [
+        (('Player inventory updated',), {'context': 'player-1'}),
+    ]
+    assert emitted == [True]
+
+
+def test_player_stat_edit_records_pending_change():
+    recorded = []
+    tab = SimpleNamespace(
+        current_player_uid='player-1',
+        _save_stats_to_raw_data=lambda: None,
+        _update_player_dropdown_level=lambda: None,
+        parent_window=SimpleNamespace(
+            record_pending_change=lambda *args, **kwargs: recorded.append(
+                (args, kwargs))),
+    )
+
+    inventory_mod.PlayerInventoryTab._on_stats_changed(tab)
+
+    assert recorded == [
+        (('Player stats updated',), {'context': 'player-1'}),
+    ]
 
 
 def _app_instance():

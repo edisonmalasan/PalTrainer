@@ -507,6 +507,18 @@ class PlayerItemActionDialog(BaseDialog):
         except ValueError:
             qty = 1
         container_type = ItemData.get_target_container(self.selected_item_id)
+        item_name = self.selected_item_name or self.selected_item_id
+        reply = QMessageBox.question(
+            self,
+            t('player_item.confirm_add', default='Confirm Add'),
+            t('player_item.confirm_add_msg',
+              default='Add {quantity} × {item_name} to each of {count} selected players?',
+              quantity=qty, item_name=item_name,
+              count=len(selected_players)),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
         self.workflow_review.set_progress(
             0, len(selected_players),
             t('ui.bulk.applying', default='Applying changes…'))
@@ -809,7 +821,7 @@ class PlayerItemActionDialog(BaseDialog):
             QMessageBox.warning(self, t('player_item.no_players_selected') if t else 'No Players Selected', t('player_item.select_at_least_one') if t else 'Please select at least one player.')
             return
         if is_effigies:
-            reply = QMessageBox.question(self, t('inventory.max_all_abilities_confirm.title', default='Max All Abilities'), t('inventory.max_all_abilities_confirm.msg', default='Max all relic abilities for this player?'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            reply = QMessageBox.question(self, t('inventory.max_all_abilities_confirm.title', default='Max All Abilities'), t('inventory.max_all_abilities_confirm.bulk_msg', count=len(uids), default='Max all relic abilities for {count} selected players?'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
                 self.add_all_effigies_requested.emit(uids)
         else:

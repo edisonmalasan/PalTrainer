@@ -1110,7 +1110,7 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         self._update_party_slots()
         self._update_palbox_page()
         self._update_box_label()
-        constants.dirty = True
+        self._update_dashboard_stats()
 
     def _container_slot_entries(self, container_id):
         if not container_id or not constants.loaded_level_json:
@@ -2510,6 +2510,11 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
             return
         for w in app.topLevelWidgets():
             if hasattr(w, 'tools_tab'):
+                recorder = getattr(w, 'record_pending_change', None)
+                if callable(recorder):
+                    recorder(t(
+                        'ui.pending.pal_collection',
+                        default='Pal collection updated'))
                 w.tools_tab.refresh()
                 break
     def refresh_labels(self):

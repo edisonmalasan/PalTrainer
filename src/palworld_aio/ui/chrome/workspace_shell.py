@@ -278,10 +278,16 @@ class WorkspaceShell(QFrame):
 
     def _apply_context(self, snapshot: WorkspaceContextSnapshot) -> None:
         if snapshot.save is None:
+            load_failed = snapshot.save_state.value == 'error'
             self.header.save_context.set_context(
                 snapshot.save_state.value,
-                tr('ui.save.no_save_title', 'No save loaded'),
-                tr('ui.save.no_save_detail', 'Open or drop a save to begin'),
+                (tr('ui.save.state.load_failed', 'Save load failed')
+                 if load_failed else tr('ui.save.no_save_title',
+                                        'No save loaded')),
+                (tr('ui.save.state.load_failed_detail',
+                    'Choose a save to try again')
+                 if load_failed else tr('ui.save.no_save_detail',
+                                        'Open or drop a save to begin')),
             )
         else:
             state_labels = {

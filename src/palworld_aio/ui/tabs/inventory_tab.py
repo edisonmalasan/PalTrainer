@@ -2912,6 +2912,12 @@ class PlayerInventoryTab(QWidget):
         if not self.current_player_uid:
             return
         self._save_stats_to_raw_data()
+        recorder = getattr(self.parent_window, 'record_pending_change', None)
+        if callable(recorder):
+            recorder(
+                t('ui.pending.player_stats', default='Player stats updated'),
+                context=str(self.current_player_uid),
+            )
         self._update_player_dropdown_level()
         pw = self.parent_window
         if hasattr(pw, '_refresh_players'):
@@ -4228,7 +4234,18 @@ class PlayerInventoryTab(QWidget):
         if not self.inventory:
             return
         self._save_stats_to_raw_data()
-        self.inventory.save()
+        if not self.inventory.save():
+            self._show_error(t(
+                'inventory.save_error',
+                default='Inventory changes could not be saved to memory.'))
+            return
+        recorder = getattr(self.parent_window, 'record_pending_change', None)
+        if callable(recorder):
+            recorder(
+                t('ui.pending.player_inventory',
+                  default='Player inventory updated'),
+                context=str(self.current_player_uid or ''),
+            )
         self.saved.emit()
         QMessageBox.information(self, t('success.title', default='Success'), t('inventory.save_success', default='Inventory saved to memory. Use "Save Changes" in the File menu to write to disk.'))
     def load_player(self, uid: str, name: str=None):

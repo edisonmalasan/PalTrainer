@@ -42,6 +42,237 @@ assert not hasattr(QDialog, 'exec_')
     assert result.returncode == 0, result.stderr
 
 
+def test_pending_journal_survives_save_failure_and_clears_on_success():
+    result = _run_isolated(r"""
+from types import SimpleNamespace
+from palworld_aio.shell_state import ShellState, ShellStateModel
+from palworld_aio.ui.main_window import MainWindow
+from palworld_aio.ui.pending_changes import PendingChangeJournal
+from palworld_aio.ui.workspace_context import SaveIdentity, WorkspaceContext
+
+context = WorkspaceContext()
+context.finish_load(SaveIdentity('world', 'Island', 'C:/saves/Level.sav'))
+journal = PendingChangeJournal()
+journal.changed.connect(context.set_pending_changes)
+activities = []
+window = SimpleNamespace(
+    workspace_context=context,
+    pending_journal=journal,
+    shell_state=ShellStateModel(),
+    _record_activity=lambda *args, **kwargs: activities.append((args, kwargs)),
+)
+MainWindow._set_dirty(window, True)
+MainWindow._set_dirty(window, True)
+assert context.snapshot.save_state is ShellState.DIRTY
+assert context.snapshot.pending_changes.count == 2
+assert len(journal.changes) == 2
+context.begin_save()
+MainWindow._on_save_failed(window, 'disk error')
+assert context.snapshot.save_state is ShellState.ERROR
+assert context.snapshot.pending_changes.count == 2
+assert len(journal.changes) == 2
+context.finish_save(True)
+MainWindow._set_dirty(window, False)
+assert context.snapshot.save_state is ShellState.LOADED
+assert not journal.changes
+assert context.snapshot.pending_changes.count == 0
+""")
+    assert result.returncode == 0, result.stderr
+
+
+def test_pending_review_discloses_context_count_and_risk():
+    result = _run_isolated(r"""
+import os
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+from types import SimpleNamespace
+from PyQt6.QtWidgets import QApplication
+import palworld_aio.ui.main_window as main_window
+from palworld_aio.ui.chrome.workspace_header import PendingChangesButton
+from palworld_aio.ui.pending_changes import PendingChangeJournal
+
+app = QApplication.instance() or QApplication([])
+button = PendingChangesButton()
+journal = PendingChangeJournal()
+journal.record('Removed Pals', context='Player A', affected_count=3,
+               high_risk=True)
+
+class Action:
+    def __init__(self, text):
+        self.text = text
+        self.tooltip = ''
+        self.enabled = True
+        self.triggered = SimpleNamespace(connect=lambda callback: setattr(
+            self, 'callback', callback))
+    def setToolTip(self, value):
+        self.tooltip = value
+    def setEnabled(self, value):
+        self.enabled = value
+
+class Menu:
+    last = None
+    def __init__(self, parent):
+        self.actions = []
+        Menu.last = self
+    def setObjectName(self, value):
+        self.object_name = value
+    def setAccessibleName(self, value):
+        self.accessible_name = value
+    def addSection(self, value):
+        self.section = value
+    def addAction(self, value):
+        action = Action(value)
+        self.actions.append(action)
+        return action
+    def exec(self, position):
+        pass
+
+main_window.QMenu = Menu
+window = SimpleNamespace(
+    workspace_shell=SimpleNamespace(
+        header=SimpleNamespace(pending_changes=button)),
+    pending_journal=journal,
+)
+main_window.MainWindow._show_pending_changes(window)
+assert Menu.last.object_name == 'appContextMenu'
+assert Menu.last.actions[0].text == 'High risk · Removed Pals (3)'
+assert Menu.last.actions[0].tooltip == 'Player A'
+assert not Menu.last.actions[0].enabled
+
+journal.clear()
+calls = []
+journal.record('Editable', undo=lambda: calls.append('undo'),
+               redo=lambda: calls.append('redo'))
+window._undo_pending_change = lambda: main_window.MainWindow._undo_pending_change(window)
+window._redo_pending_change = lambda: main_window.MainWindow._redo_pending_change(window)
+main_window.MainWindow._show_pending_changes(window)
+assert [action.text for action in Menu.last.actions] == [
+    'Editable', 'Undo last change']
+Menu.last.actions[-1].callback()
+assert calls == ['undo']
+main_window.MainWindow._show_pending_changes(window)
+assert [action.text for action in Menu.last.actions] == [
+    'No pending changes', 'Redo last change']
+Menu.last.actions[-1].callback()
+assert calls == ['undo', 'redo']
+""")
+    assert result.returncode == 0, result.stderr
+
+
+def test_legacy_dirty_flag_is_reflected_in_pending_journal():
+    result = _run_isolated(r"""
+from types import SimpleNamespace
+from palworld_aio import constants
+from palworld_aio.ui.main_window import MainWindow
+from palworld_aio.ui.pending_changes import PendingChangeJournal
+from palworld_aio.ui.workspace_context import SaveIdentity, WorkspaceContext
+
+context = WorkspaceContext()
+context.finish_load(SaveIdentity('world', 'Island', 'C:/saves/Level.sav'))
+journal = PendingChangeJournal()
+journal.changed.connect(context.set_pending_changes)
+window = SimpleNamespace(
+    workspace_context=context, pending_journal=journal,
+    _record_activity=lambda *args, **kwargs: None,
+)
+window._set_dirty = lambda dirty: MainWindow._set_dirty(window, dirty)
+constants.dirty = True
+MainWindow._sync_dirty_from_runtime(window)
+MainWindow._sync_dirty_from_runtime(window)
+assert journal.summary.count == 1
+assert context.snapshot.pending_changes.count == 1
+constants.dirty = False
+""")
+    assert result.returncode == 0, result.stderr
+
+
+def test_close_guard_preserves_pending_work_until_save_succeeds():
+    result = _run_isolated(r"""
+import os
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+from types import SimpleNamespace
+from PyQt6.QtCore import QCoreApplication, QObject, pyqtSignal
+import palworld_aio.ui.main_window as module
+from palworld_aio.ui.main_window import MainWindow
+from palworld_aio.ui.pending_changes import PendingChangeJournal
+from palworld_aio.ui.workspace_context import SaveIdentity, WorkspaceContext
+
+app = QCoreApplication.instance() or QCoreApplication([])
+context = WorkspaceContext()
+context.finish_load(SaveIdentity('world', 'Island', 'C:/saves/Level.sav'))
+journal = PendingChangeJournal()
+journal.changed.connect(context.set_pending_changes)
+journal.record('Edited player level', context='Player A')
+
+class Manager(QObject):
+    save_finished = pyqtSignal(float)
+    save_failed = pyqtSignal(str)
+    outcome = 'cancel'
+    def save_changes(self, parent=None):
+        if self.outcome == 'cancel':
+            return False
+        if self.outcome == 'exception':
+            raise RuntimeError('preflight error')
+        if self.outcome == 'failure':
+            self.save_failed.emit('disk error')
+        else:
+            self.save_finished.emit(0.1)
+        return True
+
+manager = Manager()
+module.save_manager = manager
+errors = []
+window = SimpleNamespace(
+    workspace_context=context, pending_journal=journal,
+    _sync_dirty_from_runtime=lambda: None,
+    _save_before_close=lambda: MainWindow._save_before_close(window),
+    _show_error=lambda title, detail: errors.append((title, detail)),
+)
+
+class Message:
+    choice = 'cancel'
+    def __init__(self, parent):
+        self.buttons = {}
+    def setWindowTitle(self, value):
+        pass
+    def setText(self, value):
+        self.detail = value
+        assert '1 pending changes' in value
+        assert 'Edited player level' in value
+    def addButton(self, label, role):
+        button = object()
+        self.buttons[{0: 'save', 1: 'discard', 2: 'cancel'}[role]] = button
+        return button
+    def setIcon(self, value):
+        pass
+    def setDefaultButton(self, value):
+        pass
+    def exec(self):
+        pass
+    def clickedButton(self):
+        return self.buttons[Message.choice]
+
+Message.AcceptRole = 0
+Message.DestructiveRole = 1
+Message.RejectRole = 2
+Message.Question = 3
+module.QMessageBox = Message
+for choice, outcome, expected in [
+    ('cancel', 'cancel', False),
+    ('discard', 'cancel', True),
+    ('save', 'cancel', False),
+    ('save', 'failure', False),
+    ('save', 'exception', False),
+    ('save', 'success', True),
+]:
+    Message.choice = choice
+    manager.outcome = outcome
+    assert MainWindow._confirm_close_with_pending_changes(window) is expected
+    assert len(journal.changes) == 1
+assert errors == [('Save failed', 'preflight error')]
+""")
+    assert result.returncode == 0, result.stderr
+
+
 def test_leaf_ui_import_does_not_create_editor_import_cycle():
     result = _run_isolated("""
 from palworld_aio.editor.pal_editor.widgets import SkillSlotFrame

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,9 +12,54 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from tests.dynamic_importer import import_from
 
 tab_mod = import_from('palworld_aio.ui.tabs.pal_editor_tab')
+handlers_mod = import_from('palworld_aio.editor.pal_editor.pal_info_handlers')
+pal_widget_mod = import_from('palworld_aio.editor.pal_editor.pal_editor_widget')
 i18n_mod = import_from('i18n')
 
 _app = None
+
+
+def test_pal_detail_edit_records_pending_change_and_preserves_refresh():
+    recorded = []
+    refreshed = []
+    host = SimpleNamespace(
+        tools_tab=SimpleNamespace(refresh=lambda: refreshed.append(True)),
+        record_pending_change=lambda *args, **kwargs: recorded.append(
+            (args, kwargs)),
+    )
+    editor = SimpleNamespace(
+        _apply_fanout=lambda: 3,
+        _fanout_owner=lambda: SimpleNamespace(),
+        _hovered_data=object(),
+        last_clicked_data=None,
+        parent=lambda: host,
+        pal_data_changed=SimpleNamespace(emit=lambda: None),
+    )
+
+    handlers_mod.PalInfoHandlerMixin._refresh(editor)
+
+    assert recorded == [
+        (('Pal details updated',), {'affected_count': 3}),
+    ]
+    assert refreshed == [True]
+
+
+def test_pal_collection_mutation_records_pending_change(monkeypatch):
+    recorded = []
+    refreshed = []
+    host = SimpleNamespace(
+        tools_tab=SimpleNamespace(refresh=lambda: refreshed.append(True)),
+        record_pending_change=lambda *args, **kwargs: recorded.append(
+            (args, kwargs)),
+    )
+    app = SimpleNamespace(topLevelWidgets=lambda: [host])
+    monkeypatch.setattr(pal_widget_mod, 'QApplication',
+                        SimpleNamespace(instance=lambda: app))
+
+    pal_widget_mod.PalEditorWidget._update_dashboard_stats(SimpleNamespace())
+
+    assert recorded == [(('Pal collection updated',), {})]
+    assert refreshed == [True]
 
 
 def _app_instance():

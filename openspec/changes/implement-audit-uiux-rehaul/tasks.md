@@ -89,7 +89,7 @@
 
 ## 9. Save Safety, Accessibility, Responsiveness, and Performance
 
-- [ ] 9.1 Implement the pending-change journal and explicit Saved/Unsaved/Saving/Failed/Read Only/Backup Recommended states, wiring existing in-memory mutations and save completion without claiming unsupported rollback; verify state transitions and change-summary details.
+- [x] 9.1 Implement the pending-change journal and explicit Saved/Unsaved/Saving/Failed/Read Only/Backup Recommended states, wiring existing in-memory mutations and save completion without claiming unsupported rollback; verify state transitions and change-summary details.
 - [ ] 9.2 Add change review, supported undo/redo callbacks, save/revert/discard guards, and affected-count confirmations for risky and bulk actions; verify unsupported operations never expose false Undo.
 - [ ] 9.3 Protect open-file, open-folder, recent-save, global-drop, reload-from-disk, and external-change flows from replacing pending work; verify save-and-open, discard, and cancel branches with temporary fixture paths.
 - [ ] 9.4 Add operation-aware automatic/offer backup policy and failure reporting that states whether the original save changed and where recovery exists; verify safe write, failed write, and restore scenarios without committing real saves.
