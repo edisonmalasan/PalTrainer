@@ -1147,7 +1147,7 @@ def count_private_chest_unlocks() -> int:
                 and raw.get('is_private_lock', 0) != 0):
             count += 1
     return count
-def remove_invalid_items_from_level(parent=None):
+def remove_invalid_items_from_level(parent=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return 0
     try:
@@ -1186,7 +1186,8 @@ def remove_invalid_items_from_level(parent=None):
                         elif 'id' in raw_val and isinstance(raw_val['id'], dict):
                             sid = raw_val['id'].get('static_id')
                     if isinstance(sid, str) and sid.lower() not in valid_items:
-                        data.pop(i)
+                        if not preview_only:
+                            data.pop(i)
                         removed_count += 1
                     else:
                         clean_recursive(item_obj)
@@ -1195,9 +1196,10 @@ def remove_invalid_items_from_level(parent=None):
                 i -= 1
     clean_recursive(wsd)
     return removed_count
-def remove_invalid_items_from_save(parent=None):
+def remove_invalid_items_from_save(parent=None, *, preview_only=False,
+                                   result_details=False):
     if not constants.current_save_path:
-        return 0
+        return {'fixed_files': 0, 'level_removed': 0} if result_details or preview_only else 0
     base_dir = constants.get_base_path()
     valid_items = set()
     try:
@@ -1211,7 +1213,7 @@ def remove_invalid_items_from_save(parent=None):
         pass
     players_dir = os.path.join(constants.current_save_path, 'Players')
     if not os.path.exists(players_dir):
-        return 0
+        return {'fixed_files': 0, 'level_removed': 0} if result_details or preview_only else 0
     total_files = 0
     fixed_files = 0
     total_removed = 0
@@ -1230,7 +1232,8 @@ def remove_invalid_items_from_save(parent=None):
                         changed = True
                         total_removed += 1
                 if changed:
-                    data['CraftItemCount']['value'] = new_list
+                    if not preview_only:
+                        data['CraftItemCount']['value'] = new_list
             for v in data.values():
                 if clean_craft_records(v, filename):
                     changed = True
@@ -1247,7 +1250,8 @@ def remove_invalid_items_from_save(parent=None):
             try:
                 gvas = sav_to_gvasfile(file_path)
                 if clean_craft_records(gvas.properties, filename):
-                    gvasfile_to_sav(gvas, file_path)
+                    if not preview_only:
+                        gvasfile_to_sav(gvas, file_path)
                     return 1
             except Exception as e:
                 pass
@@ -1255,9 +1259,12 @@ def remove_invalid_items_from_save(parent=None):
         with ThreadPoolExecutor(max_workers=min(32, os.cpu_count() or 1) + 4) as executor:
             results = list(executor.map(process_player_file, player_files))
             fixed_files = sum(results)
-    remove_invalid_items_from_level(parent)
+    level_removed = remove_invalid_items_from_level(parent, preview_only=preview_only)
+    if result_details or preview_only:
+        return {'fixed_files': fixed_files, 'level_removed': level_removed}
     return fixed_files
-def remove_invalid_pals_from_save(parent=None):
+def remove_invalid_pals_from_save(parent=None, *, preview_only=False,
+                                  result_details=False):
     base_dir = constants.get_base_path()
     def load_assets(fname, key):
         try:
@@ -1270,11 +1277,11 @@ def remove_invalid_pals_from_save(parent=None):
     valid_npcs = load_assets('characters.json', 'npcs')
     valid_all = valid_pals | valid_npcs
     if not constants.current_save_path or not constants.loaded_level_json:
-        return 0
+        return {'level_removed': 0, 'dps_removed': 0} if result_details or preview_only else 0
     try:
         wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
     except:
-        return 0
+        return {'level_removed': 0, 'dps_removed': 0} if result_details or preview_only else 0
     cmap = wsd.get('CharacterSaveParameterMap', {}).get('value', [])
     removed_ids = set()
     removed = 0
@@ -1292,7 +1299,8 @@ def remove_invalid_pals_from_save(parent=None):
             removed += 1
             continue
         filtered.append(entry)
-    wsd['CharacterSaveParameterMap']['value'] = filtered
+    if not preview_only:
+        wsd['CharacterSaveParameterMap']['value'] = filtered
     containers = wsd.get('CharacterContainerSaveData', {}).get('value', [])
     for cont in containers:
         try:
@@ -1305,9 +1313,13 @@ def remove_invalid_pals_from_save(parent=None):
             if inst and str(inst) in removed_ids:
                 continue
             newslots.append(s)
-        cont['value']['Slots']['value']['values'] = newslots
-    removed += _remove_invalid_pals_from_dps(valid_all, constants.current_save_path)
-    return removed
+        if not preview_only:
+            cont['value']['Slots']['value']['values'] = newslots
+    dps_removed = _remove_invalid_pals_from_dps(
+        valid_all, constants.current_save_path, preview_only=preview_only)
+    if result_details or preview_only:
+        return {'level_removed': removed, 'dps_removed': dps_removed}
+    return removed + dps_removed
 def count_imported_pals_in_world() -> int:
     """Count imported Pal records held in the loaded Level data."""
     if not constants.current_save_path or not constants.loaded_level_json:
@@ -1437,7 +1449,7 @@ def _remove_imported_pals_from_dps():
             return 0
     with ThreadPoolExecutor(max_workers=min(os.cpu_count() or 4, 8)) as ex:
         return sum(ex.map(_clean, dps_files))
-def _remove_invalid_pals_from_dps(valid_all, current_save_path):
+def _remove_invalid_pals_from_dps(valid_all, current_save_path, *, preview_only=False):
     players_dir = os.path.join(current_save_path, 'Players')
     if not os.path.exists(players_dir):
         return 0
@@ -1476,14 +1488,15 @@ def _remove_invalid_pals_from_dps(valid_all, current_save_path):
                 else:
                     new_arr.append(entry)
             if changed:
-                gvas.properties['SaveParameterArray']['value']['values'] = new_arr
-                gvasfile_to_sav(gvas, fpath)
+                if not preview_only:
+                    gvas.properties['SaveParameterArray']['value']['values'] = new_arr
+                    gvasfile_to_sav(gvas, fpath)
             return removed
         except:
             return 0
     with ThreadPoolExecutor(max_workers=min(os.cpu_count() or 4, 8)) as ex:
         return sum(ex.map(_clean, dps_files))
-def fix_missions(parent=None):
+def fix_missions(parent=None, *, preview_only=False):
     if not constants.current_save_path:
         return {'total': 0, 'fixed': 0, 'skipped': 0}
     save_path = os.path.join(constants.current_save_path, 'Players')
@@ -1499,8 +1512,9 @@ def fix_missions(parent=None):
             sd = gvas.properties.get('SaveData', {}).get('value', {})
             ca = sd.get('CompletedQuestArray_FullRelease', {}).get('value', {}).get('values')
             if ca is not None and isinstance(ca, list):
-                ca.clear()
-                gvasfile_to_sav(gvas, file_path)
+                if not preview_only:
+                    ca.clear()
+                    gvasfile_to_sav(gvas, file_path)
                 return (1, 1, 0)
             else:
                 return (1, 0, 0)

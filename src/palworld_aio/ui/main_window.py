@@ -3594,6 +3594,7 @@ class MainWindow(QMainWindow):
         risk='',
         confirm_text='',
         affected_count=None,
+        pending_count=None,
     ):
         """Review and run a loaded-save repair with a durable recovery result."""
         if not constants.loaded_level_json:
@@ -3620,7 +3621,10 @@ class MainWindow(QMainWindow):
         )
 
         def on_completed(result):
-            if isinstance(result, bool):
+            if pending_count is not None:
+                changed_count = pending_count(result)
+                changed = changed_count > 0
+            elif isinstance(result, bool):
                 changed = result
                 changed_count = None
             elif isinstance(result, int):
@@ -3687,16 +3691,21 @@ class MainWindow(QMainWindow):
         dialog.exec()
         return dialog
     def _remove_invalid_items(self):
+        preview = remove_invalid_items_from_save(self, preview_only=True)
         return self._run_loaded_save_repair(
             title=t('deletion.menu.delete_invalid_items'),
-            affected=t(
-                'repair.affected.invalid_items',
-                default='Invalid item references across the loaded save'),
+            affected=t('ui.safety.invalid_items_scope',
+                       world=preview['level_removed'],
+                       files=preview['fixed_files'],
+                       default='{world} invalid Level items and {files} player files'),
             review=t(
                 'repair.review.invalid_items',
                 default='Remove only item records that fail the existing validity checks.'),
-            operation=lambda: remove_invalid_items_from_save(self),
-            result_message=lambda fixed: t('fixed_files', fixed=fixed),
+            risk=t('ui.safety.invalid_items_risk',
+                   default='Player files are written immediately; Level changes remain pending until Save Changes.'),
+            operation=lambda: remove_invalid_items_from_save(self, result_details=True),
+            result_message=lambda result: t('fixed_files', fixed=result['fixed_files']),
+            pending_count=lambda result: result['level_removed'],
         )
     def _remove_invalid_structures(self):
         return self._run_loaded_save_repair(
@@ -3743,19 +3752,22 @@ class MainWindow(QMainWindow):
                 'deletion.items_repaired', repaired=result['repaired']),
         )
     def _remove_invalid_pals(self):
+        preview = remove_invalid_pals_from_save(self, preview_only=True)
         return self._run_loaded_save_repair(
             title=t('deletion.menu.delete_invalid_pals'),
-            affected=t(
-                'repair.affected.invalid_pals',
-                default='Invalid Pal records across all owners and containers'),
+            affected=t('ui.safety.invalid_pals_scope',
+                       world=preview['level_removed'],
+                       dps=preview['dps_removed'],
+                       default='{world} invalid Level Pals and {dps} DPS Pals'),
             review=t(
                 'repair.review.invalid_pals',
                 default='Remove only Pal records rejected by the existing save validity checks.'),
-            risk=t(
-                'repair.risk.removal',
-                default='Records identified as invalid will be removed from the in-memory save.'),
-            operation=lambda: remove_invalid_pals_from_save(self),
-            result_message=lambda removed: t('palclean.summary', removed=removed),
+            risk=t('ui.safety.invalid_pals_risk',
+                   default='DPS files are written immediately; Level changes remain pending until Save Changes.'),
+            operation=lambda: remove_invalid_pals_from_save(self, result_details=True),
+            result_message=lambda result: t(
+                'palclean.summary', removed=result['level_removed'] + result['dps_removed']),
+            pending_count=lambda result: result['level_removed'],
             confirm_text=t('repair.workflow.remove', default='Remove invalid data'),
         )
     def _delete_imported_pals(self):
@@ -3904,16 +3916,21 @@ class MainWindow(QMainWindow):
             dlg.exec()
         run_with_loading(on_scan_done, scan_task)
     def _reset_missions(self):
+        preview = fix_missions(self, preview_only=True)
         return self._run_loaded_save_repair(
             title=t('missions.reset_title'),
+            affected_count=preview['fixed'],
             affected=t(
                 'repair.affected.missions',
                 default='Mission state for every player in the loaded save'),
             review=t(
                 'repair.review.missions',
                 default='Reset mission state using the existing mission repair rules.'),
+            risk=t('ui.safety.missions_risk',
+                   default='Affected player files are written immediately. This action has no pending Undo.'),
             operation=lambda: fix_missions(self),
             result_message=lambda result: t('missions.summary', **result),
+            pending_count=lambda _result: 0,
         )
     def _reset_anti_air(self):
         return self._run_loaded_save_repair(

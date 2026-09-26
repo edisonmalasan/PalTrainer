@@ -1334,6 +1334,21 @@ def test_repair_completion_journals_only_real_mutation(monkeypatch):
     assert ('journal', ('Repair',), {'affected_count': 3, 'high_risk': True}) in calls
     assert ('refresh',) in calls
 
+    calls.clear()
+    state['result'] = {'fixed_files': 1, 'level_removed': 0}
+    main_window.MainWindow._run_loaded_save_repair(
+        window, title='Repair', affected='Items', review='Repair items',
+        operation=lambda: state['result'], result_message=str,
+        pending_count=lambda result: result['level_removed'])
+    assert calls == [('activity',)]
+
+    state['result'] = {'fixed_files': 0, 'level_removed': 2}
+    main_window.MainWindow._run_loaded_save_repair(
+        window, title='Repair', affected='Items', review='Repair items',
+        operation=lambda: state['result'], result_message=str,
+        pending_count=lambda result: result['level_removed'])
+    assert ('journal', ('Repair',), {'affected_count': 2, 'high_risk': True}) in calls
+
 
 def test_reset_preview_counts_records_without_mutating_world(monkeypatch):
     from copy import deepcopy
@@ -1419,3 +1434,87 @@ def test_skin_preview_counts_both_world_fields_without_mutation(monkeypatch):
 
     assert func_manager.count_level_skin_fields() == 3
     assert world == before
+
+
+def test_invalid_item_preview_is_read_only_across_level_and_player_files(
+        monkeypatch, tmp_path):
+    from copy import deepcopy
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    players = tmp_path / 'Players'
+    players.mkdir()
+    (players / 'ABC.sav').write_bytes(b'placeholder')
+    world = {'properties': {'worldSaveData': {'value': {'Items': [
+        {'RawData': {'value': {'item': {'static_id': 'UnknownItem'}}}},
+    ]}}}}
+    player = SimpleNamespace(properties={
+        'CraftItemCount': {'value': [{'key': 'UnknownItem'}]},
+    })
+    before_world = deepcopy(world)
+    before_player = deepcopy(player.properties)
+    monkeypatch.setattr(func_manager.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(func_manager.constants, 'current_save_path', str(tmp_path))
+    monkeypatch.setattr(func_manager.constants, 'get_base_path', lambda: tmp_path)
+    monkeypatch.setattr(func_manager, 'resource_path', lambda *a: tmp_path)
+    monkeypatch.setattr(func_manager.json_tools, 'load', lambda _: {'items': []})
+    monkeypatch.setattr(func_manager, 'sav_to_gvasfile', lambda _: player)
+    monkeypatch.setattr(func_manager, 'gvasfile_to_sav',
+                        lambda *a: (_ for _ in ()).throw(AssertionError('wrote file')))
+
+    assert func_manager.remove_invalid_items_from_save(
+        preview_only=True) == {'fixed_files': 1, 'level_removed': 1}
+    assert world == before_world
+    assert player.properties == before_player
+
+
+def test_invalid_pal_preview_is_read_only_across_level_and_dps(
+        monkeypatch, tmp_path):
+    from copy import deepcopy
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    players = tmp_path / 'Players'
+    players.mkdir()
+    (players / 'ABC_dps.sav').write_bytes(b'placeholder')
+    entry = {'key': {'InstanceId': {'value': 'instance'}},
+             'value': {'RawData': {'value': {'object': {
+                 'SaveParameter': {'value': {'CharacterID': {'value': 'UnknownPal'}}}
+             }}}}}
+    world = {'properties': {'worldSaveData': {'value': {
+        'CharacterSaveParameterMap': {'value': [entry]},
+        'CharacterContainerSaveData': {'value': []},
+    }}}}
+    dps = SimpleNamespace(properties={'SaveParameterArray': {'value': {'values': [
+        {'SaveParameter': {'value': {'CharacterID': {'value': 'UnknownPal'}}}},
+    ]}}})
+    before_world = deepcopy(world)
+    before_dps = deepcopy(dps.properties)
+    monkeypatch.setattr(func_manager.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(func_manager.constants, 'current_save_path', str(tmp_path))
+    monkeypatch.setattr(func_manager.constants, 'get_base_path', lambda: tmp_path)
+    monkeypatch.setattr(func_manager, 'resource_path', lambda *a: tmp_path)
+    monkeypatch.setattr(func_manager.json_tools, 'load',
+                        lambda _: {'pals': [], 'npcs': []})
+    monkeypatch.setattr(func_manager, 'sav_to_gvasfile', lambda _: dps)
+    monkeypatch.setattr(func_manager, 'gvasfile_to_sav',
+                        lambda *a: (_ for _ in ()).throw(AssertionError('wrote DPS')))
+
+    assert func_manager.remove_invalid_pals_from_save(
+        preview_only=True) == {'level_removed': 1, 'dps_removed': 1}
+    assert world == before_world
+    assert dps.properties == before_dps
+
+
+def test_mission_reset_preview_counts_files_without_writing(monkeypatch, tmp_path):
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    players = tmp_path / 'Players'
+    players.mkdir()
+    (players / 'ABC.sav').write_bytes(b'placeholder')
+    quests = [1, 2]
+    gvas = SimpleNamespace(properties={'SaveData': {'value': {
+        'CompletedQuestArray_FullRelease': {'value': {'values': quests}},
+    }}})
+    monkeypatch.setattr(func_manager.constants, 'current_save_path', str(tmp_path))
+    monkeypatch.setattr(func_manager, 'sav_to_gvasfile', lambda _: gvas)
+    monkeypatch.setattr(func_manager, 'gvasfile_to_sav',
+                        lambda *a: (_ for _ in ()).throw(AssertionError('wrote file')))
+
+    assert func_manager.fix_missions(preview_only=True)['fixed'] == 1
+    assert quests == [1, 2]
