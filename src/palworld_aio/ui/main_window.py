@@ -27,7 +27,7 @@ from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from palworld_aio.utils import as_uuid
 from palworld_aio.managers.save_manager import save_manager
 from palworld_aio.managers.data_manager import get_guilds, get_guild_members, get_bases, delete_guild, delete_player, load_exclusions, save_exclusions, delete_base_camp
-from palworld_aio.managers.func_manager import delete_empty_guilds, delete_inactive_players, delete_inactive_bases, delete_duplicated_players, delete_imported_pals, delete_unreferenced_data, delete_non_base_map_objects, delete_invalid_structure_map_objects, delete_all_skins, unlock_all_private_chests, remove_invalid_items_from_save, remove_invalid_pals_from_save, remove_invalid_passives_from_save, fix_missions, reset_anti_air_turrets, reset_dungeons, reset_oilrig, reset_invader, reset_supply, reset_lock_gimmick, unlock_viewing_cage_for_player, fix_all_negative_timestamps, reset_selected_player_timestamp, detect_and_trim_overfilled_inventories, unlock_all_technologies_for_player, unlock_all_lab_research_for_guild, modify_container_slots, modify_all_player_slots, modify_all_guild_chest_slots, fix_unassigned_pals, restore_all_pals, fix_all_pals_combined, max_all_pals, fix_illegal_pals_in_save, fix_illegal_player_stats, repair_structures, repair_items, edit_game_days, scan_illegal_pals_by_owner, scan_illegal_players_by_stats, fix_invalid_pal_active_skills
+from palworld_aio.managers.func_manager import delete_empty_guilds, count_empty_guilds, delete_inactive_players, delete_inactive_bases, delete_duplicated_players, delete_imported_pals, count_imported_pals, count_imported_pals_in_world, delete_unreferenced_data, delete_non_base_map_objects, count_non_base_map_objects, delete_invalid_structure_map_objects, delete_all_skins, count_level_skin_fields, unlock_all_private_chests, count_private_chest_unlocks, remove_invalid_items_from_save, remove_invalid_pals_from_save, remove_invalid_passives_from_save, fix_missions, count_reset_records, reset_anti_air_turrets, reset_dungeons, reset_oilrig, reset_invader, reset_supply, reset_lock_gimmick, unlock_viewing_cage_for_player, fix_all_negative_timestamps, reset_selected_player_timestamp, detect_and_trim_overfilled_inventories, unlock_all_technologies_for_player, unlock_all_lab_research_for_guild, modify_container_slots, modify_all_player_slots, modify_all_guild_chest_slots, fix_unassigned_pals, restore_all_pals, fix_all_pals_combined, max_all_pals, count_pals_for_max, fix_illegal_pals_in_save, fix_illegal_player_stats, repair_structures, repair_items, edit_game_days, scan_illegal_pals_by_owner, scan_illegal_players_by_stats, fix_invalid_pal_active_skills
 from palworld_aio.managers.guild_manager import move_player_to_guild, rebuild_all_guilds, make_member_leader, rename_guild, set_guild_level
 from palworld_aio.managers.base_manager import export_base_json, import_base_json, clone_base_complete, update_base_area_range, get_last_import_audit
 from palworld_aio.managers.backup_manager import export_base_backup, load_base_file, compress_to_pst3
@@ -1078,7 +1078,8 @@ class MainWindow(QMainWindow):
         if workspace_context is not None:
             journal = self.__dict__.get('pending_journal')
             if journal is not None:
-                if dirty and workspace_context.snapshot.save is not None:
+                if (dirty and workspace_context.snapshot.save is not None
+                        and not journal.changes):
                     MainWindow.record_pending_change(self, t(
                         'ui.activity.change_detail',
                         default='The current save has in-memory changes.'),
@@ -1922,10 +1923,10 @@ class MainWindow(QMainWindow):
     def _refresh_breeding(self):
         if 'breeding_tab' in self.__dict__:
             self.breeding_tab.refresh()
-    def refresh_all(self):
+    def refresh_all(self, *, mark_dirty: bool = True):
         if self._is_refreshing:
             return
-        if not getattr(self, '_suppress_dirty_refresh', False):
+        if mark_dirty and not getattr(self, '_suppress_dirty_refresh', False):
             constants.dirty = True
             self._set_dirty(True)
         self._is_refreshing = True
@@ -2456,6 +2457,30 @@ class MainWindow(QMainWindow):
             self._show_info(t('player_item.modify_slots_title') if t else 'Modify Player Slots', t('player_item.modify_slots_done', count=modified, slots=new_count) if t else f'Resized {modified} player inventories to {new_count} slots')
         run_with_loading(on_finished, task)
     def _on_player_pal_action(self, item_id, action, player_uids):
+        from palworld_aio.editor.pal_editor.pal_editor_global_ops import (
+            count_world_pals_for_deletion, count_pals_with_skills,
+        )
+        world_affected = 0
+        if action.startswith('delete_pal:'):
+            world_affected = count_world_pals_for_deletion(action.split(':')[1])
+        elif action.startswith('remove_all:'):
+            parts = action.split(':')
+            world_affected = count_pals_with_skills(
+                parts[1] or None, parts[2] or None,
+                parts[3] if len(parts) > 3 and parts[3] else 'all',
+                include_external=False,
+            )
+        def remaining_world_count():
+            if action.startswith('delete_pal:'):
+                return count_world_pals_for_deletion(action.split(':')[1])
+            if action.startswith('remove_all:'):
+                parts = action.split(':')
+                return count_pals_with_skills(
+                    parts[1] or None, parts[2] or None,
+                    parts[3] if len(parts) > 3 and parts[3] else 'all',
+                    include_external=False,
+                )
+            return 0
         def task():
             from palworld_aio.editor.edit_pals import delete_pal_from_all, remove_skill_from_all_pals
             if action.startswith('delete_pal:'):
@@ -2474,6 +2499,13 @@ class MainWindow(QMainWindow):
             action_type, r = result
             if action_type is None:
                 return
+            changed_world = max(0, world_affected - remaining_world_count())
+            if changed_world:
+                self.record_pending_change(
+                    'Delete Pals' if action_type == 'delete_pal' else 'Remove Pal skills',
+                    context='DPS and Global Pal Storage may have been written immediately',
+                    affected_count=changed_world, high_risk=True,
+                )
             if action_type == 'delete_pal':
                 if r and r.get('pals_removed', 0) > 0:
                     self._show_info(t('player_pal.remove_complete') if t else 'Bulk Pal Remove Complete', t('player_pal.pals_removed_everywhere').format(count=r.get('pals_removed', 0), affected=r.get('affected_count', 0)) if t else f"Removed {r.get('pals_removed', 0)} pals from {r.get('affected_count', 0)} players/bases everywhere.")
@@ -2484,7 +2516,7 @@ class MainWindow(QMainWindow):
                     self._show_info(t('player_pal.skill_remove_complete') if t else 'Bulk Skill Remove Complete', t('player_pal.skill_removed_from_all').format(count=r.get('skills_removed', 0), pals=r.get('pals_affected', 0)) if t else f"Removed {r.get('skills_removed', 0)} skills from {r.get('pals_affected', 0)} pals (players + bases).")
                 else:
                     self._show_info(t('player_pal.no_action') if t else 'No Action Taken', t('player_pal.no_pals_had_skill') if t else 'No pals had the selected skills.')
-            if hasattr(self, 'refresh_all'):
+            if changed_world and hasattr(self, 'refresh_all'):
                 self.refresh_all()
         run_with_loading(on_finished, task)
     def _on_player_selected(self, data):
@@ -3324,6 +3356,16 @@ class MainWindow(QMainWindow):
             msg_box.addButton(t('button.ok') if t else 'OK', QMessageBox.AcceptRole)
             msg_box.exec()
             return
+        guild_count, base_count = count_empty_guilds()
+        if not guild_count:
+            self._show_info(t('Done'), t('deletion.empty_guilds_removed', count=0))
+            return
+        if not show_question(
+            self, t('deletion.menu.delete_empty_guilds', default='Delete Empty Guilds'),
+            f'Delete {guild_count} empty guilds and {base_count} associated bases? '
+            'This cannot be undone after saving.',
+        ):
+            return
         def task():
             return delete_empty_guilds(self)
         def on_finished(removed):
@@ -3331,7 +3373,11 @@ class MainWindow(QMainWindow):
                 constants.invalidate_container_lookup()
                 if 'base_inventory_tab' in self.__dict__:
                     self.base_inventory_tab.manager.invalidate_cache()
-            self.refresh_all()
+            if removed:
+                self.record_pending_change('Delete empty guilds',
+                                           affected_count=removed + base_count,
+                                           high_risk=True)
+                self.refresh_all()
             msg_box = self._create_message_box(QMessageBox.Information)
             msg_box.setWindowTitle(t('Done'))
             msg_box.setText(t('deletion.empty_guilds_removed', count=removed))
@@ -3344,6 +3390,16 @@ class MainWindow(QMainWindow):
             return
         params = InactiveFilterDialog.get_filter(self)
         if params:
+            affected = delete_inactive_bases(params, self, preview_only=True)['count']
+            if not affected:
+                self._show_info(t('Done'), t('inactive_bases_deleted', count=0))
+                return
+            if not show_question(
+                self, t('deletion.menu.delete_inactive_bases'),
+                f'Delete {affected} inactive bases and their associated data? '
+                'This cannot be undone after saving.',
+            ):
+                return
             def task():
                 return delete_inactive_bases(params, self)
             def on_finished(result):
@@ -3351,7 +3407,9 @@ class MainWindow(QMainWindow):
                     constants.invalidate_container_lookup()
                     if 'base_inventory_tab' in self.__dict__:
                         self.base_inventory_tab.manager.invalidate_cache()
-                self.refresh_all()
+                    self.record_pending_change('Delete inactive bases',
+                                               affected_count=result['count'], high_risk=True)
+                    self.refresh_all()
                 if result['details']:
                     from resource_resolver import get_data_base
                     log_dir = os.path.join(get_data_base(), 'Logs', 'DeleteInactive')
@@ -3365,6 +3423,27 @@ class MainWindow(QMainWindow):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
             return
+        # Duplicate records can also be removed from the character map. The
+        # confirmation names both populations before the legacy cleanup runs.
+        wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+        guild_players = [p for group in wsd.get('GroupSaveDataMap', {}).get('value', [])
+                         if group['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild'
+                         for p in group['value']['RawData']['value'].get('players', [])]
+        known = set()
+        duplicates = 0
+        for player in guild_players:
+            raw_uid = player.get('player_uid', '')
+            uid = str(raw_uid.get('value', '') if isinstance(raw_uid, dict) else raw_uid).replace('-', '')
+            if uid and uid in known:
+                duplicates += 1
+            known.add(uid)
+        if not show_question(
+            self, t('deletion.menu.delete_duplicate_players'),
+            f'Clean {duplicates} duplicate guild player entries and inspect '
+            f'{len(wsd.get("CharacterSaveParameterMap", {}).get("value", []))} '
+            'character records for duplicate bodies? This cannot be undone after saving.',
+        ):
+            return
         def task():
             return delete_duplicated_players(self)
         def on_finished(removed):
@@ -3372,7 +3451,10 @@ class MainWindow(QMainWindow):
                 constants.invalidate_container_lookup()
                 if 'base_inventory_tab' in self.__dict__:
                     self.base_inventory_tab.manager.invalidate_cache()
-            self.refresh_all()
+            if removed:
+                self.record_pending_change('Delete duplicate player records',
+                                           affected_count=removed, high_risk=True)
+                self.refresh_all()
             self._show_info(t('Done'), t('deletion.duplicates_removed', count=removed))
         run_with_loading(on_finished, task)
     def _delete_inactive_players(self):
@@ -3381,10 +3463,23 @@ class MainWindow(QMainWindow):
             return
         params = InactiveFilterDialog.get_filter(self)
         if params:
+            affected = delete_inactive_players(params, self, preview_only=True)['count']
+            if not affected:
+                self._show_info(t('Done'), t('deletion.inactive_players_removed', count=0))
+                return
+            if not show_question(
+                self, t('deletion.menu.delete_inactive_players'),
+                f'Delete {affected} inactive players, associated Pals, and player files? '
+                'This cannot be undone after saving.',
+            ):
+                return
             def task():
                 return delete_inactive_players(params, self)
             def on_finished(result):
-                self.refresh_all()
+                if result['count']:
+                    self.record_pending_change('Delete inactive players',
+                                               affected_count=result['count'], high_risk=True)
+                    self.refresh_all()
                 if result['details']:
                     from resource_resolver import get_data_base
                     log_dir = os.path.join(get_data_base(), 'Logs', 'DeleteInactive')
@@ -3415,30 +3510,77 @@ class MainWindow(QMainWindow):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
             return
+        affected = count_non_base_map_objects()
+        if not affected:
+            self._show_info(t('Done'), t('deletion.non_base_objs_removed', count=0))
+            return
+        if not show_question(
+            self, t('deletion.menu.delete_non_base_map_objs',
+                    default='Delete Non-Base Map Objects'),
+            f'Delete {affected} non-base map objects and associated data? '
+            'This cannot be undone after saving.',
+        ):
+            return
         def task():
             return delete_non_base_map_objects(self)
         def on_finished(removed):
-            self.refresh_all()
+            if removed:
+                self.record_pending_change('Delete non-base map objects',
+                                           affected_count=removed, high_risk=True)
+                self.refresh_all()
             self._show_info(t('Done'), t('deletion.non_base_objs_removed', count=removed))
         run_with_loading(on_finished, task)
     def _delete_all_skins(self):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
             return
+        level_fields = count_level_skin_fields()
+        players_dir = (os.path.join(constants.current_save_path, 'Players')
+                       if constants.current_save_path else '')
+        player_files = sum(name.endswith('.sav') and '_dps' not in name
+                           for name in os.listdir(players_dir)) if os.path.isdir(players_dir) else 0
+        if not level_fields and not player_files:
+            self._show_info(t('Done'), t('deletion.skins_removed', count=0))
+            return
+        if not show_question(
+            self, t('deletion.menu.delete_all_skins'),
+            f'Remove {level_fields} loaded-world skin fields and inspect up to '
+            f'{player_files} player files for skin data? Player files are written '
+            'immediately; world changes remain pending until Save Changes.',
+        ):
+            return
         def task():
             return delete_all_skins(self)
         def on_finished(removed):
-            self.refresh_all()
+            if removed and level_fields:
+                self.record_pending_change('Remove world skin fields',
+                                           context='Player files were written immediately',
+                                           affected_count=level_fields, high_risk=True)
+                self.refresh_all()
             self._show_info(t('Done'), t('deletion.skins_removed', count=removed))
         run_with_loading(on_finished, task)
     def _unlock_private_chests(self):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
             return
+        affected = count_private_chest_unlocks()
+        if not affected:
+            self._show_info(t('Done'), t('deletion.chests_unlocked', count=0))
+            return
+        if not show_question(
+            self, t('deletion.menu.unlock_private_chests',
+                    default='Unlock Private Chests'),
+            f'Unlock {affected} private chest lock fields? '
+            'This changes access restrictions in the loaded save.',
+        ):
+            return
         def task():
             return unlock_all_private_chests(self)
         def on_finished(unlocked):
-            self.refresh_all()
+            if unlocked:
+                self.record_pending_change('Unlock private chests',
+                                           affected_count=unlocked, high_risk=True)
+                self.refresh_all()
             self._show_info(t('Done'), t('deletion.chests_unlocked', count=unlocked))
         run_with_loading(on_finished, task)
     def _run_loaded_save_repair(
@@ -3451,11 +3593,19 @@ class MainWindow(QMainWindow):
         result_message,
         risk='',
         confirm_text='',
+        affected_count=None,
     ):
         """Review and run a loaded-save repair with a durable recovery result."""
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
             return None
+        risk = risk or t(
+            'ui.safety.repair_risk',
+            default='This changes loaded save data and cannot be undone from this tool.')
+        if affected_count is not None:
+            affected = t('ui.safety.repair_records', scope=affected,
+                         count=affected_count,
+                         default='{scope} ({count} records)')
         dialog = RepairWorkflowDialog(
             loaded_save_repair_spec(
                 title,
@@ -3470,7 +3620,26 @@ class MainWindow(QMainWindow):
         )
 
         def on_completed(result):
-            self.refresh_all()
+            if isinstance(result, bool):
+                changed = result
+                changed_count = None
+            elif isinstance(result, int):
+                changed = result > 0
+                changed_count = result if changed else None
+            elif isinstance(result, dict):
+                changed_count = next((result[key] for key in (
+                    'fixed', 'removed', 'repaired', 'modified', 'count')
+                    if isinstance(result.get(key), int)), None)
+                changed = changed_count > 0 if changed_count is not None else bool(result)
+            else:
+                changed = bool(result)
+                changed_count = None
+            if changed:
+                self.record_pending_change(
+                    title, affected_count=changed_count,
+                    high_risk=bool(risk),
+                )
+                self.refresh_all()
             from palworld_aio.ui.operation_journal import ActivityKind
             dialog_text = result_message(result)
             self._record_activity(
@@ -3593,7 +3762,17 @@ class MainWindow(QMainWindow):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
             return
-        reply = show_question(self, t('deletion.delete_imported_pals.title') if t else 'Delete Imported Pals', t('deletion.delete_imported_pals.confirm') if t else 'Delete ALL imported pals (DNA) from every player\'s party, palbox, DPS storage, and all base workers? This cannot be undone. Continue?')
+        affected = count_imported_pals()
+        pending_world_count = count_imported_pals_in_world()
+        if affected == 0:
+            self._show_info(t('Done'), t('deletion.imported_pals_removed', count=0))
+            return
+        reply = show_question(
+            self, t('deletion.delete_imported_pals.title', default='Delete Imported Pals'),
+            f'Delete {affected} imported Pals (DNA) from player, base, and DPS storage? '
+            'DPS files are written immediately; other changes remain pending until Save Changes. '
+            'This cannot be undone. Back up the save before continuing.',
+        )
         if not reply:
             return
         def task():
@@ -3603,7 +3782,12 @@ class MainWindow(QMainWindow):
                 constants.invalidate_container_lookup()
                 if 'base_inventory_tab' in self.__dict__:
                     self.base_inventory_tab.manager.invalidate_cache()
-            self.refresh_all()
+            if removed:
+                self.record_pending_change('Delete imported Pals from Level',
+                                           context='DPS files were written immediately',
+                                           affected_count=pending_world_count,
+                                           high_risk=True)
+                self.refresh_all()
             self._show_info(t('Done'), t('deletion.imported_pals_removed', count=removed))
         run_with_loading(on_finished, task)
     def _remove_invalid_passives(self):
@@ -3634,10 +3818,18 @@ class MainWindow(QMainWindow):
             self._show_warning(t('Error'), t('error.no_save_loaded'))
             return
         from palworld_aio.editor.pal_editor.legacy_frame import PalFrame
+        world_count, dps_count = count_pals_for_max()
+        if not world_count and not dps_count:
+            self._show_info(t('Done'), t('func_manager.max_all_pals.success', count=0))
+            return
         cheat_q = show_question(self, t('func_manager.max_all_pals.title') if t else 'Max All Pals', t('func_manager.max_all_pals.cheat_ask') if t else 'Use extreme 255 caps?')
         PalFrame._cheat_mode = cheat_q
         msg = t('func_manager.max_all_pals.confirm_cheat') if cheat_q else (t('func_manager.max_all_pals.confirm') if t else 'This will max all stats (level 80, IVs 100, souls 20, rank 5) for all pals. Continue?')
-        reply = show_question(self, t('func_manager.max_all_pals.title') if t else 'Max All Pals', msg)
+        reply = show_question(
+            self, t('func_manager.max_all_pals.title', default='Max All Pals'),
+            f'{world_count} Pals in Level and {dps_count} Pals in DPS files will be changed.\n'
+            + msg + '\nDPS files are written immediately. This cannot be undone.',
+        )
         if not reply:
             PalFrame._cheat_mode = False
             return
@@ -3646,8 +3838,15 @@ class MainWindow(QMainWindow):
         def on_finished(count):
             PalFrame._cheat_mode = False
             self._show_info(t('func_manager.max_all_pals.title') if t else 'Max All Pals', t('func_manager.max_all_pals.success', count=count) if t else f'Maxed {count} pals.')
-            QTimer.singleShot(0, self.refresh_all)
-        run_with_loading(on_finished, task)
+            if count and world_count:
+                self.record_pending_change('Max Pal stats in Level',
+                                           context='DPS files were written immediately',
+                                           affected_count=world_count, high_risk=True)
+                QTimer.singleShot(0, self.refresh_all)
+        def on_error(error):
+            PalFrame._cheat_mode = False
+            self._show_error(t('error.title', default='Error'), str(error))
+        run_with_loading(on_finished, task, on_error=on_error)
     def _fix_illegal_pals(self):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
@@ -3719,6 +3918,7 @@ class MainWindow(QMainWindow):
     def _reset_anti_air(self):
         return self._run_loaded_save_repair(
             title=t('deletion.menu.reset_anti_air'),
+            affected_count=count_reset_records('FixedWeaponDestroySaveData'),
             affected=t(
                 'repair.affected.anti_air',
                 default='All anti-air turret reset state in the loaded world'),
@@ -3731,6 +3931,7 @@ class MainWindow(QMainWindow):
     def _reset_dungeons(self):
         return self._run_loaded_save_repair(
             title=t('deletion.menu.reset_dungeons'),
+            affected_count=count_reset_records('DungeonPointMarkerSaveData', 'DungeonSaveData'),
             affected=t(
                 'repair.affected.dungeons',
                 default='All dungeon reset state in the loaded world'),
@@ -3743,6 +3944,7 @@ class MainWindow(QMainWindow):
     def _reset_oilrig(self):
         return self._run_loaded_save_repair(
             title=t('deletion.menu.reset_oilrig'),
+            affected_count=count_reset_records('OilrigSaveData'),
             affected=t(
                 'repair.affected.oilrig',
                 default='All oil-rig reset state in the loaded world'),
@@ -3755,6 +3957,7 @@ class MainWindow(QMainWindow):
     def _reset_invader(self):
         return self._run_loaded_save_repair(
             title=t('deletion.menu.reset_invader'),
+            affected_count=count_reset_records('InvaderSaveData'),
             affected=t(
                 'repair.affected.invaders',
                 default='All invader-event reset state in the loaded world'),
@@ -3767,6 +3970,7 @@ class MainWindow(QMainWindow):
     def _reset_supply(self):
         return self._run_loaded_save_repair(
             title=t('deletion.menu.reset_supply'),
+            affected_count=count_reset_records('SupplySaveData'),
             affected=t(
                 'repair.affected.supply',
                 default='All supply-drop reset state in the loaded world'),
@@ -3779,6 +3983,7 @@ class MainWindow(QMainWindow):
     def _reset_lock_gimmick(self):
         return self._run_loaded_save_repair(
             title=t('deletion.menu.reset_lock_gimmick'),
+            affected_count=count_reset_records('LockGimmickSaveData'),
             affected=t(
                 'repair.affected.lock_gimmick',
                 default='All mini-game tower reset state in the loaded world'),
@@ -3862,6 +4067,11 @@ class MainWindow(QMainWindow):
         dlg = GuildAssignDialog(
             self, selected_player_uids=selected_player_uids)
         dlg.exec()
+        moved = getattr(dlg, 'moved_count', 0)
+        if not moved:
+            return
+        self.record_pending_change('Move players to guild',
+                                   affected_count=moved, high_risk=True)
         constants.invalidate_container_lookup()
         if 'base_inventory_tab' in self.__dict__:
             self.base_inventory_tab.manager.invalidate_cache()
@@ -4033,14 +4243,43 @@ class MainWindow(QMainWindow):
         if uid in constants.exclusions.get('players', []):
             self._show_warning(t('warning.title') if t else 'Warning', t('deletion.warning.protected_player') if t else f'Player {uid} is in exclusion list and cannot be deleted.')
             return
-        delete_player(uid)
+        if not show_question(
+            self, t('deletion.ctx.delete_player', default='Delete Player'),
+            t('ui.safety.delete_player_confirm', count=1,
+              default='Delete 1 player and their associated Pals and save data? This cannot be undone.'),
+        ):
+            return
+        player_name = self._get_player_name(uid)
+        if not delete_player(uid):
+            return
+        self.record_pending_change('Delete player', context=player_name,
+                                   affected_count=1, high_risk=True)
         self.refresh_all()
         self._show_info(t('Done'), t('deletion.player_deleted'))
     def _delete_guild(self, gid):
         if gid in constants.exclusions.get('guilds', []):
             self._show_warning(t('warning.title') if t else 'Warning', t('deletion.warning.protected_guild') if t else f'Guild {gid} is in exclusion list and cannot be deleted.')
             return
-        delete_guild(gid)
+        wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+        guild = next((entry for entry in wsd.get('GroupSaveDataMap', {}).get('value', [])
+                      if str(entry.get('key', '')).replace('-', '').lower() == str(gid).replace('-', '').lower()), None)
+        if guild is None:
+            return
+        players = guild.get('value', {}).get('RawData', {}).get('value', {}).get('players', [])
+        bases = [base for base in wsd.get('BaseCampSaveData', {}).get('value', [])
+                 if str(base.get('value', {}).get('RawData', {}).get('value', {}).get('group_id_belong_to', '')).replace('-', '').lower()
+                 == str(gid).replace('-', '').lower()]
+        if not show_question(
+            self, t('deletion.ctx.delete_guild', default='Delete Guild'),
+            f'Delete 1 guild, {len(players)} players, and {len(bases)} bases with associated data? '
+            'This cannot be undone.',
+        ):
+            return
+        if not delete_guild(gid):
+            return
+        self.record_pending_change('Delete guild', context=str(gid),
+                                   affected_count=1 + len(players) + len(bases),
+                                   high_risk=True)
         self.refresh_all()
         self._show_info(t('Done'), t('deletion.guild_deleted'))
     def _delete_base(self, bid, gid):
@@ -4048,6 +4287,11 @@ class MainWindow(QMainWindow):
             self._show_warning(t('warning.title') if t else 'Warning', t('deletion.warning.protected_base') if t else f'Base {bid} is in exclusion list and cannot be deleted.')
             return
         from ..managers.data_manager import delete_base_camp
+        if not show_question(
+            self, t('deletion.ctx.delete_base', default='Delete Base'),
+            'Delete 1 base and its associated workers and structures? This cannot be undone.',
+        ):
+            return
         wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
         base_list = wsd.get('BaseCampSaveData', {}).get('value', [])
         deleted = False
@@ -4057,11 +4301,13 @@ class MainWindow(QMainWindow):
                 deleted = True
                 break
         if deleted:
+            self.record_pending_change('Delete base', context=str(bid),
+                                       affected_count=1, high_risk=True)
             constants.invalidate_container_lookup()
             if 'base_inventory_tab' in self.__dict__:
                 self.base_inventory_tab.manager.invalidate_cache()
-        self.refresh_all()
-        self._show_info(t('Done'), t('deletion.base_deleted'))
+            self.refresh_all()
+            self._show_info(t('Done'), t('deletion.base_deleted'))
     def _rename_player(self, uid, old_name):
         new_name = InputDialog.get_text(t('player.rename.title'), t('player.rename.prompt'), self)
         if new_name:
@@ -4571,10 +4817,20 @@ class MainWindow(QMainWindow):
             return
         new_slot_num, ok = QInputDialog.getInt(self, t('modify_container_slots_title') if t else 'Modify Container Slots', t('modify_container_slots_prompt') if t else 'Enter new slot number for all containers:', 50, 1, 1000, 1)
         if ok:
+            affected = modify_container_slots(new_slot_num, preview_only=True)
+            if not affected or not show_question(
+                self, t('modify_container_slots_title', default='Modify Container Slots'),
+                f'Resize {affected} eligible containers to {new_slot_num} slots? '
+                'Reducing capacity may discard slots. This cannot be undone from the editor.',
+            ):
+                return
             def task():
                 return modify_container_slots(new_slot_num, self)
             def on_finished(modified):
-                self.refresh_all()
+                if modified:
+                    self.record_pending_change('Resize containers',
+                                               affected_count=modified, high_risk=True)
+                    self.refresh_all()
                 self._show_info(t('Done'), t('modify_container_slots_result', modified=modified) if t else f'Modified {modified} containers')
             run_with_loading(on_finished, task)
 
@@ -4584,16 +4840,30 @@ class MainWindow(QMainWindow):
             return
         new_slot_num, ok = QInputDialog.getInt(self, t('modify_all_player_slots_title') if t else 'Modify All Player Slots', t('modify_all_player_slots_prompt') if t else 'Enter new inventory slot count (42-999) for all players:', 42, 42, 999, 1)
         if ok:
+            players_dir = os.path.join(constants.current_save_path or '', 'Players')
+            candidates = sum(
+                filename.endswith('.sav') and '_dps' not in filename
+                for filename in os.listdir(players_dir)
+            ) if constants.current_save_path and os.path.isdir(players_dir) else 0
+            if not candidates or not show_question(
+                self, t('modify_all_player_slots_title', default='Modify All Player Slots'),
+                f'Resize up to {candidates} player inventories to {new_slot_num} slots? '
+                'Unreadable player saves are skipped. This cannot be undone from the editor.',
+            ):
+                return
             def task():
                 return modify_all_player_slots(new_slot_num, self)
             def on_finished(res):
-                self.refresh_all()
                 if isinstance(res, dict):
                     modified = res.get('modified', 0)
                     total = modified + res.get('skipped', 0)
                 else:
                     modified = 0
                     total = 0
+                if modified:
+                    self.record_pending_change('Resize player inventories',
+                                               affected_count=modified, high_risk=True)
+                    self.refresh_all()
                 self._show_info(t('Done'), t('modify_all_player_slots_result', modified=modified, total=total, slots=new_slot_num) if t else f'Resized {modified} of {total} player inventories to {new_slot_num} slots')
             run_with_loading(on_finished, task)
 
@@ -4603,17 +4873,28 @@ class MainWindow(QMainWindow):
             return
         new_slot_num, ok = QInputDialog.getInt(self, t('modify_all_guild_chest_slots_title') if t else 'Modify All Guild Chest Slots', t('modify_all_guild_chest_slots_prompt') if t else 'Enter new slot count for all guild chests:', 50, 1, 1000, 1)
         if ok:
+            affected = modify_all_guild_chest_slots(new_slot_num, preview_only=True)
+            if not affected or not show_question(
+                self, t('modify_all_guild_chest_slots_title',
+                        default='Modify All Guild Chest Slots'),
+                f'Resize {affected} eligible guild chests to {new_slot_num} slots? '
+                'Reducing capacity may discard slots. This cannot be undone from the editor.',
+            ):
+                return
             def task():
                 return modify_all_guild_chest_slots(new_slot_num, self)
             def on_finished(modified):
-                self.refresh_all()
+                if modified:
+                    self.record_pending_change('Resize guild chests',
+                                               affected_count=modified, high_risk=True)
+                    self.refresh_all()
                 self._show_info(t('Done'), t('modify_all_guild_chest_slots_result', modified=modified) if t else f'Modified {modified} guild chest containers')
             run_with_loading(on_finished, task)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_F5:
             if constants.current_save_path:
-                self.refresh_all()
+                self.refresh_all(mark_dirty=False)
         super().keyPressEvent(event)
     def _get_player_name(self, uid):
         try:

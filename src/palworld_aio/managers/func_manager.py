@@ -78,10 +78,10 @@ def is_entity_in_exclusion_zones(entity_data):
 def delete_player_pals(wsd, to_delete_uids):
     return _delete_player_pals(wsd, to_delete_uids).changed_entities
 def clean_character_save_parameter_map(data_source, valid_uids):
-    _clean_character_map(data_source, valid_uids)
-def delete_empty_guilds(parent=None):
+    return _clean_character_map(data_source, valid_uids).changed_entities
+def _empty_guild_targets():
     if not constants.loaded_level_json:
-        return 0
+        return []
     build_player_levels()
     wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
     group_data = wsd['GroupSaveDataMap']['value']
@@ -117,6 +117,30 @@ def delete_empty_guilds(parent=None):
                 break
         if all_invalid:
             to_delete.append(g)
+    return to_delete
+
+
+def count_empty_guilds() -> tuple[int, int]:
+    """Return empty guild and associated base counts before deletion."""
+    targets = _empty_guild_targets()
+    if not targets:
+        return 0, 0
+    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+    bases = wsd.get('BaseCampSaveData', {}).get('value', [])
+    base_count = sum(
+        are_equal_uuids(base['value']['RawData']['value'].get('group_id_belong_to'),
+                        as_uuid(guild['key']))
+        for guild in targets for base in bases
+    )
+    return len(targets), base_count
+
+
+def delete_empty_guilds(parent=None):
+    if not constants.loaded_level_json:
+        return 0
+    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+    group_data = wsd['GroupSaveDataMap']['value']
+    to_delete = _empty_guild_targets()
     for g in to_delete:
         gid = as_uuid(g['key'])
         bases = wsd.get('BaseCampSaveData', {}).get('value', [])[:]
@@ -125,7 +149,7 @@ def delete_empty_guilds(parent=None):
                 delete_base_camp(b, gid)
         group_data.remove(g)
     return len(to_delete)
-def delete_inactive_players(filter_params, parent=None):
+def delete_inactive_players(filter_params, parent=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return {'count': 0, 'details': []}
     build_player_levels()
@@ -181,6 +205,8 @@ def delete_inactive_players(filter_params, parent=None):
                 to_delete_uids.add(uid)
             else:
                 keep_players.append(player)
+        if preview_only:
+            continue
         if len(keep_players) != len(original_players):
             raw['players'] = keep_players
             keep_uids = {str(p.get('player_uid', '')).replace('-', '') for p in keep_players}
@@ -196,13 +222,15 @@ def delete_inactive_players(filter_params, parent=None):
                 nu = str(raw['admin_player_uid']).replace('-', '').lower()
                 for p in keep_players:
                     p['role'] = 1 if str(p.get('player_uid', '')).replace('-', '').lower() == nu else 3
+    if preview_only:
+        return {'count': len(to_delete_uids), 'details': deleted_info}
     if to_delete_uids:
         constants.files_to_delete.update(to_delete_uids)
         removed_pals = delete_player_pals(wsd, to_delete_uids)
         char_map = wsd.get('CharacterSaveParameterMap', {}).get('value', [])
         char_map[:] = [entry for entry in char_map if str(entry.get('key', {}).get('PlayerUId', {}).get('value', '')).replace('-', '') not in to_delete_uids and str(entry.get('value', {}).get('RawData', {}).get('value', {}).get('object', {}).get('SaveParameter', {}).get('value', {}).get('OwnerPlayerUId', {}).get('value', '')).replace('-', '') not in to_delete_uids]
     return {'count': len(to_delete_uids), 'details': deleted_info}
-def delete_inactive_bases(filter_params, parent=None):
+def delete_inactive_bases(filter_params, parent=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return {'count': 0, 'details': []}
     build_player_levels()
@@ -257,6 +285,16 @@ def delete_inactive_bases(filter_params, parent=None):
     base_list = wsd.get('BaseCampSaveData', {}).get('value', [])
     removed = 0
     excluded_bases = {ex.replace('-', '').lower() for ex in constants.exclusions.get('bases', [])}
+    if preview_only:
+        return {
+            'count': sum(
+                as_uuid(b['value']['RawData']['value'].get('group_id_belong_to'))
+                in deleted_guild_ids
+                and as_uuid(b['key']).replace('-', '').lower() not in excluded_bases
+                for b in base_list
+            ),
+            'details': deleted_info,
+        }
     for b in base_list[:]:
         gid = as_uuid(b['value']['RawData']['value'].get('group_id_belong_to'))
         base_id = as_uuid(b['key'])
@@ -318,7 +356,7 @@ def delete_duplicated_players(parent=None):
         constants.files_to_delete.update(deleted_uids)
         delete_player_pals(wsd, deleted_uids)
     valid_uids = {str(p.get('player_uid', '')).replace('-', '') for g in wsd['GroupSaveDataMap']['value'] if g['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild' for p in g['value']['RawData']['value'].get('players', [])}
-    clean_character_save_parameter_map(wsd, valid_uids)
+    removed_orphans = clean_character_save_parameter_map(wsd, valid_uids)
     players_dir = os.path.join(constants.current_save_path, 'Players')
     _, duplicate_bodies = canonical_player_entries(wsd, players_dir)
     removed_ghosts = 0
@@ -343,6 +381,7 @@ def delete_duplicated_players(parent=None):
                     ]
             except Exception:
                 continue
+    repaired_admins = 0
     for g in group_data_list:
         if g['value']['GroupType']['value']['value'] != 'EPalGroupType::Guild':
             continue
@@ -351,11 +390,12 @@ def delete_duplicated_players(parent=None):
         admin = str(raw.get('admin_player_uid', '')).replace('-', '').lower()
         if admin and admin not in {str(p.get('player_uid', '')).replace('-', '').lower() for p in players}:
             if players:
+                repaired_admins += 1
                 raw['admin_player_uid'] = players[0]['player_uid']
                 nu = str(raw['admin_player_uid']).replace('-', '').lower()
                 for p in players:
                     p['role'] = 1 if str(p.get('player_uid', '')).replace('-', '').lower() == nu else 3
-    return len(deleted_players) + removed_ghosts
+    return len(deleted_players) + removed_ghosts + removed_orphans + repaired_admins
 def delete_unreferenced_data(parent=None):
     if not constants.loaded_level_json:
         return {}
@@ -908,6 +948,26 @@ def delete_non_base_map_objects(parent=None):
         _cleanup_orphaned_works(wsd, deleted_instance_ids=deleted_instance_ids)
     _cleanup_orphaned_containers(wsd, deleted_container_ids)
     return deleted_count
+
+
+def count_non_base_map_objects() -> int:
+    """Preview the map objects removed by delete_non_base_map_objects."""
+    if not constants.loaded_level_json:
+        return 0
+    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+    active_base_ids = {
+        str(base['key']).replace('-', '').lower()
+        for base in wsd.get('BaseCampSaveData', {}).get('value', [])
+    }
+    count = 0
+    for map_object in wsd.get('MapObjectSaveData', {}).get('value', {}).get('values', []):
+        raw = map_object.get('Model', {}).get('value', {}).get('RawData', {}).get('value', {})
+        base_id = raw.get('base_camp_id_belong_to')
+        if (not is_death_bag(map_object)
+                and not (base_id and str(base_id).replace('-', '').lower() in active_base_ids)
+                and not is_entity_in_exclusion_zones(map_object)):
+            count += 1
+    return count
 def delete_invalid_structure_map_objects(parent=None):
     if not constants.loaded_level_json:
         return 0
@@ -969,6 +1029,7 @@ def delete_all_skins(parent=None):
                 removed_level_skins += 1
             if 'SkinAppliedCharacterId' in data:
                 del data['SkinAppliedCharacterId']
+                removed_level_skins += 1
             for v in list(data.values()):
                 clean_level_skins(v)
         elif isinstance(data, list):
@@ -1011,6 +1072,24 @@ def delete_all_skins(parent=None):
                 results = list(executor.map(process_player_file, player_files))
                 fixed_player_files = sum(results)
     return removed_level_skins + fixed_player_files
+
+
+def count_level_skin_fields() -> int:
+    """Count loaded-world skin fields removed by delete_all_skins."""
+    if not constants.loaded_level_json:
+        return 0
+    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+
+    def count_fields(data) -> int:
+        if isinstance(data, dict):
+            return (int('SkinName' in data) +
+                    int('SkinAppliedCharacterId' in data) +
+                    sum(count_fields(value) for value in data.values()))
+        if isinstance(data, list):
+            return sum(count_fields(value) for value in data)
+        return 0
+
+    return count_fields(wsd)
 def unlock_all_private_chests(parent=None):
     if not constants.loaded_level_json:
         return 0
@@ -1040,6 +1119,33 @@ def unlock_all_private_chests(parent=None):
             if raw.get('is_private_lock', 0) != 0:
                 raw['is_private_lock'] = 0
                 count += 1
+    return count
+
+
+def count_private_chest_unlocks() -> int:
+    """Count fields the existing private-chest unlock action will rewrite."""
+    if not constants.loaded_level_json:
+        return 0
+    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+
+    def count_locks(data) -> int:
+        if isinstance(data, list):
+            return sum(count_locks(item) for item in data)
+        if not isinstance(data, dict):
+            return 0
+        if data.get('concrete_model_type') in (
+                'PalMapObjectPalBoothModel', 'PalMapObjectItemBoothModel'):
+            return 0
+        return int('private_lock_player_uid' in data) + sum(
+            count_locks(value) for value in data.values())
+
+    count = count_locks(wsd)
+    for map_object in wsd.get('MapObjectSaveData', {}).get('value', {}).get('values', []):
+        raw = map_object.get('ConcreteModel', {}).get('value', {}).get('RawData', {}).get('value', {})
+        if (raw.get('concrete_model_type') in (
+                'PalMapObjectItemBoothModel', 'PalMapObjectPalBoothModel')
+                and raw.get('is_private_lock', 0) != 0):
+            count += 1
     return count
 def remove_invalid_items_from_level(parent=None):
     if not constants.loaded_level_json:
@@ -1202,6 +1308,48 @@ def remove_invalid_pals_from_save(parent=None):
         cont['value']['Slots']['value']['values'] = newslots
     removed += _remove_invalid_pals_from_dps(valid_all, constants.current_save_path)
     return removed
+def count_imported_pals_in_world() -> int:
+    """Count imported Pal records held in the loaded Level data."""
+    if not constants.current_save_path or not constants.loaded_level_json:
+        return 0
+    wsd = constants.loaded_level_json.get('properties', {}).get('worldSaveData', {}).get('value', {})
+    count = 0
+    for entry in wsd.get('CharacterSaveParameterMap', {}).get('value', []):
+        raw = entry.get('value', {}).get('RawData', {}).get('value', {}).get('object', {})
+        save_parameter = raw.get('SaveParameter', {})
+        if (save_parameter.get('struct_type') == 'PalIndividualCharacterSaveParameter'
+                and extract_value(save_parameter.get('value', {}), 'bImportedCharacter', False)
+                and entry.get('key', {}).get('InstanceId', {}).get('value')):
+            count += 1
+    return count
+
+
+def count_imported_pals() -> int:
+    """Count records the existing import cleanup can remove, without mutation."""
+    count = count_imported_pals_in_world()
+    if not count:
+        return 0
+    players_dir = os.path.join(constants.current_save_path, 'Players')
+    if not os.path.isdir(players_dir):
+        return count
+    for filename in os.listdir(players_dir):
+        if not filename.endswith('_dps.sav'):
+            continue
+        try:
+            gvas = sav_to_gvasfile(os.path.join(players_dir, filename))
+            entries = gvas.properties.get('SaveParameterArray', {}).get('value', {}).get('values', [])
+            count += sum(
+                isinstance(entry, dict)
+                and isinstance(entry.get('SaveParameter'), dict)
+                and isinstance(entry['SaveParameter'].get('value'), dict)
+                and bool(extract_value(entry['SaveParameter']['value'], 'bImportedCharacter', False))
+                for entry in entries
+            )
+        except Exception:
+            continue
+    return count
+
+
 def delete_imported_pals(parent=None):
     if not constants.current_save_path or not constants.loaded_level_json:
         return 0
@@ -1364,6 +1512,23 @@ def fix_missions(parent=None):
     fixed = sum((r[1] for r in results))
     skipped = sum((r[2] for r in results))
     return {'total': total, 'fixed': fixed, 'skipped': skipped}
+def count_reset_records(*keys):
+    """Count records removed by the simple world-state reset actions."""
+    if not constants.loaded_level_json:
+        return 0
+    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+    total = 0
+    for key in keys:
+        if key not in wsd:
+            continue
+        data = wsd[key]
+        values = data.get('value', []) if isinstance(data, dict) else []
+        if isinstance(values, dict):
+            values = values.get('values', [])
+        total += len(values) if isinstance(values, list) and values else 1
+    return total
+
+
 def reset_anti_air_turrets(parent=None):
     if not constants.loaded_level_json:
         return None
@@ -1991,7 +2156,7 @@ def unlock_all_lab_research_for_guild(guild_id, parent=None):
         return True
     except Exception as e:
         return False
-def modify_container_slots(new_slot_num, parent=None, container_id=None):
+def modify_container_slots(new_slot_num, parent=None, container_id=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return 0
     try:
@@ -2052,6 +2217,8 @@ def modify_container_slots(new_slot_num, parent=None, container_id=None):
                         return 0
                     if current_slot_num == new_slot_num:
                         return 0
+                    if preview_only:
+                        return 1 if 'SlotNum' in value else 0
                     if len(slots) < new_slot_num:
                         if slots:
                             template = copy.deepcopy(slots[0])
@@ -2089,6 +2256,9 @@ def modify_container_slots(new_slot_num, parent=None, container_id=None):
                     map_object_id = container_id_to_map_obj_id.get(container_id_str, 'Unknown')
                     slots = value.get('Slots', {}).get('value', {}).get('values', [])
                     if current_slot_num == new_slot_num:
+                        continue
+                    if preview_only:
+                        modified += int('SlotNum' in value)
                         continue
                     if len(slots) < new_slot_num:
                         if slots:
@@ -2145,7 +2315,7 @@ def modify_all_player_slots(new_slot_num, parent=None):
     if modified:
         constants.invalidate_container_lookup()
     return {'modified': modified, 'skipped': skipped}
-def modify_all_guild_chest_slots(new_slot_num, parent=None):
+def modify_all_guild_chest_slots(new_slot_num, parent=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return 0
     try:
@@ -2181,6 +2351,9 @@ def modify_all_guild_chest_slots(new_slot_num, parent=None):
             current_slot_num = value.get('SlotNum', {}).get('value', 0)
             slots = value.get('Slots', {}).get('value', {}).get('values', [])
             if current_slot_num == new_slot_num:
+                continue
+            if preview_only:
+                modified += int('SlotNum' in value)
                 continue
             if len(slots) < new_slot_num:
                 if slots:
@@ -2872,6 +3045,43 @@ def max_all_pals(parent=None):
             continue
     count += _apply_to_dps_files(_max_one_pal)
     return count
+
+
+def count_pals_for_max() -> tuple[int, int]:
+    """Return Level and DPS Pal counts for the global max action."""
+    if not constants.loaded_level_json:
+        return 0, 0
+    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+    world_count = 0
+    for entry in wsd.get('CharacterSaveParameterMap', {}).get('value', []):
+        parameter = entry.get('value', {}).get('RawData', {}).get('value', {}).get(
+            'object', {}).get('SaveParameter', {}).get('value')
+        if isinstance(parameter, dict) and 'IsPlayer' not in parameter:
+            world_count += 1
+    dps_count = 0
+    if not constants.current_save_path:
+        return world_count, dps_count
+    players_dir = os.path.join(constants.current_save_path, 'Players')
+    if not os.path.isdir(players_dir):
+        return world_count, dps_count
+    for filename in os.listdir(players_dir):
+        if not filename.endswith('_dps.sav'):
+            continue
+        try:
+            gvas = sav_to_gvasfile(os.path.join(players_dir, filename))
+            entries = gvas.properties.get('SaveParameterArray', {}).get('value', {}).get('values', [])
+            dps_count += sum(
+                isinstance(entry, dict)
+                and isinstance(entry.get('SaveParameter'), dict)
+                and isinstance(entry['SaveParameter'].get('value'), dict)
+                and bool(entry['SaveParameter']['value'])
+                and extract_value(entry['SaveParameter']['value'], 'CharacterID', 'None')
+                not in ('', 'None')
+                for entry in entries
+            )
+        except Exception:
+            continue
+    return world_count, dps_count
 def _scan_dps_for_illegals(players_dir, NAMEMAP, valid_player_uids):
     result = defaultdict(list)
     dps_files = [f for f in os.listdir(players_dir) if f.endswith('.sav') and '_dps' in f and (f.replace('_dps.sav', '').lower() in valid_player_uids)]

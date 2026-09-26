@@ -2387,13 +2387,17 @@ class BasePalsContentWidget(QFrame):
                 parent._trigger_auto_save()
                 break
             parent = parent.parent()
-    def _refresh_dashboard(self):
+    def _refresh_dashboard(self, change=None, affected_count=None):
         constants.dirty = True
         app = QApplication.instance()
         if app is None:
             return
         for w in app.topLevelWidgets():
             if hasattr(w, 'tools_tab'):
+                recorder = getattr(w, 'record_pending_change', None)
+                if change and callable(recorder):
+                    recorder(change, affected_count=affected_count,
+                             high_risk=True)
                 w.tools_tab.refresh()
                 if hasattr(w, '_refresh_players'):
                     w._refresh_players()
@@ -2829,7 +2833,13 @@ class BasePalsContentWidget(QFrame):
             item.widget().update_display()
         self.pal_info.set_clicked_pal(pal['character_entry'])
     def _restore_all_pals(self):
-        reply = show_question(self, t('edit_pals.ctx.bulk_heal'), t('base_inventory.restore_all_confirm'))
+        affected = sum(bool(p and _get_raw_from_item(p['character_entry']))
+                       for p in self._pals)
+        reply = show_question(
+            self, t('edit_pals.ctx.bulk_heal'),
+            t('ui.safety.base_pals_restore', count=affected,
+              detail=t('base_inventory.restore_all_confirm'),
+              default='{count} base Pals will be restored. {detail}'))
         if not reply:
             return
         count = 0
@@ -2882,6 +2892,8 @@ class BasePalsContentWidget(QFrame):
         self.pal_info._clear_display()
         for icon in self._icons:
             icon.update_display()
+        if count:
+            self._refresh_dashboard('Restore base Pals', count)
         show_information(self, t('edit_pals.ctx.bulk_heal'), t('base_inventory.restore_all_success', count=count))
     def _max_all_pals(self):
         cheat = PalFrame._cheat_mode
@@ -2889,7 +2901,12 @@ class BasePalsContentWidget(QFrame):
         soul_cap = 255 if cheat else 20
         lv_cap = 255 if cheat else 80
         msg = t('base_inventory.max_all_confirm_cheat') if cheat else t('base_inventory.max_all_confirm')
-        reply = show_question(self, t('edit_pals.ctx.max_all_stats'), msg)
+        affected = sum(bool(p and _get_raw_from_item(p['character_entry']))
+                       for p in self._pals)
+        reply = show_question(self, t('edit_pals.ctx.max_all_stats'),
+                              t('ui.safety.base_pals_max', count=affected,
+                                detail=msg,
+                                default='{count} base Pals will be changed. {detail}'))
         if not reply:
             return
         pals = [p for p in self._pals if p is not None]
@@ -2962,6 +2979,8 @@ class BasePalsContentWidget(QFrame):
         self.pal_info._clear_display()
         for icon in self._icons:
             icon.update_display()
+        if count:
+            self._refresh_dashboard('Max base Pal stats', count)
         show_information(self, t('edit_pals.ctx.max_all_stats'), t('base_inventory.max_all_success', count=count))
     def _max_buff_all_pals(self):
         from palworld_aio.editor.pal_editor.create_dialogs import FoodPickerDialog, _apply_food_buff
@@ -2970,6 +2989,13 @@ class BasePalsContentWidget(QFrame):
             return
         food_id = dlg.selected_food
         pals = [p for p in self._pals if p is not None]
+        affected = sum(bool(_get_raw_from_item(p['character_entry'])) for p in pals)
+        if not show_question(
+            self, t('edit_pals.ctx.bulk_max_buff'),
+            t('ui.safety.base_pals_food', count=affected,
+              default='Apply this food buff to {count} base Pals? This cannot be undone from the editor.'),
+        ):
+            return
         count = 0
         for pal_entry in pals:
             tr = _get_raw_from_item(pal_entry['character_entry'])
@@ -2986,6 +3012,8 @@ class BasePalsContentWidget(QFrame):
         self.pal_info._clear_display()
         for icon in self._icons:
             icon.update_display()
+        if count:
+            self._refresh_dashboard('Apply base Pal food buff', count)
         show_information(self, t('edit_pals.ctx.bulk_max_buff'), t('edit_pals.bulk_max_buff_success_all', count=count))
 class BaseInventoryTab(QWidget):
     def __init__(self, parent=None):
@@ -4455,24 +4483,58 @@ class BaseInventoryTab(QWidget):
         if not self.manager.inventory_container:
             self._show_warning(t('base_inventory.select_container_first') if t else 'Please select a container first')
             return
-        if show_question(self, t('base_inventory.clear_container') if t else 'Clear Container', t('base_inventory.clear_container_confirm') if t else 'Are you sure you want to clear all items from this container?'):
+        container_info = self.manager.current_container or {}
+        item_count = self.manager.get_items_count()
+        pal_count = self._pal_booth_affected_count(container_info)
+        trade_count = len(container_info.get('booth_trade_infos', []))
+        if show_question(
+            self, t('base_inventory.clear_container', default='Clear Container'),
+            t('base_inventory.clear_container_count_confirm', count=item_count,
+              default='Clear {count} items from this container? This cannot be undone.')
+            + f'\n{pal_count} Pal booth entries and {trade_count} trade entries will also be removed.',
+        ):
             container_id = self.manager.current_container['id'] if self.manager.current_container else None
             if not container_id:
                 self._show_warning(t('base_inventory.select_container_first') if t else 'Please select a container first')
                 return
             container_info = self.manager.current_container
-            if container_info:
-                booth_type = container_info.get('booth_type')
-                if booth_type == 'PalMapObjectItemBoothModel':
-                    trade_infos = container_info.get('booth_trade_infos', [])
-                    trade_infos.clear()
-                elif booth_type == 'PalMapObjectPalBoothModel':
-                    self._clear_pal_booth_slots(container_info)
             if self.manager.clear_container(container_id):
+                if container_info:
+                    booth_type = container_info.get('booth_type')
+                    if booth_type == 'PalMapObjectItemBoothModel':
+                        container_info.get('booth_trade_infos', []).clear()
+                    elif booth_type == 'PalMapObjectPalBoothModel':
+                        self._clear_pal_booth_slots(container_info)
+                recorder = getattr(self._main_window, 'record_pending_change', None)
+                if callable(recorder):
+                    recorder('Clear base container',
+                             context=self._current_base_name or self._current_guild_name,
+                             affected_count=max(1, item_count + pal_count + trade_count),
+                             high_risk=True)
                 self._on_container_selected(container_id)
                 QTimer.singleShot(0, lambda s=self, m=t('base_inventory.container_cleared') if t else 'Container cleared successfully': s._show_info(m) if hasattr(s, '_show_info') else None)
             else:
                 self._show_warning(t('base_inventory.failed_to_clear_container') if t else 'Failed to clear container')
+    def _pal_booth_affected_count(self, container_info) -> int:
+        if not constants.loaded_level_json or container_info.get('booth_type') != 'PalMapObjectPalBoothModel':
+            return 0
+        wsd = constants.loaded_level_json.get('properties', {}).get('worldSaveData', {}).get('value', {})
+        container_id = str(container_info.get('booth_char_container_id', '')).replace('-', '').lower()
+        if not container_id:
+            return 0
+        for container in wsd.get('CharacterContainerSaveData', {}).get('value', []):
+            key = str(container.get('key', {}).get('ID', {}).get('value', '')).replace('-', '').lower()
+            if key == container_id:
+                slots = container.get('value', {}).get('Slots', {}).get('value', {}).get('values', [])
+                return sum(
+                    bool(instance_id)
+                    and instance_id != '00000000000000000000000000000000'
+                    for slot in slots
+                    for instance_id in [str(slot.get('RawData', {}).get('value', {})
+                                            .get('instance_id', '')).replace('-', '').lower()]
+                )
+        return 0
+
     def _clear_pal_booth_slots(self, container_info):
         if not constants.loaded_level_json:
             return
@@ -4516,14 +4578,27 @@ class BaseInventoryTab(QWidget):
         if is_guild_chest:
             self._show_warning('Cannot delete Guild Chest')
             return
-        if show_question(self, t('base_inventory.delete_container') if t else 'Delete Container', t('base_inventory.delete_container_confirm') if t else 'Are you sure you want to delete this container and its map object? This action cannot be undone.'):
-            booth_type = container_info.get('booth_type')
-            if booth_type == 'PalMapObjectItemBoothModel':
-                trade_infos = container_info.get('booth_trade_infos', [])
-                trade_infos.clear()
-            elif booth_type == 'PalMapObjectPalBoothModel':
-                self._clear_pal_booth_slots(container_info)
+        item_count = self.manager._get_container_item_count(container_id)
+        pal_count = self._pal_booth_affected_count(container_info)
+        trade_count = len(container_info.get('booth_trade_infos', []))
+        if show_question(
+            self, t('base_inventory.delete_container', default='Delete Container'),
+            t('base_inventory.delete_container_count_confirm', count=item_count,
+              default='Delete this container, its map object, and {count} items? This cannot be undone.')
+            + f'\n{pal_count} Pal booth entries and {trade_count} trade entries will also be removed.',
+        ):
             if self.manager.delete_container(container_id):
+                booth_type = container_info.get('booth_type')
+                if booth_type == 'PalMapObjectItemBoothModel':
+                    container_info.get('booth_trade_infos', []).clear()
+                elif booth_type == 'PalMapObjectPalBoothModel':
+                    self._clear_pal_booth_slots(container_info)
+                recorder = getattr(self._main_window, 'record_pending_change', None)
+                if callable(recorder):
+                    recorder('Delete base container',
+                             context=self._current_base_name or self._current_guild_name,
+                             affected_count=1 + item_count + pal_count + trade_count,
+                             high_risk=True)
                 base_id = container_info.get('base_id')
                 if base_id:
                     self._load_containers_for_base(base_id)
@@ -4854,11 +4929,23 @@ class BaseInventoryTab(QWidget):
     def _on_bulk_remove_items(self, items):
         if not self.manager or not self.manager.inventory_container or not items:
             return
-        if not show_question(self, t('base_inventory.bulk_remove_title', default='Remove Items'), t('base_inventory.bulk_remove_confirm', n=len(items), default=f'Remove {len(items)} selected items?')):
+        if not show_question(
+            self, t('base_inventory.bulk_remove_title', default='Remove Items'),
+            t('base_inventory.bulk_remove_confirm', n=len(items),
+              default='Remove {n} selected items?')
+            + '\nThis cannot be undone from the editor.',
+        ):
             return
+        removed = 0
         for slot_data in items:
             slot_index = slot_data.get('slot_index', 0)
-            self.manager.remove_item(slot_index, 999999)
+            removed += bool(self.manager.remove_item(slot_index, 999999))
+        if removed:
+            recorder = getattr(self._main_window, 'record_pending_change', None)
+            if callable(recorder):
+                recorder('Remove base inventory items',
+                         context=self._current_base_name or self._current_guild_name,
+                         affected_count=removed, high_risk=True)
         inventory_container = self.manager.select_container(self.manager.current_container['id'])
         if inventory_container:
             self.inventory_grid.load_items(inventory_container.get_items(), max_slots=inventory_container.get_max_slots())
@@ -4866,9 +4953,22 @@ class BaseInventoryTab(QWidget):
     def _on_bulk_clear_qty(self, items):
         if not self.manager or not self.manager.inventory_container or not items:
             return
+        if not show_question(
+            self, t('base_inventory.bulk_clear_qty_title', default='Clear Item Quantities'),
+            t('base_inventory.bulk_clear_qty_confirm', count=len(items),
+              default='Set the quantity of {count} selected items to zero? This cannot be undone.'),
+        ):
+            return
+        changed = 0
         for slot_data in items:
             slot_index = slot_data.get('slot_index', 0)
-            self.manager.set_item_count(slot_index, 0)
+            changed += bool(self.manager.set_item_count(slot_index, 0))
+        if changed:
+            recorder = getattr(self._main_window, 'record_pending_change', None)
+            if callable(recorder):
+                recorder('Clear base inventory quantities',
+                         context=self._current_base_name or self._current_guild_name,
+                         affected_count=changed, high_risk=True)
         inventory_container = self.manager.select_container(self.manager.current_container['id'])
         if inventory_container:
             self.inventory_grid.load_items(inventory_container.get_items(), max_slots=inventory_container.get_max_slots())

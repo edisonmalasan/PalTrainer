@@ -181,6 +181,56 @@ def test_remove_skill_respects_fixture_scope_and_mutates_existing_lists(
     assert result == {'skills_removed': 3, 'pals_affected': 1}
 
 
+def test_skill_preview_matches_scope_without_mutating_lists(monkeypatch, tmp_path):
+    player_pal = _pal_entry(
+        'player-pal', 'SheepBall', container_id='player-container',
+        active=('EPalWazaID::FireBall',))
+    base_pal = _pal_entry(
+        'base-pal', 'SheepBall', group_id='base-group', passive=('Runner',))
+    world = _world([player_pal, base_pal])
+    monkeypatch.setattr(constants, 'loaded_level_json', world)
+    monkeypatch.setattr(constants, 'current_save_path', str(tmp_path))
+    monkeypatch.setattr(constants, 'gps_gvas', None)
+
+    assert global_ops.count_pals_with_skills('FireBall', 'Runner',
+                                              'player', include_external=False) == 1
+    assert global_ops.count_pals_with_skills('FireBall', 'Runner',
+                                              'base', include_external=False) == 1
+    assert global_ops.count_pals_with_skills('FireBall', 'Runner',
+                                              'all', include_external=False) == 2
+    assert player_pal['value']['RawData']['value']['object'][
+        'SaveParameter']['value']['EquipWaza']['value']['values'] == [
+            'EPalWazaID::FireBall']
+    assert base_pal['value']['RawData']['value']['object'][
+        'SaveParameter']['value']['PassiveSkillList']['value']['values'] == [
+            'Runner']
+
+
+def test_delete_preview_includes_dps_and_gps_records(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    utils = import_from('palworld_aio.utils')
+    players = tmp_path / 'Players'
+    players.mkdir()
+    (players / 'owner_dps.sav').write_bytes(b'fixture')
+    dps_entry = {'SaveParameter': {'value': {
+        'CharacterID': {'value': 'SheepBall'}}}}
+    gps_entry = {'SaveParameter': {'value': {
+        'CharacterID': {'value': 'sheepball'}}}}
+    monkeypatch.setattr(constants, 'loaded_level_json', _world([
+        _pal_entry('world-pal', 'SheepBall')]))
+    monkeypatch.setattr(constants, 'current_save_path', str(tmp_path))
+    monkeypatch.setattr(constants, 'gps_gvas', SimpleNamespace(
+        properties={'SaveParameterArray': {'value': {'values': [gps_entry]}}}))
+    monkeypatch.setattr(utils, 'sav_to_gvasfile', lambda _path: SimpleNamespace(
+        properties={'SaveParameterArray': {'value': {'values': [dps_entry]}}}))
+
+    assert global_ops.count_world_pals_for_deletion('SheepBall') == 1
+    assert global_ops.count_pals_for_deletion('SheepBall') == 3
+    assert dps_entry['SaveParameter']['value']['CharacterID']['value'] == 'SheepBall'
+    assert gps_entry['SaveParameter']['value']['CharacterID']['value'] == 'sheepball'
+
+
 def test_inventoried_inline_bulk_flows_expose_review_progress_and_results():
     source = inspect.getsource(bulk_ops.BulkOperationMixin)
 

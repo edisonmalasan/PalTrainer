@@ -2,7 +2,18 @@ from palworld_aio.utils import safe_nested_get
 
 
 def count_pals_for_deletion(pal_id: str) -> int:
-    """Count loaded Pal instances that the global delete operation can remove."""
+    """Count Pal instances across every source used by global deletion."""
+    count = count_world_pals_for_deletion(pal_id)
+    target = pal_id.lower()
+    for save_parameter in _external_pal_parameters(include_dps=True, include_gps=True):
+        character_id = save_parameter.get('CharacterID', {}).get('value', '')
+        if isinstance(character_id, str) and character_id.lower() == target:
+            count += 1
+    return count
+
+
+def count_world_pals_for_deletion(pal_id: str) -> int:
+    """Count only Pal records kept pending in the loaded Level save."""
     from palworld_aio import constants
 
     if not constants.loaded_level_json:
@@ -25,6 +36,86 @@ def count_pals_for_deletion(pal_id: str) -> int:
                     save_parameter, ['CharacterID', 'value'], '')).lower()
                 == target):
             count += 1
+    return count
+
+
+def _external_pal_parameters(*, include_dps: bool, include_gps: bool):
+    """Read DPS and loaded GPS records for preflight without writing files."""
+    from palworld_aio import constants
+    if include_dps and constants.current_save_path:
+        import os
+        from palworld_aio.utils import sav_to_gvasfile
+        players_dir = os.path.join(constants.current_save_path, 'Players')
+        if os.path.isdir(players_dir):
+            for filename in os.listdir(players_dir):
+                if not filename.endswith('_dps.sav'):
+                    continue
+                try:
+                    gvas = sav_to_gvasfile(os.path.join(players_dir, filename))
+                    entries = gvas.properties.get('SaveParameterArray', {}).get('value', {}).get('values', [])
+                except Exception:
+                    continue
+                for entry in entries:
+                    if isinstance(entry, dict):
+                        parameter = entry.get('SaveParameter', {}).get('value', {})
+                        if isinstance(parameter, dict):
+                            yield parameter
+    if include_gps and constants.gps_gvas:
+        entries = constants.gps_gvas.properties.get('SaveParameterArray', {}).get('value', {}).get('values', [])
+        for entry in entries:
+            if isinstance(entry, dict):
+                parameter = entry.get('SaveParameter', {}).get('value', {})
+                if isinstance(parameter, dict):
+                    yield parameter
+
+
+def count_pals_with_skills(
+    active_skill_id=None, passive_skill_id=None, scope='all', *,
+    include_external: bool = True,
+) -> int:
+    """Count Pals whose selected skills the bulk removal will change."""
+    from palworld_aio import constants
+    if not constants.loaded_level_json:
+        return 0
+    scope_list = scope.split(',') if scope else ['all']
+    active_skill_full = f'EPalWazaID::{active_skill_id}' if active_skill_id else None
+
+    def has_selected_skill(parameter):
+        for key, selected in (
+            ('EquipWaza', active_skill_full),
+            ('MasteredWaza', active_skill_full),
+            ('PassiveSkillList', passive_skill_id),
+        ):
+            if selected and any(
+                isinstance(skill, str) and skill.lower() == selected.lower()
+                for skill in parameter.get(key, {}).get('value', {}).get('values', [])
+            ):
+                return True
+        return False
+
+    entries = safe_nested_get(
+        constants.loaded_level_json,
+        ['properties', 'worldSaveData', 'value', 'CharacterSaveParameterMap', 'value'], [])
+    count = 0
+    for entry in entries:
+        raw = entry.get('value', {}).get('RawData', {}).get('value', {})
+        parameter = raw.get('object', {}).get('SaveParameter', {}).get('value', {})
+        if not isinstance(parameter, dict) or parameter.get('IsPlayer', {}).get('value'):
+            continue
+        if 'all' not in scope_list:
+            slot_data = parameter.get('SlotId', {}).get('value', {})
+            container_id = slot_data.get('ContainerId', {}).get('value', {}).get('ID', {}).get('value')
+            if container_id and 'player' not in scope_list:
+                continue
+            if raw.get('group_id') and 'base' not in scope_list:
+                continue
+        count += has_selected_skill(parameter)
+    if include_external:
+        for parameter in _external_pal_parameters(
+            include_dps='all' in scope_list or 'dps' in scope_list,
+            include_gps='all' in scope_list or 'gps' in scope_list,
+        ):
+            count += has_selected_skill(parameter)
     return count
 
 

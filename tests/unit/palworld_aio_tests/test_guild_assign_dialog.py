@@ -106,6 +106,7 @@ def test_source_target_review_skips_players_already_in_target(
     assert dialog.progress.value() == 1
     assert dialog.result_label.property('resultState') == 'success'
     assert dialog._completed
+    assert dialog.moved_count == 1
     assert dialog.cancel_btn.text() == 'Close'
 
 
@@ -119,6 +120,7 @@ def test_cancel_before_review_never_mutates(
         selected_player_uids=('PLAYER-2',))
     dialog.reject()
     assert calls == []
+    assert getattr(dialog, 'moved_count', 0) == 0
 
 
 def test_failed_assignment_reports_warning_result(
@@ -133,5 +135,6 @@ def test_failed_assignment_reports_warning_result(
     dialog.guild_panel.tree.setCurrentItem(_guild_item(dialog, 'GUILD-1'))
     dialog._go_next()
     dialog._assign()
+    assert dialog.moved_count == 0
     assert dialog.result_label.property('resultState') == 'warning'
     assert '1 failed' in dialog.result_label.text()
