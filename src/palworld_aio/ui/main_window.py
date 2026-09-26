@@ -1165,6 +1165,12 @@ class MainWindow(QMainWindow):
                 action = menu.addAction(label)
                 action.setToolTip(change.context or change.label)
                 action.setEnabled(False)
+            save_action = menu.addAction(t(
+                'menu.file.save_changes', default='Save Changes'))
+            save_action.triggered.connect(self._save_changes)
+            reload_action = menu.addAction(t(
+                'menu.file.reload_from_disk', default='Reload from Disk'))
+            reload_action.triggered.connect(self._reload_from_disk)
         if self.pending_journal.can_undo:
             undo_action = menu.addAction(t(
                 'ui.pending.undo_last', default='Undo last change'))
@@ -4522,7 +4528,7 @@ class MainWindow(QMainWindow):
         else:
             self._show_warning(t('Error') if t else 'Error', 'Failed to level down player (already min level?)')
     def _set_player_level(self, uid):
-        from ..managers.player_manager import adjust_player_level, get_level_from_exp
+        from ..managers.player_manager import adjust_player_level
         current_level = constants.player_levels.get(str(uid).replace('-', ''), 1)
         if current_level == 1:
             self._show_warning(t('Error') if t else 'Error', t('player.level.set_no_level_data') if t else 'Cannot set player level - player is at level 1 or unknown')
@@ -4533,7 +4539,29 @@ class MainWindow(QMainWindow):
                 self._show_warning(t('Error') if t else 'Error', t('player.level.minimum_level') if t else 'Cannot set player level - minimum level is 2')
                 return
             if adjust_player_level(uid, new_level):
-                self.refresh_all()
+                def refresh_level_views():
+                    self._suppress_dirty_refresh = True
+                    try:
+                        self.refresh_all()
+                    finally:
+                        self._suppress_dirty_refresh = False
+
+                def apply_level(level):
+                    if not adjust_player_level(uid, level):
+                        raise RuntimeError(t(
+                            'player.level.set_failed',
+                            default='Failed to set player level'))
+                    refresh_level_views()
+
+                self.record_pending_change(
+                    t('ui.pending.player_level',
+                      default='Player level changed from {old} to {new}',
+                      old=current_level, new=new_level),
+                    context=str(uid),
+                    undo=lambda: apply_level(current_level),
+                    redo=lambda: apply_level(new_level),
+                )
+                refresh_level_views()
                 self._show_info(t('Done') if t else 'Done', t('player.level.set_success', level=new_level) if t else f'Player level set to {new_level}')
             else:
                 self._show_warning(t('Error') if t else 'Error', t('player.level.set_failed') if t else 'Failed to set player level')

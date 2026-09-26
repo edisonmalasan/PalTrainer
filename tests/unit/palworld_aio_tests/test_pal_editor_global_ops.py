@@ -77,6 +77,21 @@ def _container(*instance_ids):
     }
 
 
+def test_delete_preview_counts_only_removable_loaded_pals(monkeypatch):
+    removable = _pal_entry('one', 'SheepBall')
+    another = _pal_entry('two', 'sheepball')
+    player = _pal_entry('player', 'SheepBall')
+    player['value']['RawData']['value']['object']['SaveParameter']['value'][
+        'IsPlayer'] = {'value': True}
+    missing_instance = _pal_entry('', 'SheepBall')
+    other = _pal_entry('other', 'ChickenPal')
+    monkeypatch.setattr(constants, 'loaded_level_json', _world([
+        removable, another, player, missing_instance, other]))
+
+    assert global_ops.count_pals_for_deletion('SheepBall') == 2
+    assert global_ops.count_pals_for_deletion('ChickenPal') == 1
+
+
 def test_delete_pal_removes_each_fixture_from_its_own_container(
         monkeypatch, tmp_path):
     player_pal = _pal_entry(

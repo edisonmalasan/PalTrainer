@@ -549,11 +549,22 @@ class PlayerPalActionDialog(BaseDialog):
     def _on_delete_pal(self):
         if not self.selected_pal_id:
             return
-        reply = QMessageBox.question(self, t('player_pal.confirm_delete_all') if t else 'Confirm Delete All', t('player_pal.confirm_delete_all_msg').format(pal_name=self.selected_pal_name) if t else f'Delete ALL "{self.selected_pal_name}" pals from everywhere (players + bases)? This cannot be undone!', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        from palworld_aio.editor.pal_editor.pal_editor_global_ops import (
+            count_pals_for_deletion,
+        )
+        affected = count_pals_for_deletion(self.selected_pal_id)
+        reply = QMessageBox.question(
+            self,
+            t('player_pal.confirm_delete_all', default='Confirm Delete All'),
+            t('player_pal.confirm_delete_all_count_msg',
+              default='Delete {count} {pal_name} Pals from the loaded save (players and bases)? This cannot be undone. Back up the save before continuing.',
+              count=affected, pal_name=self.selected_pal_name),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             action = f'delete_pal:{self.selected_pal_id}'
             self.workflow_review.set_progress(
-                0, 1, t('ui.bulk.applying', default='Applying changes…'))
+                0, max(1, affected),
+                t('ui.bulk.applying', default='Applying changes…'))
             self.pal_action_selected.emit('all', action, [])
             self._refresh_after_action()
 

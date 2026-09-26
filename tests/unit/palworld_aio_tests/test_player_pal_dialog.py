@@ -55,16 +55,22 @@ def test_double_click_delete_uses_confirmation_and_preserves_signal_contract(
             (source, action, targets)))
     dialog.selected_pal_id = 'SheepBall'
     dialog.selected_pal_name = 'Lamball'
+    global_ops = import_from(
+        'palworld_aio.editor.pal_editor.pal_editor_global_ops')
+    monkeypatch.setattr(global_ops, 'count_pals_for_deletion',
+                        lambda _pal_id: 12)
     monkeypatch.setattr(
         dialog_mod.QMessageBox,
         'question',
-        lambda *_args, **_kwargs: (
-            confirmations.append(True) or QMessageBox.StandardButton.Yes),
+        lambda _parent, _title, detail, *_args, **_kwargs: (
+            confirmations.append(detail) or QMessageBox.StandardButton.Yes),
     )
 
     dialog._on_delete_pal_direct()
 
-    assert confirmations == [True]
+    assert len(confirmations) == 1
+    assert 'Delete 12 Lamball Pals' in confirmations[0]
+    assert 'Back up' in confirmations[0]
     assert seen == [('all', 'delete_pal:SheepBall', [])]
     assert dialog.workflow_review.result_label.isHidden() is False
 

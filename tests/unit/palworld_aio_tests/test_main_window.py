@@ -131,6 +131,8 @@ window = SimpleNamespace(
     workspace_shell=SimpleNamespace(
         header=SimpleNamespace(pending_changes=button)),
     pending_journal=journal,
+    _save_changes=lambda: None,
+    _reload_from_disk=lambda: None,
 )
 main_window.MainWindow._show_pending_changes(window)
 assert Menu.last.object_name == 'appContextMenu'
@@ -146,7 +148,7 @@ window._undo_pending_change = lambda: main_window.MainWindow._undo_pending_chang
 window._redo_pending_change = lambda: main_window.MainWindow._redo_pending_change(window)
 main_window.MainWindow._show_pending_changes(window)
 assert [action.text for action in Menu.last.actions] == [
-    'Editable', 'Undo last change']
+    'Editable', 'Save Changes', 'Reload from Disk', 'Undo last change']
 Menu.last.actions[-1].callback()
 assert calls == ['undo']
 main_window.MainWindow._show_pending_changes(window)
@@ -519,6 +521,52 @@ finally:
     constants.loaded_level_json = old_doc
     constants.xgp_loaded = old_xgp
     constants.dirty = old_dirty
+""")
+    assert result.returncode == 0, result.stderr
+
+
+def test_player_level_change_has_real_in_memory_undo_and_redo():
+    result = _run_isolated(r"""
+from types import SimpleNamespace
+import palworld_aio.ui.main_window as module
+import palworld_aio.managers.player_manager as player_manager
+from palworld_aio import constants
+from palworld_aio.ui.main_window import MainWindow
+from palworld_aio.ui.pending_changes import PendingChangeJournal
+
+uid = 'TESTPLAYER'
+old_levels = constants.player_levels
+constants.player_levels = {uid: 5}
+module.LevelInputDialog.get_level = lambda *args: 7
+applied = []
+def adjust(player_uid, level):
+    applied.append((player_uid, level))
+    constants.player_levels[uid] = level
+    return True
+player_manager.adjust_player_level = adjust
+journal = PendingChangeJournal()
+refreshes = []
+window = SimpleNamespace(
+    refresh_all=lambda: refreshes.append(window._suppress_dirty_refresh),
+    record_pending_change=lambda label, **kwargs:
+        journal.record(label, **kwargs),
+    _show_info=lambda *args: None,
+)
+try:
+    MainWindow._set_player_level(window, uid)
+    assert applied == [(uid, 7)]
+    assert journal.summary.count == 1
+    assert journal.changes[0].label == 'Player level changed from 5 to 7'
+    assert journal.can_undo and not journal.can_redo
+    assert journal.undo_last()
+    assert applied[-1] == (uid, 5)
+    assert journal.can_redo
+    assert journal.redo_last()
+    assert applied[-1] == (uid, 7)
+    assert refreshes == [True, True, True]
+    assert window._suppress_dirty_refresh is False
+finally:
+    constants.player_levels = old_levels
 """)
     assert result.returncode == 0, result.stderr
 
