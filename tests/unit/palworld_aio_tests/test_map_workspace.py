@@ -27,6 +27,26 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _app = None
 
 
+def test_map_player_delete_cancel_keeps_save_unchanged(monkeypatch):
+    from types import SimpleNamespace
+
+    data_manager = import_from('palworld_aio.managers.data_manager')
+    calls = []
+    monkeypatch.setattr(data_manager, 'load_exclusions', lambda: None)
+    monkeypatch.setattr(data_manager, 'delete_player',
+                        lambda uid: calls.append(('delete', uid)))
+    monkeypatch.setattr(map_tab_mod.constants, 'exclusions', {'players': []})
+    monkeypatch.setattr(map_tab_mod, 'show_question',
+                        lambda _parent, _title, message:
+                        calls.append(('confirm', message)) or False)
+
+    map_tab_mod.MapTab._delete_player(
+        SimpleNamespace(), {'player_uid': 'uid', 'player_name': 'Player A'})
+
+    assert len(calls) == 1
+    assert '1 player' in calls[0][1]
+
+
 @pytest.fixture(scope='session')
 def app():
     global _app

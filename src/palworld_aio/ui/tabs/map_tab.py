@@ -2130,7 +2130,12 @@ class MapTab(QWidget):
         if str(base_data['base_id']) in constants.exclusions.get('bases', []):
             show_warning(self, t('warning.title') if t else 'Warning', t('deletion.warning.protected_base') if t else f"Base {base_data['base_id']} is in exclusion list and cannot be deleted.")
             return
-        reply = show_question(self, t('confirm.title') if t else 'Confirm', t('confirm.delete_base') if t else f"Delete base at X:{int(base_data['coords'][0])},Y:{int(base_data['coords'][1])}?")
+        reply = show_question(
+            self, t('deletion.ctx.delete_base', default='Delete Base'),
+            f"Delete 1 base at X:{int(base_data['coords'][0])}, "
+            f"Y:{int(base_data['coords'][1])} and its workers and structures? "
+            'This cannot be undone.',
+        )
         if not reply:
             return
         def task():
@@ -2144,6 +2149,9 @@ class MapTab(QWidget):
             self._play_effect(ImportEffect, img_x, img_y)
             self.refresh()
             if self.parent_window:
+                self.parent_window.record_pending_change(
+                    'Delete base', context=str(base_data['base_id']),
+                    affected_count=1, high_risk=True)
                 self.parent_window.refresh_all()
             self._hide_all_radius_rings()
             if hasattr(self, 'toggle_base_radius_rings') and self.toggle_base_radius_rings.isChecked():
@@ -2852,7 +2860,7 @@ class MapTab(QWidget):
     def _delete_guild(self, guild_id):
         from ...managers.data_manager import delete_guild, load_exclusions
         guild_name = self.guilds_data.get(guild_id, {}).get('guild_name', 'Unknown')
-        base_count = len(self.guilds_data.get(guild_id, {}).get('bases', []))
+        base_count = 0
         load_exclusions()
         guild_id_clean = str(guild_id).replace('-', '').lower()
         if guild_id_clean in [ex.replace('-', '').lower() for ex in constants.exclusions.get('guilds', [])]:
@@ -2865,17 +2873,21 @@ class MapTab(QWidget):
                 base_gid = str(b['value']['RawData']['value'].get('group_id_belong_to', '')).replace('-', '').lower()
                 base_id = str(b['key']).replace('-', '').lower()
                 if base_gid == guild_id_clean:
+                    base_count += 1
                     if base_id in [ex.replace('-', '').lower() for ex in constants.exclusions.get('bases', [])]:
                         show_warning(self, t('warning.title') if t else 'Warning', f'Guild "{guild_name}" has bases in exclusion list and cannot be deleted.\nExcluded base: {base_id}')
                         return
             except:
                 pass
+        member_count = 0
         for g in wsd.get('GroupSaveDataMap', {}).get('value', []):
             try:
                 g_id = str(g['key']).replace('-', '').lower()
                 if g_id == guild_id_clean:
                     if g['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild':
-                        for p in g['value']['RawData']['value'].get('players', []):
+                        members = g['value']['RawData']['value'].get('players', [])
+                        member_count = len(members)
+                        for p in members:
                             player_id = str(p.get('player_uid', '')).replace('-', '').lower()
                             if player_id in [ex.replace('-', '').lower() for ex in constants.exclusions.get('players', [])]:
                                 show_warning(self, t('warning.title') if t else 'Warning', f'Guild "{guild_name}" has players in exclusion list and cannot be deleted.\nExcluded player: {player_id}')
@@ -2883,7 +2895,11 @@ class MapTab(QWidget):
                     break
             except:
                 pass
-        reply = show_question(self, t('confirm.title') if t else 'Confirm', f'Delete guild "{guild_name}" and all {base_count} bases?\n\nThis will also delete all characters owned by guild members.')
+        reply = show_question(
+            self, t('deletion.ctx.delete_guild', default='Delete Guild'),
+            f'Delete 1 guild "{guild_name}", {base_count} bases, and '
+            f'{member_count} players with their associated Pals? This cannot be undone.',
+        )
         if reply:
             def task():
                 return delete_guild(guild_id)
@@ -2891,6 +2907,10 @@ class MapTab(QWidget):
                 if success:
                     self.refresh()
                     if self.parent_window:
+                        self.parent_window.record_pending_change(
+                            'Delete guild', context=guild_name,
+                            affected_count=1 + base_count + member_count,
+                            high_risk=True)
                         self.parent_window.refresh_all()
                     self._hide_all_radius_rings()
                     if hasattr(self, 'toggle_base_radius_rings') and self.toggle_base_radius_rings.isChecked():
@@ -3066,11 +3086,22 @@ class MapTab(QWidget):
         if uid_clean in [ex.replace('-', '').lower() for ex in constants.exclusions.get('players', [])]:
             show_warning(self, t('warning.title') if t else 'Warning', t('deletion.warning.protected_player') if t else f'Player "{player_name}" is in exclusion list and cannot be deleted.')
             return
+        if not show_question(
+            self, t('deletion.ctx.delete_player', default='Delete Player'),
+            f'Delete 1 player "{player_name}" and their associated Pals and save data? '
+            'This cannot be undone.',
+        ):
+            return
         def task():
-            delete_player(player_uid)
-        def on_finished(_):
+            return delete_player(player_uid)
+        def on_finished(success):
+            if not success:
+                return
             self.refresh()
             if self.parent_window:
+                self.parent_window.record_pending_change(
+                    'Delete player', context=player_name,
+                    affected_count=1, high_risk=True)
                 self.parent_window.refresh_all()
             self._hide_all_radius_rings()
             if hasattr(self, 'toggle_base_radius_rings') and self.toggle_base_radius_rings.isChecked():

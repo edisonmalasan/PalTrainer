@@ -134,13 +134,15 @@ def _load_relic_data():
         return ({}, {})
 RELIC_CUMULATIVE_MAX, RELIC_MAX_RANK = _load_relic_data()
 RELIC_TO_STATUS_NAME = {'EPalRelicType::CapturePower': '捕獲率', 'EPalRelicType::HungerReduction': '空腹率低減', 'EPalRelicType::SwimSpeed': '泳ぎ速度', 'EPalRelicType::FoodDecayReduction': '食料腐敗低減', 'EPalRelicType::JumpPower': 'ジャンプ力', 'EPalRelicType::GliderSpeed': '滑空速度', 'EPalRelicType::ClimbSpeed': '崖登り速度', 'EPalRelicType::StatusAilmentResist': '状態異常耐性', 'EPalRelicType::ExpBonus': '経験値ボーナス', 'EPalRelicType::RainbowPassiveRate': '虹パッシブ率', 'EPalRelicType::MoveSpeed': '移動速度アップ', 'EPalRelicType::SphereHoming': 'パルスフィアホーミング', 'EPalRelicType::StaminaReduction': 'スタミナ消費軽減'}
-def max_all_abilities(player_uids):
+def max_all_abilities(player_uids, *, result_details=False):
     if not constants.loaded_level_json:
         return False
     if not constants.current_save_path:
         return False
     from palworld_aio.utils import sav_to_gvasfile, gvasfile_to_sav
     level_changed = False
+    player_files = 0
+    level_players = 0
     for uid in player_uids:
         uid_clean = str(uid).replace('-', '').upper()
         players_dir = os.path.join(constants.current_save_path, 'Players')
@@ -161,10 +163,13 @@ def max_all_abilities(player_uids):
         if rd.get('RelicBonusExpTableIndex', {}).get('value', 0) < 9999:
             rd['RelicBonusExpTableIndex'] = {'id': None, 'value': 9999, 'type': 'IntProperty'}
         gvasfile_to_sav(gvas, sav_path)
+        player_files += 1
         entry = constants.player_character_cache.get(uid_clean.lower())
         if not entry:
             continue
         sv = entry['value']['RawData']['value']['object']['SaveParameter']['value']
+        from copy import deepcopy
+        before_status = deepcopy(sv.get('GotStatusPointList'))
         sl = sv.setdefault('GotStatusPointList', {}).setdefault('value', {}).setdefault('values', [])
         seen_names = {s.get('StatusName', {}).get('value', ''): s for s in sl}
         for rk, stat_name in RELIC_TO_STATUS_NAME.items():
@@ -176,16 +181,20 @@ def max_all_abilities(player_uids):
             else:
                 sl.append({'StatusName': {'id': None, 'value': stat_name, 'type': 'NameProperty'}, 'StatusPoint': {'id': None, 'value': max_val, 'type': 'IntProperty'}})
                 level_changed = True
+        if sv.get('GotStatusPointList') != before_status:
+            level_players += 1
     if level_changed:
         constants.dirty = True
-    return True
-def set_ability_values(player_uids, ability_values):
+    return {'player_files': player_files, 'level_players': level_players} if result_details else True
+def set_ability_values(player_uids, ability_values, *, result_details=False):
     if not constants.loaded_level_json:
         return False
     if not constants.current_save_path:
         return False
     from palworld_aio.utils import sav_to_gvasfile, gvasfile_to_sav
     level_changed = False
+    player_files = 0
+    level_players = 0
     for uid in player_uids:
         uid_clean = str(uid).replace('-', '').upper()
         players_dir = os.path.join(constants.current_save_path, 'Players')
@@ -209,10 +218,13 @@ def set_ability_values(player_uids, ability_values):
             rd['RelicPossessNum'] = {'id': None, 'value': 0, 'type': 'IntProperty'}
         rd['RelicPossessNum']['value'] = sum((e.get('value', 0) for e in rmap['value']))
         gvasfile_to_sav(gvas, sav_path)
+        player_files += 1
         entry = constants.player_character_cache.get(uid_clean.lower())
         if not entry:
             continue
         sv = entry['value']['RawData']['value']['object']['SaveParameter']['value']
+        from copy import deepcopy
+        before_status = deepcopy(sv.get('GotStatusPointList'))
         sl = sv.setdefault('GotStatusPointList', {}).setdefault('value', {}).setdefault('values', [])
         seen_names = {s.get('StatusName', {}).get('value', ''): s for s in sl}
         for rk, val in ability_values.items():
@@ -230,9 +242,11 @@ def set_ability_values(player_uids, ability_values):
             else:
                 sl.append({'StatusName': {'id': None, 'value': stat_name, 'type': 'NameProperty'}, 'StatusPoint': {'id': None, 'value': status_point, 'type': 'IntProperty'}})
                 level_changed = True
+        if sv.get('GotStatusPointList') != before_status:
+            level_players += 1
     if level_changed:
         constants.dirty = True
-    return True
+    return {'player_files': player_files, 'level_players': level_players} if result_details else True
 def adjust_player_level(player_uid, target_level):
     if target_level < 1 or target_level > 80:
         return False

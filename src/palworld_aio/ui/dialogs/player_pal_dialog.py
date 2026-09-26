@@ -558,7 +558,8 @@ class PlayerPalActionDialog(BaseDialog):
             t('player_pal.confirm_delete_all', default='Confirm Delete All'),
             t('player_pal.confirm_delete_all_count_msg',
               default='Delete {count} {pal_name} Pals from the loaded save (players and bases)? This cannot be undone. Back up the save before continuing.',
-              count=affected, pal_name=self.selected_pal_name),
+              count=affected, pal_name=self.selected_pal_name)
+            + '\nDPS and Global Pal Storage files are written immediately when present.',
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             action = f'delete_pal:{self.selected_pal_id}'
@@ -574,6 +575,17 @@ class PlayerPalActionDialog(BaseDialog):
         if not self.selected_active_skill_id and (not self.selected_passive_skill_id):
             QMessageBox.warning(self, t('player_pal.no_skill_selected') if t else 'No Skill Selected', t('player_pal.select_skill_first') if t else 'Please select at least one skill.')
             return
+        scope_parts = []
+        if self.skills_player_pals_checkbox.isChecked():
+            scope_parts.append('player')
+        if self.skills_base_pals_checkbox.isChecked():
+            scope_parts.append('base')
+        if self.skills_dps_pals_checkbox.isChecked():
+            scope_parts.append('dps')
+        scope_str = ','.join(scope_parts) if scope_parts else 'all'
+        from palworld_aio.editor.pal_editor.pal_editor_global_ops import count_pals_with_skills
+        affected = count_pals_with_skills(
+            self.selected_active_skill_id, self.selected_passive_skill_id, scope_str)
         skill_names = []
         if self.selected_active_skill_name:
             skill_names.append(f'Active: {self.selected_active_skill_name}')
@@ -586,16 +598,11 @@ class PlayerPalActionDialog(BaseDialog):
             msg = re.sub(r'\{[^}]+\}', skills_text, msg)
         else:
             msg = f"Remove the following skills from ALL pals (players + bases)?\n- {skills_text}\n\nThis will also remove them from learned skills lists. This cannot be undone!"
+        msg = f'{affected} Pals in the selected scope have these skills.\n' + msg
+        if 'dps' in scope_parts or scope_str == 'all':
+            msg += '\nDPS files are written immediately. Back up the save before continuing.'
         reply = QMessageBox.question(self, t('player_pal.confirm_remove_all') if t else 'Confirm Remove Skills', msg, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
-            scope_parts = []
-            if self.skills_player_pals_checkbox.isChecked():
-                scope_parts.append('player')
-            if self.skills_base_pals_checkbox.isChecked():
-                scope_parts.append('base')
-            if self.skills_dps_pals_checkbox.isChecked():
-                scope_parts.append('dps')
-            scope_str = ','.join(scope_parts) if scope_parts else 'all'
             action = f"remove_all:{self.selected_active_skill_id or ''}:{self.selected_passive_skill_id or ''}:{scope_str}"
             self.workflow_review.set_progress(
                 0, 1, t('ui.bulk.applying', default='Applying changes…'))

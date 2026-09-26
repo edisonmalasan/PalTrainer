@@ -1096,7 +1096,7 @@ def get_item_economy_stats(item_id):
         import traceback
         traceback.print_exc()
         return None
-def remove_item_from_guilds(item_id, percentage=None, guild_ids=None):
+def remove_item_from_guilds(item_id, percentage=None, guild_ids=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return {'removed': 0, 'containers_affected': 0}
     removed_count = 0
@@ -1144,20 +1144,23 @@ def remove_item_from_guilds(item_id, percentage=None, guild_ids=None):
                                 current_count = raw_value.get('count', 1)
                                 if percentage is not None:
                                     new_count = int(current_count * (1 - percentage / 100.0))
-                                    raw_value['count'] = new_count
-                                    if new_count == 0:
+                                    if not preview_only:
+                                        raw_value['count'] = new_count
+                                        if new_count == 0:
+                                            item_data['static_id'] = ''
+                                            raw_value['count'] = 0
+                                else:
+                                    if not preview_only:
                                         item_data['static_id'] = ''
                                         raw_value['count'] = 0
-                                else:
-                                    item_data['static_id'] = ''
-                                    raw_value['count'] = 0
                                 modified = True
                                 removed_count += current_count
                         except:
                             continue
                     if modified:
                         containers_affected += 1
-                        container_data['value']['Slots']['value']['values'] = slots
+                        if not preview_only:
+                            container_data['value']['Slots']['value']['values'] = slots
                     trade_infos = booth_trade_map.get(container_id)
                     if trade_infos is not None:
                         booth_removed = 0
@@ -1167,9 +1170,10 @@ def remove_item_from_guilds(item_id, percentage=None, guild_ids=None):
                                 booth_removed += t.get('product', {}).get('num', 1)
                             else:
                                 keep.append(t)
-                        trade_infos[:] = keep
+                        if not preview_only:
+                            trade_infos[:] = keep
                         removed_count += booth_removed
-        if removed_count > 0:
+        if removed_count > 0 and not preview_only:
             constants.invalidate_container_lookup()
         return {'removed': removed_count, 'containers_affected': containers_affected}
     except Exception as e:
@@ -1496,6 +1500,36 @@ def get_structure_economy_stats(structure_asset):
         import traceback
         traceback.print_exc()
         return None
+def count_structures_for_removal(structure_asset, guild_ids=None):
+    """Count completed matching structures in the selected guilds."""
+    if not constants.loaded_level_json:
+        return 0
+    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+    map_objs = wsd.get('MapObjectSaveData', {}).get('value', {}).get('values', [])
+    count = 0
+    for obj in map_objs:
+        oid = obj.get('MapObjectId', {}).get('value', '')
+        if not oid or oid.lower() != structure_asset.lower():
+            continue
+        bp = obj.get('Model', {}).get('value', {}).get('BuildProcess', {}).get(
+            'value', {}).get('RawData', {}).get('value', {})
+        if bp.get('state') != 1:
+            continue
+        raw = obj.get('Model', {}).get('value', {}).get('RawData', {}).get('value', {})
+        if not isinstance(raw, dict) or not raw.get('base_camp_id_belong_to'):
+            continue
+        base_id = str(raw['base_camp_id_belong_to']).replace('-', '').lower()
+        guild = constants.base_guild_lookup.get(base_id)
+        if not guild:
+            guild = next((value for key, value in constants.base_guild_lookup.items()
+                          if key.replace('-', '').lower() == base_id), None)
+        guild_id = guild.get('GuildID', '') if guild else ''
+        if guild_id and (guild_ids is None or
+                         str(guild_id).replace('-', '').lower() in guild_ids):
+            count += 1
+    return count
+
+
 def remove_structure_from_guilds(structure_asset, guild_ids=None):
     if not constants.loaded_level_json:
         return {'removed': 0, 'containers_affected': 0}

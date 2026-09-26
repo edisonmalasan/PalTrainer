@@ -3697,9 +3697,17 @@ class PlayerInventoryTab(QWidget):
     def _on_bulk_delete_items(self, items):
         if not self.inventory or not items:
             return
-        reply = self._themed_message_box(QMessageBox.Question, t('inventory.bulk_delete_title', default='Delete Items'), t('inventory.bulk_delete_confirm', n=len(items), default=f'Delete {len(items)} selected items?'), QMessageBox.Yes | QMessageBox.No)
+        reply = self._themed_message_box(
+            QMessageBox.Question,
+            t('inventory.bulk_delete_title', default='Delete Items'),
+            t('inventory.bulk_delete_confirm', n=len(items),
+              default='Delete {n} selected items?')
+            + '\nThis cannot be undone from the editor. Player file changes may be written immediately.',
+            QMessageBox.Yes | QMessageBox.No,
+        )
         if reply != QMessageBox.Yes:
             return
+        pending_world_items = 0
         for slot_data in items:
             container_type = slot_data.get('container_type', 'main')
             slot_index = slot_data.get('slot_index', 0)
@@ -3713,12 +3721,30 @@ class PlayerInventoryTab(QWidget):
             elif is_bounty and item_id:
                 self.inventory.remove_bounty_item(item_id)
             else:
-                self.inventory.remove_item(container_type, slot_index)
+                pending_world_items += bool(
+                    self.inventory.remove_item(container_type, slot_index))
+        if pending_world_items:
+            recorder = getattr(self.parent_window, 'record_pending_change', None)
+            if callable(recorder):
+                recorder('Delete player inventory items',
+                         context=str(self.current_player_uid),
+                         affected_count=pending_world_items, high_risk=True)
         self.selected_item = None
         self._refresh_display()
     def _on_bulk_clear_qty(self, items):
         if not self.inventory or not items:
             return
+        reply = self._themed_message_box(
+            QMessageBox.Question,
+            t('inventory.bulk_clear_qty_title', default='Clear Item Quantities'),
+            t('inventory.bulk_clear_qty_confirm', n=len(items),
+              default='Set the quantity of {n} selected items to zero? This cannot be undone.')
+            + '\nPlayer file changes may be written immediately.',
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        pending_world_items = 0
         for slot_data in items:
             container_type = slot_data.get('container_type', 'main')
             slot_index = slot_data.get('slot_index', 0)
@@ -3732,7 +3758,14 @@ class PlayerInventoryTab(QWidget):
             elif is_bounty and item_id:
                 self.inventory.remove_bounty_item(item_id)
             else:
-                self.inventory.update_quantity(container_type, slot_index, 0)
+                pending_world_items += bool(
+                    self.inventory.update_quantity(container_type, slot_index, 0))
+        if pending_world_items:
+            recorder = getattr(self.parent_window, 'record_pending_change', None)
+            if callable(recorder):
+                recorder('Clear player inventory quantities',
+                         context=str(self.current_player_uid),
+                         affected_count=pending_world_items, high_risk=True)
         self.selected_item = None
         self._refresh_display()
     def _show_item_context_menu(self, slot_data, pos):

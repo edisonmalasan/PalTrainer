@@ -504,6 +504,7 @@ class GuildAssignDialog(BaseDialog):
             QApplication.processEvents()
         constants.invalidate_container_lookup()
         self._completed = True
+        self.moved_count = successes
         self.cancel_btn.setEnabled(True)
         self.result_label.setProperty(
             'resultState', 'success' if failures == 0 else 'warning')

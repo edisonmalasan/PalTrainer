@@ -488,7 +488,7 @@ class PlayerItemActionDialog(BaseDialog):
             QMessageBox.warning(self, t('player_item.no_players_selected') if t else 'No Players Selected', t('player_item.select_at_least_one') if t else 'Please select at least one player.')
             return
         item_name = self.selected_item_name or 'this item'
-        reply = QMessageBox.question(self, t('player_item.confirm_remove') if t else 'Confirm Remove', t('player_item.confirm_remove_msg').format(item_name=item_name, count=len(selected_players)) if t else f'Remove all "{item_name}" from {len(selected_players)} selected player(s)?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        reply = QMessageBox.question(self, t('player_item.confirm_remove') if t else 'Confirm Remove', (t('player_item.confirm_remove_msg').format(item_name=item_name, count=len(selected_players)) if t else f'Remove all "{item_name}" from {len(selected_players)} selected player(s)?') + '\n' + t('ui.safety.player_bulk_mixed', default='Player files may be written immediately. Level changes remain pending until Save Changes; this action has no editor Undo.'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             self.workflow_review.set_progress(
                 0, len(selected_players),
@@ -514,7 +514,7 @@ class PlayerItemActionDialog(BaseDialog):
             t('player_item.confirm_add_msg',
               default='Add {quantity} × {item_name} to each of {count} selected players?',
               quantity=qty, item_name=item_name,
-              count=len(selected_players)),
+              count=len(selected_players)) + '\n' + t('ui.safety.player_bulk_mixed', default='Player files may be written immediately. Level changes remain pending until Save Changes; this action has no editor Undo.'),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
@@ -793,7 +793,7 @@ class PlayerItemActionDialog(BaseDialog):
         if not ability_values:
             QMessageBox.warning(self, t('player_item.no_players_selected') if t else 'No Abilities Selected', t('inventory.edit_abilities_none_checked', default='No abilities selected. Check at least one ability.'))
             return
-        reply = QMessageBox.question(self, t('inventory.edit_abilities_apply') if t else 'Apply Ability Changes', (t('inventory.edit_abilities_confirm.msg') if t else 'Apply ability changes to {count} player(s)?').format(count=len(uids)), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        reply = QMessageBox.question(self, t('inventory.edit_abilities_apply') if t else 'Apply Ability Changes', (t('inventory.edit_abilities_confirm.msg') if t else 'Apply ability changes to {count} player(s)?').format(count=len(uids)) + '\n' + t('ui.safety.player_bulk_mixed', default='Player files may be written immediately. Level changes remain pending until Save Changes; this action has no editor Undo.'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             self.workflow_review.set_progress(
                 0, len(uids),
@@ -821,11 +821,11 @@ class PlayerItemActionDialog(BaseDialog):
             QMessageBox.warning(self, t('player_item.no_players_selected') if t else 'No Players Selected', t('player_item.select_at_least_one') if t else 'Please select at least one player.')
             return
         if is_effigies:
-            reply = QMessageBox.question(self, t('inventory.max_all_abilities_confirm.title', default='Max All Abilities'), t('inventory.max_all_abilities_confirm.bulk_msg', count=len(uids), default='Max all relic abilities for {count} selected players?'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            reply = QMessageBox.question(self, t('inventory.max_all_abilities_confirm.title', default='Max All Abilities'), t('inventory.max_all_abilities_confirm.bulk_msg', count=len(uids), default='Max all relic abilities for {count} selected players?') + '\n' + t('ui.safety.player_bulk_mixed', default='Player files may be written immediately. Level changes remain pending until Save Changes; this action has no editor Undo.'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
                 self.add_all_effigies_requested.emit(uids)
         else:
-            reply = QMessageBox.question(self, f'Add All Key Items', f'Add all missing key items to {len(uids)} player(s)?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            reply = QMessageBox.question(self, f'Add All Key Items', f'Add all missing key items to {len(uids)} player(s)?\n' + t('ui.safety.player_bulk_mixed', default='Player files may be written immediately. Level changes remain pending until Save Changes; this action has no editor Undo.'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
                 self.add_all_key_items_requested.emit(uids)
     def _on_unlock_all_map_clicked(self):
@@ -842,7 +842,7 @@ class PlayerItemActionDialog(BaseDialog):
             ft_count = len(json.load(open(ft_path, 'r'))) if os.path.exists(ft_path) else 0
         except:
             ft_count = 0
-        reply = QMessageBox.question(self, t('inventory.unlock_all_map_confirm.title', default='Unlock All Fast Travel'), t('inventory.unlock_all_map_confirm.msg', count=len(uids), points=ft_count, players=len(uids), default=f'Unlock all {ft_count} fast travel points for {len(uids)} player(s)?'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        reply = QMessageBox.question(self, t('inventory.unlock_all_map_confirm.title', default='Unlock All Fast Travel'), t('inventory.unlock_all_map_confirm.msg', count=len(uids), points=ft_count, players=len(uids), default=f'Unlock all {ft_count} fast travel points for {len(uids)} player(s)?') + '\n' + t('ui.safety.player_bulk_direct', default='Player files are written immediately. This action has no pending Undo.'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             self.unlock_all_map_requested.emit(uids)
     def _player_filled_count(self, player_uid):
@@ -898,6 +898,6 @@ class PlayerItemActionDialog(BaseDialog):
         if blocked:
             QMessageBox.warning(self, t('player_item.modify_slots_title') if t else 'Modify Player Slots', t('player_item.modify_slots_blocked', slots=new_count) if t else f'Cannot shrink: these players have more items than {new_count} slots:\n{chr(10).join(blocked)}')
             return
-        reply = QMessageBox.question(self, t('player_item.modify_slots_title') if t else 'Modify Player Slots', t('player_item.modify_slots_confirm', count=len(uids), slots=new_count) if t else f'Resize inventory to {new_count} slots for {len(uids)} player(s)?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        reply = QMessageBox.question(self, t('player_item.modify_slots_title') if t else 'Modify Player Slots', (t('player_item.modify_slots_confirm', count=len(uids), slots=new_count) if t else f'Resize inventory to {new_count} slots for {len(uids)} player(s)?') + '\n' + t('ui.safety.player_bulk_level', default='Level changes remain pending until Save Changes; this action has no editor Undo.'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             self.modify_slots_requested.emit(uids, new_count)
