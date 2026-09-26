@@ -1941,3 +1941,48 @@ def test_guild_rebuild_review_counts_records_and_noop_has_no_pending_result(
 
     assert workflow['affected_count'] == 2
     assert workflow['operation']() == {'count': 0}
+
+
+def test_double_click_base_pal_delete_cancel_does_not_mutate(monkeypatch):
+    prompts = []
+    monkeypatch.setattr(base_inventory, 'safe_nested_get',
+                        lambda *a: {'CharacterID': {'value': 'TestPal'}})
+    monkeypatch.setattr(base_inventory, 'show_question',
+                        lambda _parent, _title, message:
+                        prompts.append(message) or False)
+    widget = SimpleNamespace(
+        _grid_idx_to_pal_idx=lambda _index: 0,
+        _pals=[{'character_entry': {}}],
+        _delete_base_pal=lambda _index:
+        (_ for _ in ()).throw(AssertionError('deleted')),
+    )
+
+    base_inventory.BasePalsContentWidget._on_pal_right_clicked(
+        widget, 0, 'delete_direct')
+
+    assert '1' in prompts[0]
+
+
+def test_base_pal_delete_journals_only_removed_level_record(monkeypatch):
+    entry = {'key': {'InstanceId': {'value': 'pal'}}}
+    world = {'properties': {'worldSaveData': {'value': {
+        'CharacterSaveParameterMap': {'value': [entry]},
+    }}}}
+    changes = []
+    monkeypatch.setattr(base_inventory.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(base_inventory, 'safe_nested_get', lambda *a: None)
+    widget = SimpleNamespace(
+        _pals=[{'character_entry': entry}],
+        _current_base_id='base',
+        _rebuild=lambda: None,
+        _refresh_dashboard=lambda: None,
+        pal_info=SimpleNamespace(_clear_display=lambda: None),
+        window=lambda: SimpleNamespace(record_pending_change=
+                                       lambda *a, **k: changes.append((a, k))),
+    )
+
+    assert base_inventory.BasePalsContentWidget._delete_base_pal(widget, 0)
+    assert world['properties']['worldSaveData']['value'][
+        'CharacterSaveParameterMap']['value'] == []
+    assert changes == [(('Delete base Pal',), {
+        'context': 'base', 'affected_count': 1, 'high_risk': True})]

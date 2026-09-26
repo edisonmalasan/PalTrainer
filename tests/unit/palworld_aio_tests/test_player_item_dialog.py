@@ -78,7 +78,9 @@ def test_add_item_keeps_existing_signal_contract_and_reports_result(
 
     assert seen == [(
         'AncientCore', 'add:7:CommonContainer', ['p1', 'p2'])]
-    assert confirmations == ['Add 7 × Ancient Core to each of 2 selected players?']
+    assert confirmations[0].startswith(
+        'Add 7 × Ancient Core to each of 2 selected players?')
+    assert 'Player files may be written immediately' in confirmations[0]
     assert dialog.workflow_review.progress.value() == 1
     assert dialog.workflow_review.result_label.isHidden() is False
 

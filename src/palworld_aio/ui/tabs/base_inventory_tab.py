@@ -646,7 +646,8 @@ class GuildStructurePickerDialog(BaseDialog):
         affected = count_structures_for_removal(
             self.selected_structure_asset, selected_guilds)
         if not affected:
-            show_warning(self, t('base_inventory.no_structures_removed'))
+            show_warning(self, t('base_inventory.confirm_delete_structures'),
+                         t('base_inventory.no_structures_removed'))
             return
         structure_name = self.selected_structure_name or self.selected_structure_asset
         msg_box = QMessageBox(self)
@@ -2402,10 +2403,12 @@ class BasePalsContentWidget(QFrame):
                 break
     def _delete_base_pal(self, pal_idx):
         pal = self._pals[pal_idx]
+        removed = False
         try:
             cmap = constants.loaded_level_json['properties']['worldSaveData']['value']['CharacterSaveParameterMap']['value']
             if pal['character_entry'] in cmap:
                 cmap.remove(pal['character_entry'])
+                removed = True
         except Exception:
             pass
         owner_raw = safe_nested_get(pal['character_entry'], ['value', 'RawData', 'value', 'object', 'SaveParameter', 'value', 'OwnerPlayerUId', 'value'])
@@ -2431,6 +2434,12 @@ class BasePalsContentWidget(QFrame):
         self.pal_info._hovered_data = None
         self.pal_info._clear_display()
         self._refresh_dashboard()
+        if removed:
+            recorder = getattr(self.window(), 'record_pending_change', None)
+            if callable(recorder):
+                recorder('Delete base Pal', context=str(self._current_base_id),
+                         affected_count=1, high_risk=True)
+        return removed
     def _on_pal_info_changed(self):
         for icon in self._icons:
             icon.update_display()
@@ -2817,13 +2826,13 @@ class BasePalsContentWidget(QFrame):
                     json.dump(export_data, f, cls=BackupEncoder, indent=2)
             show_information(self, t('edit_pals.export_pal'), t('edit_pals.export_pal.success', path=os.path.basename(file_path)))
             return
-        elif action == 'delete':
-            reply = show_question(self, t('edit_pals.confirm_delete'), 'Delete this pal?')
+        elif action in ('delete', 'delete_direct'):
+            reply = show_question(
+                self, t('edit_pals.confirm_delete'),
+                t('ui.safety.base_pal_delete_confirm',
+                  default='Delete 1 base Pal? This remains pending until Save Changes and has no editor Undo.'))
             if not reply:
                 return
-            self._delete_base_pal(pal_idx)
-            return
-        elif action == 'delete_direct':
             self._delete_base_pal(pal_idx)
             return
         item = self.grid.itemAt(idx)
@@ -5001,7 +5010,8 @@ class BaseInventoryTab(QWidget):
         try:
             if self.manager.save_changes():
                 recorder = getattr(self._main_window, 'record_pending_change', None)
-                if callable(recorder) and not self._suppress_next_auto_save_journal:
+                if callable(recorder) and not getattr(
+                        self, '_suppress_next_auto_save_journal', False):
                     recorder(
                         t('ui.pending.base_inventory',
                           default='Base inventory updated'),

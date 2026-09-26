@@ -2994,6 +2994,7 @@
     "ui.safety.player_bulk_mixed": "Player files may be written immediately. Level changes remain pending until Save Changes; this action has no editor Undo.",
     "ui.safety.player_bulk_direct": "Player files are written immediately. This action has no pending Undo.",
     "ui.safety.player_bulk_level": "Level changes remain pending until Save Changes; this action has no editor Undo.",
+    "ui.safety.base_pal_delete_confirm": "Delete 1 base Pal? This remains pending until Save Changes and has no editor Undo.",
     "modify.confirm.title": "Confirm Launch",
     "modify.confirm.question": "Launch external tool?",
     "modify.confirm.source": "Source: {src}",
