@@ -3707,6 +3707,17 @@ class PlayerInventoryTab(QWidget):
         )
         if reply != QMessageBox.Yes:
             return
+        if any(item.get('is_effigy') or item.get('is_bounty')
+               for item in items):
+            from palworld_aio.managers.save_manager import save_manager
+            try:
+                save_manager.create_operation_backup()
+            except Exception as error:
+                self._themed_message_box(
+                    QMessageBox.Warning,
+                    t('ui.save.backup_offer_title', default='Create a backup?'),
+                    str(error), QMessageBox.Ok)
+                return
         pending_world_items = 0
         for slot_data in items:
             container_type = slot_data.get('container_type', 'main')
@@ -3744,6 +3755,17 @@ class PlayerInventoryTab(QWidget):
         )
         if reply != QMessageBox.Yes:
             return
+        if any(item.get('is_effigy') or item.get('is_bounty')
+               for item in items):
+            from palworld_aio.managers.save_manager import save_manager
+            try:
+                save_manager.create_operation_backup()
+            except Exception as error:
+                self._themed_message_box(
+                    QMessageBox.Warning,
+                    t('ui.save.backup_offer_title', default='Create a backup?'),
+                    str(error), QMessageBox.Ok)
+                return
         pending_world_items = 0
         for slot_data in items:
             container_type = slot_data.get('container_type', 'main')
@@ -4116,6 +4138,16 @@ class PlayerInventoryTab(QWidget):
         msg = t('inventory.delete_confirm.msg', item=item_name, default=f'Delete "{item_name}"?')
         reply = self._themed_message_box(QMessageBox.Question, t('inventory.delete_confirm.title', default='Delete Item'), msg, QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
+            if (is_effigy or is_bounty) and item_id:
+                from palworld_aio.managers.save_manager import save_manager
+                try:
+                    save_manager.create_operation_backup()
+                except Exception as error:
+                    self._themed_message_box(
+                        QMessageBox.Warning,
+                        t('ui.save.backup_offer_title', default='Create a backup?'),
+                        str(error), QMessageBox.Ok)
+                    return
             if is_effigy and item_id:
                 relic_type = slot_data.get('relic_type', '')
                 if relic_type:

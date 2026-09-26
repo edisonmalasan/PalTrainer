@@ -209,10 +209,61 @@ def test_save_raises_write_error_and_cleans_tmp(session, save_dir, monkeypatch):
         raise RuntimeError('boom')
 
     monkeypatch.setattr('palworld_aio.utils.wrapper_to_sav', failing_wrapper_to_sav)
-    with pytest.raises(SaveWriteError):
+    with pytest.raises(SaveWriteError) as caught:
         session.save()
+    assert caught.value.original_changed is False
+    assert (save_dir / 'Level.sav').read_bytes() == b'save-data'
     leftovers = [p for p in save_dir.iterdir() if p.name.endswith('.sav.pt')]
     assert leftovers == []
+
+
+def test_player_delete_failure_reports_level_already_changed(
+        session, save_dir, monkeypatch):
+    player_file = save_dir / 'Players' / 'DEADBEEF.sav'
+    player_file.write_bytes(b'player')
+    constants.current_save_path = str(save_dir)
+    constants.loaded_level_json = {'fake': True}
+    constants.files_to_delete = {'deadbeef'}
+    constants.dirty = True
+    constants.xgp_loaded = False
+    def write_level(_wrapper, path):
+        with open(path, 'wb') as output:
+            output.write(b'new-level')
+
+    monkeypatch.setattr('palworld_aio.utils.wrapper_to_sav', write_level)
+    original_remove = os.remove
+
+    def fail_player_delete(path):
+        if os.fspath(path) == str(player_file):
+            raise PermissionError('player file locked')
+        return original_remove(path)
+
+    monkeypatch.setattr(os, 'remove', fail_player_delete)
+
+    with pytest.raises(SaveWriteError) as caught:
+        session.save()
+
+    assert caught.value.original_changed is True
+    assert (save_dir / 'Level.sav').read_bytes() == b'new-level'
+    assert player_file.read_bytes() == b'player'
+    assert constants.files_to_delete == {'deadbeef'}
+    assert constants.dirty is True
+
+
+def test_temp_file_creation_failure_leaves_original_unchanged(
+        session, save_dir, monkeypatch):
+    constants.current_save_path = str(save_dir)
+    constants.loaded_level_json = {'fake': True}
+    monkeypatch.setattr(
+        'palworld_aio.application.save_session.tempfile.mkstemp',
+        lambda **_kwargs: (_ for _ in ()).throw(PermissionError('locked')),
+    )
+
+    with pytest.raises(SaveWriteError) as caught:
+        session.save()
+
+    assert caught.value.original_changed is False
+    assert (save_dir / 'Level.sav').read_bytes() == b'save-data'
 
 
 # ---------------------------------------------------------------------------

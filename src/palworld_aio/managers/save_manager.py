@@ -6,6 +6,9 @@ from palsav import json_tools
 import logging
 import threading
 import re
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from collections import defaultdict
 from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -21,7 +24,7 @@ import palworld_coord
 from i18n import t
 from palworld_aio import constants
 from palworld_aio.application.derived_state import build_player_levels
-from palworld_aio.application.save_session import save_session, SavePathError, SaveNoPathError, SaveMissingPlayersError, SaveNotLevelError
+from palworld_aio.application.save_session import save_session, SaveBackupError, SavePathError, SaveNoPathError, SaveMissingPlayersError, SaveNotLevelError, SaveWriteError
 from palworld_aio.utils import sav_to_json, json_to_sav, sav_to_gvas_wrapper, wrapper_to_sav, sav_to_gvasfile, extract_value, sanitize_filename, format_duration_short, resolve_name, canonical_player_entries
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from palworld_aio.world.diagnostics import check_is_illegal_pal
@@ -37,12 +40,20 @@ def count_owned_pals(level_json):
     return _count_owned_pals(world_save_data)
 
 
+@dataclass(frozen=True, slots=True)
+class SaveFailureReport:
+    reason: str
+    original_changed: bool | None
+    backup_path: str | None
+
+
 class SaveManager(QObject):
     load_started = pyqtSignal()
     load_finished = pyqtSignal(bool)
     save_started = pyqtSignal()
     save_finished = pyqtSignal(float)
     save_failed = pyqtSignal(str)
+    backup_created = pyqtSignal(str)
     stats_updated = pyqtSignal(str)
     def __init__(self):
         super().__init__()
@@ -52,9 +63,46 @@ class SaveManager(QObject):
         self.player_sav_cache_lock = threading.Lock()
         self._xgp_temp_dir = None
         self._disabled_adapters: list[str] = []
+        self.last_save_failure: SaveFailureReport | None = None
+        self.last_backup_path: str | None = None
+        self.last_load_backup_created = False
+
+    def _create_pre_save_backup(self) -> str:
+        from palworld_aio.application.backup_catalog import (
+            create_backup_snapshot, default_backups_root,
+        )
+        root = default_backups_root() / 'Save Safety'
+        if constants.xgp_loaded:
+            source = Path(constants.xgp_container_path or '')
+            if not source.is_file():
+                raise FileNotFoundError('Game Pass container is unavailable')
+            root.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+            destination = root / f'GamePassContainer_backup_{stamp}{source.suffix}'
+            try:
+                shutil.copy2(source, destination)
+            except Exception:
+                destination.unlink(missing_ok=True)
+                raise
+            return str(destination)
+        return str(create_backup_snapshot(
+            Path(constants.current_save_path), root))
+
+    def create_operation_backup(self) -> str:
+        """Preserve the original save before an immediate high-risk write."""
+        try:
+            path = self._create_pre_save_backup()
+        except Exception as error:
+            raise SaveBackupError(
+                f'Backup failed before the operation; the original save was not changed: {error}'
+            ) from error
+        self.last_backup_path = path
+        self.backup_created.emit(path)
+        return path
 
     def _reset_state(self):
         save_session.reset()
+        self.last_load_backup_created = False
     def _load_from_path(self, level_sav_path: str, parent=None) -> bool:
         ok = save_session.load(level_sav_path)
         if not ok:
@@ -110,6 +158,7 @@ class SaveManager(QObject):
         set_last_save_path(d)
         if constants.automatic_backup_on_load:
             save_session.make_backup('AllinOneTools')
+            self.last_load_backup_created = True
         def load_task():
             try:
                 ok = self._load_from_path(p, parent)
@@ -149,7 +198,9 @@ class SaveManager(QObject):
         return True
     def is_save_stale(self, level_sav_path=None) -> bool:
         return save_session.is_stale()
-    def save_changes(self, parent=None) -> bool:
+    def save_changes(self, parent=None, *, backup_mode: str = 'none') -> bool:
+        if backup_mode not in ('none', 'offer', 'automatic'):
+            raise ValueError('unsupported backup mode')
         if is_loading_active():
             if parent:
                 show_question(parent, t('error.title'),
@@ -186,17 +237,41 @@ class SaveManager(QObject):
             if not _ok or not _name.strip():
                 return False
             self._xgp_new_world_name = _name.strip()
+        if backup_mode == 'offer':
+            backup_mode = ('automatic' if show_question(
+                parent, t('ui.save.backup_offer_title',
+                          default='Create a backup?'),
+                t('ui.save.backup_offer_message',
+                  default='Create a full recovery copy before saving these changes?'))
+                else 'none')
+        self.last_save_failure = None
+        self.last_backup_path = None
         self.save_started.emit()
         level_sav_path = os.path.join(constants.current_save_path, 'Level.sav')
         def save_task():
             t0 = time.perf_counter()
+            container_write_started = False
             try:
+                if backup_mode == 'automatic':
+                    self.last_backup_path = self.create_operation_backup()
                 save_session.save()
                 if constants.xgp_loaded:
+                    container_write_started = True
                     self._save_xgp_container()
             except Exception as error:
                 import traceback
                 traceback.print_exc()
+                if backup_mode == 'automatic' and self.last_backup_path is None:
+                    original_changed = False
+                elif isinstance(error, SaveWriteError):
+                    original_changed = (
+                        False if constants.xgp_loaded else error.original_changed)
+                elif container_write_started:
+                    original_changed = None
+                else:
+                    original_changed = None
+                self.last_save_failure = SaveFailureReport(
+                    str(error), original_changed, self.last_backup_path)
                 self.save_failed.emit(str(error))
                 raise
             duration = time.perf_counter() - t0

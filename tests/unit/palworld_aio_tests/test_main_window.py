@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -55,11 +56,13 @@ context.finish_load(SaveIdentity('world', 'Island', 'C:/saves/Level.sav'))
 journal = PendingChangeJournal()
 journal.changed.connect(context.set_pending_changes)
 activities = []
+errors = []
 window = SimpleNamespace(
     workspace_context=context,
     pending_journal=journal,
     shell_state=ShellStateModel(),
     _record_activity=lambda *args, **kwargs: activities.append((args, kwargs)),
+    _show_error=lambda *args: errors.append(args),
 )
 MainWindow._set_dirty(window, True)
 MainWindow._set_dirty(window, True)
@@ -68,6 +71,7 @@ assert context.snapshot.pending_changes.count == 1
 assert len(journal.changes) == 1
 context.begin_save()
 MainWindow._on_save_failed(window, 'disk error')
+assert 'original save may have changed' in errors[0][1]
 assert context.snapshot.save_state is ShellState.ERROR
 assert context.snapshot.pending_changes.count == 1
 assert len(journal.changes) == 1
@@ -209,7 +213,7 @@ class Manager(QObject):
     save_finished = pyqtSignal(float)
     save_failed = pyqtSignal(str)
     outcome = 'cancel'
-    def save_changes(self, parent=None):
+    def save_changes(self, parent=None, *, backup_mode='none'):
         if self.outcome == 'cancel':
             return False
         if self.outcome == 'exception':
@@ -304,7 +308,7 @@ class Manager(QObject):
     def __init__(self):
         super().__init__()
         self.loads = []
-    def save_changes(self, parent=None):
+    def save_changes(self, parent=None, *, backup_mode='none'):
         if self.outcome == 'cancel':
             return False
         if self.outcome == 'failure':
@@ -862,6 +866,7 @@ assert not (current / 'Players' / 'current.sav').exists()
 safety = tuple((root / 'Restore Safety').glob('PalworldSave_backup_*'))
 assert len(safety) == 1
 assert (safety[0] / 'Level.sav').read_bytes() == b'current'
+assert window.workspace_context.snapshot.backup.latest_id == str(safety[0])
 assert window.backups_page.result_banner is not None
 assert 'previous save is preserved' in (
     window.backups_page.result_banner.message_label.text())
@@ -1033,8 +1038,10 @@ def test_bulk_quantity_clear_cancel_does_not_mutate(monkeypatch):
     assert '1' in calls[0][1]
 
 
-def test_bulk_quantity_clear_records_only_pending_world_items():
+def test_bulk_quantity_clear_records_only_pending_world_items(monkeypatch):
     calls = []
+    monkeypatch.setattr(main_window.save_manager, 'create_operation_backup',
+                        lambda: calls.append(('backup',)) or 'snapshot')
     inventory = SimpleNamespace(
         set_effigy_count=lambda *args: calls.append(('effigy', args)),
         update_quantity=lambda *args: calls.append(('world', args)) or True,
@@ -1056,11 +1063,28 @@ def test_bulk_quantity_clear_records_only_pending_world_items():
 
     player_inventory.PlayerInventoryTab._on_bulk_clear_qty(tab, items)
 
+    assert calls[0] == ('backup',)
     assert ('world', ('main', 1, 0)) in calls
     assert ('effigy', ('Fire', 0)) in calls
     assert ('journal', ('Clear player inventory quantities',), {
         'context': 'uid', 'affected_count': 1, 'high_risk': True,
     }) in calls
+
+
+def test_bulk_effigy_clear_aborts_when_backup_fails(monkeypatch):
+    mutations = []
+    monkeypatch.setattr(main_window.save_manager, 'create_operation_backup',
+                        lambda: (_ for _ in ()).throw(OSError('backup failed')))
+    tab = SimpleNamespace(
+        inventory=SimpleNamespace(set_effigy_count=lambda *a:
+                                  mutations.append(a)),
+        _themed_message_box=lambda *a: player_inventory.QMessageBox.Yes,
+    )
+
+    player_inventory.PlayerInventoryTab._on_bulk_clear_qty(
+        tab, [{'is_effigy': True, 'item_id': 'Effigy', 'relic_type': 'Fire'}])
+
+    assert mutations == []
 
 
 def test_base_container_clear_cancel_preserves_booth_and_journal(monkeypatch):
@@ -1986,3 +2010,67 @@ def test_base_pal_delete_journals_only_removed_level_record(monkeypatch):
         'CharacterSaveParameterMap']['value'] == []
     assert changes == [(('Delete base Pal',), {
         'context': 'base', 'affected_count': 1, 'high_risk': True})]
+
+
+def test_save_backup_policy_follows_operation_risk_and_existing_backup(
+        monkeypatch):
+    modes = []
+    monkeypatch.setattr(main_window.constants, 'loaded_level_json',
+                        {'loaded': True})
+    monkeypatch.setattr(main_window.constants, 'files_to_delete', set())
+    monkeypatch.setattr(main_window.save_manager, 'save_changes',
+                        lambda *, parent, backup_mode: modes.append(backup_mode))
+    backup = SimpleNamespace(count=0, recommended=True)
+    summary = SimpleNamespace(has_high_risk=False)
+    window = SimpleNamespace(
+        _sync_dirty_from_runtime=lambda: None,
+        workspace_context=SimpleNamespace(snapshot=SimpleNamespace(
+            save_state=SimpleNamespace(value='dirty'), backup=backup)),
+        pending_journal=SimpleNamespace(summary=summary),
+    )
+
+    main_window.MainWindow._save_changes(window)
+    backup.count, backup.recommended = 1, False
+    main_window.MainWindow._save_changes(window)
+    summary.has_high_risk = True
+    main_window.MainWindow._save_changes(window)
+
+    assert modes == ['offer', 'none', 'automatic']
+
+
+def test_save_failure_reports_changed_original_and_recovery_path(monkeypatch):
+    messages = []
+    monkeypatch.setattr(main_window.save_manager, 'last_save_failure',
+                        SimpleNamespace(original_changed=True,
+                                        backup_path='C:/recovery/snapshot'))
+    window = SimpleNamespace(
+        shell_state=SimpleNamespace(finish_save=lambda _ok: None),
+        _record_activity=lambda *a, **k: None,
+        _show_error=lambda _title, message: messages.append(message),
+    )
+
+    main_window.MainWindow._on_save_failed(window, 'write failed')
+
+    assert 'original save changed' in messages[0]
+    assert 'C:/recovery/snapshot' in messages[0]
+
+
+def test_immediate_operation_backup_failure_prevents_write(monkeypatch):
+    writes = []
+    monkeypatch.setattr(main_window.save_manager, 'create_operation_backup',
+                        lambda: (_ for _ in ()).throw(RuntimeError('backup failed')))
+
+    with pytest.raises(RuntimeError, match='backup failed'):
+        main_window.MainWindow._with_operation_backup(
+            lambda: writes.append('written'))
+
+    assert writes == []
+
+
+def test_immediate_operation_failure_names_recovery_copy(monkeypatch):
+    monkeypatch.setattr(main_window.save_manager, 'create_operation_backup',
+                        lambda: 'C:/recovery/snapshot')
+
+    with pytest.raises(RuntimeError, match='C:/recovery/snapshot'):
+        main_window.MainWindow._with_operation_backup(
+            lambda: (_ for _ in ()).throw(OSError('write failed')))

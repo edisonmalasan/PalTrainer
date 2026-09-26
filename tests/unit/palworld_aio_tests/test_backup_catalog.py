@@ -92,8 +92,46 @@ def test_failed_restore_rolls_back_and_reports_safety_path(tmp_path, monkeypatch
 
     assert calls == 2
     assert caught.value.safety_backup_path.is_dir()
+    assert caught.value.original_changed is False
     assert (current / 'Level.sav').read_bytes() == b'current-level'
     assert (current / 'Players' / 'current.sav').is_file()
+
+
+def test_restore_stage_failure_keeps_original_and_safety_copy(
+        tmp_path, monkeypatch):
+    current = _save_folder(tmp_path / 'current', b'current')
+    backup_path = _save_folder(tmp_path / 'backup', b'backup')
+    record = catalog.BackupRecord(
+        'backup', backup_path, datetime(2026, 9, 9), 'Manual', 'World', 42)
+    monkeypatch.setattr(catalog, '_stage_snapshot',
+                        lambda *_args: (_ for _ in ()).throw(OSError('stage failed')))
+
+    with pytest.raises(catalog.BackupRestoreError) as caught:
+        catalog.restore_backup(record, current, tmp_path / 'safety')
+
+    assert caught.value.original_changed is False
+    assert caught.value.safety_backup_path.is_dir()
+    assert (current / 'Level.sav').read_bytes() == b'current-level'
+
+
+def test_restore_and_rollback_failure_reports_uncertain_original(
+        tmp_path, monkeypatch):
+    current = _save_folder(tmp_path / 'current', b'current')
+    backup_path = _save_folder(tmp_path / 'backup', b'backup')
+    record = catalog.BackupRecord(
+        'backup', backup_path, datetime(2026, 9, 9), 'Manual', 'World', 42)
+
+    def fail_install(stage, target):
+        shutil.copy2(stage / 'Level.sav', target / 'Level.sav')
+        raise OSError('install failed')
+
+    monkeypatch.setattr(catalog, '_install_staged_snapshot', fail_install)
+
+    with pytest.raises(catalog.BackupRestoreError) as caught:
+        catalog.restore_backup(record, current, tmp_path / 'safety')
+
+    assert caught.value.original_changed is None
+    assert caught.value.safety_backup_path.is_dir()
 
 
 def test_invalid_restore_inputs_and_size_formatting(tmp_path):

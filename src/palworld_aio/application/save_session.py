@@ -44,6 +44,10 @@ class SaveBackupError(SaveSessionError):
 class SaveWriteError(SaveSessionError):
     """Writing the save file failed."""
 
+    def __init__(self, message: str, *, original_changed: bool = False) -> None:
+        super().__init__(message)
+        self.original_changed = original_changed
+
 
 class SaveSnapshot:
     """Immutable record of file state at a point in time."""
@@ -320,8 +324,19 @@ class SaveSession:
             raise SaveSessionError('No save is currently loaded')
         level_sav_path = os.path.join(constants.current_save_path, 'Level.sav')
         from palworld_aio.utils import wrapper_to_sav
-        fd, tmp_path = tempfile.mkstemp(suffix='.sav.pt', dir=constants.current_save_path)
-        os.close(fd)
+        try:
+            fd, tmp_path = tempfile.mkstemp(
+                suffix='.sav.pt', dir=constants.current_save_path)
+        except Exception as error:
+            raise SaveWriteError(f'Write could not start: {error}') from error
+        try:
+            os.close(fd)
+        except Exception as error:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            raise SaveWriteError(f'Write could not start: {error}') from error
         try:
             wrapper_to_sav(constants.loaded_level_json, tmp_path)
             os.replace(tmp_path, level_sav_path)
@@ -332,23 +347,28 @@ class SaveSession:
                 except OSError:
                     pass
             raise SaveWriteError(f'Write failed: {e}') from e
-        players_folder = os.path.join(constants.current_save_path, 'Players')
-        for uid in constants.files_to_delete:
-            f = os.path.join(players_folder, uid.upper() + '.sav')
-            f_dps = os.path.join(players_folder, f'{uid.upper()}_dps.sav')
-            try:
-                os.remove(f)
-            except FileNotFoundError:
-                pass
-            try:
-                os.remove(f_dps)
-            except FileNotFoundError:
-                pass
-        constants.files_to_delete.clear()
-        if not constants.xgp_loaded:
-            constants.loaded_level_mtime = os.path.getmtime(level_sav_path)
-        self._last_snapshot = self.snapshot()
-        constants.dirty = False
+        try:
+            players_folder = os.path.join(constants.current_save_path, 'Players')
+            for uid in constants.files_to_delete:
+                f = os.path.join(players_folder, uid.upper() + '.sav')
+                f_dps = os.path.join(players_folder, f'{uid.upper()}_dps.sav')
+                try:
+                    os.remove(f)
+                except FileNotFoundError:
+                    pass
+                try:
+                    os.remove(f_dps)
+                except FileNotFoundError:
+                    pass
+            constants.files_to_delete.clear()
+            if not constants.xgp_loaded:
+                constants.loaded_level_mtime = os.path.getmtime(level_sav_path)
+            self._last_snapshot = self.snapshot()
+            constants.dirty = False
+        except Exception as error:
+            raise SaveWriteError(
+                f'Save did not finish: {error}', original_changed=True,
+            ) from error
 
 
 # module-level singleton for shared use
