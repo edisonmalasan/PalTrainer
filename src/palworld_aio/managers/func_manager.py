@@ -396,10 +396,16 @@ def delete_duplicated_players(parent=None):
                 for p in players:
                     p['role'] = 1 if str(p.get('player_uid', '')).replace('-', '').lower() == nu else 3
     return len(deleted_players) + removed_ghosts + removed_orphans + repaired_admins
-def delete_unreferenced_data(parent=None):
+def delete_unreferenced_data(parent=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return {}
     build_player_levels()
+    if preview_only:
+        import copy
+        level_json = {'properties': {'worldSaveData': {'value': copy.deepcopy(
+            constants.loaded_level_json['properties']['worldSaveData']['value'])}}}
+    else:
+        level_json = constants.loaded_level_json
     def normalize_uid(uid):
         if isinstance(uid, dict):
             uid = uid.get('value', '')
@@ -409,7 +415,7 @@ def delete_unreferenced_data(parent=None):
         return bp.get('state') == 0
     def is_dropped_item(obj):
         return obj.get('ConcreteModel', {}).get('value', {}).get('RawData', {}).get('value', {}).get('concrete_model_type') == 'PalMapObjectDropItemModel'
-    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+    wsd = level_json['properties']['worldSaveData']['value']
     group_data_list = wsd.get('GroupSaveDataMap', {}).get('value', [])
     char_map = wsd.get('CharacterSaveParameterMap', {}).get('value', [])
     char_containers = wsd.get('CharacterContainerSaveData', {}).get('value', [])
@@ -460,7 +466,8 @@ def delete_unreferenced_data(parent=None):
                 base_gid_raw = b['value']['RawData']['value'].get('group_id_belong_to')
                 base_gid = normalize_uid(base_gid_raw)
                 if base_gid == gid:
-                    delete_base_camp(b, gid_raw, delete_workers=True)
+                    delete_base_camp(b, gid_raw, level_json=level_json,
+                                     delete_workers=True)
             group_data_list.remove(group)
             removed_guilds += 1
             continue
@@ -494,7 +501,8 @@ def delete_unreferenced_data(parent=None):
             char_map.remove(pal)
     char_map[:] = [entry for entry in char_map if normalize_uid(entry.get('key', {}).get('PlayerUId')) not in unreferenced_uids + invalid_uids and normalize_uid(entry.get('value', {}).get('RawData', {}).get('value', {}).get('object', {}).get('SaveParameter', {}).get('value', {}).get('OwnerPlayerUId')) not in unreferenced_uids + invalid_uids]
     all_removed_uids = set(unreferenced_uids + invalid_uids)
-    constants.files_to_delete.update(all_removed_uids)
+    if not preview_only:
+        constants.files_to_delete.update(all_removed_uids)
     removed_pals = delete_player_pals(wsd, all_removed_uids)
     if all_removed_uids:
         map_objs = wsd.get('MapObjectSaveData', {}).get('value', {}).get('values', [])
@@ -574,7 +582,7 @@ def delete_unreferenced_data(parent=None):
         removed_orphaned_works = _cleanup_orphaned_works(wsd, deleted_instance_ids=deleted_ids)
     removed_orphaned_containers = _cleanup_orphaned_containers(wsd, deleted_container_ids)
     removed_orphaned_containers += _sweep_orphaned_item_containers(wsd)
-    removed_orphaned_dynamic = delete_orphaned_dynamic_items()
+    removed_orphaned_dynamic = delete_orphaned_dynamic_items(level_json=level_json)
     return {'characters': len(all_removed_uids), 'pals': removed_pals + len(orphaned_pals), 'guilds': removed_guilds, 'broken_objects': removed_broken, 'dropped_items': removed_drops, 'orphaned_dynamic_items': removed_orphaned_dynamic, 'orphaned_works': removed_orphaned_works, 'orphaned_containers': removed_orphaned_containers, 'treasure_dupes': removed_treasure_dupes}
 def _cleanup_orphaned_works(wsd, deleted_instance_ids=None, deleted_base_camp_ids=None, scope_base_camp_id=None):
     work_root = wsd.get('WorkSaveData', {})
@@ -968,7 +976,7 @@ def count_non_base_map_objects() -> int:
                 and not is_entity_in_exclusion_zones(map_object)):
             count += 1
     return count
-def delete_invalid_structure_map_objects(parent=None):
+def delete_invalid_structure_map_objects(parent=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return 0
     import os
@@ -1012,6 +1020,8 @@ def delete_invalid_structure_map_objects(parent=None):
                     deleted_instance_ids.add(concrete_str)
             deleted_container_ids |= _map_object_container_ids(m)
     deleted_count = initial_count - len(new_map_objs)
+    if preview_only:
+        return deleted_count
     map_objs[:] = new_map_objs
     if deleted_instance_ids:
         _cleanup_orphaned_works(wsd, deleted_instance_ids=deleted_instance_ids)
@@ -1701,7 +1711,7 @@ def unlock_viewing_cage_for_player(player_uid, parent=None):
         return True
     except Exception as e:
         return False
-def detect_and_trim_overfilled_inventories(parent=None):
+def detect_and_trim_overfilled_inventories(parent=None, *, preview_only=False):
     if not constants.current_save_path:
         return 0
     players_dir = os.path.join(constants.current_save_path, 'Players')
@@ -1746,15 +1756,25 @@ def detect_and_trim_overfilled_inventories(parent=None):
                     if len(slots) != target_slots or current_slot_num != target_slots:
                         before_count = len(slots)
                         if len(slots) > target_slots:
-                            slots[:] = slots[:target_slots]
+                            if not preview_only:
+                                slots[:] = slots[:target_slots]
+                            resulting_count = target_slots
                         elif len(slots) < target_slots:
-                            sc = StandardizedContainer(str(main_id), container, max_slots=target_slots)
-                            slots[:] = sc.get_raw_slots()
-                        changed = len(slots) != before_count
+                            if preview_only:
+                                resulting_count = target_slots
+                            else:
+                                sc = StandardizedContainer(str(main_id), container, max_slots=target_slots)
+                                resized_slots = sc.get_raw_slots()
+                                slots[:] = resized_slots
+                                resulting_count = len(resized_slots)
+                        else:
+                            resulting_count = before_count
+                        changed = resulting_count != before_count
                         if 'SlotNum' in container['value']:
-                            new_slot_num = len(slots)
+                            new_slot_num = resulting_count
                             if container['value']['SlotNum']['value'] != new_slot_num:
-                                container['value']['SlotNum']['value'] = new_slot_num
+                                if not preview_only:
+                                    container['value']['SlotNum']['value'] = new_slot_num
                                 changed = True
                         if changed:
                             fixed_containers += 1
@@ -1766,14 +1786,15 @@ def detect_and_trim_overfilled_inventories(parent=None):
                 slots = c['value']['Slots']['value']['values']
                 slot_num = c['value'].get('SlotNum', {}).get('value')
                 if slot_num is not None and slot_num > 0 and len(slots) > slot_num:
-                    slots[:] = slots[:slot_num]
+                    if not preview_only:
+                        slots[:] = slots[:slot_num]
                     fixed_containers += 1
             except Exception as e:
                 pass
         return fixed_containers
     except Exception as e:
         return 0
-def fix_all_negative_timestamps(parent=None):
+def fix_all_negative_timestamps(parent=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return 0
     fixed_count = 0
@@ -1789,14 +1810,16 @@ def fix_all_negative_timestamps(parent=None):
                     if 'last_online_real_time' in raw:
                         last_time = raw.get('last_online_real_time')
                         if last_time and int(last_time) > current_tick:
-                            raw['last_online_real_time'] = current_tick
+                            if not preview_only:
+                                raw['last_online_real_time'] = current_tick
                             fixed_count += 1
                     if 'object' in raw and 'SaveParameter' in raw['object']:
                         p = raw['object']['SaveParameter']['value']
                         if 'LastOnlineRealTime' in p:
                             last_time = p['LastOnlineRealTime'].get('value')
                             if last_time and int(last_time) > current_tick:
-                                p['LastOnlineRealTime']['value'] = current_tick
+                                if not preview_only:
+                                    p['LastOnlineRealTime']['value'] = current_tick
                                 fixed_count += 1
                 except:
                     continue
@@ -1811,17 +1834,19 @@ def fix_all_negative_timestamps(parent=None):
                         if 'player_info' in p_info and 'last_online_real_time' in p_info['player_info']:
                             last_time = p_info['player_info'].get('last_online_real_time')
                             if last_time and int(last_time) > current_tick:
-                                p_info['player_info']['last_online_real_time'] = current_tick
+                                if not preview_only:
+                                    p_info['player_info']['last_online_real_time'] = current_tick
                                 fixed_count += 1
                 except:
                     continue
     except Exception as e:
         pass
     return fixed_count
-def reset_selected_player_timestamp(player_uid, parent=None):
+def reset_selected_player_timestamp(player_uid, parent=None, *, result_details=False):
     if not constants.loaded_level_json:
         return False
     try:
+        changed = 0
         uid_clean = str(player_uid).replace('-', '').lower()
         wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
         current_tick = int(wsd['GameTimeSaveData']['value']['RealDateTimeTicks']['value'])
@@ -1830,10 +1855,12 @@ def reset_selected_player_timestamp(player_uid, parent=None):
                 char_uid = str(char['key']['PlayerUId']['value']).replace('-', '').lower()
                 if char_uid == uid_clean:
                     raw = char['value']['RawData']['value']
+                    changed += int(raw.get('last_online_real_time') != current_tick)
                     raw['last_online_real_time'] = current_tick
                     if 'object' in raw and 'SaveParameter' in raw['object']:
                         p = raw['object']['SaveParameter']['value']
                         if 'LastOnlineRealTime' in p:
+                            changed += int(p['LastOnlineRealTime'].get('value') != current_tick)
                             p['LastOnlineRealTime']['value'] = current_tick
         if 'GroupSaveDataMap' in wsd:
             group_map = wsd['GroupSaveDataMap']['value']
@@ -1843,11 +1870,14 @@ def reset_selected_player_timestamp(player_uid, parent=None):
                 for p_info in players:
                     if str(p_info.get('player_uid', '')).replace('-', '').lower() == uid_clean:
                         if 'player_info' in p_info:
+                            changed += int(p_info['player_info'].get('last_online_real_time') != current_tick)
                             p_info['player_info']['last_online_real_time'] = current_tick
-        return True
+        return {'changed': changed} if result_details else True
     except Exception as e:
         return False
-def remove_invalid_passives_from_save(parent=None):
+def remove_invalid_passives_from_save(parent=None, *, preview_only=False,
+                                      result_details=False):
+    empty = {'level_removed': 0, 'player_removed': 0, 'dps_removed': 0}
     base_dir = constants.get_base_path()
     valid_passives = set()
     try:
@@ -1858,15 +1888,16 @@ def remove_invalid_passives_from_save(parent=None):
             if isinstance(asset, str):
                 valid_passives.add(asset.lower())
     except:
-        return 0
+        return empty if preview_only or result_details else 0
     if not constants.current_save_path or not constants.loaded_level_json:
-        return 0
+        return empty if preview_only or result_details else 0
     try:
         wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
     except:
-        return 0
+        return empty if preview_only or result_details else 0
     players_dir = os.path.join(constants.current_save_path, 'Players')
     removed_count = 0
+    player_removed = 0
     cmap = wsd.get('CharacterSaveParameterMap', {}).get('value', [])
     for itm in cmap:
         try:
@@ -1876,7 +1907,8 @@ def remove_invalid_passives_from_save(parent=None):
                 new_p_list = [s for s in p_list if s.lower() in valid_passives]
                 removed = len(p_list) - len(new_p_list)
                 if removed > 0:
-                    raw['PassiveSkillList']['value']['values'] = new_p_list
+                    if not preview_only:
+                        raw['PassiveSkillList']['value']['values'] = new_p_list
                     removed_count += removed
         except:
             pass
@@ -1903,7 +1935,7 @@ def remove_invalid_passives_from_save(parent=None):
                                         else:
                                             changed = True
                                             local_removed += 1
-                                    if changed:
+                                    if changed and not preview_only:
                                         data['PassiveSkills']['value'] = new_skills
                             for v in data.values():
                                 remove_invalid_passives(v)
@@ -1911,17 +1943,23 @@ def remove_invalid_passives_from_save(parent=None):
                             for item in data:
                                 remove_invalid_passives(item)
                     remove_invalid_passives(gvas.properties)
-                    if changed:
+                    if changed and not preview_only:
                         gvasfile_to_sav(gvas, file_path)
                 except:
                     pass
                 return local_removed
             with ThreadPoolExecutor(max_workers=min(32, os.cpu_count() or 1) + 4) as executor:
                 results = list(executor.map(process_player_file, player_files))
-                removed_count += sum(results)
-    removed_count += _remove_invalid_passives_from_dps(valid_passives, players_dir)
-    return removed_count
-def _remove_invalid_passives_from_dps(valid_passives, players_dir):
+                player_removed = sum(results)
+    dps_removed = _remove_invalid_passives_from_dps(
+        valid_passives, players_dir, preview_only=preview_only)
+    if preview_only or result_details:
+        return {'level_removed': removed_count, 'player_removed': player_removed,
+                'dps_removed': dps_removed}
+    return removed_count + player_removed + dps_removed
+def _remove_invalid_passives_from_dps(valid_passives, players_dir, *, preview_only=False):
+    if not os.path.isdir(players_dir):
+        return 0
     from concurrent.futures import ThreadPoolExecutor
     dps_files = [os.path.join(players_dir, f) for f in os.listdir(players_dir) if f.endswith('_dps.sav')]
     if not dps_files:
@@ -1954,11 +1992,12 @@ def _remove_invalid_passives_from_dps(valid_passives, players_dir):
                 if len(filtered) != len(passives):
                     removed += len(passives) - len(filtered)
                     changed = True
-                    if isinstance(ps_val, dict):
-                        sp['PassiveSkillList']['value']['values'] = filtered
-                    else:
-                        sp['PassiveSkillList']['value'] = filtered
-            if changed:
+                    if not preview_only:
+                        if isinstance(ps_val, dict):
+                            sp['PassiveSkillList']['value']['values'] = filtered
+                        else:
+                            sp['PassiveSkillList']['value'] = filtered
+            if changed and not preview_only:
                 gvasfile_to_sav(gvas, fpath)
             return removed
         except:
@@ -2012,7 +2051,7 @@ def _is_skill_invalid_for_pal(skill_full, pal_learnset_set, skill_name_map, excl
             return True
     return False
 
-def fix_invalid_pal_active_skills(parent=None):
+def fix_invalid_pal_active_skills(parent=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return {'removed': 0, 'details': []}
     learnset = {}
@@ -2060,16 +2099,19 @@ def fix_invalid_pal_active_skills(parent=None):
                         new_skills.append(s)
                 if len(new_skills) != len(skills):
                     removed_count += len(skills) - len(new_skills)
-                    if isinstance(eq_val, dict):
-                        raw[skill_key]['value']['values'] = new_skills
-                    else:
-                        raw[skill_key]['value'] = new_skills
+                    if not preview_only:
+                        if isinstance(eq_val, dict):
+                            raw[skill_key]['value']['values'] = new_skills
+                        else:
+                            raw[skill_key]['value'] = new_skills
             if removed_from_pal:
                 display_name = f'{pal_name} ({nick})' if nick and nick != 'Unknown' else pal_name
                 details.append({'pal': display_name, 'character_id': cid, 'instance_id': inst_id[:8] if len(inst_id) > 8 else inst_id, 'removed_skills': removed_from_pal})
         except Exception:
             continue
     log_path = None
+    if preview_only:
+        return {'removed': removed_count, 'details': details, 'log_path': None}
     try:
         from resource_resolver import get_data_base
         log_dir = os.path.join(get_data_base(), 'Logs', 'Fix Invalid Skills')
@@ -2390,7 +2432,7 @@ def modify_all_guild_chest_slots(new_slot_num, parent=None, *, preview_only=Fals
         except:
             pass
     return modified
-def repair_structures(parent=None):
+def repair_structures(parent=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return None
     try:
@@ -2414,13 +2456,14 @@ def repair_structures(parent=None):
                     current = hp_data['current']
                     max_hp = hp_data['max']
                     if current < max_hp:
-                        hp_data['current'] = max_hp
+                        if not preview_only:
+                            hp_data['current'] = max_hp
                         repaired_structures += 1
         except Exception:
             continue
     skipped = total_structures - repaired_structures
     return {'repaired': repaired_structures, 'skipped': skipped}
-def repair_items(parent=None):
+def repair_items(parent=None, *, preview_only=False):
     if not constants.loaded_level_json:
         return None
     try:
@@ -2458,6 +2501,9 @@ def repair_items(parent=None):
                         did = it_raw.get('dynamic_id', {})
                         if not isinstance(did, dict):
                             continue
+                        if preview_only:
+                            repaired_count += 1
+                            continue
                         lid = did.get('local_id_in_created_world', '')
                         ls = str(lid).replace('-', '').lower()
                         nu = uuid.uuid4()
@@ -2479,6 +2525,9 @@ def repair_items(parent=None):
                 dynamic_id = item.get('dynamic_id', {})
                 if not isinstance(dynamic_id, dict):
                     continue
+                if preview_only:
+                    repaired_count += 1
+                    continue
                 local_id = dynamic_id.get('local_id_in_created_world', '')
                 local_id_str = str(local_id).replace('-', '').lower()
                 new_uuid = uuid.uuid4()
@@ -2492,8 +2541,8 @@ def repair_items(parent=None):
                 repaired_count += 1
             except:
                 continue
-    if repaired_count == 0:
-        return {'repaired': 0}
+    if repaired_count == 0 or preview_only:
+        return {'repaired': repaired_count}
     from palworld_aio.inventory.dynamic_item_manager import dynamic_item_manager
     old_dyn_by_id = {}
     for di in dynamic_items:
@@ -2518,14 +2567,15 @@ def repair_items(parent=None):
     if manager:
         manager.invalidate_cache()
     return {'repaired': repaired_count}
-def delete_orphaned_dynamic_items(parent=None):
-    if not constants.loaded_level_json:
+def delete_orphaned_dynamic_items(parent=None, *, level_json=None):
+    level_json = level_json if level_json is not None else constants.loaded_level_json
+    if not level_json:
         return 0
     def normalize_uid(uid):
         if isinstance(uid, dict):
             uid = uid.get('value', '')
         return str(uid).replace('-', '').lower()
-    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+    wsd = level_json['properties']['worldSaveData']['value']
     dynamic_items = wsd.get('DynamicItemSaveData', {}).get('value', {}).get('values', [])
     dynamic_ids = set()
     for di in dynamic_items:
@@ -2973,10 +3023,33 @@ def fix_all_pals_in_save(level_json, save_path, include_dps=True):
     wsd = level_json['properties']['worldSaveData']['value']
     return _fix_all_pals_core(wsd, save_path, include_dps=include_dps)
 
-def fix_all_pals_combined(parent=None):
+def fix_all_pals_combined(parent=None, *, result_details=False):
     if not constants.current_save_path or not constants.loaded_level_json:
-        return 0
+        return {'level_fixed': 0, 'dps_fixed': 0} if result_details else 0
+    if result_details:
+        level_fixed = fix_all_pals_in_save(
+            constants.loaded_level_json, constants.current_save_path,
+            include_dps=False)
+        dps_fixed = _apply_to_dps_files(
+            _restore_one_pal, constants.current_save_path)
+        return {'level_fixed': level_fixed, 'dps_fixed': dps_fixed}
     return fix_all_pals_in_save(constants.loaded_level_json, constants.current_save_path)
+
+
+def count_pals_for_fix_all() -> tuple[int, int]:
+    """Count Pal records eligible for the existing fix-all transform."""
+    world_count, dps_count = count_pals_for_max()
+    if not constants.loaded_level_json:
+        return world_count, dps_count
+    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+    world_count = sum(
+        bool(entry.get('value', {}).get('RawData', {}).get('value', {}).get(
+            'object', {}).get('SaveParameter', {}).get('value'))
+        and 'IsPlayer' not in entry['value']['RawData']['value']['object'][
+            'SaveParameter']['value']
+        for entry in wsd.get('CharacterSaveParameterMap', {}).get('value', [])
+    )
+    return world_count, dps_count
 def _max_one_pal(raw):
     from palworld_aio.editor.pal_editor.data import get_pal_base_data, _ensure_friendship_thresholds
     from palworld_aio.editor.pal_editor.legacy_frame import PalFrame
@@ -3344,9 +3417,9 @@ def scan_illegal_pals_by_owner():
                 result[uid_str]['guild_name'] = pinfo.get('guild_name', 'Unknown')
                 result[uid_str]['level'] = pinfo.get('level', 1)
     return dict(result)
-def fix_illegal_pals_in_save(parent=None, selected_uids=None):
+def fix_illegal_pals_in_save(parent=None, selected_uids=None, *, result_details=False):
     if not constants.current_save_path or not constants.loaded_level_json:
-        return 0
+        return {'level_fixed': 0, 'dps_fixed': 0} if result_details else 0
     from resource_resolver import get_data_base
     base_path = get_data_base()
     illegal_log_folder = os.path.join(base_path, 'Logs', 'Illegal Pal Logger')
@@ -3358,6 +3431,7 @@ def fix_illegal_pals_in_save(parent=None, selected_uids=None):
             pass
     players_dir = os.path.join(constants.current_save_path, 'Players')
     total_fixed = 0
+    level_fixed = 0
     try:
         os.makedirs(illegal_log_folder, exist_ok=True)
         error_log = open(error_log_path, 'w', encoding='utf-8')
@@ -3608,6 +3682,7 @@ def fix_illegal_pals_in_save(parent=None, selected_uids=None):
                             sp.pop('FoodRegeneEffectInfo', None)
                     if changed:
                         total_fixed += 1
+                        level_fixed += 1
                 except Exception as e:
                     import traceback
                     elog(f'Error fixing pal entry: {e}\n{traceback.format_exc()}')
@@ -3866,7 +3941,9 @@ def fix_illegal_pals_in_save(parent=None, selected_uids=None):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return 0
+        return {'level_fixed': level_fixed, 'dps_fixed': total_fixed - level_fixed} if result_details else 0
+    if result_details:
+        return {'level_fixed': level_fixed, 'dps_fixed': total_fixed - level_fixed}
     return total_fixed
 def gather_update_dynamic_containers_with_reporting(parent=None):
     try:

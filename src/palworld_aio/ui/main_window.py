@@ -27,7 +27,7 @@ from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from palworld_aio.utils import as_uuid
 from palworld_aio.managers.save_manager import save_manager
 from palworld_aio.managers.data_manager import get_guilds, get_guild_members, get_bases, delete_guild, delete_player, load_exclusions, save_exclusions, delete_base_camp
-from palworld_aio.managers.func_manager import delete_empty_guilds, count_empty_guilds, delete_inactive_players, delete_inactive_bases, delete_duplicated_players, delete_imported_pals, count_imported_pals, count_imported_pals_in_world, delete_unreferenced_data, delete_non_base_map_objects, count_non_base_map_objects, delete_invalid_structure_map_objects, delete_all_skins, count_level_skin_fields, unlock_all_private_chests, count_private_chest_unlocks, remove_invalid_items_from_save, remove_invalid_pals_from_save, remove_invalid_passives_from_save, fix_missions, count_reset_records, reset_anti_air_turrets, reset_dungeons, reset_oilrig, reset_invader, reset_supply, reset_lock_gimmick, unlock_viewing_cage_for_player, fix_all_negative_timestamps, reset_selected_player_timestamp, detect_and_trim_overfilled_inventories, unlock_all_technologies_for_player, unlock_all_lab_research_for_guild, modify_container_slots, modify_all_player_slots, modify_all_guild_chest_slots, fix_unassigned_pals, restore_all_pals, fix_all_pals_combined, max_all_pals, count_pals_for_max, fix_illegal_pals_in_save, fix_illegal_player_stats, repair_structures, repair_items, edit_game_days, scan_illegal_pals_by_owner, scan_illegal_players_by_stats, fix_invalid_pal_active_skills
+from palworld_aio.managers.func_manager import delete_empty_guilds, count_empty_guilds, delete_inactive_players, delete_inactive_bases, delete_duplicated_players, delete_imported_pals, count_imported_pals, count_imported_pals_in_world, delete_unreferenced_data, delete_non_base_map_objects, count_non_base_map_objects, delete_invalid_structure_map_objects, delete_all_skins, count_level_skin_fields, unlock_all_private_chests, count_private_chest_unlocks, remove_invalid_items_from_save, remove_invalid_pals_from_save, remove_invalid_passives_from_save, fix_missions, count_reset_records, reset_anti_air_turrets, reset_dungeons, reset_oilrig, reset_invader, reset_supply, reset_lock_gimmick, unlock_viewing_cage_for_player, fix_all_negative_timestamps, reset_selected_player_timestamp, detect_and_trim_overfilled_inventories, unlock_all_technologies_for_player, unlock_all_lab_research_for_guild, modify_container_slots, modify_all_player_slots, modify_all_guild_chest_slots, fix_unassigned_pals, restore_all_pals, fix_all_pals_combined, count_pals_for_fix_all, max_all_pals, count_pals_for_max, fix_illegal_pals_in_save, fix_illegal_player_stats, repair_structures, repair_items, edit_game_days, scan_illegal_pals_by_owner, scan_illegal_players_by_stats, fix_invalid_pal_active_skills
 from palworld_aio.managers.guild_manager import move_player_to_guild, rebuild_all_guilds, make_member_leader, rename_guild, set_guild_level
 from palworld_aio.managers.base_manager import export_base_json, import_base_json, clone_base_complete, update_base_area_range, get_last_import_audit
 from palworld_aio.managers.backup_manager import export_base_backup, load_base_file, compress_to_pst3
@@ -3493,19 +3493,43 @@ class MainWindow(QMainWindow):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
             return
-        def task():
-            return delete_unreferenced_data(self)
-        def on_finished(result):
-            self.refresh_all()
-            self._show_info(t('Done'), t('deletion.unreferenced_result',
-                                        characters=result.get('characters', 0),
-                                        pals=result.get('pals', 0),
-                                        guilds=result.get('guilds', 0),
-                                        broken_objects=result.get('broken_objects', 0),
-                                        dropped_items=result.get('dropped_items', 0),
-                                        treasure_dupes=result.get('treasure_dupes', 0),
-                                        orphaned_containers=result.get('orphaned_containers', 0)))
-        run_with_loading(on_finished, task)
+        def count_result(result):
+            return sum(value for value in result.values()
+                       if isinstance(value, int) and value > 0)
+        def on_preview(preview):
+            affected = count_result(preview)
+            if not affected:
+                self._show_info(t('Done'), t('deletion.unreferenced_result',
+                                            **{key: 0 for key in (
+                                                'characters', 'pals', 'guilds',
+                                                'broken_objects', 'dropped_items',
+                                                'treasure_dupes', 'orphaned_containers')}))
+                return
+            if not show_question(
+                self, t('deletion.menu.delete_unreferenced'),
+                t('ui.safety.unreferenced_confirm', count=affected,
+                  players=preview.get('characters', 0), pals=preview.get('pals', 0),
+                  guilds=preview.get('guilds', 0),
+                  default='Delete {count} unreferenced records, including {players} players, {pals} Pals, and {guilds} guilds? This cannot be undone after saving.'),
+            ):
+                return
+            def on_finished(result):
+                removed = count_result(result)
+                if removed:
+                    self.record_pending_change('Delete unreferenced data',
+                                               affected_count=removed, high_risk=True)
+                    self.refresh_all()
+                self._show_info(t('Done'), t('deletion.unreferenced_result',
+                                            characters=result.get('characters', 0),
+                                            pals=result.get('pals', 0),
+                                            guilds=result.get('guilds', 0),
+                                            broken_objects=result.get('broken_objects', 0),
+                                            dropped_items=result.get('dropped_items', 0),
+                                            treasure_dupes=result.get('treasure_dupes', 0),
+                                            orphaned_containers=result.get('orphaned_containers', 0)))
+            run_with_loading(on_finished, lambda: delete_unreferenced_data(self))
+        run_with_loading(on_preview,
+                         lambda: delete_unreferenced_data(self, preview_only=True))
     def _delete_non_base_map_objs(self):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
@@ -3713,6 +3737,7 @@ class MainWindow(QMainWindow):
     def _remove_invalid_structures(self):
         return self._run_loaded_save_repair(
             title=t('deletion.menu.delete_invalid_structures'),
+            affected_count=delete_invalid_structure_map_objects(self, preview_only=True),
             affected=t(
                 'repair.affected.invalid_structures',
                 default='Invalid structure map objects in the loaded world'),
@@ -3730,6 +3755,7 @@ class MainWindow(QMainWindow):
     def _repair_structures(self):
         return self._run_loaded_save_repair(
             title=t('deletion.menu.fix_structures'),
+            affected_count=(repair_structures(self, preview_only=True) or {}).get('repaired', 0),
             affected=t(
                 'repair.affected.structures',
                 default='All repairable structures in the loaded world'),
@@ -3744,6 +3770,7 @@ class MainWindow(QMainWindow):
     def _repair_items(self):
         return self._run_loaded_save_repair(
             title=t('deletion.menu.fix_items'),
+            affected_count=(repair_items(self, preview_only=True) or {}).get('repaired', 0),
             affected=t(
                 'repair.affected.items',
                 default='All repairable item durability records in the loaded save'),
@@ -3806,27 +3833,39 @@ class MainWindow(QMainWindow):
             self._show_info(t('Done'), t('deletion.imported_pals_removed', count=removed))
         run_with_loading(on_finished, task)
     def _remove_invalid_passives(self):
+        preview = remove_invalid_passives_from_save(self, preview_only=True)
         return self._run_loaded_save_repair(
             title=t('deletion.menu.delete_invalid_passives'),
-            affected=t(
-                'repair.affected.invalid_passives',
-                default='Invalid passive-skill references on Pals'),
+            affected=t('ui.safety.invalid_passives_scope',
+                       world=preview['level_removed'],
+                       files=preview['player_removed'] + preview['dps_removed'],
+                       default='{world} invalid Level passives and {files} player/DPS passives'),
             review=t(
                 'repair.review.invalid_passives',
                 default='Remove passive skills rejected by the existing skill validity checks.'),
-            operation=lambda: remove_invalid_passives_from_save(self),
-            result_message=lambda removed: t(
-                'deletion.invalid_passives_removed', count=removed),
+            risk=t('ui.safety.invalid_passives_risk',
+                   default='Player and DPS files are written immediately; Level changes remain pending until Save Changes.'),
+            operation=lambda: remove_invalid_passives_from_save(self, result_details=True),
+            result_message=lambda result: t(
+                'deletion.invalid_passives_removed',
+                count=sum(result.values())),
+            pending_count=lambda result: result['level_removed'],
         )
     def _fix_all_pals(self):
+        world_count, dps_count = count_pals_for_fix_all()
         return self._run_loaded_save_repair(
             title=t('func_manager.fix_all_pals.title'),
-            affected=t(
-                'repair.affected.all_pals', default='Every Pal in the loaded save'),
+            affected=t('ui.safety.fix_all_pals_scope', world=world_count,
+                       dps=dps_count,
+                       default='{world} Level Pals and {dps} DPS Pals'),
             review=t('func_manager.fix_all_pals.confirm'),
-            operation=lambda: fix_all_pals_combined(self),
-            result_message=lambda count: t(
-                'func_manager.fix_all_pals.success', count=count),
+            risk=t('ui.safety.fix_all_pals_risk',
+                   default='DPS files are written immediately; Level changes remain pending until Save Changes.'),
+            operation=lambda: fix_all_pals_combined(self, result_details=True),
+            result_message=lambda result: t(
+                'func_manager.fix_all_pals.success',
+                count=result['level_fixed'] + result['dps_fixed']),
+            pending_count=lambda result: result['level_fixed'],
         )
     def _max_all_pals(self):
         if not constants.loaded_level_json:
@@ -3877,9 +3916,16 @@ class MainWindow(QMainWindow):
             def start_fix(selected_uids):
                 def fix_task():
                     return fix_illegal_pals_in_save(
-                        self, selected_uids=selected_uids)
-                def on_fix_done(fixed):
-                    self.refresh_all()
+                        self, selected_uids=selected_uids,
+                        result_details=True)
+                def on_fix_done(result):
+                    fixed = result['level_fixed'] + result['dps_fixed']
+                    if result['level_fixed']:
+                        self.record_pending_change(
+                            'Fix illegal Level Pals',
+                            context='DPS files were written immediately',
+                            affected_count=result['level_fixed'], high_risk=True)
+                        self.refresh_all()
                     dlg.finish_repair(t(
                         'deletion.illegal_pals_fixed', count=fixed))
                 def on_fix_error(error):
@@ -3907,7 +3953,10 @@ class MainWindow(QMainWindow):
                     return fix_illegal_player_stats(
                         self, selected_uids=selected_uids)
                 def on_fix_done(fixed):
-                    self.refresh_all()
+                    if fixed:
+                        self.record_pending_change('Fix illegal player stats',
+                                                   affected_count=fixed, high_risk=True)
+                        self.refresh_all()
                     dlg.finish_repair(t(
                         'deletion.illegal_players_fixed', count=fixed))
                 def on_fix_error(error):
@@ -4015,6 +4064,7 @@ class MainWindow(QMainWindow):
                 'lock_gimmick_reset_count', count=count),
         )
     def _fix_invalid_active_skills(self):
+        preview = fix_invalid_pal_active_skills(self, preview_only=True)
         def result_message(result):
             removed = result.get('removed', 0)
             pals = len(result.get('details', []))
@@ -4025,6 +4075,7 @@ class MainWindow(QMainWindow):
             return msg
         return self._run_loaded_save_repair(
             title=t('deletion.menu.fix_invalid_active_skills'),
+            affected_count=preview['removed'],
             affected=t(
                 'repair.affected.active_skills',
                 default='Invalid active-skill references on every Pal'),
@@ -4037,6 +4088,7 @@ class MainWindow(QMainWindow):
     def _fix_all_timestamps(self):
         return self._run_loaded_save_repair(
             title=t('deletion.menu.fix_timestamps'),
+            affected_count=fix_all_negative_timestamps(self, preview_only=True),
             affected=t(
                 'repair.affected.timestamps',
                 default='Every player with a negative last-seen timestamp'),
@@ -4050,6 +4102,7 @@ class MainWindow(QMainWindow):
     def _reset_player_timestamp(self, uid):
         return self._run_loaded_save_repair(
             title=t('player.reset_timestamp.menu'),
+            affected_count=1,
             affected=t(
                 'repair.affected.player_timestamp',
                 default='Selected player: {uid}', uid=_short_guid(uid)),
@@ -4057,9 +4110,11 @@ class MainWindow(QMainWindow):
                 'repair.review.player_timestamp',
                 default='Reset this player timestamp to the current time.'),
             operation=lambda: require_repair_success(
-                lambda: reset_selected_player_timestamp(uid, self),
+                lambda: reset_selected_player_timestamp(
+                    uid, self, result_details=True),
                 t('timestamps.reset_failed')),
             result_message=lambda _success: t('timestamps.player_reset'),
+            pending_count=lambda result: result['changed'],
         )
     def _open_paldefender(self):
         if not constants.loaded_level_json:
@@ -4648,6 +4703,7 @@ class MainWindow(QMainWindow):
     def _trim_overfilled_inventories(self):
         return self._run_loaded_save_repair(
             title=t('deletion.menu.fix_overfilled_inventories'),
+            affected_count=detect_and_trim_overfilled_inventories(self, preview_only=True),
             affected=t(
                 'repair.affected.containers',
                 default='Underfilled and overfilled item and Pal containers'),

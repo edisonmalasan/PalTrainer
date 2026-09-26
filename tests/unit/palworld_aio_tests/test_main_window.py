@@ -969,7 +969,7 @@ def test_repair_actions_keep_manager_callbacks_behind_shared_review():
 
     illegal_pal_source = ast.unparse(methods['_fix_illegal_pals'])
     illegal_player_source = ast.unparse(methods['_fix_illegal_players'])
-    assert 'fix_illegal_pals_in_save(self, selected_uids=selected_uids)' in illegal_pal_source
+    assert 'fix_illegal_pals_in_save(self, selected_uids=selected_uids, result_details=True)' in illegal_pal_source
     assert 'fix_illegal_player_stats(self, selected_uids=selected_uids)' in illegal_player_source
 
 
@@ -1297,6 +1297,7 @@ def test_max_pal_preview_counts_level_and_dps_without_writes(monkeypatch, tmp_pa
                         lambda *args: (_ for _ in ()).throw(AssertionError('wrote DPS')))
 
     assert func_manager.count_pals_for_max() == (1, 1)
+    assert func_manager.count_pals_for_fix_all() == (1, 1)
     assert dps.properties['SaveParameterArray']['value']['values'][0][
         'SaveParameter']['value']['CharacterID']['value'] == 'ChickenPal'
 
@@ -1518,3 +1519,305 @@ def test_mission_reset_preview_counts_files_without_writing(monkeypatch, tmp_pat
 
     assert func_manager.fix_missions(preview_only=True)['fixed'] == 1
     assert quests == [1, 2]
+
+
+def test_unreferenced_preview_does_not_change_world_or_deletion_queue(monkeypatch):
+    from copy import deepcopy
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    world = {'properties': {'worldSaveData': {'value': {
+        'GroupSaveDataMap': {'value': []},
+        'CharacterSaveParameterMap': {'value': []},
+        'CharacterContainerSaveData': {'value': []},
+        'MapObjectSaveData': {'value': {'values': [{
+            'Model': {'value': {'BuildProcess': {'value': {
+                'RawData': {'value': {'state': 0}}}}}},
+        }]}},
+    }}}}
+    before = deepcopy(world)
+    queue = {'existing'}
+    monkeypatch.setattr(func_manager.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(func_manager.constants, 'files_to_delete', queue)
+    monkeypatch.setattr(func_manager, 'build_player_levels', lambda: None)
+    monkeypatch.setattr(func_manager, 'is_entity_in_exclusion_zones',
+                        lambda _entity: False)
+
+    preview = func_manager.delete_unreferenced_data(preview_only=True)
+
+    assert preview['broken_objects'] == 1
+    assert world == before
+    assert queue == {'existing'}
+
+
+def test_unreferenced_cleanup_cancel_does_not_run_mutator(monkeypatch):
+    prompts = []
+    monkeypatch.setattr(main_window.constants, 'loaded_level_json', {'properties': {}})
+    monkeypatch.setattr(main_window, 'delete_unreferenced_data',
+                        lambda _parent=None, *, preview_only=False:
+                        {'broken_objects': 2} if preview_only else
+                        (_ for _ in ()).throw(AssertionError('mutated')))
+    monkeypatch.setattr(main_window, 'run_with_loading',
+                        lambda done, task: done(task()))
+    monkeypatch.setattr(main_window, 'show_question',
+                        lambda _parent, _title, message:
+                        prompts.append(message) or False)
+    window = SimpleNamespace(
+        record_pending_change=lambda *a, **k: (_ for _ in ()).throw(
+            AssertionError('journaled')),
+        refresh_all=lambda: (_ for _ in ()).throw(AssertionError('refreshed')),
+    )
+
+    main_window.MainWindow._delete_unreferenced(window)
+
+    assert '2' in prompts[0]
+
+
+def test_structure_and_item_repair_previews_are_read_only(monkeypatch):
+    from copy import deepcopy
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    dynamic_items = import_from('palworld_aio.inventory.dynamic_item_manager')
+    world = {'properties': {'worldSaveData': {'value': {
+        'MapObjectSaveData': {'value': {'values': [{
+            'Model': {'value': {'RawData': {'value': {
+                'hp': {'current': 1, 'max': 10},
+            }}}},
+        }]}},
+        'ItemContainerSaveData': {'value': [{
+            'value': {'Slots': {'value': {'values': [{
+                'RawData': {'value': {'item': {
+                    'static_id': 'TestWeapon', 'dynamic_id': {},
+                }}},
+            }]}}},
+        }]},
+    }}}}
+    before = deepcopy(world)
+    monkeypatch.setattr(func_manager.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(dynamic_items, 'get_item_type', lambda _: 'weapon')
+
+    assert func_manager.repair_structures(preview_only=True)['repaired'] == 1
+    assert func_manager.repair_items(preview_only=True)['repaired'] == 1
+    assert world == before
+
+
+def test_invalid_structure_preview_does_not_delete_map_object(monkeypatch, tmp_path):
+    from copy import deepcopy
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    world = {'properties': {'worldSaveData': {'value': {
+        'MapObjectSaveData': {'value': {'values': [
+            {'MapObjectId': {'value': 'UnknownStructure'}},
+        ]}},
+    }}}}
+    before = deepcopy(world)
+    monkeypatch.setattr(func_manager.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(func_manager.constants, 'get_base_path', lambda: tmp_path)
+    monkeypatch.setattr(func_manager, 'resource_path', lambda *a: tmp_path)
+    monkeypatch.setattr(func_manager.json_tools, 'load',
+                        lambda _: {'structures': []})
+    monkeypatch.setattr(func_manager, 'is_entity_in_exclusion_zones',
+                        lambda _entity: False)
+    monkeypatch.setattr(func_manager, 'is_death_bag', lambda _entity: False)
+
+    assert func_manager.delete_invalid_structure_map_objects(
+        preview_only=True) == 1
+    assert world == before
+
+
+def test_timestamp_preview_and_noop_result_reflect_real_changes(monkeypatch):
+    from copy import deepcopy
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    uid = '11111111-1111-1111-1111-111111111111'
+    raw = {'last_online_real_time': 200}
+    world = {'properties': {'worldSaveData': {'value': {
+        'GameTimeSaveData': {'value': {'RealDateTimeTicks': {'value': 100}}},
+        'CharacterSaveParameterMap': {'value': [{
+            'key': {'PlayerUId': {'value': uid}},
+            'value': {'RawData': {'value': raw}},
+        }]},
+        'GroupSaveDataMap': {'value': []},
+    }}}}
+    before = deepcopy(world)
+    monkeypatch.setattr(func_manager.constants, 'loaded_level_json', world)
+
+    assert func_manager.fix_all_negative_timestamps(preview_only=True) == 1
+    assert world == before
+    assert func_manager.reset_selected_player_timestamp(
+        uid, result_details=True) == {'changed': 1}
+    assert func_manager.reset_selected_player_timestamp(
+        uid, result_details=True) == {'changed': 0}
+
+
+def test_invalid_passive_preview_keeps_level_and_files_unchanged(
+        monkeypatch, tmp_path):
+    from copy import deepcopy
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    players = tmp_path / 'Players'
+    players.mkdir()
+    (players / 'ABC.sav').write_bytes(b'placeholder')
+    (players / 'ABC_dps.sav').write_bytes(b'placeholder')
+    world = {'properties': {'worldSaveData': {'value': {
+        'CharacterSaveParameterMap': {'value': [{
+            'value': {'RawData': {'value': {'object': {'SaveParameter': {
+                'value': {'PassiveSkillList': {'value': {'values': ['BadSkill']}}}
+            }}}}},
+        }]},
+    }}}}
+    player = SimpleNamespace(properties={'PassiveSkills': {
+        'value': [{'value': 'BadSkill'}]}})
+    dps = SimpleNamespace(properties={'SaveParameterArray': {'value': {'values': [
+        {'SaveParameter': {'value': {'PassiveSkillList': {
+            'value': {'values': ['BadSkill']}}}}},
+    ]}}})
+    before = deepcopy((world, player.properties, dps.properties))
+    monkeypatch.setattr(func_manager.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(func_manager.constants, 'current_save_path', str(tmp_path))
+    monkeypatch.setattr(func_manager.constants, 'get_base_path', lambda: tmp_path)
+    monkeypatch.setattr(func_manager, 'resource_path', lambda *a: tmp_path)
+    monkeypatch.setattr(func_manager.json_tools, 'load', lambda _: {'passives': []})
+    monkeypatch.setattr(func_manager, 'sav_to_gvasfile',
+                        lambda path: dps if '_dps' in str(path) else player)
+    monkeypatch.setattr(func_manager, 'gvasfile_to_sav',
+                        lambda *a: (_ for _ in ()).throw(AssertionError('wrote file')))
+
+    assert func_manager.remove_invalid_passives_from_save(
+        preview_only=True) == {
+            'level_removed': 1, 'player_removed': 1, 'dps_removed': 1}
+    assert (world, player.properties, dps.properties) == before
+
+
+def test_invalid_active_skill_preview_does_not_edit_pal_or_write_log(monkeypatch):
+    from copy import deepcopy
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    world = {'properties': {'worldSaveData': {'value': {
+        'CharacterSaveParameterMap': {'value': [{
+            'key': {'InstanceId': {'value': 'instance'}},
+            'value': {'RawData': {'value': {'object': {'SaveParameter': {
+                'value': {'CharacterID': {'value': 'TestPal'},
+                          'EquipWaza': {'value': {'values': ['InvalidSkill']}}}
+            }}}}},
+        }]},
+    }}}}
+    before = deepcopy(world)
+    monkeypatch.setattr(func_manager.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(func_manager.constants, 'get_base_path', lambda: '')
+    monkeypatch.setattr(func_manager, 'resource_path', lambda *a: '')
+    monkeypatch.setattr(func_manager.json_tools, 'load', lambda _: {})
+    monkeypatch.setattr(func_manager, 'load_game_data_map', lambda *a: {})
+    monkeypatch.setattr(func_manager, '_build_skill_name_map', lambda: {})
+    monkeypatch.setattr(func_manager, '_is_skill_invalid_for_pal',
+                        lambda *a: True)
+
+    assert func_manager.fix_invalid_pal_active_skills(
+        preview_only=True)['removed'] == 1
+    assert world == before
+
+
+def test_fix_all_pals_reports_pending_level_and_direct_dps_separately(monkeypatch):
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    monkeypatch.setattr(func_manager.constants, 'loaded_level_json', {
+        'properties': {'worldSaveData': {'value': {}}}})
+    monkeypatch.setattr(func_manager.constants, 'current_save_path', 'fixture')
+    monkeypatch.setattr(func_manager, '_fix_all_pals_core',
+                        lambda _wsd, _path, *, include_dps: 2
+                        if not include_dps else 99)
+    monkeypatch.setattr(func_manager, '_apply_to_dps_files',
+                        lambda _transform, _path: 3)
+
+    assert func_manager.fix_all_pals_combined(
+        result_details=True) == {'level_fixed': 2, 'dps_fixed': 3}
+
+
+def test_container_trim_preview_does_not_resize_or_touch_registry(
+        monkeypatch, tmp_path):
+    from copy import deepcopy
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    players = tmp_path / 'Players'
+    players.mkdir()
+    (players / 'ABC.sav').write_bytes(b'placeholder')
+    world = {'properties': {'worldSaveData': {'value': {
+        'ItemContainerSaveData': {'value': [{
+            'key': {'ID': {'value': 'main'}},
+            'value': {'Slots': {'value': {'values': []}},
+                      'SlotNum': {'value': 1}},
+        }]},
+        'CharacterContainerSaveData': {'value': [{
+            'value': {'Slots': {'value': {'values': [1, 2]}},
+                      'SlotNum': {'value': 1}},
+        }]},
+    }}}}
+    gvas = SimpleNamespace(properties={'SaveData': {'value': {
+        'InventoryInfo': {'value': {
+            'CommonContainerId': {'value': {'ID': {'value': 'main'}}},
+            'EssentialContainerId': {'value': {'ID': {'value': 'key'}}},
+        }},
+    }}})
+    before = deepcopy(world)
+    monkeypatch.setattr(func_manager.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(func_manager.constants, 'current_save_path', str(tmp_path))
+    monkeypatch.setattr(func_manager, 'sav_to_gvasfile', lambda _: gvas)
+
+    assert func_manager.detect_and_trim_overfilled_inventories(
+        preview_only=True) == 2
+    assert world == before
+
+
+def test_guild_item_removal_preview_does_not_change_container(monkeypatch):
+    from copy import deepcopy
+    manager = import_from('palworld_aio.inventory.base_inventory_manager')
+    container = {'value': {'Slots': {'value': {'values': [{
+        'RawData': {'type': 'ArrayProperty', 'value': {
+            'item': {'static_id': 'TestItem'}, 'count': 5,
+        }},
+    }]}}}}
+    world = {'properties': {'worldSaveData': {'value': {
+        'MapObjectSaveData': {'value': {'values': []}},
+    }}}}
+    before = deepcopy((container, world))
+    monkeypatch.setattr(manager.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(manager.constants, 'get_container_lookup',
+                        lambda: {'container': container})
+    monkeypatch.setattr(manager, 'find_item_locations_efficient',
+                        lambda _item: {'guild': {'base': ['container']}})
+
+    assert manager.remove_item_from_guilds(
+        'TestItem', 50, ['guild'], preview_only=True) == {
+            'removed': 5, 'containers_affected': 1}
+    assert (container, world) == before
+
+
+def test_guild_item_bulk_cancel_never_runs_removal(monkeypatch):
+    manager = import_from('palworld_aio.inventory.base_inventory_manager')
+    prompts = []
+    monkeypatch.setattr(manager, 'remove_item_from_guilds',
+                        lambda _item, _pct, _guilds, *, preview_only=False:
+                        {'removed': 5, 'containers_affected': 1}
+                        if preview_only else
+                        (_ for _ in ()).throw(AssertionError('mutated')))
+    monkeypatch.setattr(base_inventory, 'show_question',
+                        lambda _parent, _title, message:
+                        prompts.append(message) or False)
+    tab = SimpleNamespace(_get_item_name=lambda _item: 'Test Item')
+
+    base_inventory.BaseInventoryTab._on_item_action_selected(
+        tab, 'TestItem', 'remove_pct:50', ['guild'])
+
+    assert '5' in prompts[0]
+
+
+def test_structure_removal_count_matches_selected_guild(monkeypatch):
+    manager = import_from('palworld_aio.inventory.base_inventory_manager')
+    world = {'properties': {'worldSaveData': {'value': {
+        'MapObjectSaveData': {'value': {'values': [
+            {'MapObjectId': {'value': 'TestStructure'},
+             'Model': {'value': {
+                 'BuildProcess': {'value': {'RawData': {'value': {'state': 1}}}},
+                 'RawData': {'value': {'base_camp_id_belong_to': 'base'}},
+             }}},
+        ]}},
+    }}}}
+    monkeypatch.setattr(manager.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(manager.constants, 'base_guild_lookup', {
+        'base': {'GuildID': 'guild'}})
+
+    assert manager.count_structures_for_removal(
+        'TestStructure', ['guild']) == 1
+    assert manager.count_structures_for_removal(
+        'TestStructure', ['other']) == 0
