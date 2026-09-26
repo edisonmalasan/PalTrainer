@@ -2975,6 +2975,7 @@
     "ui.safety.base_pals_food": "Apply this food buff to {count} base Pals? This cannot be undone from the editor.",
     "ui.safety.invalid_items_scope": "{world} invalid Level items and {files} player files",
     "ui.safety.invalid_items_risk": "Player files are written immediately; Level changes remain pending until Save Changes.",
+    "ui.safety.invalid_items_result": "{files} player files fixed; {world} Level items removed.",
     "ui.safety.invalid_pals_scope": "{world} invalid Level Pals and {dps} DPS Pals",
     "ui.safety.invalid_pals_risk": "DPS files are written immediately; Level changes remain pending until Save Changes.",
     "ui.safety.missions_risk": "Affected player files are written immediately. This action has no pending Undo.",

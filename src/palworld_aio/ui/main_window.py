@@ -3704,7 +3704,10 @@ class MainWindow(QMainWindow):
             risk=t('ui.safety.invalid_items_risk',
                    default='Player files are written immediately; Level changes remain pending until Save Changes.'),
             operation=lambda: remove_invalid_items_from_save(self, result_details=True),
-            result_message=lambda result: t('fixed_files', fixed=result['fixed_files']),
+            result_message=lambda result: t(
+                'ui.safety.invalid_items_result',
+                files=result['fixed_files'], world=result['level_removed'],
+                default='{files} player files fixed; {world} Level items removed.'),
             pending_count=lambda result: result['level_removed'],
         )
     def _remove_invalid_structures(self):
