@@ -1821,3 +1821,123 @@ def test_structure_removal_count_matches_selected_guild(monkeypatch):
         'TestStructure', ['guild']) == 1
     assert manager.count_structures_for_removal(
         'TestStructure', ['other']) == 0
+
+
+def test_viewing_cage_cancel_does_not_write_player_file(monkeypatch):
+    prompts = []
+    monkeypatch.setattr(main_window, 'show_question',
+                        lambda _parent, _title, message:
+                        prompts.append(message) or False)
+    monkeypatch.setattr(main_window, 'unlock_viewing_cage_for_player',
+                        lambda *a: (_ for _ in ()).throw(AssertionError('wrote')))
+
+    main_window.MainWindow._unlock_viewing_cage(SimpleNamespace(), 'player')
+
+    assert '1' in prompts[0]
+
+
+def test_base_clone_journals_only_success(monkeypatch):
+    calls = []
+    window = SimpleNamespace(
+        _run_transfer_workflow=lambda **kwargs: kwargs,
+        record_pending_change=lambda *a, **k: calls.append(('journal', a, k)),
+        refresh_all=lambda: calls.append(('refresh',)),
+    )
+
+    workflow = main_window.MainWindow._clone_base(window, 'base', 'guild')
+    workflow['on_completed'](False)
+    assert calls == []
+
+    workflow['on_completed'](True)
+    assert ('journal', ('Clone base',), {
+        'context': 'base', 'affected_count': 1, 'high_risk': True}) in calls
+    assert ('refresh',) in calls
+
+
+def test_duplicate_player_preview_does_not_mutate_world_or_deletion_queue(
+        monkeypatch, tmp_path):
+    from copy import deepcopy
+    func_manager = import_from('palworld_aio.managers.func_manager')
+    uid = '11111111-1111-1111-1111-111111111111'
+    player = {'player_uid': uid, 'player_info': {
+        'player_name': 'Player', 'last_online_real_time': 1}}
+    guild = {'key': 'guild', 'value': {
+        'GroupType': {'value': {'value': 'EPalGroupType::Guild'}},
+        'RawData': {'value': {'players': [deepcopy(player), deepcopy(player)],
+                              'admin_player_uid': uid}}}}
+    world = {'properties': {'worldSaveData': {'value': {
+        'GameTimeSaveData': {'value': {'RealDateTimeTicks': {'value': 100}}},
+        'GroupSaveDataMap': {'value': [guild]},
+        'CharacterSaveParameterMap': {'value': []},
+    }}}}
+    before = deepcopy(world)
+    queue = {'existing'}
+    monkeypatch.setattr(func_manager.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(func_manager.constants, 'current_save_path', str(tmp_path))
+    monkeypatch.setattr(func_manager.constants, 'files_to_delete', queue)
+    monkeypatch.setattr(func_manager, 'delete_player_pals', lambda *a: 0)
+    monkeypatch.setattr(func_manager, 'canonical_player_entries',
+                        lambda *a: ({}, {}))
+
+    assert func_manager.delete_duplicated_players(preview_only=True) == 1
+    assert world == before
+    assert queue == {'existing'}
+
+
+def test_bulk_ability_result_separates_written_player_from_pending_level(
+        monkeypatch, tmp_path):
+    player_manager = import_from('palworld_aio.managers.player_manager')
+    players_dir = tmp_path / 'Players'
+    players_dir.mkdir()
+    (players_dir / 'ABC.sav').write_bytes(b'fixture')
+    save_parameter = {'GotStatusPointList': {'value': {'values': [
+        {'StatusName': {'value': 'Capture'},
+         'StatusPoint': {'value': 3}},
+    ]}}}
+    gvas = SimpleNamespace(properties={'SaveData': {'value': {
+        'RecordData': {'value': {}}}}})
+    written = []
+    monkeypatch.setattr(player_manager.constants, 'loaded_level_json',
+                        {'properties': {'worldSaveData': {'value': {}}}})
+    monkeypatch.setattr(player_manager.constants, 'current_save_path', str(tmp_path))
+    monkeypatch.setattr(player_manager.constants, 'player_character_cache', {
+        'abc': {'value': {'RawData': {'value': {'object': {
+            'SaveParameter': {'value': save_parameter}}}}}}})
+    monkeypatch.setattr(player_manager, 'RELIC_TO_STATUS_NAME',
+                        {'Relic': 'Capture'})
+    monkeypatch.setattr(player_manager, 'RELIC_MAX_RANK', {'Relic': 3})
+    monkeypatch.setattr(player_manager, 'RELIC_CUMULATIVE_MAX', {'Relic': 3})
+    utils = import_from('palworld_aio.utils')
+    monkeypatch.setattr(utils, 'sav_to_gvasfile', lambda _path: gvas)
+    monkeypatch.setattr(utils, 'gvasfile_to_sav',
+                        lambda _gvas, path: written.append(path))
+
+    assert player_manager.max_all_abilities(
+        ['ABC'], result_details=True) == {
+            'player_files': 1, 'level_players': 0}
+    assert len(written) == 1
+
+    assert player_manager.set_ability_values(
+        ['ABC'], {'Relic': 2}, result_details=True) == {
+            'player_files': 1, 'level_players': 1}
+
+
+def test_guild_rebuild_review_counts_records_and_noop_has_no_pending_result(
+        monkeypatch):
+    world = {'properties': {'worldSaveData': {'value': {
+        'GroupSaveDataMap': {'value': [{
+            'value': {'GroupType': {'value': {
+                'value': 'EPalGroupType::Guild'}}}}]},
+        'CharacterSaveParameterMap': {'value': [{
+            'value': {'RawData': {'value': {'object': {
+                'SaveParameter': {'value': {'IsPlayer': {'value': False}}}
+            }}}}}]},
+    }}}}
+    monkeypatch.setattr(main_window.constants, 'loaded_level_json', world)
+    monkeypatch.setattr(main_window, 'rebuild_all_guilds', lambda: True)
+    window = SimpleNamespace(_run_loaded_save_repair=lambda **kwargs: kwargs)
+
+    workflow = main_window.MainWindow._rebuild_all_guilds(window)
+
+    assert workflow['affected_count'] == 2
+    assert workflow['operation']() == {'count': 0}

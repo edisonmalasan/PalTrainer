@@ -310,10 +310,15 @@ def delete_inactive_bases(filter_params, parent=None, *, preview_only=False):
         if manager:
             manager.invalidate_cache()
     return {'count': removed, 'details': deleted_info}
-def delete_duplicated_players(parent=None):
+def delete_duplicated_players(parent=None, *, preview_only=False):
     if not constants.current_save_path or not constants.loaded_level_json:
         return 0
-    wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
+    if preview_only:
+        import copy
+        wsd = copy.deepcopy(
+            constants.loaded_level_json['properties']['worldSaveData']['value'])
+    else:
+        wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
     tick_now = wsd['GameTimeSaveData']['value']['RealDateTimeTicks']['value']
     group_data_list = wsd['GroupSaveDataMap']['value']
     uid_to_player = {}
@@ -353,7 +358,8 @@ def delete_duplicated_players(parent=None):
         raw['players'] = filtered_players
     deleted_uids = {d['deleted_uid'] for d in deleted_players}
     if deleted_uids:
-        constants.files_to_delete.update(deleted_uids)
+        if not preview_only:
+            constants.files_to_delete.update(deleted_uids)
         delete_player_pals(wsd, deleted_uids)
     valid_uids = {str(p.get('player_uid', '')).replace('-', '') for g in wsd['GroupSaveDataMap']['value'] if g['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild' for p in g['value']['RawData']['value'].get('players', [])}
     removed_orphans = clean_character_save_parameter_map(wsd, valid_uids)

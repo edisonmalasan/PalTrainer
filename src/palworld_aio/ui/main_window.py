@@ -2251,6 +2251,13 @@ class MainWindow(QMainWindow):
             action_type = result[0]
             if action_type is None:
                 return
+            changed = result[1] or {}
+            if changed.get('containers_modified', 0):
+                self.record_pending_change(
+                    'Change player inventory items',
+                    affected_count=changed['containers_modified'], high_risk=True,
+                    context='Player files were written immediately',
+                )
             if action_type == 'remove_all':
                 r = result[1]
                 if r and r.get('players_affected', 0) > 0:
@@ -2273,9 +2280,13 @@ class MainWindow(QMainWindow):
     def _on_bulk_add_all_effigies(self, player_uids):
         def task():
             from palworld_aio.managers.player_manager import max_all_abilities
-            max_all_abilities(player_uids)
-            return True
-        def on_finished(_):
+            return max_all_abilities(player_uids, result_details=True)
+        def on_finished(result):
+            result = result or {'level_players': 0, 'player_files': 0}
+            if result['level_players']:
+                self.record_pending_change('Max player abilities',
+                    affected_count=result['level_players'], high_risk=True,
+                    context=f"{result['player_files']} player files were written immediately")
             self._show_info(t('inventory.max_all_abilities_done', default='Abilities maxed.'), t('inventory.max_all_abilities_done', default='Abilities maxed to maximum rank.'))
             if hasattr(self, 'refresh_all'):
                 self.refresh_all()
@@ -2283,9 +2294,13 @@ class MainWindow(QMainWindow):
     def _on_bulk_edit_abilities(self, player_uids, ability_values):
         def task():
             from palworld_aio.managers.player_manager import set_ability_values
-            set_ability_values(player_uids, ability_values)
-            return True
-        def on_finished(_):
+            return set_ability_values(player_uids, ability_values, result_details=True)
+        def on_finished(result):
+            result = result or {'level_players': 0, 'player_files': 0}
+            if result['level_players']:
+                self.record_pending_change('Edit player abilities',
+                    affected_count=result['level_players'], high_risk=True,
+                    context=f"{result['player_files']} player files were written immediately")
             self._show_info(t('inventory.edit_abilities_done', default='Abilities updated.'), t('inventory.edit_abilities_done', default='Ability values applied.'))
             if hasattr(self, 'refresh_all'):
                 self.refresh_all()
@@ -2384,6 +2399,10 @@ class MainWindow(QMainWindow):
             return (total_missing, players_affected)
         def on_finished(result):
             total_missing, players_affected = result
+            if total_missing:
+                self.record_pending_change('Add missing key items',
+                    affected_count=total_missing, high_risk=True,
+                    context=f'{players_affected} player files were written immediately')
             if total_missing == 0:
                 self._show_info(t('player_item.add_complete') if t else 'Add All Key Items', t('inventory.no_new_items') if t else 'All key items already present.')
             else:
@@ -2445,13 +2464,19 @@ class MainWindow(QMainWindow):
                     inv = PlayerInventory(uid)
                     if not inv.load():
                         continue
-                    if inv.set_max_slots(new_count):
+                    main_container = inv.get_container('main')
+                    before_slots = (main_container._standardized_container.max_slots
+                                    if main_container else None)
+                    if inv.set_max_slots(new_count) and before_slots != new_count:
                         modified += 1
                 except Exception as e:
                     print(f'Error resizing slots for player {uid}: {e}')
                     continue
             return modified
         def on_finished(modified):
+            if modified:
+                self.record_pending_change('Resize player inventories',
+                    affected_count=modified, high_risk=True)
             if hasattr(self, 'refresh_all'):
                 self.refresh_all()
             self._show_info(t('player_item.modify_slots_title') if t else 'Modify Player Slots', t('player_item.modify_slots_done', count=modified, slots=new_count) if t else f'Resized {modified} player inventories to {new_count} slots')
@@ -3423,25 +3448,14 @@ class MainWindow(QMainWindow):
         if not constants.loaded_level_json:
             self._show_warning(t('Error'), t('error.no_save_loaded'))
             return
-        # Duplicate records can also be removed from the character map. The
-        # confirmation names both populations before the legacy cleanup runs.
-        wsd = constants.loaded_level_json['properties']['worldSaveData']['value']
-        guild_players = [p for group in wsd.get('GroupSaveDataMap', {}).get('value', [])
-                         if group['value']['GroupType']['value']['value'] == 'EPalGroupType::Guild'
-                         for p in group['value']['RawData']['value'].get('players', [])]
-        known = set()
-        duplicates = 0
-        for player in guild_players:
-            raw_uid = player.get('player_uid', '')
-            uid = str(raw_uid.get('value', '') if isinstance(raw_uid, dict) else raw_uid).replace('-', '')
-            if uid and uid in known:
-                duplicates += 1
-            known.add(uid)
+        affected = delete_duplicated_players(self, preview_only=True)
+        if not affected:
+            self._show_info(t('Done'), t('deletion.duplicates_removed', count=0))
+            return
         if not show_question(
             self, t('deletion.menu.delete_duplicate_players'),
-            f'Clean {duplicates} duplicate guild player entries and inspect '
-            f'{len(wsd.get("CharacterSaveParameterMap", {}).get("value", []))} '
-            'character records for duplicate bodies? This cannot be undone after saving.',
+            t('ui.safety.duplicate_players_confirm', count=affected,
+              default='Clean {count} duplicate player, character, and guild records? This cannot be undone after saving.'),
         ):
             return
         def task():
@@ -4123,6 +4137,23 @@ class MainWindow(QMainWindow):
         dialog = PalDefenderDialog(self)
         dialog.exec()
     def _rebuild_all_guilds(self):
+        wsd = constants.loaded_level_json['properties']['worldSaveData']['value'] if constants.loaded_level_json else {}
+        guild_count = sum(
+            group.get('value', {}).get('GroupType', {}).get('value', {}).get('value')
+            == 'EPalGroupType::Guild'
+            for group in wsd.get('GroupSaveDataMap', {}).get('value', [])
+        )
+        pal_count = sum(
+            not character.get('value', {}).get('RawData', {}).get('value', {})
+            .get('object', {}).get('SaveParameter', {}).get('value', {})
+            .get('IsPlayer', {}).get('value', False)
+            for character in wsd.get('CharacterSaveParameterMap', {}).get('value', [])
+        )
+        def rebuild_with_result():
+            from copy import deepcopy
+            before = deepcopy(wsd)
+            require_repair_success(rebuild_all_guilds, t('guild.rebuild.failed'))
+            return {'count': guild_count + pal_count if wsd != before else 0}
         return self._run_loaded_save_repair(
             title=t('deletion.menu.fix_all_guilds'),
             affected=t(
@@ -4131,8 +4162,8 @@ class MainWindow(QMainWindow):
             review=t(
                 'repair.review.guilds',
                 default='Rebuild guild relationships using the existing guild manager action.'),
-            operation=lambda: require_repair_success(
-                rebuild_all_guilds, t('guild.rebuild.failed')),
+            affected_count=guild_count + pal_count,
+            operation=rebuild_with_result,
             result_message=lambda _success: t('guild.rebuild.done'),
         )
     def _open_guild_assign_dialog(self, selected_player_uids=()):
@@ -4390,6 +4421,12 @@ class MainWindow(QMainWindow):
             self.refresh_all()
             self._show_info(t('player.rename.done_title'), t('player.rename.done_msg', old=old_name, new=new_name))
     def _unlock_viewing_cage(self, uid):
+        if not show_question(
+            self, t('player.viewing_cage.unlocked'),
+            t('ui.safety.viewing_cage_confirm',
+              default='Update 1 player file to unlock its viewing cage? The file is written immediately and this has no pending Undo.'),
+        ):
+            return
         if unlock_viewing_cage_for_player(uid, self):
             self._show_info(t('Done'), t('player.viewing_cage.unlocked'))
         else:
@@ -4693,7 +4730,15 @@ class MainWindow(QMainWindow):
         current_radius = src_base_entry['value']['RawData']['value'].get('area_range', 3500.0)
         new_radius = RadiusInputDialog.get_radius(t('base.radius.title') if t else 'Adjust Base Radius', t('base.radius.prompt') if t else f'Current radius: {int(current_radius)}\nEnter new radius (50% -1000%):', current_radius, self)
         if new_radius is not None and new_radius != current_radius:
+            if not show_question(
+                self, t('base.radius.title'),
+                t('ui.safety.base_radius_confirm', radius=int(new_radius),
+                  default='Change the radius of 1 base to {radius}? This remains pending until Save Changes.'),
+            ):
+                return
             if update_base_area_range(constants.loaded_level_json, bid, new_radius):
+                self.record_pending_change('Adjust base radius', context=str(bid),
+                                           affected_count=1, high_risk=True)
                 self.refresh_all()
                 self._show_info(t('success.title') if t else 'Success', t('base.radius.updated', radius=int(new_radius)) if t else f'Base radius updated to {new_radius}\n\n⚠ Load this save in-game for structures to be reassigned.')
             else:
@@ -4719,7 +4764,10 @@ class MainWindow(QMainWindow):
             self._show_warning(t('Error') if t else 'Error', t('error.no_save_loaded') if t else 'No save file loaded.')
             return
         from palworld_aio.editor.dialogs import NudgeInputDialog
-        reply = show_question(self, t('confirm.title') if t else 'Confirm', t('base.palbox_nudge.warning') if t else 'This moves ONLY the Palbox structure. All other buildings stay in place. The base center will shift.\n\nContinue?')
+        reply = show_question(
+            self, t('confirm.title', default='Confirm'),
+            t('ui.safety.palbox_nudge_confirm',
+              default='Move 1 Palbox structure? All other buildings stay in place, but the base center shifts. This remains pending until Save Changes.'))
         if not reply:
             return
         dialog = NudgeInputDialog(self)
@@ -4762,12 +4810,19 @@ class MainWindow(QMainWindow):
             if not found:
                 self._show_warning(t('error.title') if t else 'Error', t('base.export.not_found') if t else 'Palbox not found for this base.')
                 return
+            self.record_pending_change('Nudge Palbox', context=str(bid),
+                                       affected_count=1, high_risk=True)
             self.refresh_all()
             self._show_info(t('success.title') if t else 'Success', t('base.palbox_nudge.success') if t else 'Palbox nudged successfully.')
         run_with_loading(on_finished, task)
     def _clone_base(self, bid, gid):
         def task():
             return clone_base_complete(constants.loaded_level_json, bid, gid)
+        def on_completed(success):
+            if success:
+                self.record_pending_change('Clone base', context=str(bid),
+                                           affected_count=1, high_risk=True)
+                self.refresh_all()
         def result_message(success):
             if success:
                 return t('clone_base.msg')
@@ -4785,9 +4840,8 @@ class MainWindow(QMainWindow):
             target=t(
                 'transfer.base.guild_target',
                 default='Guild {guild}', guild=_short_guid(gid)),
-            review=t(
-                'transfer.base.clone_review',
-                default='Create a new base with copied structures, containers, and ownership links.'),
+            review=t('ui.safety.clone_base_review',
+                     default='Create 1 new base with copied structures, containers, and ownership links.'),
             backup=t(
                 'repair.workflow.loaded_backup',
                 default=(
@@ -4799,7 +4853,7 @@ class MainWindow(QMainWindow):
             operation=task,
             result_message=result_message,
             result_success=bool,
-            on_completed=lambda _success: self.refresh_all(),
+            on_completed=on_completed,
             confirm_text=t('clone.base', default='Clone Base'),
         )
     def _edit_player_pals(self, uid, name):
