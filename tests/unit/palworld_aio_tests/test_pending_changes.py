@@ -89,6 +89,17 @@ def test_failed_undo_preserves_pending_change_and_new_edit_clears_redo():
     assert not journal.can_redo
 
 
+def test_inverse_callback_cannot_corrupt_journal_with_nested_record():
+    journal = journal_module.PendingChangeJournal()
+    journal.record('Reversible', undo=lambda: journal.record('Nested edit'))
+
+    with pytest.raises(RuntimeError, match='cannot record'):
+        journal.undo_last()
+
+    assert journal.summary.count == 1
+    assert journal.can_undo
+
+
 def test_context_distinguishes_backup_recommended_and_read_only():
     context = context_module.WorkspaceContext()
     context.finish_load(

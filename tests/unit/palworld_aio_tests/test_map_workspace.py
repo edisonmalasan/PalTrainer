@@ -64,6 +64,34 @@ def _base(identifier='base-001'):
     }
 
 
+def test_clear_zones_confirms_affected_count_before_write(monkeypatch):
+    from types import SimpleNamespace
+    zone_manager = import_from('palworld_aio.managers.zone_manager')
+
+    i18n_mod.load_resources('en_US')
+    zones = [{'id': 'a'}, {'id': 'b'}, {'id': 'c'}]
+    prompts = []
+    writes = []
+    monkeypatch.setattr(zone_manager, 'get_zones', lambda: zones)
+    monkeypatch.setattr(zone_manager, 'clear_all_zones',
+                        lambda: writes.append('cleared'))
+    monkeypatch.setattr(map_tab_mod, 'show_question',
+                        lambda _parent, _title, detail:
+                        prompts.append(detail) or False)
+    tab = SimpleNamespace(_update_zone_items=lambda: None)
+
+    map_tab_mod.MapTab._clear_zones(tab)
+    assert prompts == ['Delete all 3 protection zones? This cannot be undone.']
+    assert writes == []
+
+    monkeypatch.setattr(map_tab_mod, 'show_question',
+                        lambda *_args: True)
+    monkeypatch.setattr(map_tab_mod, 'run_with_loading',
+                        lambda on_finished, task: on_finished(task()))
+    map_tab_mod.MapTab._clear_zones(tab)
+    assert writes == ['cleared']
+
+
 def _player(identifier='player-001'):
     return {
         'player_uid': identifier,

@@ -38,6 +38,7 @@ class PendingChangeJournal(QObject):
         super().__init__(parent)
         self._changes: list[PendingChange] = []
         self._undone: list[PendingChange] = []
+        self._applying_inverse = False
 
     @property
     def changes(self) -> tuple[PendingChange, ...]:
@@ -69,6 +70,8 @@ class PendingChangeJournal(QObject):
         undo: Callable[[], None] | None = None,
         redo: Callable[[], None] | None = None,
     ) -> PendingChange:
+        if self._applying_inverse:
+            raise RuntimeError('undo/redo callbacks cannot record changes')
         if not label.strip():
             raise ValueError('change label must not be empty')
         if affected_count is not None and affected_count < 1:
@@ -90,11 +93,17 @@ class PendingChangeJournal(QObject):
         return change
 
     def undo_last(self) -> bool:
+        if self._applying_inverse:
+            raise RuntimeError('undo/redo callbacks cannot be nested')
         if not self.can_undo:
             return False
         change = self._changes[-1]
         assert change.undo is not None
-        change.undo()
+        self._applying_inverse = True
+        try:
+            change.undo()
+        finally:
+            self._applying_inverse = False
         self._changes.pop()
         if change.redo is not None:
             self._undone.append(change)
@@ -102,17 +111,25 @@ class PendingChangeJournal(QObject):
         return True
 
     def redo_last(self) -> bool:
+        if self._applying_inverse:
+            raise RuntimeError('undo/redo callbacks cannot be nested')
         if not self.can_redo:
             return False
         change = self._undone[-1]
         assert change.redo is not None
-        change.redo()
+        self._applying_inverse = True
+        try:
+            change.redo()
+        finally:
+            self._applying_inverse = False
         self._undone.pop()
         self._changes.append(change)
         self.changed.emit(self.summary)
         return True
 
     def clear(self) -> None:
+        if self._applying_inverse:
+            raise RuntimeError('undo/redo callbacks cannot clear changes')
         if self._changes or self._undone:
             self._changes.clear()
             self._undone.clear()

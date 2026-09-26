@@ -3354,7 +3354,15 @@ class MapTab(QWidget):
         run_with_loading(on_finished, task, on_error=on_error)
     def _clear_zones(self):
         from palworld_aio.managers import zone_manager
-        confirmed = show_question(self, t('zone_exclusion.delete_zone') if t else 'Delete Zone', t('zone_exclusion.confirm_delete_all') if t else 'Are you sure you want to delete all zones?')
+        count = len(zone_manager.get_zones())
+        if count == 0:
+            return
+        confirmed = show_question(
+            self,
+            t('zone_exclusion.delete_zone', default='Delete Zone'),
+            t('zone_exclusion.confirm_delete_all_count',
+              count=count,
+              default='Delete all {count} protection zones? This cannot be undone.'))
         if confirmed:
             def task():
                 zone_manager.clear_all_zones()

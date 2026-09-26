@@ -2197,6 +2197,7 @@
     "player_pal.confirm_delete_all": "Confirm Delete All",
     "player_pal.confirm_delete_all_msg": "Delete ALL \"{pal_name}\" pals from everywhere (players + bases)? This cannot be undone!",
     "player_pal.confirm_delete_all_count_msg": "Delete {count} {pal_name} Pals from the loaded save (players and bases)? This cannot be undone. Back up the save before continuing.",
+    "zone_exclusion.confirm_delete_all_count": "Delete all {count} protection zones? This cannot be undone.",
     "player_pal.pals_removed_everywhere": "Removed {count} pals from {affected} players/bases everywhere.",
     "player_pal.no_pals_had_pal": "No pals of that type were found.",
     "player_pal.active_skills": "Active Skills",
