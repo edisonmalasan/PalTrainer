@@ -1,4 +1,4 @@
-"""Unit tests for the vector icon factory (top-nav-shell task 1.3)."""
+"""Unit tests for the bundled, local-only vector icon factory."""
 from __future__ import annotations
 
 import os
@@ -73,6 +73,19 @@ def test_unknown_icon_returns_none():
     assert icons.get_qicon('definitely_not_an_icon') is None
 
 
-def test_glyph_registry_still_intact():
-    for name in ('save', 'close', 'search', 'tools'):
-        assert icons.get_icon(name)
+def test_public_registry_contains_only_bundled_vectors():
+    names = icons.available_vector_icons()
+    assert set(EXPECTED_CORE) <= names
+    assert not hasattr(icons, 'get_icon')
+
+
+def test_svg_assets_are_token_tintable_and_local_only():
+    for name in icons.available_vector_icons():
+        source = icons._svg_source(name)
+        assert source is not None
+        assert '__COLOR__' in source
+        lowered = source.lower()
+        assert 'href="http://' not in lowered
+        assert 'href="https://' not in lowered
+        assert "href='http://" not in lowered
+        assert "href='https://" not in lowered

@@ -1,7 +1,8 @@
-from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem, QHeaderView, QMenu, QAbstractItemView
+from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem, QAbstractItemView
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QAction
-from palworld_aio import constants
+from palworld_aio.ui.chrome.localization import tr
+
+
 class SortableTreeWidget(QTreeWidget):
     context_menu_requested = pyqtSignal(object, object)
     def __init__(self, columns, column_widths=None, parent=None):
@@ -10,6 +11,8 @@ class SortableTreeWidget(QTreeWidget):
         self.column_widths = column_widths or []
         self._setup_ui()
     def _setup_ui(self):
+        self.setObjectName('dataTree')
+        self.setAccessibleName(tr('ui.table.accessible', 'Data table'))
         self.setHeaderLabels(self.columns)
         self.setAlternatingRowColors(True)
         self.setRootIsDecorated(False)
@@ -17,7 +20,6 @@ class SortableTreeWidget(QTreeWidget):
         self.setSortingEnabled(True)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
-        self.setStyleSheet(f'\n            QTreeWidget {{\n                background-color: {constants.GLASS};\n                color: {constants.TEXT};\n                border: 1px solid {constants.BORDER};\n                border-radius: 4px;\n            }}\n            QTreeWidget::item {{\n                padding: 4px;\n            }}\n            QTreeWidget::item:selected {{\n                background-color: rgba(125,211,252,0.15);\n                color: #7DD3FC;\n            }}\n            QTreeWidget::item:hover {{\n                background-color: {constants.BUTTON_HOVER};\n            }}\n            QHeaderView::section {{\n                background-color: #3a3a3a;\n                color: {constants.EMPHASIS};\n                padding: 6px;\n                border: none;\n                font-weight: bold;\n            }}\n        ')
         header = self.header()
         for i, width in enumerate(self.column_widths):
             if i < len(self.columns):

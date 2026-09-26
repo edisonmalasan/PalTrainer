@@ -98,3 +98,7 @@ PalTrainer_standalone*.zip
 # Pal exports created while testing
 *.pstpal
 *.pstbase
+
+
+AUDIT.md
+temp

@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QGraphicsView, QLabel
+from PyQt6.QtWidgets import QFrame, QGraphicsView, QLabel
 from PyQt6.QtCore import Qt, QPointF, QPoint, QSize, pyqtSignal, QTimer
 from PyQt6.QtGui import QPainter
 from i18n import t
@@ -54,13 +54,18 @@ class MapGraphicsView(QGraphicsView):
         self.base_scale = 1.0
         self.current_map = 'world'
         self.coord_range = 1000
+        self.navigation_bar = QFrame(self)
+        self.navigation_bar.setObjectName('mapNavigationBar')
+        self.navigation_bar.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.coords_label = QLabel(f"{(t('cursor_coords') if t else 'Cursor')}: 0,0", self)
-        self.coords_label.setStyleSheet('background-color: rgba(0,0,0,150); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; min-width: 120px;')
+        self.coords_label.setObjectName('mapCoordsReadout')
+        self.coords_label.setAccessibleName(t('cursor_coords') if t else 'Cursor coordinates')
         self.coords_label.move(10, self.height() - 30)
         self.coords_label.setVisible(True)
         self.coords_label.setAttribute(Qt.WA_ShowWithoutActivating)
         self.zoom_label = QLabel((t('zoom') if t else 'Zoom') + ': 100%', self)
-        self.zoom_label.setStyleSheet('background-color: rgba(0,0,0,150); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; min-width: 80px;')
+        self.zoom_label.setObjectName('mapZoomReadout')
+        self.zoom_label.setAccessibleName(t('zoom') if t else 'Zoom level')
         self.zoom_label.move(self.width() - 100, self.height() - 30)
         self.zoom_label.setAlignment(Qt.AlignCenter)
         self.zoom_label.setAttribute(Qt.WA_ShowWithoutActivating)
@@ -294,11 +299,11 @@ class MapGraphicsView(QGraphicsView):
         if self.zone_drawing_mode and event.key() == Qt.Key_Escape:
             self.zone_drawing_cancelled.emit()
         super().keyPressEvent(event)
-    def leaveEvent(self, event):
+    def leaveEvent(self, a0):
         if self._hovered_marker is not None:
             self._hovered_marker = None
             self.marker_hover_left.emit()
-        super().leaveEvent(event)
+        super().leaveEvent(a0)
     def animate_to_marker(self, marker, zoom_level=None, duration_ms=1500):
         if zoom_level is None:
             zoom_level = self.config['zoom']['double_click_target']
@@ -386,21 +391,25 @@ class MapGraphicsView(QGraphicsView):
             self.zoom_label.setText((t('zoom') if t else 'Zoom') + f': {int(self.current_zoom * 100)}%')
             self.zoom_changed.emit(self.current_zoom)
     def _position_zoom_controls(self):
-        # bottom-right cluster: [−][+] then the readout; kept below the
-        # top-right toggle overlay row and clear of the legend card.
-        y = max(30, self.height() - 30)
-        self.zoom_out_btn.move(self.width() - 184, y)
-        self.zoom_in_btn.move(self.width() - 158, y)
+        bar_x = 10
+        bar_y = max(8, self.height() - 38)
+        bar_width = max(220, self.width() - 20)
+        self.navigation_bar.setGeometry(bar_x, bar_y, bar_width, 28)
+        self.navigation_bar.lower()
+        y = bar_y + 2
+        self.coords_label.move(bar_x + 8, y)
+        self.coords_label.adjustSize()
+        self.zoom_out_btn.move(self.width() - 180, y)
+        self.zoom_in_btn.move(self.width() - 152, y)
+        self.zoom_label.move(self.width() - 120, y)
+        self.zoom_label.resize(100, 24)
         self.zoom_out_btn.raise_()
         self.zoom_in_btn.raise_()
         self.zoom_label.raise_()
+        self.coords_label.raise_()
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.coords_label.move(10, self.height() - 30)
-        self.zoom_label.move(self.width() - 100, self.height() - 30)
         self._position_zoom_controls()
-        self.coords_label.raise_()
-        self.zoom_label.raise_()
         if self.overlay_position_callback:
             self.overlay_position_callback()
     def sizeHint(self):
@@ -420,6 +429,8 @@ class MapGraphicsView(QGraphicsView):
                 self.base_scale = scale
                 self.scale(scale, scale)
                 self.centerOn(self.scene().itemsBoundingRect().center())
+        self._update_zoom_label()
+        self._update_zoom_buttons_enabled()
         self.zoom_changed.emit(self.current_zoom)
     def _validate_and_recover_view(self):
         if not self.scene():
@@ -458,5 +469,5 @@ class MapGraphicsView(QGraphicsView):
             self.polygon_preview_item = None
         self.polygon_points = []
     def _update_zone_preview(self, current_point):
-        if self.zone_preview_item and self.zone_point_a:
+        if self.zone_preview_item is not None and self.zone_point_a is not None:
             self.zone_preview_item.update_preview(self.zone_point_a, current_point)

@@ -8,6 +8,7 @@ from i18n import t
 from loading_manager import show_critical
 from palworld_aio import constants
 from palworld_aio.ui.chrome import icons as app_icons
+from palworld_aio.ui.chrome.components import BaseDialog, make_button
 from resource_resolver import resource_path
 from palworld_aio.ui.chrome.styles import ThemeManager
 CONVERTING_TOOL_KEYS = ['tool.convert.saves', 'tool.convert.gamepass.steam', 'tool.convert.steamid', 'tool.restore_map']
@@ -202,60 +203,29 @@ def center_on_parent(dialog):
         dialog_x = screen_geometry.x() + (screen_geometry.width() - size.width()) // 2
         dialog_y = screen_geometry.y() + (screen_geometry.height() - size.height()) // 2
         dialog.move(dialog_x, dialog_y)
-class ConversionOptionsDialog(QDialog):
+class ConversionOptionsDialog(BaseDialog):
     def __init__(self, parent=None):
-        super().__init__(parent)
         self.selected_option = None
-        self.setWindowTitle(t('tool.convert.saves') if t else 'Convert Save Files')
-        self.setModal(True)
-        self.setFixedWidth(380)
+        super().__init__(
+            t('tool.convert.saves') if t else 'Convert Save Files',
+            parent, min_size=(460, 280),
+            kicker=t('tools.section.converting', default='Conversion'))
         self._setup_ui()
-        self._load_theme()
     def _setup_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(14, 14, 14, 14)
-        main_layout.setSpacing(12)
-        sheet = QFrame()
-        sheet.setObjectName('dialogSheet')
-        sheet_layout = QVBoxLayout(sheet)
-        sheet_layout.setContentsMargins(0, 0, 0, 0)
-        sheet_layout.setSpacing(12)
-        kicker = QLabel((t('tools.section.converting') if t else 'Converting').upper())
-        kicker.setObjectName('dialogKicker')
-        sheet_layout.addWidget(kicker)
-        title_label = QLabel(t('tool.convert.saves') if t else 'Convert Save Files')
-        title_label.setObjectName('dialogTitle')
-        sheet_layout.addWidget(title_label)
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setObjectName('dialogSeparator')
-        sheet_layout.addWidget(separator)
-        sheet_layout.addSpacing(4)
+        explanation = QLabel(t(
+            'tool.convert.direction_help',
+            default='Choose the output format. You will review the source and target before conversion.'))
+        explanation.setWordWrap(True)
+        explanation.setProperty('class', 'secondary')
+        self.content_layout.addWidget(explanation)
         options = [('tool.convert.any.to_json', 0), ('tool.convert.any.to_sav', 1)]
         for key, index in options:
-            btn = QPushButton(t(key) if t else key)
-            btn.setObjectName('dialogOption')
-            btn.setFixedHeight(36)
-            btn.setCursor(QCursor(Qt.PointingHandCursor))
+            btn = make_button(t(key) if t else key, 'secondary', parent=self)
             btn.clicked.connect(lambda checked, idx=index: self._on_option_selected(idx))
-            sheet_layout.addWidget(btn)
-        sheet_layout.addStretch(1)
-        cancel_btn = QPushButton(t('Cancel') if t else 'Cancel')
-        cancel_btn.setObjectName('dialogCancel')
-        cancel_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        cancel_btn.clicked.connect(self.reject)
-        sheet_layout.addWidget(cancel_btn, alignment=Qt.AlignCenter)
-        main_layout.addWidget(sheet)
+            self.content_layout.addWidget(btn)
     def _on_option_selected(self, index):
         self.selected_option = index
         self.accept()
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
-            self.reject()
-        else:
-            super().keyPressEvent(event)
-    def _load_theme(self):
-        ThemeManager.apply_to_widget(self)
 class ToolCard(QFrame):
     clicked = pyqtSignal()
     def __init__(self, label_text, tooltip_text, description_text=None, icon_path=None, parent=None):

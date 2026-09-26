@@ -40,6 +40,7 @@ def test_all_palettes_have_same_keys():
 
 
 def test_spacing_is_4px_grid():
+    assert set(tokens.SPACING.values()) == {4, 8, 12, 16, 20, 24, 32, 40}
     for value in tokens.SPACING.values():
         assert value % 4 == 0
 
@@ -49,10 +50,52 @@ def test_type_scale_shape():
         px, weight = spec
         assert px > 0
         assert weight in (400, 500, 600, 700)
-    # Plan 019 type scale, top-nav-shell: display 19/700, title 14/600
-    # (real bundled SemiBold, no synthetic bold).
-    assert tokens.TYPE['display'] == (19, 700)
-    assert tokens.TYPE['title'] == (14, 600)
+    assert tokens.TYPE['page_title'] == (24, 600)
+    assert tokens.TYPE['section_title'] == (17, 600)
+    assert tokens.TYPE['body'] == (14, 400)
+    assert tokens.TYPE['table'] == (13, 400)
+    assert tokens.TYPE['metadata'] == (12, 400)
+    assert tokens.TYPE['caption'] == (11, 400)
+
+
+def test_no_text_role_is_undersized():
+    for name, (px, _weight) in tokens.TYPE.items():
+        assert px >= 11, f'{name} is smaller than the audit minimum'
+
+
+def test_audit_radii_and_shell_dimensions():
+    assert tokens.RADIUS == {'sm': 6, 'md': 8, 'lg': 10, 'xl': 12, 'pill': 9999}
+    assert tokens.LAYOUT['minimum_width'] == 1024
+    assert tokens.LAYOUT['minimum_height'] == 700
+    assert tokens.LAYOUT['sidebar_expanded'] == 240
+    assert tokens.LAYOUT['sidebar_collapsed'] == 64
+    assert tokens.LAYOUT['inspector_width'] == 340
+    assert tokens.LAYOUT['content_padding'] == 24
+
+
+def test_density_presets_stay_on_the_spacing_grid():
+    assert set(tokens.DENSITY) == {'compact', 'standard', 'comfortable'}
+    for preset in tokens.DENSITY.values():
+        assert set(preset) == {'row', 'control', 'gap'}
+        assert all(value % 4 == 0 for value in preset.values())
+
+
+def test_focus_and_motion_contracts():
+    palette = tokens.resolve('dark')
+    assert palette['focus_ring'] != palette['border']
+    assert tokens.FOCUS['width'] >= 2
+    assert 160 <= tokens.motion_duration('drawer') <= 220
+    assert 180 <= tokens.motion_duration('sidebar') <= 220
+    assert tokens.motion_duration('dialog', reduced_motion=True) == 0
+    with pytest.raises(KeyError):
+        tokens.motion_duration('unknown')
+
+
+def test_generated_theme_rejects_retired_shell_colors():
+    qss = qss_builder.build_qss('dark').lower()
+    for legacy in tokens.RETIRED_COLORS:
+        assert legacy.lower() not in qss
+    assert tokens.RETIRED_RGBA_PREFIX.lower() not in qss
 
 
 def test_rgba_helper():

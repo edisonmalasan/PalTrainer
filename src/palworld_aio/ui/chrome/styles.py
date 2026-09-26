@@ -54,17 +54,24 @@ class ThemeManager:
     def load_qss_content(cls):
         if cls._darkmode_content is None:
             qss_path = _os.path.join(str(GUI_DIR), 'darkmode.qss')
+            extras_path = _os.path.join(str(GUI_DIR), 'legacy-dark.qss')
             try:
-                with open(qss_path, 'r', encoding='utf-8') as f:
-                    cls._darkmode_content = f.read()
-            except FileNotFoundError:
-                cls._darkmode_content = ''
+                from palworld_aio.ui.chrome.qss_builder import build_qss
+                generated = build_qss(cls.theme())
+                with open(extras_path, 'r', encoding='utf-8') as f:
+                    extras = f.read()
+                cls._darkmode_content = generated + '\n\n' + extras
+            except (FileNotFoundError, ImportError, KeyError):
+                try:
+                    with open(qss_path, 'r', encoding='utf-8') as f:
+                        cls._darkmode_content = f.read()
+                except FileNotFoundError:
+                    cls._darkmode_content = ''
         return cls._darkmode_content
     @classmethod
     def apply_global(cls):
-        # Applies the deployed theme file (generated global QSS + transitional
-        # extras). Runtime re-generation is not used here so un-migrated
-        # screens keep their objectName rules until their plan lands.
+        # Assemble current generated rules with transitional legacy extras;
+        # fall back to the deployed generated file in constrained builds.
         qss = cls.load_qss_content()
         if not qss:
             return cls._apply_fallback_global()

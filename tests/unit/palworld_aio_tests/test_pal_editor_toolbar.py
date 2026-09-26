@@ -98,7 +98,238 @@ def test_button_tiers_and_handlers_unchanged(editor):
         assert callable(handler)
 
 
+def test_multi_selection_shows_counted_single_row_with_overflow(editor):
+    from PyQt6.QtWidgets import QHBoxLayout
+
+    editor.selected_pal_slot = ('palbox', 0)
+    editor._multi_selected = {('palbox', 1)}
+    editor._update_multi_toolbar()
+
+    assert editor.multi_toolbar.isHidden() is False
+    assert isinstance(editor.multi_toolbar.layout(), QHBoxLayout)
+    assert editor.multi_count_label.text() == '2 pals selected'
+    assert editor.multi_toolbar.accessibleName() == 'Actions for 2 selected Pals'
+    assert editor.multi_heal_btn.property('actionTier') == 'safe'
+    assert editor.multi_delete_btn.property('actionTier') == 'destructive'
+    assert editor.multi_delete_separator.isHidden() is False
+    assert editor.multi_more_btn.isHidden() is False
+    for name in (
+        'multi_max_btn', 'multi_buff_btn', 'multi_skills_btn',
+        'multi_rename_btn',
+    ):
+        button = editor._multi_action_buttons[name]
+        assert button.isHidden() is True
+        assert button.property('actionTier') == 'bulk'
+        assert button.accessibleDescription() == '2 selected Pals are affected.'
+        assert callable(editor._multi_overflow_handlers[name])
+    for action in (
+        editor.restore_all_btn, editor.max_all_btn, editor.max_buff_all_btn,
+        editor.all_skills_all_btn, editor.sort_btn, editor.select_all_btn,
+        editor.bulk_clone_btn, editor.bulk_delete_separator,
+        editor.bulk_delete_btn,
+    ):
+        assert action.isHidden() is True
+
+    editor._multi_selected.clear()
+    editor.selected_pal_slot = None
+    editor._update_multi_toolbar()
+
+
+def test_all_multi_action_buttons_keep_their_handlers(editor):
+    for button in editor._multi_action_buttons.values():
+        assert button.receivers(button.clicked) >= 1
+    assert editor.multi_deselect_btn.receivers(
+        editor.multi_deselect_btn.clicked) >= 1
+    assert editor.multi_more_btn.receivers(editor.multi_more_btn.clicked) >= 1
+    for button in (
+        editor.restore_all_btn, editor.max_all_btn, editor.max_buff_all_btn,
+        editor.all_skills_all_btn, editor.sort_btn, editor.select_all_btn,
+        editor.bulk_clone_btn, editor.bulk_delete_btn,
+    ):
+        assert button.receivers(button.clicked) >= 1
+
+
+def test_overflow_selection_dispatches_the_existing_handler(editor, monkeypatch):
+    menu_mod = import_from('palworld_aio.widgets.scrollable_context_menu')
+    seen = []
+
+    class _Menu:
+        def __init__(self, _parent):
+            self.items = []
+
+        def add_item(self, key, text):
+            self.items.append((key, text))
+
+        def exec(self, _position):
+            assert [key for key, _text in self.items] == [
+                'multi_max_btn', 'multi_buff_btn', 'multi_skills_btn',
+                'multi_rename_btn',
+            ]
+            return 'multi_max_btn'
+
+    original = editor._multi_overflow_handlers['multi_max_btn']
+    editor._multi_overflow_handlers['multi_max_btn'] = lambda: seen.append('max')
+    monkeypatch.setattr(menu_mod, 'ScrollableContextMenu', _Menu)
+
+    editor._open_multi_overflow()
+
+    assert seen == ['max']
+    editor._multi_overflow_handlers['multi_max_btn'] = original
+
+
+def test_cancelled_destructive_bulk_action_preserves_selection(
+        editor, monkeypatch):
+    first = {'key': {'InstanceId': {'value': 'pal-one'}}, 'data': {}}
+    second = {'key': {'InstanceId': {'value': 'pal-two'}}, 'data': {}}
+    editor.palbox_pal_dict = {0: first, 1: second}
+    editor.selected_pal_slot = ('palbox', 0)
+    editor._multi_selected = {('palbox', 1)}
+    monkeypatch.setattr(editor_widget_mod, 'show_question', lambda *_args: False)
+
+    editor._on_bulk_delete_selected()
+
+    assert editor.palbox_pal_dict == {0: first, 1: second}
+    assert editor.selected_pal_slot == ('palbox', 0)
+    assert editor._multi_selected == {('palbox', 1)}
+    editor.palbox_pal_dict = {}
+    editor.selected_pal_slot = None
+    editor._multi_selected.clear()
+    editor._update_multi_toolbar()
+
+
+def test_editor_has_source_collection_and_responsive_inspector_regions(editor):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QSplitter
+
+    assert isinstance(editor.workspace_splitter, QSplitter)
+    assert isinstance(editor.collection_splitter, QSplitter)
+    assert editor.party_panel.parent() is editor.collection_splitter
+    assert editor.palbox_panel.parent() is editor.collection_splitter
+    assert editor.collection_splitter.parent() is editor.workspace_splitter
+    assert editor.inspector_host.parent() is editor.workspace_splitter
+    assert editor.pal_info.parent() is editor.inspector_host
+    assert editor.inspector_host.accessibleName() == 'Selected Pal inspector'
+
+    editor.resize(900, 700)
+    editor._apply_responsive_layout()
+    assert editor.workspace_splitter.orientation() == Qt.Orientation.Vertical
+    assert editor.inspector_host.property('responsiveMode') == 'stacked'
+    editor.resize(1200, 700)
+    editor._apply_responsive_layout()
+    assert editor.workspace_splitter.orientation() == Qt.Orientation.Horizontal
+    assert editor.inspector_host.property('responsiveMode') == 'side-by-side'
+
+
+def test_editor_source_modes_use_shared_chips_and_preserve_switch_contract(
+        editor):
+    assert editor.source_label.text() == 'Source'
+    assert editor.mode_box_btn.property('controlRole') == 'chip'
+    assert editor.mode_dps_btn.property('controlRole') == 'chip'
+    assert editor.mode_box_btn.property('pickerSelected') == 'true'
+    editor._clicked_pal = object()
+    editor.selected_pal_slot = ('palbox', 0)
+
+    editor._set_palbox_mode('dps')
+
+    assert editor._palbox_mode == 'dps'
+    assert editor._clicked_pal is None
+    assert editor.selected_pal_slot is None
+    editor._set_palbox_mode('box')
+
+
+def test_editable_slots_use_shared_pal_card_semantics(editor):
+    cards_mod = import_from('palworld_aio.ui.chrome.content_cards')
+    party_slot = editor.party_slots[0]
+    palbox_slot = editor.palbox_slots[0]
+
+    assert isinstance(party_slot._card_model, cards_mod.PalCardModel)
+    assert isinstance(palbox_slot._card_model, cards_mod.PalCardModel)
+    assert party_slot.property('cardRole') == 'pal'
+    assert palbox_slot.property('cardRole') == 'pal'
+    assert party_slot.property('empty') is True
+    assert palbox_slot.property('empty') is True
+    assert party_slot.accessibleName() == 'Empty party slot'
+    assert palbox_slot.accessibleName() == 'Empty Palbox slot'
+    assert party_slot.styleSheet() == ''
+    assert palbox_slot.styleSheet() == ''
+
+
+def test_party_selection_keeps_selected_pal_identity(editor, monkeypatch):
+    selected_pal = object()
+    seen = []
+    editor.party_pals[0] = selected_pal
+    editor.party_slots[0].pal_data = selected_pal
+    monkeypatch.setattr(
+        editor.pal_info, 'set_clicked_pal', lambda pal: seen.append(pal))
+
+    editor._on_party_slot_clicked(0)
+
+    assert editor.selected_pal_slot == ('party', 0)
+    assert editor._clicked_pal is selected_pal
+    assert seen == [selected_pal]
+    editor.party_pals.clear()
+    editor.party_slots[0].pal_data = None
+    editor._clear_party_highlight()
+    editor.selected_pal_slot = None
+
+
+def test_party_hp_is_readable_beside_the_visual_ratio(app):
+    from PyQt6.QtCore import Qt
+
+    party_slot_mod = import_from(
+        'palworld_aio.editor.pal_editor.party_slot_widget')
+    slot = party_slot_mod.PartySlotWidget({
+        'data': {
+            'CharacterID': {'value': 'SheepBall'},
+            'Level': {'value': 12},
+            'NickName': {'value': 'Mallow'},
+            'Hp': {'value': {'Value': {'value': 54_000}}},
+            'MaxHP': {'value': {'Value': {'value': 90_000}}},
+        },
+    })
+
+    assert slot.hp_bar.isTextVisible() is False
+    assert slot.hp_bar.value() == 60
+    assert slot.hp_pill.objectName() == 'palHpPill'
+    assert slot.hp_pill.text() == '54 / 90'
+    assert slot.hp_pill.alignment() == Qt.AlignmentFlag.AlignCenter
+    slot.deleteLater()
+
+
 # ---------------------------------------------- 10.2 computed vs editable
+
+def test_inspector_exposes_distinct_information_sections(info):
+    assert info.identity_section.objectName() == 'palInspectorIdentitySection'
+    assert info.identity_section.accessibleName() == 'Identity'
+    assert info.editable_section.objectName() == 'palInspectorEditableSection'
+    assert info.editable_section.accessibleName() == 'Editable values'
+    assert info.computed_section.objectName() == 'palInspectorComputedSection'
+    assert info.computed_section.accessibleName() == 'Computed stats'
+    assert info.active_skills_frame.property(
+        'inspectorSection') == 'active-skills'
+    assert info.passive_container.property(
+        'inspectorSection') == 'passive-skills'
+    assert info.work_section.property('inspectorSection') == 'work'
+    assert info.technical_section.objectName() == 'palInspectorTechnicalSection'
+    assert info.instance_id_lbl.parent() is info.technical_section
+
+
+def test_inspector_keeps_existing_edit_handlers_on_editable_controls(info):
+    controls = (
+        (info.name_lbl, '_on_name_click'),
+        (info.level_num_lbl, '_on_level_click'),
+        (info.ivs_hp_lbl, '_on_talent_click'),
+        (info.soul_craft_lbl, '_on_soul_click'),
+        (info.trust_bar, '_on_trust_click'),
+    )
+    for control, handler in controls:
+        assert control.property('editableValue') == 'true'
+        assert control.property('editHandler') == handler
+        assert control.accessibleDescription() == 'Click to edit this value.'
+        assert callable(getattr(info, handler))
+    assert info.gender_icon.receivers(info.gender_icon.clicked) == 1
+    assert info.info_boss_btn.receivers(info.info_boss_btn.clicked) == 1
+
 
 def test_computed_stat_labels_carry_read_only_class(info):
     for lbl in (info.atk_lbl, info.def_lbl, info.wspd_lbl):
@@ -109,6 +340,8 @@ def test_computed_stat_labels_have_hint_tooltip(info):
     for lbl in (info.atk_lbl, info.def_lbl, info.wspd_lbl):
         assert 'Calculated from level, IVs and passives' in lbl.toolTip()
         assert 'read-only' in lbl.toolTip()
+        assert 'points' in lbl.toolTip()
+        assert lbl.property('editHandler') is None
 
 
 def test_computed_class_in_built_qss(app):

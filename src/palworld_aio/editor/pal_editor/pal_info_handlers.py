@@ -1,7 +1,7 @@
 import copy
 import os
 from functools import partial
-from PyQt6.QtWidgets import QApplication, QDialog, QFrame, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QListWidget, QListWidgetItem, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QVBoxLayout, QWidget
 from PyQt6.QtCore import Qt, QEvent, QPoint, QTimer
 from PyQt6.QtGui import QPixmap
 from i18n import t
@@ -12,6 +12,7 @@ from resource_resolver import resource_path
 from palworld_aio.utils import extract_value, safe_nested_get, calculate_max_hp
 from palworld_aio.ui.chrome.styles import slot_full, slot_selected, TOOLTIP_STYLE, INPUT_DIALOG_STYLE
 from palworld_aio.ui.chrome import tokens as _chrome_tokens
+from palworld_aio.ui.chrome.components import InputPromptDialog as QInputDialog
 _P = _chrome_tokens.resolve()
 from palworld_aio.ui.dialogs.skill_picker import SkillPicker
 from palsav import json_tools
@@ -968,6 +969,13 @@ class PalInfoHandlerMixin:
         parent = self.parent()
         while parent:
             if hasattr(parent, 'tools_tab'):
+                recorder = getattr(parent, 'record_pending_change', None)
+                if callable(recorder):
+                    recorder(
+                        t('ui.pending.pal_details',
+                          default='Pal details updated'),
+                        affected_count=fanned or 1,
+                    )
                 parent.tools_tab.refresh()
                 break
             if hasattr(parent, '_update_party_slots'):

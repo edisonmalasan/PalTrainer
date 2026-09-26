@@ -19,18 +19,24 @@ class ShellState(Enum):
     DIRTY = 'dirty'
     SAVING = 'saving'
     ERROR = 'error'
+    READ_ONLY = 'read_only'
+    BACKUP_RECOMMENDED = 'backup_recommended'
 
     @property
     def can_load(self) -> bool:
-        return self in (ShellState.NO_SAVE, ShellState.LOADED, ShellState.DIRTY, ShellState.ERROR)
+        return self in (ShellState.NO_SAVE, ShellState.LOADED, ShellState.DIRTY,
+                        ShellState.ERROR, ShellState.READ_ONLY,
+                        ShellState.BACKUP_RECOMMENDED)
 
     @property
     def can_save(self) -> bool:
-        return self in (ShellState.LOADED, ShellState.DIRTY)
+        return self in (ShellState.LOADED, ShellState.DIRTY,
+                        ShellState.BACKUP_RECOMMENDED)
 
     @property
     def can_edit(self) -> bool:
-        return self in (ShellState.LOADED, ShellState.DIRTY)
+        return self in (ShellState.LOADED, ShellState.DIRTY,
+                        ShellState.BACKUP_RECOMMENDED)
 
 
 class ShellStateModel:
@@ -64,7 +70,8 @@ class ShellStateModel:
             self._set(ShellState.ERROR)
 
     def mark_dirty(self) -> None:
-        if self._state in (ShellState.LOADED, ShellState.DIRTY):
+        if self._state in (ShellState.LOADED, ShellState.DIRTY,
+                           ShellState.BACKUP_RECOMMENDED):
             self._set(ShellState.DIRTY)
 
     def begin_save(self) -> None:

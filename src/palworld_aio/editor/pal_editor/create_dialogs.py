@@ -8,7 +8,7 @@ from PyQt6.QtGui import QIcon
 from i18n import t
 from loading_manager import run_with_loading, show_information, show_warning, show_question
 from palworld_aio import constants
-from palworld_aio.ui.chrome.styles import DIALOG_STYLE
+from palworld_aio.ui.chrome.components import BaseDialog, make_button
 from palworld_aio.ui.chrome.styled_combo import StyledCombo
 from resource_resolver import resource_path
 from palworld_aio.utils import extract_value, json_tools, resolve_name, safe_nested_get
@@ -19,7 +19,7 @@ from .icons import _partner_desc_to_html, _strip_prefix_label
 from .pal_ops import _generate_pal_save_param, _get_raw_from_item, _learn_all_skills_raw, _register_pal_instance_to_guild, creation_nickname, get_name_mode, get_sync_nickname, set_name_mode, set_sync_nickname
 from .legacy_frame import PalFrame
 from .pal_info_widget import PalInfoWidget
-from .widgets import FramelessDialog, SkillSlotFrame
+from .widgets import PalEditorDialog, SkillSlotFrame
 from .data import _ensure_food_buff_map
 from .palbox_slot_widget import _PalSlotDelegate
 
@@ -33,7 +33,7 @@ def _show_learned_moves_dialog(raw, parent):
         mw_list = mw_data
     else:
         mw_list = []
-    dlg = FramelessDialog('edit_pals.learnt_skills_title', parent)
+    dlg = PalEditorDialog('edit_pals.learnt_skills_title', parent)
     dlg.setWindowTitle(t('edit_pals.learnt_skills_title'))
     dlg.setModal(True)
     dlg.setFixedSize(500, 600)
@@ -320,7 +320,7 @@ def _show_learned_moves_dialog(raw, parent):
     dlg.content_layout.addWidget(inner)
     dlg.exec()
 _EDITABLE_KEYS = {'Level', 'Exp', 'Gender', 'Talent_HP', 'Talent_Shot', 'Talent_Defense', 'Rank_HP', 'Rank_Attack', 'Rank_Defence', 'Rank_CraftSpeed', 'Rank', 'FriendshipPoint', 'IsRarePal', 'bIsAwakening', 'bImportedCharacter', 'FavoriteIndex', 'EquipWaza', 'MasteredWaza', 'PassiveSkillList', 'Hp', 'MaxHP'}
-class BulkSyncPalDialog(FramelessDialog):
+class BulkSyncPalDialog(PalEditorDialog):
     def __init__(self, pal_item, pal_editor, parent=None, candidates=None):
         super().__init__('edit_pals.bulk_sync_pal_title', parent)
         self.pal_editor = pal_editor
@@ -332,7 +332,7 @@ class BulkSyncPalDialog(FramelessDialog):
         pal_name = _strip_prefix_label(resolve_name(cid, PalFrame._NAMEMAP) or cid)
         self.setWindowTitle(f"{t('edit_pals.bulk_sync_pal_title')} - {pal_name}")
         self.setModal(True)
-        self.setMinimumSize(740, 750)
+        self.setMinimumSize(740, 640)
         self._all_candidates = []
         if candidates is not None:
             self._all_candidates = list(candidates)
@@ -535,7 +535,7 @@ class BulkSyncPalDialog(FramelessDialog):
         self.pal_editor._update_palbox_page()
         show_information(self, 'Bulk Sync', t('edit_pals.bulk_sync_success', count=len(selected), name=pal_name))
         self.accept()
-class BulkSyncAllDialog(FramelessDialog):
+class BulkSyncAllDialog(PalEditorDialog):
     def __init__(self, pal_item, pal_editor, parent=None, candidates=None):
         super().__init__('edit_pals.bulk_sync_all_title', parent)
         self.pal_editor = pal_editor
@@ -545,7 +545,7 @@ class BulkSyncAllDialog(FramelessDialog):
             return
         self._source_raw = raw
         self.setModal(True)
-        self.setMinimumSize(740, 750)
+        self.setMinimumSize(740, 640)
         self._all_candidates = []
         self._from_party = True
         self._from_palbox = True
@@ -784,21 +784,24 @@ class BulkSyncAllDialog(FramelessDialog):
         show_information(self, 'Bulk Sync All', t('edit_pals.bulk_sync_all_success', count=count))
         self.accept()
 
-class PalCreateDialog(QDialog):
+class PalCreateDialog(BaseDialog):
     def __init__(self, pal_editor, is_party, slot_index, parent=None, is_dps=False):
-        super().__init__(parent)
         self.pal_editor = pal_editor
         self.is_party = is_party
         self.slot_index = slot_index
         self.is_dps = is_dps
         self.created_item = None
         container_name = t('edit_pals.dps') if is_dps else (t('edit_pals.party') if is_party else t('edit_pals.palbox'))
-        self.setWindowTitle(f'Create New Pal in {container_name} Slot {slot_index}')
-        self.setModal(True)
-        self.setMinimumSize(840, 600)
+        title = t(
+            'edit_pals.create_in_slot',
+            default='Create New Pal in {container} Slot {slot}',
+            container=container_name,
+            slot=slot_index,
+        )
+        super().__init__(title, parent, min_size=(840, 600))
+        self.setProperty('dialogFamily', 'palEditor')
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-        self.setStyleSheet(DIALOG_STYLE)
-        layout = QVBoxLayout(self)
+        layout = self.content_layout
         layout.setSpacing(8)
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel(t('common.search') if t else 'Search:'))
@@ -922,13 +925,11 @@ class PalCreateDialog(QDialog):
         self._name_mode_combo.currentIndexChanged.connect(self._on_name_mode_changed)
         nick_layout.addWidget(self._name_mode_combo)
         nick_layout.addStretch()
-        ok_btn = QPushButton(t('edit_pals.create'))
+        ok_btn = make_button(t('edit_pals.create'), 'primary')
         ok_btn.clicked.connect(self._on_create)
-        nick_layout.addWidget(ok_btn)
-        cancel_btn = QPushButton(t('edit_pals.cancel'))
-        cancel_btn.clicked.connect(self.reject)
-        nick_layout.addWidget(cancel_btn)
         layout.addLayout(nick_layout)
+        self.cancel_btn.setText(t('edit_pals.cancel'))
+        self.footer.addWidget(ok_btn)
     def _on_name_mode_changed(self, index):
         mode = self._name_mode_combo.itemData(index) if self._name_mode_combo else None
         if mode:
@@ -1087,15 +1088,15 @@ class PalCreateDialog(QDialog):
         self.created_item = {'character_id': cid, 'nickname': nick, 'container_id': container_id, 'slot_index': slot_to_use, 'pal_item': pal_item}
         self.accept()
 
-class BulkSpeciesDialog(FramelessDialog):
+class BulkSpeciesDialog(PalEditorDialog):
     def __init__(self, pal_editor, mode='clone', parent=None, external_pals=None):
         self.mode = mode
         title_key = 'edit_pals.bulk_clone' if mode == 'clone' else 'edit_pals.bulk_delete'
         super().__init__(title_key, parent)
         self.pal_editor = pal_editor
         self.setModal(True)
-        self.setMinimumSize(740, 750)
-        self.resize(780, 780)
+        self.setMinimumSize(740, 640)
+        self.resize(780, 660)
         self._from_party = True
         self._from_palbox = True
         self._from_dps = True
@@ -1639,7 +1640,7 @@ class _FoodRowClick(QObject):
         return False
 
 
-class FoodPickerDialog(FramelessDialog):
+class FoodPickerDialog(PalEditorDialog):
     def __init__(self, parent=None, multi=False):
         super().__init__('edit_pals.food_picker_title', parent)
         self.setModal(True)
@@ -1804,7 +1805,7 @@ class FoodPickerDialog(FramelessDialog):
 _CB_SPIN_STYLE = 'QSpinBox { color: #ECE7E0; background: rgba(236,231,224,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 2px 4px; } QSpinBox::up-button, QSpinBox::down-button { border: none; background: rgba(255,255,255,0.05); } QSpinBox::up-arrow { image: none; border: none; } QSpinBox::down-arrow { image: none; border: none; }'
 
 
-class CloneBulkDialog(FramelessDialog):
+class CloneBulkDialog(PalEditorDialog):
     def __init__(self, pals, free_slots, parent=None):
         super().__init__('edit_pals.ctx.clone_bulk', parent)
         self.setWindowTitle(t('edit_pals.ctx.clone_bulk'))

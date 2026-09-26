@@ -38,7 +38,7 @@ from palworld_aio.editor.pal_editor import (
     creation_nickname,
     delete_pal_from_all,
     EditPalsDialog,
-    FramelessDialog,
+    PalEditorDialog,
     get_pal_base_data,
     PalboxSlotWidget,
     PalCardWidget,
@@ -56,3 +56,7 @@ from palworld_aio.utils import (
     resolve_name,
     safe_nested_get,
 )
+
+# Compatibility export for Base Inventory and GPS workflows scheduled for the
+# remaining-dialog migration. Pal Editor dialogs use PalEditorDialog directly.
+FramelessDialog = PalEditorDialog

@@ -1,5 +1,5 @@
 import sys, os, shutil, time, traceback, pickle
-from PyQt6.QtWidgets import QHeaderView, QWidget, QTreeWidget, QTreeWidgetItem, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, QFileDialog, QMessageBox, QApplication, QFrame, QInputDialog
+from PyQt6.QtWidgets import QHeaderView, QWidget, QTreeWidget, QTreeWidgetItem, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, QFileDialog, QApplication, QFrame
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QFont
 from i18n import t
@@ -9,6 +9,12 @@ from loading_manager import show_information, show_warning, show_critical, run_w
 from palsav.core import decompress_sav_to_gvas, compress_gvas_to_sav
 
 from palworld_aio.ui.chrome.styles import ThemeManager
+from palworld_aio.ui.chrome.components import (
+    BulkWorkflowReview,
+    InputPromptDialog as QInputDialog,
+    MessageDialog as QMessageBox,
+    make_button,
+)
 from palworld_aio.inventory.container_ownership import ContainerOwnership
 from palworld_aio.inventory.inventory_manager import PlayerInventory
 from palworld_aio.editor.edit_pals import _generate_pal_save_param, get_pal_base_data, _ensure_friendship_thresholds
@@ -176,12 +182,11 @@ class CharacterTransferWindow(QWidget):
         source_level_path_label = self.source_level_path_label
         target_level_path_label = self.target_level_path_label
         current_selection_label = self.current_selection_label
-    def closeEvent(self, event):
+    def closeEvent(self, a0):
         global level_json, host_json, targ_lvl, targ_json
         global target_gvas_file, targ_json_gvas, player_list_cache
         global modified_target_players, modified_targets_data, _session_transferred_dynamics, _session_id_map
         if modified_target_players:
-            from PyQt6.QtWidgets import QMessageBox
             msg = QMessageBox(self)
             msg.setWindowTitle(t('error.unsaved_title', default='Unsaved Changes'))
             msg.setText(t('character_transfer.unsaved_warning', default='You have unsaved transfers. Save before exiting?'))
@@ -192,11 +197,11 @@ class CharacterTransferWindow(QWidget):
             msg.setDefaultButton(cancel_btn)
             msg.exec()
             if msg.clickedButton() == save_btn:
-                event.ignore()
+                a0.ignore()
                 self._save_and_close()
                 return
             elif msg.clickedButton() == cancel_btn:
-                event.ignore()
+                a0.ignore()
                 return
         level_json = None
         host_json = None
@@ -208,7 +213,7 @@ class CharacterTransferWindow(QWidget):
         modified_targets_data = {}
         _session_transferred_dynamics.clear()
         _session_id_map.clear()
-        event.accept()
+        a0.accept()
     def _save_and_close(self):
         def _on_save_done(success):
             global level_json, host_json, targ_lvl, targ_json
@@ -231,14 +236,15 @@ class CharacterTransferWindow(QWidget):
         except Exception as e:
             print(f'GUI finalize_save error: {e}')
             self.close()
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
+    def keyPressEvent(self, a0):
+        if a0.key() == Qt.Key_Escape:
             self.close()
         else:
-            super().keyPressEvent(event)
+            super().keyPressEvent(a0)
     def setup_ui(self):
         self.setWindowTitle(t('tool.character_transfer'))
-        self.setFixedSize(1200, 640)
+        self.setMinimumSize(980, 680)
+        self.resize(1200, 760)
         self.load_styles()
         try:
             if ICON_PATH and os.path.exists(ICON_PATH):
@@ -255,32 +261,34 @@ class CharacterTransferWindow(QWidget):
         glass_layout.setSpacing(12)
         file_row = QHBoxLayout()
         file_row.setSpacing(10)
-        import nerdfont as nf
-        _nf_font = QFont(constants.FONT_FAMILY_NERD, 10)
-        src_btn = QPushButton(f"{nf.icons['nf-fa-steam']} {t('character_transfer.source_btn')}")
-        src_btn.setFont(_nf_font)
+        self.src_btn = make_button(
+            t('character_transfer.source_btn'), 'secondary')
+        src_btn = self.src_btn
         src_btn.setMinimumWidth(110)
         src_btn.setMaximumWidth(160)
         src_btn.setToolTip(t('character_transfer.source_tooltip'))
         src_btn.clicked.connect(self.source_level_file)
         file_row.addWidget(src_btn)
-        self.src_xgp_btn = QPushButton(f"{nf.icons['nf-fa-xbox']} {t('character_transfer.source_btn')}")
-        self.src_xgp_btn.setFont(_nf_font)
+        self.src_xgp_btn = make_button(
+            t('character_transfer.source_xgp', default='Source Game Pass'),
+            'secondary')
         self.src_xgp_btn.setMinimumWidth(110)
         self.src_xgp_btn.setMaximumWidth(160)
         self.src_xgp_btn.setToolTip('Load a GamePass save from the container as source')
         self.src_xgp_btn.clicked.connect(lambda: self._xgp_load('source'))
         self.src_xgp_btn.setEnabled(True)
         file_row.addWidget(self.src_xgp_btn)
-        tgt_btn = QPushButton(f"{nf.icons['nf-fa-steam']} {t('character_transfer.target_btn')}")
-        tgt_btn.setFont(_nf_font)
+        self.tgt_btn = make_button(
+            t('character_transfer.target_btn'), 'secondary')
+        tgt_btn = self.tgt_btn
         tgt_btn.setMinimumWidth(110)
         tgt_btn.setMaximumWidth(160)
         tgt_btn.setToolTip(t('character_transfer.target_tooltip'))
         tgt_btn.clicked.connect(self.target_level_file)
         file_row.addWidget(tgt_btn)
-        self.tgt_xgp_btn = QPushButton(f"{nf.icons['nf-fa-xbox']} {t('character_transfer.target_btn')}")
-        self.tgt_xgp_btn.setFont(_nf_font)
+        self.tgt_xgp_btn = make_button(
+            t('character_transfer.target_xgp', default='Target Game Pass'),
+            'secondary')
         self.tgt_xgp_btn.setMinimumWidth(110)
         self.tgt_xgp_btn.setMaximumWidth(160)
         self.tgt_xgp_btn.setToolTip('Load the GamePass save currently open in PalTrainer as target')
@@ -439,17 +447,44 @@ class CharacterTransferWindow(QWidget):
         self.current_selection_label.setWordWrap(True)
         self.current_selection_label.setAlignment(Qt.AlignCenter)
         glass_layout.addWidget(self.current_selection_label)
+        self.workflow_review = BulkWorkflowReview(
+            source=t(
+                'character_transfer.no_source_selected',
+                default='Choose a source Level.sav and player'),
+            target=t(
+                'character_transfer.no_target_selected',
+                default='Choose a target Level.sav and player'),
+            review=t(
+                'character_transfer.review_missing',
+                default='Load both saves and choose players before transferring data.'),
+            parent=self,
+        )
+        self.workflow_review.set_risk(
+            t(
+                'character_transfer.risk',
+                default='Transferred data can replace the selected target player data.'),
+            t(
+                'character_transfer.backup',
+                default=(
+                    'A full Backups/Character Transfer copy of the target save is '
+                    'created when the target is loaded. Transfers remain in memory '
+                    'until Save Changes.')),
+        )
+        glass_layout.addWidget(self.workflow_review)
         actions_row = QHBoxLayout()
         actions_row.setSpacing(12)
-        transfer_all_btn = QPushButton(t('Transfer All'))
+        self.transfer_all_btn = make_button(t('Transfer All'), 'secondary')
+        transfer_all_btn = self.transfer_all_btn
         transfer_all_btn.setToolTip(t('character_transfer.transfer_all_tooltip'))
         transfer_all_btn.clicked.connect(self.transfer_all_characters)
         actions_row.addWidget(transfer_all_btn)
-        transfer_btn = QPushButton(t('Transfer'))
+        self.transfer_btn = make_button(t('Transfer'), 'primary')
+        transfer_btn = self.transfer_btn
         transfer_btn.setToolTip(t('character_transfer.transfer_tooltip'))
         transfer_btn.clicked.connect(lambda: self.main(skip_msgbox=False))
         actions_row.addWidget(transfer_btn)
-        save_btn = QPushButton(t('Save Changes'))
+        self.save_btn = make_button(t('Save Changes'), 'warning')
+        save_btn = self.save_btn
         save_btn.setToolTip(t('character_transfer.save_tooltip'))
         save_btn.clicked.connect(self.finalize_save)
         actions_row.addWidget(save_btn)
@@ -465,9 +500,10 @@ class CharacterTransferWindow(QWidget):
         warning_label.setWordWrap(True)
         glass_layout.addWidget(warning_label)
         main_layout.addWidget(glass_frame)
-    def showEvent(self, event):
-        super().showEvent(event)
-        if not event.spontaneous():
+        self._sync_transfer_review()
+    def showEvent(self, a0):
+        super().showEvent(a0)
+        if not a0.spontaneous():
             self.activateWindow()
             self.raise_()
             self.src_xgp_btn.setEnabled(True)
@@ -535,6 +571,7 @@ class CharacterTransferWindow(QWidget):
                 modified_targets_data = {}
             current_selection_label.setText(
                 f'Source: {selected_source_player},Target: {selected_target_player}')
+            self._sync_transfer_review()
         run_with_loading(on_finished, task)
     def source_level_file(self):
         try:
@@ -557,6 +594,7 @@ class CharacterTransferWindow(QWidget):
             else:
                 selected_source_player = None
             self.current_selection_label.setText(t('character_transfer.selection_status', source=selected_source_player or 'N/A', target=selected_target_player or 'N/A'))
+        self._sync_transfer_review()
     def on_selection_of_target_player(self):
         try:
             on_selection_of_target_player()
@@ -568,6 +606,7 @@ class CharacterTransferWindow(QWidget):
             else:
                 selected_target_player = None
             self.current_selection_label.setText(t('character_transfer.selection_status', source=selected_source_player or 'N/A', target=selected_target_player or 'N/A'))
+        self._sync_transfer_review()
     def transfer_all_characters(self):
         try:
             transfer_all_characters()
@@ -583,6 +622,45 @@ class CharacterTransferWindow(QWidget):
         show_information(None, title, message)
     def finalize_save(self):
         finalize_save(self, on_close_complete=None)
+    def _sync_transfer_review(self):
+        source_path = getattr(self.source_level_path_label, 'text', lambda: '')()
+        target_path = getattr(self.target_level_path_label, 'text', lambda: '')()
+        source_ready = bool(level_json and level_sav_path)
+        target_ready = bool(targ_lvl and t_level_sav_path)
+        single_ready = bool(
+            source_ready and target_ready and selected_source_player)
+        self.workflow_review.set_context(
+            source=(
+                f'{selected_source_player} — {source_path}' if selected_source_player
+                else source_path),
+            target=(
+                f'{selected_target_player or selected_source_player} — {target_path}'
+                if single_ready else target_path),
+            review=t(
+                'character_transfer.review_ready' if single_ready
+                else 'character_transfer.review_missing',
+                default=(
+                    'Ready to stage the selected character, inventory, guild, Pal, '
+                    'technology, dynamic-container, and timestamp data in the target.'
+                    if single_ready else
+                    'Load both saves and choose a source player before transferring data.')),
+        )
+        self.transfer_btn.setEnabled(single_ready)
+        self.transfer_all_btn.setEnabled(source_ready and target_ready)
+        self.save_btn.setEnabled(bool(modified_target_players))
+    def _set_transfer_progress(self, message):
+        self.workflow_review.progress.setRange(0, 0)
+        self.workflow_review.progress.setFormat(message)
+        self.workflow_review.progress.show()
+        self.transfer_btn.setEnabled(False)
+        self.transfer_all_btn.setEnabled(False)
+    def _set_transfer_result(self, message, success=True):
+        self.workflow_review.set_progress(
+            1, 1,
+            t('ui.bulk.complete', default='Complete') if success
+            else t('repair.workflow.failed_short', default='Operation failed'))
+        self.workflow_review.set_result(message, success=success)
+        self._sync_transfer_review()
 def load_json_files():
     global host_json_gvas, targ_json_gvas, host_json, targ_json
     host_json_gvas = load_player_file(level_sav_path, selected_source_player)
@@ -790,10 +868,20 @@ modified_targets_data = {}
 _session_transferred_dynamics = set()
 _session_id_map = {}
 _target_removed_body_instances = set()
+def _active_transfer_window():
+    if source_player_list is None:
+        return None
+    window = source_player_list.window()
+    return window if isinstance(window, CharacterTransferWindow) else None
 def transfer_all_characters():
     if not level_json or not targ_lvl:
         show_warning(None, t('warning.title'), t('character_transfer.load_both_saves'))
         return
+    transfer_window = _active_transfer_window()
+    if transfer_window is not None:
+        transfer_window._set_transfer_progress(t(
+            'character_transfer.running_all',
+            default='Staging every eligible source player…'))
     def worker():
         import time
         global selected_source_player, selected_target_player, host_guid, targ_uid, host_json, host_json_gvas, targ_json, targ_json_gvas
@@ -865,12 +953,29 @@ def transfer_all_characters():
         current_selection_label.setText('Source: None,Target: None')
         source_player_list.clearSelection()
         target_player_list.clearSelection()
-        show_information(None, t('Transfer Successful'), t('All players transferred!'))
+        if transfer_window is not None:
+            transfer_window._set_transfer_result(t(
+                'character_transfer.all_staged',
+                default=(
+                    'All eligible players were staged in the target. Review the '
+                    'target and choose Save Changes to write them.')))
+        else:
+            show_information(None, t('Transfer Successful'), t('All players transferred!'))
     def task():
         worker()
     def on_finished(_):
         on_bulk_finished()
-    run_with_loading(on_finished, task)
+    def on_error(error):
+        if transfer_window is not None:
+            transfer_window._set_transfer_result(t(
+                'character_transfer.stage_failed_detail',
+                default=(
+                    'The bulk transfer could not be staged. The target save was '
+                    'not written. Details: {detail}'), detail=str(error).strip()),
+                success=False)
+    run_with_loading(
+        on_finished, task, parent=transfer_window, on_error=on_error,
+        local_state=transfer_window is not None)
 def main(skip_msgbox=False, skip_gui=False):
     global host_guid, targ_uid, exported_map, selected_source_player, selected_target_player
     if not all([level_sav_path, t_level_sav_path, selected_source_player]):
@@ -909,6 +1014,12 @@ def main(skip_msgbox=False, skip_gui=False):
         print('Load Error: Failed to load JSON files.')
         return False
 
+    transfer_window = _active_transfer_window()
+    if transfer_window is not None and not skip_gui:
+        transfer_window._set_transfer_progress(t(
+            'character_transfer.running_one',
+            default='Staging the selected player in the target…'))
+
     def task():
         src_players_folder = os.path.join(os.path.dirname(level_sav_path), 'Players')
         tgt_players_folder = os.path.join(os.path.dirname(t_level_sav_path), 'Players')
@@ -946,6 +1057,11 @@ def main(skip_msgbox=False, skip_gui=False):
         return True
     def on_finished(success):
         if not success:
+            if transfer_window is not None and not skip_gui:
+                transfer_window._set_transfer_result(t(
+                    'character_transfer.stage_failed',
+                    default='The transfer could not be staged. The target save was not written.'),
+                    success=False)
             return
         constants.dirty = True
         if not skip_gui:
@@ -959,9 +1075,26 @@ def main(skip_msgbox=False, skip_gui=False):
             current_selection_label.setText('Source: None,Target: None')
             source_player_list.clearSelection()
             target_player_list.clearSelection()
-        if not skip_msgbox:
-            show_information(None, t('Transfer Successful'), t("Transfer successful in memory! Hit 'Save Changes' to save."))
-    run_with_loading(on_finished, task)
+        result_text = t(
+            'character_transfer.staged',
+            default=(
+                'Transfer staged in memory. Review the target and choose Save '
+                'Changes to write it.'))
+        if transfer_window is not None and not skip_gui:
+            transfer_window._set_transfer_result(result_text)
+        elif not skip_msgbox:
+            show_information(None, t('Transfer Successful'), result_text)
+    def on_error(error):
+        if transfer_window is not None and not skip_gui:
+            transfer_window._set_transfer_result(t(
+                'character_transfer.stage_failed_detail',
+                default=(
+                    'The transfer could not be staged. The target save was not '
+                    'written. Details: {detail}'), detail=str(error).strip()),
+                success=False)
+    run_with_loading(
+        on_finished, task, parent=transfer_window, on_error=on_error,
+        local_state=transfer_window is not None)
     return True
 def _normalize_lid(lid):
     if hasattr(lid, 'raw_bytes'):
@@ -1544,6 +1677,9 @@ def source_level_file():
         load_players(wsd, True)
         current_selection_label.setText(f'Source: {selected_source_player},Target: {selected_target_player}')
         print('Done loading the data from Source Save!')
+        transfer_window = _active_transfer_window()
+        if transfer_window is not None:
+            transfer_window._sync_transfer_review()
     run_with_loading(on_finished, task)
 def target_level_file():
     global t_level_sav_path, targ_lvl, target_gvas_file, selected_target_player
@@ -1592,6 +1728,9 @@ def target_level_file():
         load_players(wsd, False)
         current_selection_label.setText(f'Source: {selected_source_player},Target: {selected_target_player}')
         print('Done loading the data from Target Save!')
+        transfer_window = _active_transfer_window()
+        if transfer_window is not None:
+            transfer_window._sync_transfer_review()
     run_with_loading(on_finished, task)
 def _check_player_sav(guid, base_path):
     if not base_path:
@@ -1628,7 +1767,7 @@ def finalize_save(window, on_close_complete=None):
     global _xgp_new_world_name
     _xgp_new_world_name = None
     if _xgp_cpath:
-        from PyQt6.QtWidgets import QInputDialog, QLineEdit
+        from PyQt6.QtWidgets import QLineEdit
         _old_name = 'World'
         _meta_p = os.path.join(os.path.dirname(t_level_sav_path), 'LevelMeta.sav')
         if os.path.isfile(_meta_p):
@@ -1647,7 +1786,6 @@ def finalize_save(window, on_close_complete=None):
         show_warning(None, t('warning.title'), t('character_transfer.load_target_first'))
         return
     if t_level_mtime is not None and os.path.getmtime(t_level_sav_path) != t_level_mtime:
-        from PyQt6.QtWidgets import QMessageBox
         msg = QMessageBox(window)
         msg.setWindowTitle(t('error.save_stale_title', default='Save File Changed'))
         msg.setText(t('error.save_stale_msg', default='Level.sav on disk has changed since it was loaded. Saving now will overwrite those changes.\n\nSave anyway?'))
@@ -1666,8 +1804,23 @@ def finalize_save(window, on_close_complete=None):
             if success:
                 global t_level_mtime
                 t_level_mtime = os.path.getmtime(t_level_sav_path)
-                show_information(None, t('Success'), t('Transfer complete and backup created!'))
+                message = t(
+                    'character_transfer.saved_result',
+                    default=(
+                        'Transfer saved successfully. The pre-transfer target '
+                        'backup remains available under Backups/Character Transfer.'))
+                if isinstance(window, CharacterTransferWindow):
+                    window._set_transfer_result(message)
+                else:
+                    show_information(None, t('Success'), message)
                 print('Done saving all modified target players!')
+            elif isinstance(window, CharacterTransferWindow):
+                window._set_transfer_result(t(
+                    'character_transfer.save_failed',
+                    default=(
+                        'The transfer could not be saved. Restore the target from '
+                        'Backups/Character Transfer if any partial files were written.')),
+                    success=False)
             if on_close_complete:
                 on_close_complete(success)
         run_with_loading(on_finished, finalize_save_task)

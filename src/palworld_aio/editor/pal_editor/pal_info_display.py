@@ -2,7 +2,7 @@ import os
 import math
 import re
 from functools import partial
-from PyQt6.QtWidgets import QApplication, QDialog, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QInputDialog, QLabel, QListWidget, QListWidgetItem, QProgressBar, QPushButton, QScrollArea, QScrollBar, QSizePolicy, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QDialog, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QProgressBar, QPushButton, QScrollArea, QScrollBar, QSizePolicy, QVBoxLayout, QWidget
 from PyQt6.QtCore import Qt, QEvent, QObject, QPoint, QSize, QTimer, pyqtSignal
 from PyQt6.QtGui import QFontMetrics, QIcon, QShortcut, QKeySequence
 from i18n import t
@@ -14,7 +14,6 @@ from palworld_aio.ui.chrome import tokens as _chrome_tokens
 _P = _chrome_tokens.resolve()
 from palworld_aio.utils import extract_value, safe_nested_get, calculate_max_hp, calculate_shot_attack, calculate_defense, calculate_work_speed, resolve_name, _hp_breakdown, _atk_breakdown, _def_breakdown, _ws_breakdown, stat_breakdown_tooltip
 from palworld_aio.ui.chrome.styles import slot_full, slot_selected, TOOLTIP_STYLE
-from palworld_aio.ui.chrome.components import NerdBtn
 from palworld_aio.ui.dialogs.skill_picker import SkillPicker
 from . import data as _data
 from . import icons as _icons
@@ -46,6 +45,9 @@ class PalInfoDisplayMixin:
             _ensure_skill_data()
             _ensure_passive_data()
             cid = extract_value(raw, 'CharacterID', '')
+            self._reference_pal_asset = str(cid or '')
+            self.reference_pal_btn.setEnabled(bool(self._reference_pal_asset))
+            self.breeding_pal_btn.setEnabled(bool(self._reference_pal_asset))
             level = extract_value(raw, 'Level', 1)
             nick = extract_value(raw, 'NickName', '')
             pal_name = _strip_prefix_label(resolve_name(cid, PalFrame._NAMEMAP) or cid)

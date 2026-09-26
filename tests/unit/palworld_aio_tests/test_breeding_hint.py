@@ -15,7 +15,8 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from tests.dynamic_importer import import_from
 
 tab_mod = import_from('palworld_aio.ui.tabs.breeding_tab')
-empty_state_mod = import_from('palworld_aio.widgets.empty_state')
+state_views_mod = import_from('palworld_aio.ui.chrome.state_views')
+components_mod = import_from('palworld_aio.ui.chrome.components')
 i18n_mod = import_from('i18n')
 
 _app = None
@@ -75,7 +76,7 @@ def test_no_positional_breeding_strings_in_en_us():
                 assert word not in lowered, f'{key} references position: {word!r}'
 
 
-# ------------------------------------- single-CTA empty state (unchanged)
+# ------------------------------------- shared Reference workspace patterns
 
 def test_empty_state_hides_standalone_cta_and_shows_one_action(tab):
     tab._selected_tribe = None
@@ -83,10 +84,10 @@ def test_empty_state_hides_standalone_cta_and_shows_one_action(tab):
     tab._do_update_results()
     assert not tab._select_btn.isVisibleTo(tab._select_btn.parentWidget())
     assert not tab._hint_label.isVisibleTo(tab._hint_label.parentWidget())
-    empties = list(tab.findChildren(empty_state_mod.EmptyState))
+    empties = list(tab.findChildren(state_views_mod.ConfiguredEmptyState))
     assert len(empties) == 1
     empty = empties[0]
-    # the EmptyState owns the single visible "Select a Pal" affordance
+    # The shared state owns the single visible "Select a Pal" affordance.
     buttons = [b for b in empty.findChildren(type(tab._select_btn))
                if b.text() == 'Select a Pal...']
     assert len(buttons) == 1
@@ -108,3 +109,33 @@ def test_post_selection_restores_reselect_affordance(tab):
     assert tab._select_btn.isVisibleTo(tab._select_btn.parentWidget())
     assert tab._hint_label.isVisibleTo(tab._hint_label.parentWidget())
     assert tab._hint_label.text() == i18n_mod.t('breeding.hint')
+
+
+def test_breeding_uses_shared_segmented_control(tab):
+    assert isinstance(tab._mode_switch, components_mod.SegmentedControl)
+    tab._mode_switch.set_current('children')
+    assert tab._mode == 'children'
+    tab._mode_switch.set_current('parents')
+    assert tab._mode == 'parents'
+
+
+def test_select_pal_supports_editor_cross_link(tab):
+    tab._breeding_data = {
+        'pal_info': {'SheepBall': {'name': 'Lamball', 'icon': ''}},
+        'child_to_parents_unique': {},
+        'child_to_parents_formula': {},
+        'child_to_parents_ignore': {},
+        'parent_to_children_formula': {},
+    }
+    assert tab.select_pal('sheepball')
+    tab._update_timer.stop()
+    tab._do_update_results()
+    assert tab._selected_tribe == 'SheepBall'
+    assert tab._selected_label.text() == 'Lamball'
+    assert tab._reference_btn.isEnabled()
+
+
+def test_unknown_pal_cross_link_is_non_destructive(tab):
+    selected = tab._selected_tribe
+    assert not tab.select_pal('DefinitelyMissingPal')
+    assert tab._selected_tribe == selected

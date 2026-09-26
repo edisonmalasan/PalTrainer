@@ -1,8 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QStackedWidget
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QCursor
-from palworld_aio import constants
-from i18n import t
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QStackedWidget
 from palworld_aio.ui.tabs.docs.wiki_tab import WikiTab
 
 class DocsTab(QWidget):
@@ -15,14 +11,9 @@ class DocsTab(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-
-        # top-nav-shell 4.5: the single-item sub-tab bar is dropped; the
-        # ribbon carries the page identity. WikiTab fills the page.
-        layout.addWidget(create_page_ribbon(t('docs.tab') if t else 'Docs', (t('sidebar.section.reference') if t else 'Reference').upper(), self))
 
         self._sub_stack = QStackedWidget()
         self.wiki_tab = WikiTab(self)
@@ -38,3 +29,8 @@ class DocsTab(QWidget):
 
     def refresh_labels(self):
         self.wiki_tab.refresh_labels()
+
+    def open_reference(self, category: str, identifier: str) -> bool:
+        """Open one bundled-data record while preserving shell history."""
+        self._switch_sub_tab('wiki')
+        return self.wiki_tab.open_reference(category, identifier)

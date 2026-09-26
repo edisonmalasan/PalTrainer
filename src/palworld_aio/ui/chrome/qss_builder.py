@@ -18,7 +18,7 @@ from palworld_aio.ui.chrome.fonts import (
     FONT_BODY_STACK, FONT_HEADING_STACK, FONT_MONO_STACK,
     font_family_qss,
 )
-from palworld_aio.ui.chrome.tokens import HEIGHT, RADIUS, SPACING, TYPE, resolve
+from palworld_aio.ui.chrome.tokens import FOCUS, HEIGHT, RADIUS, SPACING, TYPE, resolve
 
 BUTTON_PAD = f'{SPACING["sm"] - 2}px {SPACING["lg"] - 2}px'
 
@@ -202,7 +202,7 @@ QPushButton:pressed {{
     background-color: {p['surface_input']};
 }}
 QPushButton:focus {{
-    border: 1px solid {p['accent_border_strong']};
+    border: {FOCUS['width']}px solid {p['focus_ring']};
 }}
 QPushButton:disabled {{
     background-color: {p['surface']};
@@ -221,7 +221,8 @@ QPushButton[class="primary"]:hover {{
     border-color: {p['accent_hover']};
 }}
 QPushButton[class="primary"]:pressed {{ background-color: {p['accent_pressed']}; }}
-QPushButton[class="primary"]:focus {{ border: 1px solid {p['text']}; }}
+QPushButton[class="primary"]:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QPushButton[class="primary"]:checked {{ background-color: {p['accent_pressed']}; }}
 QPushButton[class="primary"]:disabled {{
     background-color: {p['surface_raised']};
     color: {p['text_disabled']};
@@ -271,6 +272,70 @@ QPushButton[class="tool"]:checked {{
     border-color: {p['accent_border']};
 }}
 QPushButton[class="tool"]:disabled {{ color: {p['text_disabled']}; }}
+
+/* ---- audit shared control hierarchy ---- */
+QPushButton[class="secondary"] {{
+    background: {p['surface_raised']}; color: {p['text']};
+    border: 1px solid {p['border_strong']};
+}}
+QPushButton[class="secondary"]:hover {{ background: {p['surface_hover']}; border-color: {p['accent_border']}; }}
+QPushButton[class="secondary"]:pressed {{ background: {p['surface_input']}; }}
+QPushButton[class="secondary"]:checked {{ background: {p['accent_bg_strong']}; border-color: {p['accent_border_strong']}; }}
+QPushButton[class="secondary"]:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QPushButton[class="secondary"]:disabled {{ background: {p['surface']}; color: {p['text_disabled']}; border-color: {p['border']}; }}
+
+QPushButton[class="tertiary"] {{ background: transparent; color: {p['text_secondary']}; border: 1px solid transparent; }}
+QPushButton[class="tertiary"]:hover {{ background: {p['surface_hover']}; color: {p['text']}; }}
+QPushButton[class="tertiary"]:pressed {{ background: {p['surface_active']}; }}
+QPushButton[class="tertiary"]:checked {{ background: {p['accent_bg']}; color: {p['accent']}; }}
+QPushButton[class="tertiary"]:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QPushButton[class="tertiary"]:disabled {{ background: transparent; color: {p['text_disabled']}; }}
+
+QPushButton[class="warning"] {{ background: {p['warning_bg']}; color: {p['warning']}; border: 1px solid {p['warning_border']}; }}
+QPushButton[class="warning"]:hover {{ background: {p['surface_hover']}; border-color: {p['warning']}; }}
+QPushButton[class="warning"]:pressed {{ background: {p['warning_border']}; }}
+QPushButton[class="warning"]:checked {{ background: {p['warning_border']}; color: {p['text']}; }}
+QPushButton[class="warning"]:focus {{ border: {FOCUS['width']}px solid {p['warning']}; }}
+QPushButton[class="warning"]:disabled {{ background: {p['surface']}; color: {p['text_disabled']}; border-color: {p['border']}; }}
+
+QPushButton[class="destructive"] {{ background: {p['danger_bg']}; color: {p['danger']}; border: 1px solid {p['danger_border']}; }}
+QPushButton[class="destructive"]:hover {{ background: {p['surface_hover']}; border-color: {p['danger']}; }}
+QPushButton[class="destructive"]:pressed {{ background: {p['danger_border']}; }}
+QPushButton[class="destructive"]:checked {{ background: {p['danger_border']}; color: {p['text']}; }}
+QPushButton[class="destructive"]:focus {{ border: {FOCUS['width']}px solid {p['danger']}; }}
+QPushButton[class="destructive"]:disabled {{ background: {p['surface']}; color: {p['text_disabled']}; border-color: {p['border']}; }}
+
+QPushButton[class="icon"] {{ background: transparent; color: {p['text_secondary']}; border: 1px solid transparent; padding: {SPACING['xs']}px; }}
+QPushButton[class="icon"]:hover {{ background: {p['surface_hover']}; color: {p['text']}; }}
+QPushButton[class="icon"]:pressed {{ background: {p['surface_active']}; }}
+QPushButton[class="icon"]:checked {{ background: {p['accent_bg_strong']}; border-color: {p['accent_border']}; }}
+QPushButton[class="icon"]:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QPushButton[class="icon"]:disabled {{ background: transparent; color: {p['text_disabled']}; }}
+
+QPushButton[class="segmented"] {{
+    background: {p['surface_raised']}; color: {p['text_secondary']};
+    border: 1px solid {p['border_strong']}; border-radius: 0;
+}}
+QPushButton[class="segmented"][segmentPosition="start"] {{ border-top-left-radius: {RADIUS['md']}px; border-bottom-left-radius: {RADIUS['md']}px; }}
+QPushButton[class="segmented"][segmentPosition="end"] {{ border-top-right-radius: {RADIUS['md']}px; border-bottom-right-radius: {RADIUS['md']}px; }}
+QPushButton[class="segmented"][segmentPosition="only"] {{ border-radius: {RADIUS['md']}px; }}
+QPushButton[class="segmented"]:hover {{ background: {p['surface_hover']}; color: {p['text']}; }}
+QPushButton[class="segmented"]:pressed {{ background: {p['surface_active']}; }}
+QPushButton[class="segmented"]:checked {{ background: {p['accent_bg_strong']}; color: {p['accent']}; border-color: {p['accent_border_strong']}; }}
+QPushButton[class="segmented"]:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QPushButton[class="segmented"]:disabled {{ background: {p['surface']}; color: {p['text_disabled']}; border-color: {p['border']}; }}
+
+QPushButton[class="chip"], QPushButton[class="filter"], QPushButton[class="tab"] {{
+    background: {p['surface']}; color: {p['text_secondary']};
+    border: 1px solid {p['border']}; border-radius: {RADIUS['pill']}px;
+    padding: {SPACING['xs']}px {SPACING['md']}px;
+}}
+QPushButton[class="chip"]:hover, QPushButton[class="filter"]:hover, QPushButton[class="tab"]:hover {{ background: {p['surface_hover']}; color: {p['text']}; }}
+QPushButton[class="chip"]:pressed, QPushButton[class="filter"]:pressed, QPushButton[class="tab"]:pressed {{ background: {p['surface_active']}; }}
+QPushButton[class="chip"]:checked, QPushButton[class="filter"]:checked, QPushButton[class="tab"]:checked {{ background: {p['accent_bg_strong']}; color: {p['accent']}; border-color: {p['accent_border_strong']}; }}
+QPushButton[class="chip"][pickerSelected="true"] {{ background: {p['accent_bg']}; color: {p['accent']}; border-color: {p['accent_border_strong']}; }}
+QPushButton[class="chip"]:focus, QPushButton[class="filter"]:focus, QPushButton[class="tab"]:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QPushButton[class="chip"]:disabled, QPushButton[class="filter"]:disabled, QPushButton[class="tab"]:disabled {{ background: {p['surface']}; color: {p['text_disabled']}; border-color: {p['border']}; }}
 
 /* ---- selection views ---- */
 QTreeWidget, QTreeView, QListWidget, QTableWidget, QTableView, QListView {{
@@ -668,6 +733,51 @@ QLabel#dialogTitle {{
     font-weight: {TYPE['title'][1]};
     color: {p['text']};
 }}
+QLabel#workflowStep {{
+    color: {p['text_disabled']};
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['pill']}px;
+    padding: {SPACING['xs']}px {SPACING['md']}px;
+    font-size: {TYPE['secondary'][0]}px;
+    font-weight: 600;
+}}
+QLabel#workflowStep[stepState="active"] {{
+    color: {p['accent']};
+    background: {p['accent_bg']};
+    border-color: {p['accent_border']};
+}}
+QLabel#workflowStep[stepState="complete"] {{
+    color: {p['success']};
+    border-color: {p['success_border']};
+}}
+QFrame#guildMembersPane {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QLabel#operationSummary {{
+    color: {p['text']};
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+    padding: {SPACING['lg']}px;
+    font-size: {TYPE['body'][0]}px;
+    font-weight: 600;
+}}
+QLabel#operationResult {{
+    color: {p['text']};
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+    padding: {SPACING['md']}px;
+}}
+QLabel#operationResult[resultState="success"] {{
+    color: {p['success']}; border-color: {p['success_border']};
+}}
+QLabel#operationResult[resultState="warning"] {{
+    color: {p['warning']}; border-color: {p['warning_border']};
+}}
 QMessageBox, QInputDialog {{
     background-color: {p['surface_raised']};
     color: {p['text']};
@@ -827,6 +937,353 @@ QFrame[class="searchField"] QLineEdit {{
 QFrame[class="searchField"] QLineEdit:focus {{ border: none; }}
 QFrame[class="searchField"] QLabel {{ color: {p['text_secondary']}; }}
 
+/* ---- workspace header and context ---- */
+QFrame#workspaceHeader {{
+    background: {p['surface']};
+    border-bottom: 1px solid {p['border']};
+    padding: {SPACING['lg']}px {SPACING['xl']}px {SPACING['sm']}px;
+}}
+QLabel#workspaceTitle {{
+    color: {p['text']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['page_title'][0]}px;
+    font-weight: {TYPE['page_title'][1]};
+}}
+QLabel#workspaceDescription {{ color: {p['text_secondary']}; font-size: {TYPE['metadata'][0]}px; }}
+QPushButton#workspaceSaveContext {{
+    background: {p['surface_raised']}; color: {p['text']};
+    border: 1px solid {p['border']}; border-radius: {RADIUS['md']}px;
+    padding: {SPACING['xs']}px {SPACING['md']}px; text-align: left;
+}}
+QPushButton#workspaceSaveContext:hover {{ background: {p['surface_hover']}; border-color: {p['border_strong']}; }}
+QPushButton#workspaceSaveContext:pressed {{ background: {p['surface_active']}; }}
+QPushButton#workspaceSaveContext:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QPushButton#workspaceSaveContext:disabled {{ color: {p['text_disabled']}; border-color: {p['border']}; }}
+QPushButton#workspaceSaveContext[saveState="loaded"] {{ border-color: {p['success_border']}; }}
+QPushButton#workspaceSaveContext[saveState="dirty"], QPushButton#workspaceSaveContext[saveState="read_only"], QPushButton#workspaceSaveContext[saveState="backup_recommended"] {{ border-color: {p['warning_border']}; }}
+QPushButton#workspaceSaveContext[saveState="error"] {{ border-color: {p['danger_border']}; }}
+QPushButton#workspaceSaveContext[saveState="loading"], QPushButton#workspaceSaveContext[saveState="saving"] {{ border-color: {p['info_border']}; }}
+QPushButton#pendingChangesButton {{
+    background: transparent; color: {p['text_secondary']};
+    border: 1px solid {p['border']}; border-radius: {RADIUS['pill']}px;
+    padding: {SPACING['xs']}px {SPACING['md']}px;
+}}
+QPushButton#pendingChangesButton:hover {{ background: {p['surface_hover']}; color: {p['text']}; }}
+QPushButton#pendingChangesButton:pressed {{ background: {p['surface_active']}; }}
+QPushButton#pendingChangesButton:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QPushButton#pendingChangesButton:disabled {{ color: {p['text_disabled']}; }}
+QPushButton#pendingChangesButton[hasChanges="true"] {{ color: {p['warning']}; border-color: {p['warning_border']}; background: {p['warning_bg']}; }}
+QFrame#workspaceContextBar {{ background: transparent; }}
+QLabel[class="contextSeparator"] {{ color: {p['text_disabled']}; font-size: {TYPE['metadata'][0]}px; }}
+QFrame#notificationHost {{ background: transparent; }}
+
+/* ---- workspace shell ---- */
+QFrame#workspaceShell, QFrame#workspaceArea, QFrame#workspaceContent {{
+    background: {p['canvas']};
+}}
+QFrame#shellTitleBar {{
+    background: {p['surface_sidebar']};
+    border-bottom: 1px solid {p['border']};
+}}
+QFrame#windowDragRegion {{ background: transparent; border: none; }}
+QLabel#windowDragLabel {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['caption'][0]}px;
+}}
+QStackedWidget#workspacePageHost {{ background: transparent; border: none; }}
+QFrame#workspaceInspectorSide {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QWidget#overviewPage, QWidget#overviewBody, QWidget#overviewNoSaveBody,
+QScrollArea#overviewScroll, QScrollArea#overviewNoSaveScroll,
+QScrollArea#overviewScroll > QWidget > QWidget,
+QScrollArea#overviewNoSaveScroll > QWidget > QWidget {{ background: transparent; border: none; }}
+QFrame#overviewIdentity, QFrame#overviewActivity, QFrame#overviewWelcome,
+QFrame#overviewRecentSaves {{
+    background: {p['surface']}; border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QLabel#overviewWelcomeTitle {{
+    color: {p['text']}; font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['page_title'][0]}px; font-weight: 600;
+}}
+QLabel#overviewWelcomeDescription, QLabel#overviewRecentDetail,
+QLabel#overviewRecentEmpty {{ color: {p['text_secondary']}; font-size: {TYPE['body'][0]}px; }}
+QLabel#overviewDropHint {{
+    color: {p['text_secondary']}; background: {p['canvas']};
+    border: 1px dashed {p['border_strong']}; border-radius: {RADIUS['md']}px;
+    padding: {SPACING['lg']}px;
+}}
+QFrame#overviewRecentRow {{
+    background: {p['surface_raised']}; border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame#overviewRecentRow[available="false"] {{ border-color: {p['warning_border']}; }}
+QLabel#overviewRecentName {{ color: {p['text']}; font-size: {TYPE['body'][0]}px; font-weight: 600; }}
+QLabel#overviewSaveName {{
+    color: {p['text']}; font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['section_title'][0]}px; font-weight: 600;
+}}
+QLabel#overviewSaveDetail {{ color: {p['text_secondary']}; font-size: {TYPE['metadata'][0]}px; }}
+QLabel#overviewBackupState, QLabel#overviewPendingState {{
+    color: {p['text_secondary']}; background: {p['surface_raised']};
+    border: 1px solid {p['border']}; border-radius: {RADIUS['pill']}px;
+    padding: {SPACING['xs']}px {SPACING['md']}px;
+}}
+QLabel#overviewPendingState[hasChanges="true"] {{ color: {p['warning']}; border-color: {p['warning_border']}; }}
+QPushButton#overviewMetric {{
+    background: {p['surface']}; color: {p['text']}; border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px; text-align: left; padding: {SPACING['lg']}px;
+    font-size: {TYPE['section_title'][0]}px; font-weight: 600;
+}}
+QPushButton#overviewMetric:hover {{ background: {p['surface_hover']}; border-color: {p['accent_border']}; }}
+QPushButton#overviewMetric:pressed {{ background: {p['surface_active']}; }}
+QPushButton#overviewMetric:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QLabel[class="sectionTitle"] {{
+    color: {p['text']}; font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['section_title'][0]}px; font-weight: 600;
+}}
+QFrame#overviewActivity QLabel {{ color: {p['text_secondary']}; font-size: {TYPE['body'][0]}px; }}
+
+QWidget#toolCenterPage, QWidget#toolCenterBody, QScrollArea#toolCenterScroll,
+QScrollArea#toolCenterScroll > QWidget > QWidget {{ background: transparent; border: none; }}
+QWidget#toolCenterPage QPushButton[class="chip"]:checked {{
+    background: {p['accent']}; color: {p['text_on_accent']};
+    border-color: {p['accent']};
+}}
+QFrame#toolCenterCard {{
+    background: {p['surface']}; border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QFrame#toolCenterCard:hover {{ border-color: {p['border_strong']}; }}
+QFrame#toolCenterCard[ready="false"] {{ background: {p['surface_raised']}; }}
+QLabel#toolCenterTitle {{
+    color: {p['text']}; font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['section_title'][0]}px; font-weight: 600;
+}}
+QLabel#toolCenterDescription {{ color: {p['text_secondary']}; font-size: {TYPE['body'][0]}px; }}
+QLabel#toolCenterIo {{ color: {p['text_disabled']}; font-size: {TYPE['metadata'][0]}px; }}
+QLabel#toolCenterRequirement {{ color: {p['success']}; font-size: {TYPE['metadata'][0]}px; font-weight: 600; }}
+QFrame#toolCenterCard[ready="false"] QLabel#toolCenterRequirement {{ color: {p['warning']}; }}
+QLabel#toolCenterEmpty {{ color: {p['text_secondary']}; font-size: {TYPE['body'][0]}px; padding: {SPACING['xl']}px; }}
+
+QWidget#settingsPage, QWidget#settingsBody, QScrollArea#settingsScroll,
+QScrollArea#settingsScroll > QWidget > QWidget {{ background: transparent; border: none; }}
+QFrame#settingsSection {{
+    background: {p['surface']}; border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QFrame#settingsSection:focus-within {{ border-color: {p['border_strong']}; }}
+QLabel#settingsSectionTitle {{
+    color: {p['text']}; font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['section_title'][0]}px; font-weight: 600;
+}}
+QLabel#settingsSectionHelp, QLabel#settingsStatus {{
+    color: {p['text_secondary']}; font-size: {TYPE['metadata'][0]}px;
+}}
+QFrame#settingsSection QCheckBox {{ padding: {SPACING['xs']}px 0; }}
+
+QWidget#aboutPage, QWidget#aboutBody, QScrollArea#aboutScroll,
+QScrollArea#aboutScroll > QWidget > QWidget,
+QWidget#diagnosticsPage, QWidget#diagnosticsBody, QScrollArea#diagnosticsScroll,
+QScrollArea#diagnosticsScroll > QWidget > QWidget {{ background: transparent; border: none; }}
+QFrame#aboutHero, QFrame#aboutCard, QFrame#systemUpdateBanner,
+QFrame#diagnosticsSummary, QFrame#diagnosticsPaths,
+QFrame#diagnosticsReport, QFrame#diagnosticsConsole {{
+    background: {p['surface']}; border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QLabel#aboutProductTitle {{
+    color: {p['text']}; font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['page_title'][0]}px; font-weight: 600;
+}}
+QLabel#aboutDescription, QLabel#aboutCardBody {{
+    color: {p['text_secondary']}; font-size: {TYPE['body'][0]}px;
+}}
+QLabel#aboutCardTitle, QLabel#diagnosticsSectionTitle {{
+    color: {p['text']}; font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['section_title'][0]}px; font-weight: 600;
+}}
+QFrame#systemUpdateBanner[status="available"] {{
+    background: {p['warning_bg']}; border-color: {p['warning_border']};
+}}
+QFrame#systemUpdateBanner[status="current"] {{
+    background: {p['success_bg']}; border-color: {p['success_border']};
+}}
+QFrame#systemUpdateBanner[status="error"] {{
+    background: {p['danger_bg']}; border-color: {p['danger_border']};
+}}
+QLabel#diagnosticsValue, QLabel#diagnosticsPath {{
+    color: {p['text']}; font-family: {font_family_qss(FONT_MONO_STACK)};
+    font-size: {TYPE['mono'][0]}px;
+}}
+QFrame#diagnosticsPathRow {{
+    background: {p['surface_raised']}; border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QLabel#diagnosticsPrivacy {{ color: {p['text_secondary']}; }}
+QLabel#diagnosticsResult[status="success"] {{ color: {p['success']}; }}
+QLabel#diagnosticsResult[status="warning"] {{ color: {p['warning']}; }}
+QLabel#diagnosticsResult[status="danger"] {{ color: {p['danger']}; }}
+QPlainTextEdit#diagnosticsConsoleOutput {{
+    background: {p['canvas']}; color: {p['text_secondary']};
+    border: 1px solid {p['border']}; border-radius: {RADIUS['md']}px;
+    font-family: {font_family_qss(FONT_MONO_STACK)};
+    font-size: {TYPE['mono'][0]}px;
+}}
+
+QWidget#activityPage, QWidget#activityBody, QScrollArea#activityScroll,
+QScrollArea#activityScroll > QWidget > QWidget {{ background: transparent; border: none; }}
+QLabel#activityCount {{ color: {p['text_secondary']}; font-size: {TYPE['metadata'][0]}px; }}
+QFrame#activityRow {{
+    background: {p['surface']}; border: 1px solid {p['border']};
+    border-left: 3px solid {p['info']}; border-radius: {RADIUS['lg']}px;
+}}
+QFrame#activityRow[status="success"] {{ border-left-color: {p['success']}; }}
+QFrame#activityRow[status="warning"] {{ border-left-color: {p['warning']}; }}
+QFrame#activityRow[status="failed"] {{ border-left-color: {p['danger']}; }}
+QFrame#activityRow[status="undone"] {{ border-left-color: {p['text_disabled']}; }}
+QLabel#activityTime {{
+    color: {p['text_disabled']}; font-family: {font_family_qss(FONT_MONO_STACK)};
+    font-size: {TYPE['metadata'][0]}px;
+}}
+QLabel#activityTitle {{
+    color: {p['text']}; font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['section_title'][0]}px; font-weight: 600;
+}}
+QLabel#activityContext {{ color: {p['text_secondary']}; font-size: {TYPE['body'][0]}px; }}
+QLabel#activityDetail {{
+    color: {p['text_secondary']}; background: {p['canvas']};
+    border: 1px solid {p['border']}; border-radius: {RADIUS['sm']}px;
+    padding: {SPACING['sm']}px;
+}}
+
+QWidget#backupsPage, QWidget#backupsBody, QScrollArea#backupsScroll,
+QScrollArea#backupsScroll > QWidget > QWidget {{ background: transparent; border: none; }}
+QLabel#backupCount {{ color: {p['text_secondary']}; font-size: {TYPE['metadata'][0]}px; }}
+QFrame#backupRow {{
+    background: {p['surface']}; border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QFrame#backupRow:hover {{ border-color: {p['border_strong']}; }}
+QLabel#backupTimestamp {{
+    color: {p['text']}; font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['section_title'][0]}px; font-weight: 600;
+}}
+QLabel#backupReason {{ color: {p['text_secondary']}; font-size: {TYPE['body'][0]}px; }}
+QLabel#backupSize {{
+    color: {p['text_disabled']}; font-family: {font_family_qss(FONT_MONO_STACK)};
+    font-size: {TYPE['metadata'][0]}px;
+}}
+QFrame#backupProgress {{ max-height: 156px; }}
+
+QWidget#playersPage, QWidget#basesPage, QWidget#guildsPage, QWidget#exclusionsPage, QWidget#entityBrowserFrame {{
+    background: transparent; border: none;
+}}
+
+/* ---- standardized state surfaces ---- */
+QFrame[class="stateView"], QFrame[class="skeletonView"] {{
+    background: {p['surface']}; border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QLabel[class="stateIcon"] {{ background: transparent; }}
+QLabel[class="stateTitle"] {{
+    color: {p['text']}; font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['section_title'][0]}px; font-weight: {TYPE['section_title'][1]};
+}}
+QLabel[class="stateMessage"] {{ color: {p['text_secondary']}; font-size: {TYPE['body'][0]}px; }}
+QFrame[class="stateView"][stateKind="prerequisite"] {{ border-color: {p['warning_border']}; }}
+QFrame[class="stateView"][stateKind="error"], QFrame[class="stateView"][stateKind="operation_error"] {{ border-color: {p['danger_border']}; }}
+QFrame[class="stateView"][stateKind="operation_success"] {{ border-color: {p['success_border']}; }}
+QFrame[class="skeletonLine"] {{ background: {p['surface_raised']}; border-radius: {RADIUS['sm']}px; }}
+QFrame[class="skeletonLine"][lineLength="short"] {{ max-width: 240px; }}
+QFrame[class="blockingProgress"] {{
+    background: {p['surface_overlay']}; border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['xl']}px;
+}}
+QFrame[class="notificationBanner"] {{
+    background: {p['surface_raised']}; border: 1px solid {p['info_border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame[class="notificationBanner"][level="success"] {{ background: {p['success_bg']}; border-color: {p['success_border']}; }}
+QFrame[class="notificationBanner"][level="warning"] {{ background: {p['warning_bg']}; border-color: {p['warning_border']}; }}
+QFrame[class="notificationBanner"][level="danger"] {{ background: {p['danger_bg']}; border-color: {p['danger_border']}; }}
+QFrame[class="notificationBanner"][level="info"] {{ background: {p['info_bg']}; border-color: {p['info_border']}; }}
+
+QDialog#baseDialog {{ background: {p['surface_overlay']}; color: {p['text']}; }}
+QDialog#baseDialog[riskVariant="destructive"] {{ border: 1px solid {p['danger_border']}; }}
+QFrame#contextDrawer {{
+    background: {p['surface_overlay']}; border-left: 1px solid {p['border_strong']};
+}}
+QFrame#contextDrawer[riskVariant="warning"] {{ border-left-color: {p['warning']}; }}
+QFrame#contextDrawer[riskVariant="destructive"] {{ border-left-color: {p['danger']}; }}
+
+/* ---- shared inventory slots and Pal cards ---- */
+QFrame#inventoryGridToolbar {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame#inventoryGridToolbar QLabel#sectionHeader {{
+    color: {p['text']};
+    font-size: {TYPE['secondary'][0]}px;
+    font-weight: 600;
+    padding-right: {SPACING['xs']}px;
+}}
+QFrame#inventoryGridToolbar QLabel#inventoryFilterCount {{
+    color: {p['text_secondary']};
+    font-size: {TYPE['metadata'][0]}px;
+}}
+QFrame#invMultiToolbar {{ background: transparent; border: none; }}
+QWidget#auditInventoryGrid {{ background: transparent; }}
+QFrame#auditInventorySlot, QFrame#auditPalCard {{
+    background: {p['surface']}; border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame#auditInventorySlot:hover, QFrame#auditPalCard:hover {{
+    background: {p['surface_hover']}; border-color: {p['border_strong']};
+}}
+QFrame#auditInventorySlot:focus, QFrame#auditPalCard:focus {{
+    border: {FOCUS['width']}px solid {p['focus_ring']};
+}}
+QFrame#auditInventorySlot[selected="true"], QFrame#auditPalCard[selected="true"] {{
+    background: {p['accent_bg_strong']}; border: {FOCUS['width']}px solid {p['accent']};
+}}
+QFrame#auditInventorySlot[empty="true"] {{ background: {p['canvas']}; border-style: dashed; }}
+QFrame#auditInventorySlot[rarity="1"], QFrame#auditPalCard[rarity="1"] {{ border-color: {p['success_border']}; }}
+QFrame#auditInventorySlot[rarity="2"], QFrame#auditPalCard[rarity="2"] {{ border-color: {p['info_border']}; }}
+QFrame#auditInventorySlot[rarity="3"], QFrame#auditPalCard[rarity="3"] {{ border-color: {p['special_border']}; }}
+QFrame#auditInventorySlot[rarity="4"], QFrame#auditPalCard[rarity="4"] {{ border-color: {p['warning_border']}; }}
+QLabel#slotPortrait, QLabel#palCardPortrait {{ background: {p['surface_raised']}; border-radius: {RADIUS['sm']}px; }}
+QLabel#slotName {{ color: {p['text_secondary']}; font-size: {TYPE['caption'][0]}px; }}
+QLabel#slotQuantity {{ color: {p['text']}; font-size: {TYPE['metadata'][0]}px; font-weight: 600; }}
+QLabel#slotBadge {{
+    color: {p['text_secondary']}; font-size: {TYPE['micro'][0]}px;
+    background: {p['surface_raised']}; border: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px; padding: 1px {SPACING['xs']}px;
+}}
+QFrame#auditInventorySlot[equipmentSlot="true"] {{ min-width: 72px; }}
+QFrame#auditInventorySlot[equipmentSlot="true"][locked="true"] {{
+    background: {p['warning_bg']}; border-style: dashed;
+    border-color: {p['warning_border']};
+}}
+QLabel#equipmentWorkspaceTitle, QLabel#equipmentCategoryHeader {{
+    color: {p['text']}; font-size: {TYPE['secondary'][0]}px; font-weight: 600;
+}}
+QLabel#equipmentCategoryHeader {{ color: {p['text_secondary']}; }}
+QLabel#inventorySelectionPreview, QLabel#equipmentSelectionPreview {{
+    color: {p['text_secondary']}; font-size: {TYPE['metadata'][0]}px;
+}}
+QLabel#slotQuantity[rarity="1"], QLabel#palCardLevel[rarity="1"] {{ color: {p['success']}; }}
+QLabel#slotQuantity[rarity="2"], QLabel#palCardLevel[rarity="2"] {{ color: {p['info']}; }}
+QLabel#slotQuantity[rarity="3"], QLabel#palCardLevel[rarity="3"] {{ color: {p['special']}; }}
+QLabel#slotQuantity[rarity="4"], QLabel#palCardLevel[rarity="4"] {{ color: {p['warning']}; }}
+QLabel#palCardName {{ color: {p['text']}; font-size: {TYPE['body'][0]}px; font-weight: 600; }}
+QLabel#palCardLevel {{ color: {p['text_secondary']}; font-size: {TYPE['metadata'][0]}px; font-weight: 600; }}
+QLabel#palCardMeta {{ color: {p['text_secondary']}; font-size: {TYPE['caption'][0]}px; }}
+
 /* ---- shell hairline (reused by search panels / tools sections) ---- */
 QFrame#bandZoneRule {{
     background: {p['border']};
@@ -881,10 +1338,20 @@ QLabel#ribbonSep {{
     font-size: {TYPE['micro'][0]}px;
 }}
 
-/* ---- transitional: legacy sidebar/header blocks (removed in plan 025) ---- */
+/* ---- workspace sidebar ---- */
 QWidget#sideBar {{
-    background-color: {p['canvas']};
+    background-color: {p['surface_sidebar']};
     border-right: 1px solid {p['border']};
+}}
+QWidget#sidebarContent, QScrollArea#sidebarScroll, QScrollArea#sidebarScroll > QWidget > QWidget {{
+    background: transparent;
+    border: none;
+}}
+QLabel#sidebarBrand {{
+    color: {p['text']};
+    font-family: {font_family_qss(FONT_HEADING_STACK)};
+    font-size: {TYPE['section_title'][0]}px;
+    font-weight: {TYPE['section_title'][1]};
 }}
 QLabel#sidebarSection {{
     color: {p['text_disabled']};
@@ -898,7 +1365,11 @@ QPushButton[sidebarItem="true"] {{
     color: {p['text_secondary']};
     border: none;
     border-radius: {RADIUS['md']}px;
-    font-size: 14px;
+    font-size: {TYPE['body'][0]}px;
+    text-align: left;
+    padding: 0px {SPACING['md']}px;
+}}
+QWidget#sideBar[collapsed="true"] QPushButton[sidebarItem="true"] {{
     text-align: center;
     padding: 0px;
 }}
@@ -907,7 +1378,10 @@ QPushButton[sidebarItem="true"]:hover {{
     color: {p['text']};
 }}
 QPushButton[sidebarItem="true"]:focus {{
-    border: 1px solid {p['accent_border']};
+    border: {FOCUS['width']}px solid {p['focus_ring']};
+}}
+QPushButton[sidebarItem="true"]:pressed {{
+    background: {p['surface_active']};
 }}
 QPushButton[sidebarItem="true"][active="true"] {{
     color: {p['accent']};
@@ -920,6 +1394,9 @@ QPushButton[sidebarItem="true"][active="true"]:hover {{
 QPushButton[sidebarItem="true"]:disabled {{
     color: {p['text_disabled']};
     background: transparent;
+}}
+QPushButton[sidebarItem="true"][prerequisiteMissing="true"] {{
+    color: {p['text_disabled']};
 }}
 
 /* header chips: neutral by default, semantic only where meaning exists */
@@ -1022,7 +1499,7 @@ QTextEdit#consoleTextEdit {{
     font-family: {fonts.font_family_qss(fonts.FONT_MONO_STACK)};
 }}
 QLabel#consoleTitleLabel {{
-    font-weight: bold;
+    font-weight: 600;
     font-size: 14px;
     color: {p['text']};
     background: transparent;
@@ -1031,7 +1508,7 @@ QPushButton#consoleCloseBtn {{
     background: transparent;
     color: {p['text_secondary']};
     font-size: 14px;
-    font-weight: bold;
+    font-weight: 600;
     border: none;
     padding: 5px;
 }}
@@ -1095,9 +1572,9 @@ QPushButton#copyStatsBtn:hover {{
     border-radius: {RADIUS['sm']}px;
     color: {p['text']};
 }}
-QLabel#statsHeaderLabel {{ color: {p['text']}; font-weight: 700; }}
+QLabel#statsHeaderLabel {{ color: {p['text']}; font-weight: 600; }}
 QLabel#statsFieldLabel {{ color: {p['text_secondary']}; }}
-QLabel#statsValueLabel {{ color: {p['text']}; font-weight: 700; }}
+QLabel#statsValueLabel {{ color: {p['text']}; font-weight: 600; }}
 QLabel#statsValueLabel[placeholder="true"] {{ color: {p['text_disabled']}; font-weight: 400; }}
 
 /* ---- search screens ---- */
@@ -1113,12 +1590,101 @@ QLineEdit#searchInput {{
 QLineEdit#searchInput:focus {{ border-color: {p['accent_border_strong']}; }}
 
 /* ---- map hover overlays (top-nav-shell 5.2: re-tokened from legacy cyan) ---- */
+QWidget#popupSurface, QFrame#popupSurface, QFrame#menuPopupContainer {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QWidget#popupContent {{ background: transparent; }}
+QWidget#menuPopupButton, QWidget#popupGroupHeader {{
+    background: transparent;
+    border: none;
+    border-radius: {RADIUS['md']}px;
+}}
+QWidget#menuPopupButton[hovered="true"],
+QWidget#popupGroupHeader[hovered="true"] {{
+    background: {p['surface_hover']};
+}}
+QWidget#menuPopupButton[active="true"],
+QWidget#popupGroupHeader[active="true"] {{
+    background: {p['surface_active']};
+    border-left: 3px solid {p['accent']};
+}}
+QWidget#menuPopupButton QLabel, QWidget#popupGroupHeader QLabel {{
+    color: {p['text_secondary']};
+    background: transparent;
+    border: none;
+}}
+QWidget#menuPopupButton[hovered="true"] QLabel,
+QWidget#menuPopupButton[active="true"] QLabel,
+QWidget#popupGroupHeader[hovered="true"] QLabel,
+QWidget#popupGroupHeader[active="true"] QLabel {{ color: {p['text']}; }}
+QPushButton#popupMenuItem {{
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: {p['text_secondary']};
+    min-height: {HEIGHT['compact']}px;
+    padding: {SPACING['sm']}px {SPACING['md']}px;
+    text-align: left;
+}}
+QPushButton#popupMenuItem:hover,
+QPushButton#popupMenuItem:focus {{
+    background: {p['surface_hover']};
+    color: {p['text']};
+}}
+QPushButton#popupMenuItem:checked {{
+    background: {p['surface_active']};
+    color: {p['accent']};
+}}
+QFrame#popupSeparator {{
+    border: none;
+    border-top: 1px solid {p['border']};
+    margin: {SPACING['xs']}px {SPACING['sm']}px;
+}}
+QLabel#popupMenuLabel {{
+    color: {p['text_secondary']};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 600;
+    padding: {SPACING['xs']}px {SPACING['md']}px;
+    background: transparent;
+    border: none;
+}}
+QMenu#appContextMenu {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['lg']}px;
+    padding: {SPACING['sm']}px;
+    color: {p['text_secondary']};
+}}
+QMenu#appContextMenu::item {{
+    padding: {SPACING['sm']}px {SPACING['md']}px;
+    min-height: {HEIGHT['compact']}px;
+    border-radius: {RADIUS['sm']}px;
+}}
+QMenu#appContextMenu::item:selected {{
+    background: {p['surface_hover']};
+    color: {p['text']};
+}}
+QMenu#appContextMenu::item:checked {{
+    background: {p['surface_active']};
+    color: {p['accent']};
+}}
+QMenu#appContextMenu::separator {{
+    height: 1px;
+    background: {p['border']};
+    margin: {SPACING['xs']}px {SPACING['sm']}px;
+}}
 QFrame#hoverOverlayContainer {{
     background: {p['surface_raised']};
     border: 1px solid {p['border_strong']};
     border-radius: {RADIUS['lg']}px;
 }}
 QLabel#hoverGuildLabel {{
+    color: {p['accent']};
+    font-weight: 600;
+}}
+QLabel#hoverNameLabel {{
     color: {p['accent']};
     font-weight: 600;
 }}
@@ -1193,6 +1759,48 @@ QPushButton#selectorChip[pickerSelected="true"] {{
     border-color: {p['accent_border_strong']};
     color: {p['accent']};
 }}
+/* Inventory editor context belongs to the workspace, not a page ribbon. */
+QFrame#editorContextBar {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QLabel#editorContextLabel {{
+    color: {p['text_secondary']};
+    font-size: {TYPE['metadata'][0]}px;
+    font-weight: 600;
+    letter-spacing: 1px;
+}}
+QLabel#editorContextHint {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['secondary'][0]}px;
+}}
+QLabel#contextHierarchySeparator {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['title'][0]}px;
+    padding: 0 {SPACING['xs']}px;
+}}
+QFrame#workspaceViewTabs {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame#baseInventoryFilterGroup, QFrame#baseInventoryActionGroup {{
+    background: transparent;
+    border: none;
+}}
+QPushButton#workspacePlayerSelector {{
+    min-height: {HEIGHT['comfortable'] - 8}px;
+    text-align: left;
+}}
+QPushButton#workspacePlayerSelector[pickerSelected="true"] {{
+    background: {p['accent_bg']};
+    border-color: {p['accent_border_strong']};
+    color: {p['accent']};
+}}
+QPushButton#workspacePlayerSelector:focus {{
+    border: {FOCUS['width']}px solid {p['focus_ring']};
+}}
 /* uiux-audit-remediation 8.2 (design D10): view modes render as underlined
    tabs — transparent body, active = accent text + bottom underline. */
 QPushButton#viewTabBtn {{
@@ -1220,6 +1828,55 @@ QLabel#containerGroupLabel {{
     font-size: {TYPE['micro'][0]}px;
     font-weight: 600;
     letter-spacing: 1px;
+    background: transparent;
+}}
+QLabel#containerNavigatorTitle {{
+    color: {p['text']};
+    font-size: {TYPE['secondary'][0]}px;
+    font-weight: 600;
+}}
+QLabel#containerSelectionSummary {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['metadata'][0]}px;
+}}
+QTreeWidget#containerNavigator {{
+    background: transparent;
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+    color: {p['text']};
+    outline: none;
+}}
+QTreeWidget#containerNavigator::item {{
+    padding: {SPACING['sm']}px;
+    margin: 1px 2px;
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+    background: {p['surface']};
+}}
+QTreeWidget#containerNavigator::item:selected {{
+    background: {p['accent_bg']};
+    border: 2px solid {p['accent']};
+}}
+QTreeWidget#containerNavigator::item:hover {{
+    background: {p['surface_hover']};
+    border-color: {p['border_strong']};
+}}
+QTreeWidget#containerNavigator::branch {{ background: transparent; }}
+QWidget#containerRow, QWidget#containerGroupRow {{ background: transparent; }}
+QLabel#containerThumbnail {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QLabel#containerName {{
+    color: {p['text']};
+    font-size: {TYPE['secondary'][0]}px;
+    font-weight: 600;
+    background: transparent;
+}}
+QLabel#containerMeta {{
+    color: {p['text_secondary']};
+    font-size: {TYPE['metadata'][0]}px;
     background: transparent;
 }}
 QPushButton#ghostBtn, QPushButton#toolButton {{
@@ -1274,6 +1931,96 @@ QWidget#techAncientPlaceholder {{
     border-radius: {RADIUS['sm']}px;
 }}
 /* modernize-tab-ui 4.2: Pal Editor stat bar tiers (flat token fills). */
+QSplitter#palEditorWorkspaceSplitter, QSplitter#palCollectionSplitter {{
+    background: transparent;
+}}
+QSplitter#palEditorWorkspaceSplitter::handle,
+QSplitter#palCollectionSplitter::handle {{
+    background: {p['border']};
+    width: 1px;
+    height: 1px;
+}}
+QFrame#partyPanel, QFrame#palboxPanel, QFrame#palInspectorHost {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame#palInspectorHost[responsiveMode="stacked"] {{
+    border-color: {p['accent_border']};
+}}
+QFrame#palInspectorIdentitySection,
+QFrame#palInspectorEditableSection,
+QFrame#palInspectorComputedSection,
+QFrame#palInspectorTechnicalSection,
+QFrame#passiveSkillsBox {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px;
+}}
+QLabel#palInspectorSectionTitle {{
+    color: {p['text_secondary']};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 700;
+    padding: 2px {SPACING['xs']}px;
+}}
+QLabel#palTechnicalLabel {{
+    color: {p['text_secondary']};
+    font-size: {TYPE['micro'][0]}px;
+}}
+QLabel[editableValue="true"] {{
+    background: {p['surface_input']};
+    color: {p['text']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px;
+    padding: 1px {SPACING['xs']}px;
+    font-weight: 600;
+}}
+QLabel[editableValue="true"]:hover {{
+    border-color: {p['accent_border_strong']};
+    background: {p['surface_hover']};
+}}
+QLabel#palSourceLabel {{
+    color: {p['text_secondary']};
+    font-size: {TYPE['metadata'][0]}px;
+    font-weight: 600;
+}}
+QLabel#palSourcePlayer {{
+    color: {p['text']};
+    font-size: {TYPE['metadata'][0]}px;
+}}
+QPushButton#palSourceModeChip {{
+    background: {p['surface_raised']};
+    color: {p['text_secondary']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['pill']}px;
+    padding: 2px {SPACING['sm']}px;
+}}
+QPushButton#palSourceModeChip[pickerSelected="true"] {{
+    background: {p['accent_bg']};
+    color: {p['accent']};
+    border-color: {p['accent_border_strong']};
+}}
+QFrame#partySlot, QFrame#palboxSlot {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px;
+}}
+QFrame#partySlot:hover, QFrame#palboxSlot:hover {{
+    background: {p['surface_hover']};
+    border-color: {p['border_strong']};
+}}
+QFrame#partySlot[selected="true"], QFrame#palboxSlot[selected="true"] {{
+    background: {p['accent_bg_strong']};
+    border: {FOCUS['width']}px solid {p['accent']};
+}}
+QFrame#partySlot[multiSelected="true"], QFrame#palboxSlot[multiSelected="true"] {{
+    background: {p['special_bg']};
+    border: 1px solid {p['special']};
+}}
+QFrame#partySlot[empty="true"], QFrame#palboxSlot[empty="true"] {{
+    background: {p['surface']};
+    border-color: {p['border']};
+}}
 QProgressBar#palStatBar {{
     background: {p['surface_input']};
     border: none;
@@ -1281,7 +2028,7 @@ QProgressBar#palStatBar {{
     text-align: center;
     color: {p['text']};
     font-size: {TYPE['micro'][0]}px;
-    font-weight: 700;
+    font-weight: 600;
 }}
 QProgressBar#palStatBar[barTier="success"]::chunk {{ background: {p['success']}; border-radius: 2px; }}
 QProgressBar#palStatBar[barTier="warning"]::chunk {{ background: {p['warning']}; border-radius: 2px; }}
@@ -1293,12 +2040,12 @@ QLabel#palHpPill {{
     background: {p['tooltip_bg']};
     color: {p['text']};
     font-size: {TYPE['micro'][0]}px;
-    font-weight: 700;
+    font-weight: 600;
     border-radius: {RADIUS['pill']}px;
     padding: 0px {SPACING['sm']}px;
 }}
-/* modernize-tab-ui 4.6: Pal Editor bulk toolbar — compact tier variants so the
-   eight toolbar actions hold a single row at the 1200px minimum window width. */
+/* Pal Editor action rows: compact global tiers plus a contextual single-row
+   selection surface with less-frequent mutations in an overflow menu. */
 QWidget#palboxPanel QPushButton#ghostBtn {{
     padding: 2px 5px;
     font-size: {TYPE['micro'][0]}px;
@@ -1311,6 +2058,52 @@ QWidget#palboxPanel QPushButton[class="danger"] {{
     padding: 2px 5px;
     font-size: {TYPE['micro'][0]}px;
 }}
+QFrame#multiToolbar {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['accent_border']};
+    border-radius: {RADIUS['md']}px;
+    padding: 2px;
+}}
+QLabel#palMultiCount {{
+    color: {p['accent']};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 700;
+    padding: 0 {SPACING['xs']}px;
+}}
+QFrame#multiToolbar QPushButton {{
+    min-height: 0px;
+    padding: 2px {SPACING['sm']}px;
+    font-size: {TYPE['micro'][0]}px;
+}}
+QFrame#bulkWorkflowReview {{
+    background: {p['surface_raised']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+}}
+QFrame#bulkWorkflowReview[riskVariant="destructive"] {{
+    border-color: {p['danger_border']};
+}}
+QLabel#bulkWorkflowField {{
+    color: {p['text_disabled']};
+    font-size: {TYPE['micro'][0]}px;
+    font-weight: 700;
+    min-width: 56px;
+}}
+QLabel#bulkWorkflowValue {{
+    color: {p['text']};
+    font-size: {TYPE['metadata'][0]}px;
+}}
+QLabel#bulkWorkflowRisk {{
+    color: {p['danger']};
+    background: {p['danger_bg']};
+    border: 1px solid {p['danger_border']};
+    border-radius: {RADIUS['sm']}px;
+    padding: {SPACING['xs']}px {SPACING['sm']}px;
+}}
+QLabel#bulkWorkflowBackup {{ color: {p['warning']}; }}
+QLabel#bulkWorkflowResult[resultState="success"] {{ color: {p['success']}; }}
+QLabel#bulkWorkflowResult[resultState="error"] {{ color: {p['danger']}; }}
+QProgressBar#bulkWorkflowProgress {{ min-height: 16px; }}
 QTreeWidget#jsonTree {{
     background: {p['canvas']};
     alternate-background-color: {p['surface']};
@@ -1337,12 +2130,55 @@ QLabel#jsonCrumbMuted {{
     background: transparent;
     padding: 0 2px;
 }}
-/* Map viewer: floating legend card over the canvas (008-r02) */
-QWidget#mapLegendCard {{
+QPlainTextEdit#jsonRawEditor {{
+    font-family: {font_family_qss(FONT_MONO_STACK)};
+    font-size: {TYPE['mono'][0]}px;
+    background: {p['canvas']};
+}}
+QLabel#jsonRawNotice {{
+    color: {p['warning']};
+    background: {p['warning_bg']};
+    border: 1px solid {p['warning_border']};
+    border-radius: {RADIUS['sm']}px;
+    padding: {SPACING['sm']}px;
+}}
+QLabel#jsonRawValidation {{ color: {p['text_secondary']}; }}
+/* Map workspace: explicit controls, structured explorer, map-first canvas,
+   responsive inspector, and one consolidated navigation readout. */
+QFrame#mapControlBar, QFrame#mapExplorerPanel, QFrame#mapInspectorHost {{
     background: {p['surface_raised']};
     border: 1px solid {p['border_strong']};
     border-radius: {RADIUS['md']}px;
 }}
+QFrame#mapCanvasFrame {{
+    background: {p['canvas']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['md']}px;
+}}
+QLabel#mapExplorerCount {{
+    color: {p['text_secondary']};
+    background: transparent;
+}}
+QFrame#mapNavigationBar {{
+    background: {p['surface_overlay']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['md']}px;
+}}
+QLabel#mapCoordsReadout, QLabel#mapZoomReadout {{
+    color: {p['text']};
+    background: transparent;
+    font-size: {TYPE['micro'][0]}px;
+    padding: 2px 6px;
+}}
+QLabel#mapCalibrationNotice, QLabel#mapCalibrationWarning {{
+    background: {p['surface_overlay']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['sm']}px;
+    padding: {SPACING['sm']}px {SPACING['md']}px;
+    font-size: {TYPE['metadata'][0]}px;
+}}
+QLabel#mapCalibrationNotice {{ color: {p['info']}; }}
+QLabel#mapCalibrationWarning {{ color: {p['warning']}; }}
 /* modernize-tab-ui 6.1: map overlay toggle buttons (token-styled; the
    active toggle shows the accent state instead of the retired cyan ring).
    Wide icon variant via the `wide` dynamic property. */
@@ -1373,7 +2209,7 @@ QPushButton#mapZoomBtn {{
     background: {p['surface_hover']};
     border: 1px solid {p['border_strong']};
     border-radius: {RADIUS['sm']}px;
-    font-weight: 700;
+    font-weight: 600;
     padding: 0px;
 }}
 QPushButton#mapZoomBtn:hover {{
@@ -1451,7 +2287,7 @@ QPushButton#opsLoadBtn {{
     border: 1px solid {p['accent']};
     border-radius: {RADIUS['md']}px;
     color: {p['text_on_accent']};
-    font-weight: 700;
+    font-weight: 600;
     padding: {SPACING['sm']}px {SPACING['lg']}px;
 }}
 QPushButton#opsLoadBtn:hover {{ background: {p['accent_hover']}; border-color: {p['accent_hover']}; }}
@@ -1634,6 +2470,35 @@ QFrame#inspectorPanel {{
     border: 1px solid {p['border']};
     border-radius: {RADIUS['lg']}px;
 }}
+QScrollArea#referenceInspector {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QListWidget#referenceResults {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['md']}px;
+    color: {p['text']};
+    outline: none;
+}}
+QListWidget#referenceResults::item {{
+    min-height: {HEIGHT['compact']}px;
+    padding: 0 {SPACING['sm']}px;
+    border-radius: {RADIUS['sm']}px;
+}}
+QListWidget#referenceResults::item:hover {{ background: {p['surface_hover']}; }}
+QListWidget#referenceResults::item:selected {{
+    background: {p['accent_bg']};
+    color: {p['text']};
+}}
+QFrame#conversionSurface, QFrame#conversionPanel {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['lg']}px;
+}}
+QFrame#conversionPanel {{ background: {p['surface_raised']}; }}
+QFrame#conversionResults {{ background: transparent; border: none; }}
 QFrame#inspectorSideColumn {{ background: transparent; }}
 QLabel#inspectorTitle {{
     color: {p['text']};
@@ -1751,6 +2616,26 @@ QFrame[palRow="true"] {{
     border-radius: {RADIUS['md']}px;
 }}
 QFrame[palRow="true"]:hover {{ background: {p['surface_hover']}; }}
+QLabel#illegalPalLine {{ color: {p['text']}; font-size: {TYPE['caption'][0]}px; }}
+QLabel#illegalPalMarkers {{
+    color: {p['warning']};
+    background: {p['warning_bg']};
+    border: 1px solid {p['warning_border']};
+    border-radius: {RADIUS['sm']}px;
+    padding: 1px {SPACING['sm']}px;
+    font-size: {TYPE['caption'][0]}px;
+    font-weight: 700;
+}}
+QLabel#illegalPlayerName {{
+    color: {p['text']};
+    font-size: {TYPE['body'][0]}px;
+    font-weight: 600;
+}}
+QLabel#illegalPlayerDetails {{
+    color: {p['text_secondary']};
+    font-size: {TYPE['caption'][0]}px;
+}}
+QScrollArea#dialogListScroll {{ border: none; background: transparent; }}
 /* transient skill-picker popup (Phase 4): floating card, global input/list rules inside */
 QWidget#skillPicker {{
     background: {p['surface_raised']};

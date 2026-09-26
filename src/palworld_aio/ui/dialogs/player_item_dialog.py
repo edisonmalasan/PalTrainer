@@ -1,5 +1,5 @@
 import os
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QGroupBox, QCheckBox, QMessageBox, QSpinBox, QFrame, QAbstractItemView, QListView, QTabWidget, QWidget, QInputDialog
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QGroupBox, QCheckBox, QSpinBox, QFrame, QAbstractItemView, QListView, QTabWidget, QWidget
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer
 from PyQt6.QtGui import QPixmap, QIcon, QColor, QPainter, QPen, QIntValidator
 from PyQt6.QtWidgets import QStyledItemDelegate, QSplitter
@@ -9,7 +9,13 @@ from palworld_aio.inventory.inventory_manager import ItemData
 from palworld_aio.managers.data_manager import get_guilds, get_guild_members
 from palworld_aio.utils import sav_to_gvasfile, gvasfile_to_sav
 
-from palworld_aio.ui.chrome.components import BaseDialog, make_button
+from palworld_aio.ui.chrome.components import (
+    BaseDialog,
+    BulkWorkflowReview,
+    InputPromptDialog as QInputDialog,
+    MessageDialog as QMessageBox,
+    make_button,
+)
 from palworld_aio.ui.chrome import tokens as ui_tokens
 from palworld_aio.ui.chrome.styles import wrap_tooltip_text
 from palworld_aio.editor.edit_pals import _clean_desc_for_tooltip
@@ -72,6 +78,23 @@ class PlayerItemActionDialog(BaseDialog):
     def _setup_ui(self):
         pal = ui_tokens.resolve()
         layout = self.content_layout
+        self.workflow_review = BulkWorkflowReview(
+            source=t('ui.bulk.select_source', default='Select an item or ability'),
+            target=t('ui.bulk.no_targets', default='No players selected'),
+            review=t('ui.bulk.review_prompt', default='Review the bulk action before applying it.'),
+            parent=self,
+        )
+        self.workflow_review.set_risk(
+            t(
+                'ui.bulk.item_risk',
+                default='Removing items and overwriting ability values cannot be undone in this dialog.',
+            ),
+            t(
+                'ui.bulk.backup_guidance',
+                default='Create or verify a backup before applying broad save changes.',
+            ),
+        )
+        layout.addWidget(self.workflow_review)
         search_bar_layout = QHBoxLayout()
         search_label = QLabel(t('common.search') if t else 'Search:')
         self.search_input = QLineEdit()
@@ -177,6 +200,40 @@ class PlayerItemActionDialog(BaseDialog):
         self.footer.addWidget(self.qty_input)
         self.footer.addWidget(self.add_btn)
         self.cancel_btn.setText(t('button.close') if t else 'Close')
+
+    def _update_workflow_review(self, *_args):
+        tab_index = self.item_tabs.currentIndex()
+        if tab_index == 3:
+            targets = len(self._get_checked_ability_players())
+            ability_count = sum(
+                1 for widget in self.ability_widgets
+                if widget['toggle'].isChecked())
+            source = t(
+                'ui.bulk.ability_source',
+                default='{count} ability values',
+                count=ability_count,
+            )
+            review = t(
+                'ui.bulk.ability_review',
+                default='Apply selected ability values to the chosen players.',
+            )
+        else:
+            targets = len(self._get_selected_players())
+            source = self.selected_item_name or t(
+                'ui.bulk.select_source', default='Select an item')
+            review = t(
+                'ui.bulk.item_review',
+                default='Add a quantity or remove every matching item from the target players.',
+            )
+        self.workflow_review.set_context(
+            source=source,
+            target=t(
+                'ui.bulk.player_targets',
+                default='{count} selected players',
+                count=targets,
+            ),
+            review=review,
+        )
     def _make_item_grid(self):
         grid = QListWidget()
         grid.setViewMode(QListView.IconMode)
@@ -269,6 +326,7 @@ class PlayerItemActionDialog(BaseDialog):
         self.remove_btn.setEnabled(True)
         self.find_players_btn.setEnabled(True)
         self._update_player_list()
+        self._update_workflow_review()
     def _load_players(self):
         self.players_data = []
         if not constants.loaded_level_json:
@@ -311,6 +369,7 @@ class PlayerItemActionDialog(BaseDialog):
             checkbox = ToggleCheckBtn(display_text)
             checkbox.setProperty('uid', uid)
             checkbox.setChecked(uid in self.players_with_item)
+            checkbox.toggled.connect(self._update_workflow_review)
             item = QListWidgetItem()
             item.setSizeHint(QSize(0, 36))
             self.player_list.addItem(item)
@@ -431,6 +490,9 @@ class PlayerItemActionDialog(BaseDialog):
         item_name = self.selected_item_name or 'this item'
         reply = QMessageBox.question(self, t('player_item.confirm_remove') if t else 'Confirm Remove', t('player_item.confirm_remove_msg').format(item_name=item_name, count=len(selected_players)) if t else f'Remove all "{item_name}" from {len(selected_players)} selected player(s)?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
+            self.workflow_review.set_progress(
+                0, len(selected_players),
+                t('ui.bulk.applying', default='Applying changes…'))
             self.item_action_selected.emit(self.selected_item_id, 'remove_all', selected_players)
             self._refresh_after_action()
     def _on_add_item(self):
@@ -445,13 +507,33 @@ class PlayerItemActionDialog(BaseDialog):
         except ValueError:
             qty = 1
         container_type = ItemData.get_target_container(self.selected_item_id)
+        item_name = self.selected_item_name or self.selected_item_id
+        reply = QMessageBox.question(
+            self,
+            t('player_item.confirm_add', default='Confirm Add'),
+            t('player_item.confirm_add_msg',
+              default='Add {quantity} × {item_name} to each of {count} selected players?',
+              quantity=qty, item_name=item_name,
+              count=len(selected_players)),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        self.workflow_review.set_progress(
+            0, len(selected_players),
+            t('ui.bulk.applying', default='Applying changes…'))
         self.item_action_selected.emit(self.selected_item_id, f'add:{qty}:{container_type}', selected_players)
         self._refresh_after_action()
     def _refresh_after_action(self):
-        item_name = self.selected_item_name or 'Item'
-        self.status_label.setText(t('player_item.action_complete').format(item_name=item_name) if t else f'{item_name} action completed successfully!')
+        self.status_label.setText(t(
+            'ui.bulk.submitted',
+            default='Bulk action submitted. Results appear when processing finishes.',
+        ))
         self.status_label.setProperty('role', 'success')
         _polish(self.status_label)
+        self.workflow_review.set_progress(
+            1, 1, t('ui.bulk.submitted_short', default='Submitted'))
+        self.workflow_review.set_result(self.status_label.text())
         QTimer.singleShot(3000, lambda s=self: s.status_label.setText('') if hasattr(s, 'status_label') else None)
         if self.selected_item_id:
             self._load_players()
@@ -538,6 +620,7 @@ class PlayerItemActionDialog(BaseDialog):
             toggle = ToggleCheckBtn(display)
             toggle.setProperty('relic_type', relic_type)
             toggle.setProperty('cumulative_max', RELIC_CUMULATIVE_MAX.get(relic_type, 1))
+            toggle.toggled.connect(self._update_workflow_review)
             row_layout.addWidget(toggle, 1)
             icon_label = QLabel()
             icon_label.setFixedSize(24, 24)
@@ -612,6 +695,7 @@ class PlayerItemActionDialog(BaseDialog):
         if self.players_data:
             self._last_ability_player_uid = self.players_data[0]['uid']
         self._load_ability_values_from_player()
+        self._update_workflow_review()
     def _select_all_ability_players(self):
         self._last_ability_player_uid = None
         for i in range(self.ability_player_list.count()):
@@ -711,10 +795,17 @@ class PlayerItemActionDialog(BaseDialog):
             return
         reply = QMessageBox.question(self, t('inventory.edit_abilities_apply') if t else 'Apply Ability Changes', (t('inventory.edit_abilities_confirm.msg') if t else 'Apply ability changes to {count} player(s)?').format(count=len(uids)), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
+            self.workflow_review.set_progress(
+                0, len(uids),
+                t('ui.bulk.applying', default='Applying changes…'))
             self.edit_abilities_requested.emit(uids, ability_values)
             self.ability_status.setText(t('inventory.edit_abilities_done', default='Abilities updated successfully.'))
             self.ability_status.setProperty('role', 'success')
             _polish(self.ability_status)
+            self.workflow_review.set_progress(
+                len(uids), len(uids),
+                t('ui.bulk.complete', default='Complete'))
+            self.workflow_review.set_result(self.ability_status.text())
     def _on_tab_changed(self, idx):
         if idx == 2 and self.player_list.count() == 0:
             self._load_all_players()
@@ -723,13 +814,14 @@ class PlayerItemActionDialog(BaseDialog):
                 self._populate_ability_player_list()
             else:
                 self._load_ability_values_from_player()
+        self._update_workflow_review()
     def _on_add_all_clicked(self, is_effigies):
         uids = self._get_checked_player_uids()
         if not uids:
             QMessageBox.warning(self, t('player_item.no_players_selected') if t else 'No Players Selected', t('player_item.select_at_least_one') if t else 'Please select at least one player.')
             return
         if is_effigies:
-            reply = QMessageBox.question(self, t('inventory.max_all_abilities_confirm.title', default='Max All Abilities'), t('inventory.max_all_abilities_confirm.msg', default='Max all relic abilities for this player?'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            reply = QMessageBox.question(self, t('inventory.max_all_abilities_confirm.title', default='Max All Abilities'), t('inventory.max_all_abilities_confirm.bulk_msg', count=len(uids), default='Max all relic abilities for {count} selected players?'), QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
                 self.add_all_effigies_requested.emit(uids)
         else:

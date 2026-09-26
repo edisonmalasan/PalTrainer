@@ -3,7 +3,7 @@ from PyQt6.QtCore import pyqtSignal, QSize
 from i18n import t
 from palworld_aio import constants
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
-from palworld_aio.ui.chrome.components import BaseDialog, make_button
+from palworld_aio.ui.chrome.components import BaseDialog, BulkWorkflowReview, make_button
 
 class FixIllegalPlayerDialog(BaseDialog):
     """Illegal-player fix list on the shared dialog scaffold (Phase 4).
@@ -17,6 +17,7 @@ class FixIllegalPlayerDialog(BaseDialog):
         super().__init__(title, parent, min_size=(700, 450))
         self.setWindowTitle(title)
         self.scan_data = scan_data
+        self.repair_running = False
         self._setup_ui()
         self._populate_players()
     def _setup_ui(self):
@@ -28,12 +29,33 @@ class FixIllegalPlayerDialog(BaseDialog):
         self.summary_label = QLabel('')
         self.summary_label.setProperty('role', 'warning')
         layout.addWidget(self.summary_label)
+        self.workflow_review = BulkWorkflowReview(
+            source=t('repair.workflow.loaded_source', default='Current loaded save'),
+            target=t(
+                'repair.affected.illegal_players',
+                default='Selected players and their illegal statistics'),
+            review=t(
+                'repair.review.illegal_players',
+                default='Clamp only the selected illegal player statistics to legal maximums.'),
+            parent=self,
+        )
+        self.workflow_review.set_risk(
+            t(
+                'repair.risk.illegal_values',
+                default='Selected out-of-range values will be replaced with legal values.'),
+            t(
+                'repair.workflow.loaded_backup',
+                default=(
+                    'Recovery: a full backup was created when this save was loaded. '
+                    'This repair stays in memory until you choose Save Changes.')),
+        )
+        layout.addWidget(self.workflow_review)
         btn_row = QHBoxLayout()
-        self.select_all_btn = QPushButton(t('player_item.select_all') if t else 'Select All')
+        self.select_all_btn = make_button(t('player_item.select_all') if t else 'Select All', 'tertiary')
         self.select_all_btn.clicked.connect(self._select_all)
         self.select_all_btn.setEnabled(False)
         btn_row.addWidget(self.select_all_btn)
-        self.deselect_all_btn = QPushButton(t('player_item.deselect_all') if t else 'Deselect All')
+        self.deselect_all_btn = make_button(t('player_item.deselect_all') if t else 'Deselect All', 'tertiary')
         self.deselect_all_btn.clicked.connect(self._deselect_all)
         self.deselect_all_btn.setEnabled(False)
         btn_row.addWidget(self.deselect_all_btn)
@@ -96,9 +118,11 @@ class FixIllegalPlayerDialog(BaseDialog):
             self.select_all_btn.setEnabled(True)
             self.deselect_all_btn.setEnabled(True)
             self.fix_btn.setEnabled(True)
+        self._sync_affected_summary()
     def _on_check_toggled(self, checked=False):
         any_checked = any((w.isChecked() for w in self._player_widgets.values()))
         self.fix_btn.setEnabled(any_checked)
+        self._sync_affected_summary()
     def _select_all(self):
         for w in self._player_widgets.values():
             w.setChecked(True)
@@ -107,12 +131,26 @@ class FixIllegalPlayerDialog(BaseDialog):
         for w in self._player_widgets.values():
             w.setChecked(False)
         self.fix_btn.setEnabled(False)
+        self._sync_affected_summary()
     def _get_selected_uids(self):
         uids = []
         for uid, w in self._player_widgets.items():
             if w.isChecked():
                 uids.append(uid)
         return uids
+    def _sync_affected_summary(self):
+        uids = self._get_selected_uids()
+        stat_count = sum(self.scan_data[uid]['stat_count'] for uid in uids)
+        self.workflow_review.set_context(
+            source=t('repair.workflow.loaded_source', default='Current loaded save'),
+            target=t(
+                'repair.affected.illegal_player_count',
+                default='{players} selected player(s), {stats} illegal statistic(s)',
+                players=len(uids), stats=stat_count),
+            review=t(
+                'repair.review.illegal_players',
+                default='Clamp only the selected illegal player statistics to legal maximums.'),
+        )
     def _on_fix(self):
         uids = self._get_selected_uids()
         if not uids:
@@ -121,5 +159,34 @@ class FixIllegalPlayerDialog(BaseDialog):
             self.status_label.style().unpolish(self.status_label)
             self.status_label.style().polish(self.status_label)
             return
-        self.accept()
+        self.repair_running = True
+        self.fix_btn.setEnabled(False)
+        self.cancel_btn.setEnabled(False)
+        self.close_btn.setEnabled(False)
+        self.workflow_review.progress.setRange(0, 0)
+        self.workflow_review.progress.setFormat(t(
+            'repair.workflow.running', default='Repair in progress…'))
+        self.workflow_review.progress.show()
         self.fix_requested.emit(uids)
+    def finish_repair(self, message):
+        self.repair_running = False
+        self.workflow_review.set_progress(
+            1, 1, t('repair.workflow.complete', default='Repair complete'))
+        self.workflow_review.set_result(message, success=True)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setText(t('button.close', default='Close'))
+        self.close_btn.setEnabled(True)
+        self._primary_button = self.cancel_btn
+    def fail_repair(self, detail):
+        self.repair_running = False
+        self.workflow_review.set_progress(
+            1, 1, t('repair.workflow.failed_short', default='Repair failed'))
+        self.workflow_review.set_result(t(
+            'repair.workflow.failed',
+            default=(
+                'The repair did not complete. Do not save unexpected in-memory '
+                'changes; reload the current save or restore its load-time backup. '
+                'Details: {detail}'), detail=detail), success=False)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setText(t('button.close', default='Close'))
+        self.close_btn.setEnabled(True)

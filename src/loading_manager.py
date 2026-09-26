@@ -1,13 +1,18 @@
 import sys, os, json, time, random, subprocess, threading, traceback
 import qt_compat as _qt_compat
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFrame, QLabel, QPushButton, QTextEdit, QGraphicsOpacityEffect, QMessageBox, QProgressBar, QDialog
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFrame, QLabel, QPushButton, QTextEdit, QGraphicsOpacityEffect, QProgressBar, QDialog
+from palworld_aio.ui.chrome.components import MessageDialog as QMessageBox
+from palworld_aio.ui.chrome.styles import ThemeManager
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QObject, QEvent
 import weakref
+from typing import Any, Callable
 from PyQt6.QtGui import QPixmap, QCursor, QFont
 from i18n import t, init_language
 from resource_resolver import get_base_dir, get_resources_dir, resource_path
 from palworld_aio import constants
-_queued_next = None
+_queued_next: tuple[
+    Callable[..., Any], Callable[..., Any], tuple[Any, ...], dict[str, Any], Any
+] | None = None
 _active_tasks = 0
 _active_tasks_lock = threading.Lock()
 def get_path(filename):
@@ -113,13 +118,14 @@ class OverlayResizer(QObject):
     def __init__(self, target):
         super().__init__(target)
         self.target = target
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.Resize and obj is self.target.parent():
-            self.target.setGeometry(obj.rect())
+    def eventFilter(self, a0, a1):
+        if a1.type() == QEvent.Resize and a0 is self.target.parent():
+            self.target.setGeometry(a0.rect())
         return False
 
 def run_with_loading(callback, func, *args, parent=None, **kwargs):
     on_error = kwargs.pop('on_error', None)
+    local_state = bool(kwargs.pop('local_state', False))
     mode = getattr(constants, 'loading_screen_mode', 'overlay')
     result = {'data': None, 'done': False}
     if parent is None:
@@ -134,12 +140,13 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
                     break
     overlay_widget = None
     overlay_resizer = None
-    if mode == 'header' and constants.header_loading_widget is not None:
+    if (not local_state and mode == 'header'
+            and constants.header_loading_widget is not None):
         try:
             constants.header_loading_widget.set_loading_state('loading')
         except RuntimeError:
             pass
-    elif mode == 'overlay' and parent:
+    elif not local_state and mode == 'overlay' and parent:
         try:
             phrases = [t(f'loading.phrase.{i}') for i in range(1, 21)]
         except:
@@ -221,7 +228,8 @@ def run_with_loading(callback, func, *args, parent=None, **kwargs):
             return
         from ui_debug import log as _log2
         _log2('run_with_loading.done', func=getattr(func, '__name__', repr(func)), is_error=isinstance(result['data'], str))
-        if mode == 'header' and constants.header_loading_widget is not None:
+        if (not local_state and mode == 'header'
+                and constants.header_loading_widget is not None):
             try:
                 constants.header_loading_widget.set_loading_state('idle')
             except RuntimeError:
@@ -520,10 +528,9 @@ def _get_effective_parent(parent):
     if active and hasattr(active, 'geometry') and active.isVisible():
         return active
     return None
-_MSG_BOX_DARK_STYLESHEET = '\n    QMessageBox {\n        background: qlineargradient(spread:pad, x1:0.0, y1:0.0, x2:1.0, y2:1.0,\n                    stop:0 #07080a, stop:0.5 #08101a, stop:1 #05060a);\n        color: #dfeefc;\n    }\n    QMessageBox QLabel {\n        color: #dfeefc;\n    }\n    QMessageBox QPushButton {\n        background-color: rgba(125,211,252,0.12);\n        color: #7DD3FC;\n        border: 1px solid rgba(125,211,252,0.2);\n        border-radius: 4px;\n        padding: 6px 16px;\n        min-width: 70px;\n    }\n    QMessageBox QPushButton:hover {\n        background-color: rgba(125,211,252,0.2);\n        color: #FFFFFF;\n    }\n'
 def _load_theme_to_msg_box(msg_box):
     try:
-        msg_box.setStyleSheet(_MSG_BOX_DARK_STYLESHEET)
+        ThemeManager.load_styles(msg_box)
     except Exception as e:
         print(f'Failed to load theme for message box: {e}')
 def show_information(parent, title, text):

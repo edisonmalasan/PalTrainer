@@ -36,6 +36,7 @@ class WindowControls(QWidget):
         self.minimize_btn.setFixedSize(30, 24)
         self.minimize_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.minimize_btn.setToolTip(_txt('button.minimize', 'Minimize'))
+        self.minimize_btn.setAccessibleName(_txt('button.minimize', 'Minimize'))
         self.minimize_btn.clicked.connect(self.minimize_clicked.emit)
         self.maximize_btn = QPushButton()
         self.maximize_btn.setIcon(app_icons.get_qicon('maximize', role='text_secondary'))
@@ -43,6 +44,7 @@ class WindowControls(QWidget):
         self.maximize_btn.setFixedSize(30, 24)
         self.maximize_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.maximize_btn.setToolTip(_txt('button.maximize', 'Maximize'))
+        self.maximize_btn.setAccessibleName(_txt('button.maximize', 'Maximize'))
         self.maximize_btn.clicked.connect(self.maximize_clicked.emit)
         self.close_btn = QPushButton()
         self.close_btn.setIcon(app_icons.get_qicon('close', role='danger'))
@@ -51,6 +53,7 @@ class WindowControls(QWidget):
         self.close_btn.setFixedSize(30, 24)
         self.close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.close_btn.setToolTip(_txt('button.close', 'Close'))
+        self.close_btn.setAccessibleName(_txt('button.close', 'Close'))
         self.close_btn.clicked.connect(self.close_clicked.emit)
         for btn in (self.minimize_btn, self.maximize_btn, self.close_btn):
             lay.addWidget(btn)

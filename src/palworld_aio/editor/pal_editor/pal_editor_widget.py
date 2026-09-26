@@ -4,17 +4,18 @@ import json
 import threading
 import uuid
 from functools import partial
-from PyQt6.QtWidgets import QApplication, QCheckBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QScrollBar, QSizePolicy, QSpinBox, QToolTip, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QCheckBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QScrollBar, QSizePolicy, QSpinBox, QSplitter, QToolTip, QVBoxLayout, QWidget
 from PyQt6.QtCore import Qt, QEvent, QSize, QTimer
 from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 from i18n import t
 from loading_manager import show_information, show_warning, show_question
 from palworld_aio import constants
 from palworld_aio.ui.chrome.styles import TOOLTIP_STYLE
-from palworld_aio.ui.chrome.components import set_picker_selected
+from palworld_aio.ui.chrome.components import make_chip, set_picker_selected
+from palworld_aio.ui.chrome.tokens import SPACING
 from palworld_aio.utils import extract_value, safe_nested_get, calculate_max_hp, resolve_name, sav_to_gvasfile, gvasfile_to_sav
 from palworld_aio.inventory.container_ownership import ContainerOwnership
-from .widgets import FramelessDialog, FlowLayout
+from .widgets import PalEditorDialog, FlowLayout
 from . import data as _data
 from .data import _PAL_STYLESHEET, _ensure_friendship_thresholds
 from .legacy_frame import PalFrame
@@ -43,10 +44,6 @@ from .party_slot_widget import PartySlotWidget
 from .palbox_slot_widget import PalboxSlotWidget
 from .create_dialogs import BulkSyncPalDialog, PalCreateDialog, _show_learned_moves_dialog, BulkSpeciesDialog
 from .pal_editor_bulk_ops import BulkOperationMixin
-
-def _hex_to_rgb(hex_color):
-    h = hex_color.lstrip('#')
-    return f'{int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)}'
 
 class PalEditorWidget(QWidget, BulkOperationMixin):
     _process_lock = threading.Lock()
@@ -99,16 +96,20 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         if app:
             app.setStyleSheet((app.styleSheet() or '') + TOOLTIP_STYLE)
         root = QHBoxLayout(self)
-        root.setContentsMargins(8, 8, 8, 8)
-        root.setSpacing(8)
-        party_panel = QWidget()
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        self.collection_splitter = QSplitter(Qt.Orientation.Horizontal, self)
+        self.collection_splitter.setObjectName('palCollectionSplitter')
+        self.collection_splitter.setChildrenCollapsible(False)
+        party_panel = QFrame()
         party_panel.setObjectName('partyPanel')
         party_layout = QVBoxLayout(party_panel)
-        party_layout.setContentsMargins(6, 6, 6, 6)
-        party_layout.setSpacing(4)
+        party_layout.setContentsMargins(
+            SPACING['sm'], SPACING['sm'], SPACING['sm'], SPACING['sm'])
+        party_layout.setSpacing(SPACING['xs'])
         party_header = QLabel(t('pal_editor.party') if t else 'PARTY')
         self._party_header = party_header
-        party_header.setStyleSheet('font-size: 12px; font-weight: 700; color: #F59E0B; letter-spacing: 2px; border-bottom: 1px solid rgba(245,158,11,0.12); padding-bottom: 4px;')
+        party_header.setProperty('class', 'section')
         party_layout.addWidget(party_header)
         self.party_slots = []
         for i in range(5):
@@ -120,23 +121,38 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
             slot.left.connect(self._on_party_slot_left)
             party_layout.addWidget(slot)
             self.party_slots.append(slot)
-        party_panel.setFixedWidth(240)
-        root.addWidget(party_panel)
-        palbox_panel = QWidget()
+        party_panel.setMinimumWidth(200)
+        party_panel.setMaximumWidth(280)
+        party_panel.setAccessibleName(
+            t('ui.pal_editor.party_region', default='Player party'))
+        self.party_panel = party_panel
+        self.collection_splitter.addWidget(party_panel)
+        palbox_panel = QFrame()
         palbox_panel.setObjectName('palboxPanel')
         palbox_layout = QVBoxLayout(palbox_panel)
-        palbox_layout.setContentsMargins(6, 6, 6, 6)
-        palbox_layout.setSpacing(6)
+        palbox_layout.setContentsMargins(
+            SPACING['sm'], SPACING['sm'], SPACING['sm'], SPACING['sm'])
+        palbox_layout.setSpacing(SPACING['sm'])
         mode_bar = QHBoxLayout()
         mode_bar.setSpacing(4)
         mode_bar.setContentsMargins(0, 0, 0, 0)
-        self.mode_box_btn = QPushButton(t('pal_editor.box_tab') if t else 'Box')
-        self.mode_box_btn.setObjectName('ghostBtn')
+        self.source_label = QLabel(
+            t('ui.pal_editor.source_label', default='Source'))
+        self.source_label.setObjectName('palSourceLabel')
+        mode_bar.addWidget(self.source_label)
+        self.source_player_label = QLabel(
+            t('ui.pal_editor.no_player_source', default='No player selected'))
+        self.source_player_label.setObjectName('palSourcePlayer')
+        mode_bar.addWidget(self.source_player_label)
+        self.mode_box_btn = make_chip(
+            t('pal_editor.box_tab') if t else 'Box', checkable=False)
+        self.mode_box_btn.setObjectName('palSourceModeChip')
         self.mode_box_btn.setFixedHeight(22)
         self.mode_box_btn.setCursor(Qt.PointingHandCursor)
         self.mode_box_btn.clicked.connect(lambda: self._set_palbox_mode('box'))
-        self.mode_dps_btn = QPushButton(t('pal_editor.dps') if t else 'DPS')
-        self.mode_dps_btn.setObjectName('ghostBtn')
+        self.mode_dps_btn = make_chip(
+            t('pal_editor.dps') if t else 'DPS', checkable=False)
+        self.mode_dps_btn.setObjectName('palSourceModeChip')
         self.mode_dps_btn.setFixedHeight(22)
         self.mode_dps_btn.setCursor(Qt.PointingHandCursor)
         self.mode_dps_btn.clicked.connect(lambda: self._set_palbox_mode('dps'))
@@ -146,10 +162,18 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         self.prev_box_btn = QPushButton('<')
         self.prev_box_btn.setObjectName('navBtn')
         self.prev_box_btn.setFixedSize(32, 28)
+        self.prev_box_btn.setToolTip(
+            t('pal_editor.previous_box', default='Previous box'))
+        self.prev_box_btn.setAccessibleName(
+            t('pal_editor.previous_box', default='Previous box'))
         self.prev_box_btn.clicked.connect(self._prev_box)
         self.next_box_btn = QPushButton('>')
         self.next_box_btn.setObjectName('navBtn')
         self.next_box_btn.setFixedSize(32, 28)
+        self.next_box_btn.setToolTip(
+            t('pal_editor.next_box', default='Next box'))
+        self.next_box_btn.setAccessibleName(
+            t('pal_editor.next_box', default='Next box'))
         self.next_box_btn.clicked.connect(self._next_box)
         self.box_label = QLabel(t('pal_editor.box', n=1) if t else 'Box 1')
         self.box_label.setObjectName('boxHeader')
@@ -171,34 +195,69 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         mode_bar.addWidget(self.next_box_btn)
         self.multi_toolbar = QFrame()
         self.multi_toolbar.setObjectName('multiToolbar')
-        self.multi_toolbar.setStyleSheet('QFrame#multiToolbar { background: transparent; border: none; }')
+        self.multi_toolbar.setAccessibleName(
+            t('ui.pal_editor.multi_actions', default='Selected Pal actions'))
         self.multi_toolbar.setVisible(False)
         mt_layout = QHBoxLayout(self.multi_toolbar)
         mt_layout.setContentsMargins(0, 0, 0, 0)
         mt_layout.setSpacing(4)
         self.multi_count_label = QLabel()
-        self.multi_count_label.setStyleSheet('font-size: 11px; font-weight: 700; color: #F59E0B; background: transparent; border: none; padding: 0 4px;')
-        for btn_cfg in [('multi_max_btn', 'pal_editor.bulk_max_btn', self._on_bulk_max_selected, '#C084FC', '#C084FC'),
-                         ('multi_buff_btn', 'pal_editor.bulk_max_buff_btn', self._on_bulk_max_buff_selected, '#F97316', '#F97316'),
-                         ('multi_skills_btn', 'pal_editor.bulk_skills_btn', self._on_bulk_all_skills_selected, '#F59E0B', '#F59E0B'),
-                         ('multi_heal_btn', 'pal_editor.bulk_heal_btn', self._on_bulk_heal_selected, '#2DD4BF', '#2DD4BF'),
-                         ('multi_rename_btn', 'pal_editor.bulk_rename_btn', self._on_bulk_rename_selected, '#E8B44C', '#E8B44C'),
-                         ('multi_delete_btn', 'pal_editor.bulk_delete_btn', self._on_bulk_delete_selected, '#F87171', '#F87171')]:
-            btn = QPushButton(t(btn_cfg[1]))
-            btn.setObjectName(btn_cfg[0])
+        self.multi_count_label.setObjectName('palMultiCount')
+        mt_layout.addWidget(self.multi_count_label)
+        action_configs = (
+            ('multi_heal_btn', 'pal_editor.bulk_heal_btn',
+             self._on_bulk_heal_selected, 'safe', False),
+            ('multi_max_btn', 'pal_editor.bulk_max_btn',
+             self._on_bulk_max_selected, 'bulk', True),
+            ('multi_buff_btn', 'pal_editor.bulk_max_buff_btn',
+             self._on_bulk_max_buff_selected, 'bulk', True),
+            ('multi_skills_btn', 'pal_editor.bulk_skills_btn',
+             self._on_bulk_all_skills_selected, 'bulk', True),
+            ('multi_rename_btn', 'pal_editor.bulk_rename_btn',
+             self._on_bulk_rename_selected, 'bulk', True),
+            ('multi_delete_btn', 'pal_editor.bulk_delete_btn',
+             self._on_bulk_delete_selected, 'destructive', False),
+        )
+        self._multi_action_buttons = {}
+        self._multi_overflow_handlers = {}
+        for object_name, label_key, handler, tier, overflow in action_configs:
+            btn = QPushButton(t(label_key), self.multi_toolbar)
+            btn.setObjectName(object_name)
             btn.setFixedHeight(22)
             btn.setCursor(Qt.PointingHandCursor)
-            btn.setStyleSheet(f'QPushButton {{ background: rgba({_hex_to_rgb(btn_cfg[3])},0.12); color: {btn_cfg[4]}; border: 1px solid rgba({_hex_to_rgb(btn_cfg[3])},0.25); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; }} QPushButton:hover {{ background: rgba({_hex_to_rgb(btn_cfg[3])},0.25); color: #FFFFFF; }}')
-            btn.clicked.connect(btn_cfg[2])
+            btn.setProperty('actionTier', tier)
+            btn.setProperty(
+                'class',
+                'destructive' if tier == 'destructive' else
+                ('warning' if tier == 'bulk' else 'secondary'),
+            )
+            btn.clicked.connect(handler)
+            setattr(self, object_name, btn)
+            self._multi_action_buttons[object_name] = btn
+            if overflow:
+                btn.hide()
+                self._multi_overflow_handlers[object_name] = handler
+                continue
             mt_layout.addWidget(btn)
-        deselect_btn = QPushButton(t('pal_editor.bulk_deselect_btn'))
-        deselect_btn.setObjectName('multi_deselect_btn')
-        deselect_btn.setFixedHeight(22)
-        deselect_btn.setCursor(Qt.PointingHandCursor)
-        deselect_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #A69F94; border: 1px solid rgba(236,231,224,0.10); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(236,231,224,0.10); color: #FFFFFF; }')
-        deselect_btn.clicked.connect(self._clear_multi_selection)
-        mt_layout.addWidget(deselect_btn)
-        mt_layout.addWidget(self.multi_count_label)
+        self.multi_more_btn = QPushButton(t(
+            'ui.pal_editor.more_actions', default='More actions'))
+        self.multi_more_btn.setObjectName('multiMoreBtn')
+        self.multi_more_btn.setProperty('class', 'tertiary')
+        self.multi_more_btn.setFixedHeight(22)
+        self.multi_more_btn.clicked.connect(self._open_multi_overflow)
+        mt_layout.insertWidget(mt_layout.count() - 1, self.multi_more_btn)
+        self.multi_delete_separator = QFrame()
+        self.multi_delete_separator.setObjectName('toolbarTierSep')
+        self.multi_delete_separator.setFixedSize(1, 18)
+        delete_index = mt_layout.indexOf(self.multi_delete_btn)
+        mt_layout.insertWidget(delete_index, self.multi_delete_separator)
+        self.multi_deselect_btn = QPushButton(t('pal_editor.bulk_deselect_btn'))
+        self.multi_deselect_btn.setObjectName('multi_deselect_btn')
+        self.multi_deselect_btn.setProperty('class', 'tertiary')
+        self.multi_deselect_btn.setFixedHeight(22)
+        self.multi_deselect_btn.setCursor(Qt.PointingHandCursor)
+        self.multi_deselect_btn.clicked.connect(self._clear_multi_selection)
+        mt_layout.addWidget(self.multi_deselect_btn)
         palbox_layout.addLayout(mode_bar)
         self._update_mode_buttons()
         header_row = FlowLayout(h_spacing=4)
@@ -297,11 +356,57 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
                 self.palbox_slots.append(slot)
         self.grid_scroll.setWidget(grid_container)
         palbox_layout.addWidget(self.grid_scroll)
-        root.addWidget(palbox_panel, 1)
+        palbox_panel.setMinimumWidth(420)
+        palbox_panel.setAccessibleName(
+            t('ui.pal_editor.collection_region', default='Palbox collection'))
+        self.palbox_panel = palbox_panel
+        self.collection_splitter.addWidget(palbox_panel)
+        self.collection_splitter.setStretchFactor(0, 0)
+        self.collection_splitter.setStretchFactor(1, 1)
+        self.collection_splitter.setSizes([232, 720])
+        self.workspace_splitter = QSplitter(Qt.Orientation.Horizontal, self)
+        self.workspace_splitter.setObjectName('palEditorWorkspaceSplitter')
+        self.workspace_splitter.setChildrenCollapsible(False)
+        self.workspace_splitter.addWidget(self.collection_splitter)
         self.pal_info = PalInfoWidget()
-        self.pal_info.setMinimumWidth(340)
+        self.pal_info.setMinimumWidth(320)
         self.pal_info.pal_data_changed.connect(self._mark_dps_modified)
-        root.addWidget(self.pal_info)
+        self.inspector_host = QFrame(self)
+        self.inspector_host.setObjectName('palInspectorHost')
+        self.inspector_host.setAccessibleName(t(
+            'ui.pal_editor.inspector_region', default='Selected Pal inspector'))
+        inspector_layout = QVBoxLayout(self.inspector_host)
+        inspector_layout.setContentsMargins(0, 0, 0, 0)
+        inspector_layout.addWidget(self.pal_info)
+        self.workspace_splitter.addWidget(self.inspector_host)
+        self.workspace_splitter.setStretchFactor(0, 1)
+        self.workspace_splitter.setStretchFactor(1, 0)
+        self.workspace_splitter.setSizes([900, 360])
+        root.addWidget(self.workspace_splitter, 1)
+        self._responsive_mode = ''
+        self._apply_responsive_layout()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._apply_responsive_layout()
+
+    def _apply_responsive_layout(self):
+        if not hasattr(self, 'workspace_splitter'):
+            return
+        mode = 'stacked' if self.width() < 980 else 'side-by-side'
+        if mode == self._responsive_mode:
+            return
+        self._responsive_mode = mode
+        if mode == 'stacked':
+            self.workspace_splitter.setOrientation(Qt.Orientation.Vertical)
+            self.workspace_splitter.setSizes([430, 250])
+            self.inspector_host.setProperty('responsiveMode', 'stacked')
+        else:
+            self.workspace_splitter.setOrientation(Qt.Orientation.Horizontal)
+            self.workspace_splitter.setSizes([900, 360])
+            self.inspector_host.setProperty('responsiveMode', 'side-by-side')
+        self.inspector_host.style().unpolish(self.inspector_host)
+        self.inspector_host.style().polish(self.inspector_host)
     def _set_palbox_mode(self, mode):
         if mode == self._palbox_mode:
             return
@@ -330,6 +435,11 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         # overrides removed so the token rule applies).
         set_picker_selected(self.mode_box_btn, self._palbox_mode == 'box')
         set_picker_selected(self.mode_dps_btn, has_dps and self._palbox_mode == 'dps')
+        if hasattr(self, 'source_player_label'):
+            self.source_player_label.setText(
+                self.player_name or t(
+                    'ui.pal_editor.no_player_source',
+                    default='No player selected'))
     def _mark_dps_modified(self):
         if self._palbox_mode != 'dps' or not self.dps_file_path:
             return
@@ -433,16 +543,27 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
             self.box_label.setText(t('pal_editor.dps_count', n=self.current_box_index, m=total, count=count) if t else f'DPS {self.current_box_index}/{total} ({count})')
         else:
             count = len(self.palbox_pal_dict)
-            self.box_label.setText(t('pal_editor.box_count', n=self.current_box_index, count=count) if t else f'Box {self.current_box_index} ({count})')
+            total = self._get_max_box()
+            self.box_label.setText(
+                t(
+                    'pal_editor.box_count',
+                    n=self.current_box_index,
+                    m=total,
+                    count=count,
+                ) if t else
+                f'Box {self.current_box_index} of {total} ({count})')
         self._sync_box_jump_spin()
     def _goto_box(self, idx):
         """Shared navigation core for prev/next and the jump control
-        (uiux-audit-remediation 7.5): applies the index, clears the clicked-pal
-        state, and refreshes the page. Wrapping stays in the callers."""
+        (uiux-audit-rehaul 7.2).
+
+        The selected Pal uses an absolute slot index, so paging must retain it.
+        ``_update_palbox_page`` hides the highlight while its page is absent and
+        restores it when the user returns. Wrapping stays in the callers.
+        """
         self.current_box_index = max(1, min(int(idx), self._get_max_box()))
-        self._clicked_pal = None
-        self.selected_pal_slot = None
-        self.pal_info.set_clicked_pal(None)
+        self._hovered_pal = None
+        self.pal_info.clear_hover()
         self._update_box_label()
         self._update_palbox_page()
     def _on_box_jump(self, value):
@@ -989,7 +1110,7 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         self._update_party_slots()
         self._update_palbox_page()
         self._update_box_label()
-        constants.dirty = True
+        self._update_dashboard_stats()
 
     def _container_slot_entries(self, container_id):
         if not container_id or not constants.loaded_level_json:
@@ -1731,33 +1852,67 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
                 rel = idx % 30
                 if 0 <= rel < len(self.palbox_slots):
                     self.palbox_slots[rel].set_selected(True)
-    def _update_multi_toolbar(self):
+
+    def _selected_pal_count(self):
         count = len(self._multi_selected)
         if self.selected_pal_slot:
-            st, si = self.selected_pal_slot
-            if (st, si) not in self._multi_selected:
+            slot_type, slot_index = self.selected_pal_slot
+            if (slot_type, slot_index) not in self._multi_selected:
                 count += 1
+        return count
+
+    def _open_multi_overflow(self):
+        from palworld_aio.widgets.scrollable_context_menu import (
+            ScrollableContextMenu,
+        )
+
+        popup = ScrollableContextMenu(self)
+        for object_name in self._multi_overflow_handlers:
+            popup.add_item(
+                object_name,
+                self._multi_action_buttons[object_name].text(),
+            )
+        selected = popup.exec(self.multi_more_btn.mapToGlobal(
+            self.multi_more_btn.rect().bottomLeft()))
+        handler = self._multi_overflow_handlers.get(selected)
+        if handler is not None:
+            handler()
+
+    def _update_multi_toolbar(self):
+        count = self._selected_pal_count()
+        regular_actions = (
+            self.restore_all_btn,
+            self.max_all_btn,
+            self.max_buff_all_btn,
+            self.all_skills_all_btn,
+            self.sort_btn,
+            self.select_all_btn,
+            self.bulk_clone_btn,
+            self.bulk_delete_separator,
+            self.bulk_delete_btn,
+        )
         if count >= 2:
             self.multi_count_label.setText(t('pal_editor.multi_selected', n=count))
+            affected = t(
+                'ui.pal_editor.affected_count',
+                default='{count} selected Pals are affected.',
+                count=count,
+            )
+            self.multi_toolbar.setAccessibleName(t(
+                'ui.pal_editor.multi_actions_count',
+                default='Actions for {count} selected Pals',
+                count=count,
+            ))
+            for button in self._multi_action_buttons.values():
+                button.setAccessibleDescription(affected)
+            self.multi_more_btn.setAccessibleDescription(affected)
             self.multi_toolbar.setVisible(True)
-            self.restore_all_btn.setVisible(False)
-            self.max_all_btn.setVisible(False)
-            self.max_buff_all_btn.setVisible(False)
-            self.all_skills_all_btn.setVisible(False)
-            self.sort_btn.setVisible(False)
-            self.select_all_btn.setVisible(False)
-            self.bulk_clone_btn.setVisible(False)
-            self.bulk_delete_btn.setVisible(False)
+            for action in regular_actions:
+                action.setVisible(False)
         else:
             self.multi_toolbar.setVisible(False)
-            self.restore_all_btn.setVisible(True)
-            self.max_all_btn.setVisible(True)
-            self.max_buff_all_btn.setVisible(True)
-            self.all_skills_all_btn.setVisible(True)
-            self.sort_btn.setVisible(True)
-            self.select_all_btn.setVisible(True)
-            self.bulk_clone_btn.setVisible(True)
-            self.bulk_delete_btn.setVisible(True)
+            for action in regular_actions:
+                action.setVisible(True)
         self._refresh_header_layout()
     def showEvent(self, event):
         super().showEvent(event)
@@ -2147,7 +2302,7 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         pals = self._gather_selected_pals()
         if not pals:
             return
-        dlg = FramelessDialog('pal_editor.bulk_rename_title', self)
+        dlg = PalEditorDialog('pal_editor.bulk_rename_title', self)
         dlg.setWindowTitle(t('pal_editor.bulk_rename_title'))
         dlg.setModal(True)
         dlg.setMinimumSize(360, 160)
@@ -2355,6 +2510,11 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
             return
         for w in app.topLevelWidgets():
             if hasattr(w, 'tools_tab'):
+                recorder = getattr(w, 'record_pending_change', None)
+                if callable(recorder):
+                    recorder(t(
+                        'ui.pending.pal_collection',
+                        default='Pal collection updated'))
                 w.tools_tab.refresh()
                 break
     def refresh_labels(self):
@@ -2386,6 +2546,14 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
             self.mode_box_btn.setText(t('pal_editor.box_tab') if t else 'Box')
         if hasattr(self, 'mode_dps_btn'):
             self.mode_dps_btn.setText(t('pal_editor.dps') if t else 'DPS')
+        if hasattr(self, 'source_label'):
+            self.source_label.setText(t(
+                'ui.pal_editor.source_label', default='Source'))
+        if hasattr(self, 'source_player_label'):
+            self.source_player_label.setText(
+                self.player_name or t(
+                    'ui.pal_editor.no_player_source',
+                    default='No player selected'))
         if hasattr(self, 'multi_toolbar') and self.multi_toolbar:
             for btn in self.multi_toolbar.findChildren(QPushButton):
                 obj = btn.objectName()
@@ -2403,6 +2571,10 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
                     btn.setText(t('pal_editor.bulk_delete_btn'))
                 elif obj == 'multi_deselect_btn':
                     btn.setText(t('pal_editor.bulk_deselect_btn'))
+                elif obj == 'multiMoreBtn':
+                    btn.setText(t(
+                        'ui.pal_editor.more_actions',
+                        default='More actions'))
         if hasattr(self, 'pal_info') and self.pal_info:
             self.pal_info.refresh_labels()
     def _load_pals(self):
@@ -2497,14 +2669,14 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
     def closeEvent(self, event):
         self._save_dps()
         super().closeEvent(event)
-class EditPalsDialog(FramelessDialog):
+class EditPalsDialog(PalEditorDialog):
     def __init__(self, player_uid, player_name, parent=None):
         super().__init__('edit_pals.title', parent)
         self.player_uid = player_uid
         self.player_name = player_name
         self.setWindowTitle(f"{t('edit_pals.title')} - {player_name}")
         self.setModal(True)
-        self.setMinimumSize(1200, 800)
+        self.setMinimumSize(980, 640)
         if os.path.exists(constants.ICON_PATH):
             self.setWindowIcon(QIcon(constants.ICON_PATH))
         self.pal_editor_widget = PalEditorWidget()

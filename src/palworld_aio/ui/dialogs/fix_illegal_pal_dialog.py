@@ -2,11 +2,8 @@
 from PyQt6.QtCore import Qt, pyqtSignal
 from i18n import t
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
-from palworld_aio.ui.chrome.components import BaseDialog, make_button
-from palworld_aio.ui.chrome import tokens as ui_tokens
+from palworld_aio.ui.chrome.components import BaseDialog, BulkWorkflowReview, make_button
 from palworld_aio.editor.pal_editor.icons import _get_pal_icon_path, _get_cached_pixmap
-
-_CARD_TOKENS = ui_tokens.resolve()
 
 
 def _polish(widget) -> None:
@@ -41,23 +38,20 @@ class PalRowWidget(QFrame):
         stars = rank - 1 if rank > 1 else 0
         info_parts = [f'Lv.{lvl}']
         if stars:
-            info_parts.append(f'{stars}â˜…')
+            info_parts.append(f'{stars}★')
         info_text = ' '.join(info_parts)
         ivs = f"IVs {self.pal_data.get('talent_hp', 0)}/{self.pal_data.get('talent_shot', 0)}/{self.pal_data.get('talent_defense', 0)}"
         souls = f"Souls {self.pal_data.get('rank_hp', 0)}/{self.pal_data.get('rank_attack', 0)}/{self.pal_data.get('rank_defense', 0)}/{self.pal_data.get('rank_craftspeed', 0)}"
         detail = f'{info_text} | {ivs} | {souls} | {self.pal_data.get("location", "")}'
-        line_label = QLabel(f'{name_text} â€” {detail}')
-        line_label.setStyleSheet(f'color: {_CARD_TOKENS["text"]}; font-size: 11px;')
+        line_label = QLabel(f'{name_text} — {detail}')
+        line_label.setObjectName('illegalPalLine')
         top_row.addWidget(line_label, 1)
         main.addLayout(top_row)
         markers = self.pal_data.get('illegal_markers', [])
         if markers:
             marker_text = '  '.join(f'[{m}]' for m in markers)
             marker_lbl = QLabel(marker_text)
-            marker_lbl.setStyleSheet(
-                f'color: {_CARD_TOKENS["warning"]}; font-size: 10px; font-weight: 700; '
-                f'padding: 1px 8px; background: {_CARD_TOKENS["warning_bg"]}; '
-                f'border: 1px solid {_CARD_TOKENS["warning_border"]}; border-radius: 4px;')
+            marker_lbl.setObjectName('illegalPalMarkers')
             marker_lbl.setWordWrap(True)
             main.addWidget(marker_lbl)
 class PlayerCardWidget(QFrame):
@@ -88,19 +82,19 @@ class PlayerCardWidget(QFrame):
         level = self.data.get('level', 1)
         count = self.data['pal_count']
         name_lbl = QLabel(f'{name} (Lv.{level})')
-        name_lbl.setStyleSheet(f'color: {_CARD_TOKENS["text"]}; font-size: 12px; font-weight: 600;')
+        name_lbl.setObjectName('illegalPlayerName')
         text_l.addWidget(name_lbl)
         extra_lbl = QLabel(f'{guild}  [{count} illegal]')
-        extra_lbl.setStyleSheet(f'color: {_CARD_TOKENS["text_secondary"]}; font-size: 10px;')
+        extra_lbl.setObjectName('illegalPlayerDetails')
         text_l.addWidget(extra_lbl)
         card.addWidget(text_w, 1)
     def _update_style(self):
         self.setProperty('selected', self._selected)
         _polish(self)
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+    def mousePressEvent(self, a0):
+        if a0.button() == Qt.LeftButton:
             self.clicked.emit(self.uid)
-        super().mousePressEvent(event)
+        super().mousePressEvent(a0)
     def set_selected(self, selected):
         self._selected = selected
         self._update_style()
@@ -115,6 +109,8 @@ class FixIllegalPalDialog(BaseDialog):
     Card/row selection is property-driven (`playerCard`/`palRow` rules in
     qss_builder). All scan/selection/fix logic unchanged.
     """
+    repair_requested = pyqtSignal(list)
+
     def __init__(self, scan_data, parent=None):
         title = t('fix_illegal_pal.title') if t else 'Fix Illegal Pals'
         super().__init__(title, parent, min_size=(1000, 550))
@@ -123,6 +119,7 @@ class FixIllegalPalDialog(BaseDialog):
         self._player_cards = {}
         self._player_pal_rows = {}
         self._selected_uid = None
+        self.repair_running = False
         self._setup_ui()
         self._populate_players()
         self._populate_all_pal_rows()
@@ -136,6 +133,27 @@ class FixIllegalPalDialog(BaseDialog):
         self.summary_label = QLabel('')
         self.summary_label.setProperty('role', 'warning')
         layout.addWidget(self.summary_label)
+        self.workflow_review = BulkWorkflowReview(
+            source=t('repair.workflow.loaded_source', default='Current loaded save'),
+            target=t(
+                'repair.affected.illegal_pals',
+                default='Selected players and their illegal Pals'),
+            review=t(
+                'repair.review.illegal_pals',
+                default='Clamp only the selected illegal Pal values to legal maximums.'),
+            parent=self,
+        )
+        self.workflow_review.set_risk(
+            t(
+                'repair.risk.illegal_values',
+                default='Selected out-of-range values will be replaced with legal values.'),
+            t(
+                'repair.workflow.loaded_backup',
+                default=(
+                    'Recovery: a full backup was created when this save was loaded. '
+                    'This repair stays in memory until you choose Save Changes.')),
+        )
+        layout.addWidget(self.workflow_review)
         splitter = QSplitter(Qt.Horizontal)
         splitter.setChildrenCollapsible(False)
         left_panel = QFrame()
@@ -147,29 +165,21 @@ class FixIllegalPalDialog(BaseDialog):
         left_header.setObjectName('sectionHeader')
         left_layout.addWidget(left_header)
         left_btn_row = QHBoxLayout()
-        left_sel_all = QPushButton(t('player_item.select_all') if t else 'All')
+        left_sel_all = make_button(
+            t('player_item.select_all') if t else 'All', 'tertiary')
         left_sel_all.setFixedHeight(22)
-        left_sel_all.setStyleSheet(
-            f'QPushButton {{ background: {_CARD_TOKENS["success_bg"]}; color: {_CARD_TOKENS["success"]}; '
-            f'border: 1px solid {_CARD_TOKENS["success_border"]}; border-radius: 4px; '
-            'padding: 2px 8px; font-weight: 600; font-size: 11px; }} '
-            f'QPushButton:hover {{ background: {_CARD_TOKENS["success_border"]}; }}')
         left_sel_all.clicked.connect(lambda: self._set_all_players(True))
         left_btn_row.addWidget(left_sel_all)
-        left_sel_none = QPushButton(t('player_item.deselect_all') if t else 'None')
+        left_sel_none = make_button(
+            t('player_item.deselect_all') if t else 'None', 'ghost')
         left_sel_none.setFixedHeight(22)
-        left_sel_none.setStyleSheet(
-            f'QPushButton {{ background: {_CARD_TOKENS["danger_bg"]}; color: {_CARD_TOKENS["danger"]}; '
-            f'border: 1px solid {_CARD_TOKENS["danger_border"]}; border-radius: 4px; '
-            'padding: 2px 8px; font-weight: 600; font-size: 11px; }} '
-            f'QPushButton:hover {{ background: {_CARD_TOKENS["danger_border"]}; }}')
         left_sel_none.clicked.connect(lambda: self._set_all_players(False))
         left_btn_row.addWidget(left_sel_none)
         left_btn_row.addStretch()
         left_layout.addLayout(left_btn_row)
         left_scroll = QScrollArea()
         left_scroll.setWidgetResizable(True)
-        left_scroll.setStyleSheet('QScrollArea { border: none; background: transparent; }')
+        left_scroll.setObjectName('dialogListScroll')
         self.left_content = QWidget()
         self.left_layout_inner = QVBoxLayout(self.left_content)
         self.left_layout_inner.setContentsMargins(0, 0, 0, 0)
@@ -186,7 +196,7 @@ class FixIllegalPalDialog(BaseDialog):
         right_layout.addWidget(self.right_header)
         right_scroll = QScrollArea()
         right_scroll.setWidgetResizable(True)
-        right_scroll.setStyleSheet('QScrollArea { border: none; background: transparent; }')
+        right_scroll.setObjectName('dialogListScroll')
         self.right_content = QWidget()
         self.right_layout_inner = QVBoxLayout(self.right_content)
         self.right_layout_inner.setContentsMargins(0, 0, 0, 0)
@@ -203,6 +213,7 @@ class FixIllegalPalDialog(BaseDialog):
         sep.setFixedHeight(1)
         layout.addWidget(sep)
         self.fix_btn = make_button(t('fix_illegal_pal.fix_selected') if t else 'Fix Selected', 'primary')
+        self.fix_btn.setEnabled(False)
         self.fix_btn.clicked.connect(self._on_fix)
         self.footer.addWidget(self.fix_btn)
         self.status_label = QLabel('')
@@ -224,12 +235,14 @@ class FixIllegalPalDialog(BaseDialog):
                 continue
             card = PlayerCardWidget(uid_clean, data)
             card.clicked.connect(self._select_player)
+            card.checkbox.toggled.connect(self._sync_affected_summary)
             self.left_layout_inner.addWidget(card)
             self._player_cards[uid_clean] = card
         self.left_layout_inner.addStretch(1)
         self._update_summary()
         if self._player_cards:
             self.fix_btn.setEnabled(True)
+        self._sync_affected_summary()
     def _populate_all_pal_rows(self):
         for uid_clean, data in self.scan_data.items():
             u_rows = []
@@ -253,14 +266,28 @@ class FixIllegalPalDialog(BaseDialog):
             self._player_cards[uid].set_selected(True)
         data = self.scan_data.get(uid, {})
         pname = data.get('player_name', uid)
-        self.right_header.setText(t('fix_illegal_pal.pals_for_header', name=pname) if t else f'Illegal Pals â€” {pname}')
+        self.right_header.setText(t('fix_illegal_pal.pals_for_header', name=pname) if t else f'Illegal Pals — {pname}')
         for r in self._player_pal_rows.get(uid, []):
             r.setVisible(True)
     def _set_all_players(self, checked):
         for card in self._player_cards.values():
             card.set_checked(checked)
+        self._sync_affected_summary()
     def _get_selected_uids(self):
         return [uid for uid, card in self._player_cards.items() if card.is_checked()]
+    def _sync_affected_summary(self):
+        uids = self._get_selected_uids()
+        pal_count = sum(self.scan_data[uid]['pal_count'] for uid in uids)
+        self.workflow_review.set_context(
+            source=t('repair.workflow.loaded_source', default='Current loaded save'),
+            target=t(
+                'repair.affected.illegal_pal_count',
+                default='{players} selected player(s), {pals} illegal Pal(s)',
+                players=len(uids), pals=pal_count),
+            review=t(
+                'repair.review.illegal_pals',
+                default='Clamp only the selected illegal Pal values to legal maximums.'),
+        )
     def _on_fix(self):
         uids = self._get_selected_uids()
         if not uids:
@@ -268,4 +295,34 @@ class FixIllegalPalDialog(BaseDialog):
             self.status_label.setProperty('role', 'danger')
             _polish(self.status_label)
             return
-        self.accept()
+        self.repair_running = True
+        self.fix_btn.setEnabled(False)
+        self.cancel_btn.setEnabled(False)
+        self.close_btn.setEnabled(False)
+        self.workflow_review.progress.setRange(0, 0)
+        self.workflow_review.progress.setFormat(t(
+            'repair.workflow.running', default='Repair in progress…'))
+        self.workflow_review.progress.show()
+        self.repair_requested.emit(uids)
+    def finish_repair(self, message):
+        self.repair_running = False
+        self.workflow_review.set_progress(
+            1, 1, t('repair.workflow.complete', default='Repair complete'))
+        self.workflow_review.set_result(message, success=True)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setText(t('button.close', default='Close'))
+        self.close_btn.setEnabled(True)
+        self._primary_button = self.cancel_btn
+    def fail_repair(self, detail):
+        self.repair_running = False
+        self.workflow_review.set_progress(
+            1, 1, t('repair.workflow.failed_short', default='Repair failed'))
+        self.workflow_review.set_result(t(
+            'repair.workflow.failed',
+            default=(
+                'The repair did not complete. Do not save unexpected in-memory '
+                'changes; reload the current save or restore its load-time backup. '
+                'Details: {detail}'), detail=detail), success=False)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setText(t('button.close', default='Close'))
+        self.close_btn.setEnabled(True)

@@ -42,7 +42,7 @@ from .pal_ops import (
     build_pal_context_menu,
     creation_nickname,
 )
-from .widgets import FramelessDialog, StrokedLabel
+from .widgets import PalEditorDialog, StrokedLabel
 from .card_widgets import PalIcon, PalCardWidget, TribeIcon
 from .party_slot_widget import PartySlotWidget
 from .palbox_slot_widget import PalboxSlotWidget, _PalSlotDelegate
@@ -97,7 +97,7 @@ __all__ = [
     "BulkSyncPalDialog",
     "delete_pal_from_all",
     "EditPalsDialog",
-    "FramelessDialog",
+    "PalEditorDialog",
     "get_pal_base_data",
     "PalboxSlotWidget",
     "PalCardWidget",

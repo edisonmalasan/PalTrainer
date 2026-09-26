@@ -26,6 +26,7 @@ _TEST_STEM_ALIASES: dict[str, str] = {
     'design_tokens': 'palworld_aio/ui/chrome/tokens',
     'components': 'palworld_aio/ui/chrome/components',
     'icon_factory': 'palworld_aio/ui/chrome/icons',
+    'font_registry': 'palworld_aio/ui/chrome/fonts',
     'shell_v3_chrome': 'palworld_aio/ui/main_window',
     'shell_status_chrome': 'palworld_aio/ui/main_window',
     'tools_tab': 'palworld_aio/ui/tabs/tools_tab',
@@ -34,14 +35,17 @@ _TEST_STEM_ALIASES: dict[str, str] = {
     'inventory_chip': 'palworld_aio/ui/tabs/inventory_tab',
     'pal_editor_toolbar': 'palworld_aio/editor/pal_editor/pal_editor_widget',
     'pal_editor_box_jump': 'palworld_aio/editor/pal_editor/pal_editor_widget',
+    'pal_dialog_migration': 'palworld_aio/editor/pal_editor/create_dialogs',
     'json_editor_breadcrumb': 'palworld_aio/ui/tabs/json_editor_tab',
     'map_zoom_controls': 'palworld_aio/ui/tabs/map_tab',
+    'map_workspace': 'palworld_aio/ui/tabs/map_tab',
     'breeding_hint': 'palworld_aio/ui/tabs/breeding_tab',
     'domain_stats': 'stats',
     'palworld_coord': 'palworld_coord/__init__',
     'xgp_import': 'palworld_xgp_import/__init__',
     'compatibility_matrix': 'save_engine/__init__',
     'modular_monolith': 'application/save_session',
+    'uiux_baseline_contracts': 'palworld_aio/ui/main_window',
 }
 
 _INSTALLED_MODULES: dict[str, str] = {

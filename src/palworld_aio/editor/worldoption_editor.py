@@ -1,13 +1,14 @@
 import os
 import sys
 from palsav import json_tools
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QFrame, QSpinBox, QDoubleSpinBox, QLineEdit, QComboBox, QWidget, QApplication, QGroupBox, QFormLayout, QGridLayout, QTabWidget, QTextEdit, QListWidget, QListWidgetItem, QSplitter
+from PyQt6.QtWidgets import QDialog, QFileDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QFrame, QSpinBox, QDoubleSpinBox, QLineEdit, QComboBox, QWidget, QApplication, QGroupBox, QFormLayout, QGridLayout, QTabWidget, QTextEdit, QListWidget, QListWidgetItem, QSplitter
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QCursor
 from i18n import t
 from loading_manager import show_warning, show_critical
 from palworld_aio.ui.chrome.styles import ThemeManager
+from palworld_aio.ui.chrome.components import BaseDialog, make_button
 from palworld_aio import constants
 def get_src_path():
     return constants.get_src_path()
@@ -29,23 +30,19 @@ def extract_actual_value(prop):
     elif 'value' in prop:
         return prop.get('value')
     return prop
-class WorldOptionEditorDialog(QDialog):
+class WorldOptionEditorDialog(BaseDialog):
     def __init__(self, json_data, sav_path=None, parent=None):
-        super().__init__(parent)
+        title = t('worldoption.editor.title') if t else 'WorldOption Settings Editor'
+        super().__init__(title, parent, min_size=(1000, 700))
         self.json_data = json_data
         self.sav_path = sav_path
         self.settings = json_data['properties']['OptionWorldData']['value']['Settings']['value']
         self.parent_window = parent if parent else None
-        self.setWindowTitle(t('worldoption.editor.title') if t else 'WorldOption Settings Editor')
-        self.setModal(True)
-        self.setMinimumSize(1000, 700)
         self.editors = {}
         self._setup_ui()
         self._load_theme()
     def _setup_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(15)
+        main_layout = self.content_layout
         splitter = QSplitter(Qt.Horizontal)
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
@@ -79,19 +76,14 @@ class WorldOptionEditorDialog(QDialog):
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
         main_layout.addWidget(splitter)
-        btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(10)
-        save_btn = QPushButton(t('worldoption.editor.save') if t else 'Save Changes')
+        save_btn = make_button(
+            t('worldoption.editor.save') if t else 'Save Changes', 'primary')
         save_btn.setObjectName('dialogOption')
         save_btn.setCursor(QCursor(Qt.PointingHandCursor))
         save_btn.clicked.connect(self._save_to_file)
-        btn_layout.addWidget(save_btn)
-        cancel_btn = QPushButton(t('worldoption.editor.cancel') if t else 'Cancel')
-        cancel_btn.setObjectName('dialogCancel')
-        cancel_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
-        main_layout.addLayout(btn_layout)
+        self.footer.insertWidget(self.footer.count() - 1, save_btn)
+        self.cancel_btn.setText(
+            t('worldoption.editor.cancel') if t else 'Cancel')
         self._populate_settings_list()
         self.settings_list.currentRowChanged.connect(self._on_setting_selected)
     def _populate_settings_list(self):
@@ -248,11 +240,11 @@ class WorldOptionEditorDialog(QDialog):
             show_critical(self, t('error.title') if t else 'Error', error_details)
     def _load_theme(self):
         ThemeManager.apply_to_widget(self)
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
+    def keyPressEvent(self, a0):
+        if a0.key() == Qt.Key_Escape:
             self.reject()
         else:
-            super().keyPressEvent(event)
+            super().keyPressEvent(a0)
 def edit_worldoption_settings(json_data, sav_path=None, parent=None):
     dialog = WorldOptionEditorDialog(json_data, sav_path, parent)
     result = dialog.exec()

@@ -7,6 +7,7 @@ class PlayerHoverOverlay(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName('playerHoverOverlay')
+        self.setAccessibleName(t('ui.hover.player', default='Player details'))
         self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
@@ -56,7 +57,6 @@ class PlayerHoverOverlay(QWidget):
         shadow.setOffset(2, 2)
         shadow.setColor(QColor(0, 0, 0, 100))
         self.container.setGraphicsEffect(shadow)
-        self.container.setStyleSheet('\n            QFrame#hoverOverlayContainer {\n                background: rgba(18,20,24,0.95);\n                border: 1px solid rgba(0, 200, 120, 0.5);\n                border-radius: 8px;\n            }\n            QLabel#hoverNameLabel {\n                color: #00C878;\n            }\n            QLabel#hoverDetailLabel {\n                color: #a0aec0;\n            }\n        ')
     def show_for_player(self, player_data: dict, global_pos: QPoint):
         self._hide_timer.stop()
         player_name = player_data.get('player_name', 'Unknown')
@@ -83,6 +83,9 @@ class PlayerHoverOverlay(QWidget):
         self.last_seen_label.show()
         self.coords_label.setText(f"{(t('player.hover.location') if t else 'Location:')} X:{int(coords[0])},Y:{int(coords[1])}")
         self.coords_label.show()
+        self.setAccessibleDescription(
+            f'{player_name}. Level {player_level}. {pal_count} Pals. '
+            f'X {int(coords[0])}, Y {int(coords[1])}.')
         self.adjustSize()
         offset_x = 20
         offset_y = -self.height() // 2

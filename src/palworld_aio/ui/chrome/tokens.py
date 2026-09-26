@@ -50,8 +50,10 @@ PALETTES: dict[str, dict[str, str]] = {
         # surfaces (canvas < surface < raised < input) — warm, opaque
         'canvas': '#141312',
         'surface': '#1B1917',
+        'surface_sidebar': '#171513',
         'surface_raised': '#211E1B',
         'surface_input': '#262220',
+        'surface_overlay': '#2A2623',
         'surface_hover': rgba('#F59E0B', 0.07),
         'surface_active': rgba('#F59E0B', 0.12),
         # text (warm grays)
@@ -62,6 +64,8 @@ PALETTES: dict[str, dict[str, str]] = {
         # borders
         'border': rgba('#ECE7E0', 0.10),
         'border_strong': rgba('#ECE7E0', 0.18),
+        'focus_ring': '#F7B03A',
+        'focus_ring_outer': rgba('#F59E0B', 0.28),
         # accent (interactive/selected/focus only)
         'accent': '#F59E0B',
         'accent_hover': '#F7B03A',
@@ -128,13 +132,21 @@ def resolve(theme: str = DEFAULT_THEME) -> dict[str, str]:
 # Medium/SemiBold files rather than synthetic bold.
 # ---------------------------------------------------------------------------
 TYPE: dict[str, tuple[int, int]] = {
-    'display': (19, 700),
-    'title': (14, 600),
-    'section': (12, 600),
-    'body': (12, 400),
-    'secondary': (11, 400),
-    'micro': (10, 400),
-    'mono': (11, 400),
+    # Canonical audit roles.
+    'page_title': (24, 600),
+    'section_title': (17, 600),
+    'body': (14, 400),
+    'table': (13, 400),
+    'metadata': (12, 400),
+    'caption': (11, 400),
+    'mono': (12, 400),
+    # Compatibility roles used by screens that have not migrated yet. They
+    # resolve to the same readable hierarchy and are retired page by page.
+    'display': (24, 600),
+    'title': (17, 600),
+    'section': (14, 600),
+    'secondary': (12, 400),
+    'micro': (11, 400),
 }
 
 # ---------------------------------------------------------------------------
@@ -145,14 +157,17 @@ SPACING: dict[str, int] = {
     'sm': 8,
     'md': 12,
     'lg': 16,
+    'lg_plus': 20,
     'xl': 24,
     'xxl': 32,
+    'xxxl': 40,
 }
 
 RADIUS: dict[str, int] = {
-    'sm': 3,
-    'md': 5,
-    'lg': 8,
+    'sm': 6,
+    'md': 8,
+    'lg': 10,
+    'xl': 12,
     'pill': 9999,
 }
 
@@ -164,9 +179,56 @@ HEIGHT: dict[str, int] = {
 }
 
 ROW: dict[str, int] = {
-    'dense': 28,
-    'standard': 32,
+    'dense': 32,
+    'standard': 40,
+    'comfortable': 48,
 }
+
+# Density is a user-facing layout choice, not a separate palette. Values are
+# component dimensions on the same 4px grid so tables and toolbars can switch
+# density without inventing screen-local measurements.
+DENSITY: dict[str, dict[str, int]] = {
+    'compact': {'row': 32, 'control': 32, 'gap': 4},
+    'standard': {'row': 40, 'control': 36, 'gap': 8},
+    'comfortable': {'row': 48, 'control': 40, 'gap': 12},
+}
+
+# Shared shell geometry. Responsive behavior consumes these values rather than
+# embedding per-page breakpoints or fixed widths.
+LAYOUT: dict[str, int] = {
+    'minimum_width': 1024,
+    'minimum_height': 700,
+    'default_width': 1450,
+    'default_height': 800,
+    'sidebar_expanded': 240,
+    'sidebar_collapsed': 64,
+    'inspector_width': 340,
+    'content_padding': 24,
+    'content_padding_medium': 20,
+    'content_padding_narrow': 16,
+    'toolbar_height': 48,
+}
+
+FOCUS: dict[str, int] = {
+    'width': 2,
+    'offset': 2,
+}
+
+MOTION: dict[str, int] = {
+    'instant': 0,
+    'selection': 100,
+    'tooltip': 120,
+    'drawer': 180,
+    'sidebar': 200,
+    'dialog': 180,
+}
+
+
+def motion_duration(role: str, *, reduced_motion: bool = False) -> int:
+    """Return a transition duration, disabling decorative motion on request."""
+    if role not in MOTION:
+        raise KeyError(f'unknown motion role {role!r}; known: {sorted(MOTION)}')
+    return 0 if reduced_motion else MOTION[role]
 
 # ---------------------------------------------------------------------------
 # Transitional composite aliases. Existing modules (chrome/styles.py and

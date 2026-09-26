@@ -251,6 +251,9 @@ class NavStrip(QWidget):
         self._overflow_btn.setFixedHeight(28)
         self._overflow_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._overflow_menu = QMenu(self)
+        self._overflow_menu.setObjectName('appContextMenu')
+        self._overflow_menu.setAccessibleName(_txt(
+            'ui.menu.context_actions', 'Context actions'))
         self._overflow_btn.setMenu(self._overflow_menu)
         self._overflow_btn.hide()
         primary.addStretch(1)

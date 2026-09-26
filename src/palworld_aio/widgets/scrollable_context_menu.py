@@ -2,23 +2,16 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFra
 from PyQt6.QtCore import Qt, QPoint, QEvent, QEventLoop, QTimer, QRect
 from PyQt6.QtGui import QColor, QCursor, QFont
 from palworld_aio import constants
-
-_MENU_BG = 'rgba(18,20,24,0.95)'
-_MENU_BORDER = 'rgba(125,211,252,0.2)'
-_MENU_TEXT = '#A6B8C8'
-_MENU_HOVER_BG = 'rgba(125,211,252,0.1)'
-_MENU_HOVER_TEXT = '#7DD3FC'
-_MENU_ACTIVE_BG = 'rgba(125,211,252,0.15)'
-_MENU_ACTIVE_BORDER = '#7DD3FC'
-
-_ITEM_STYLE = f'''QPushButton {{ background: transparent; border: none; padding: 8px 12px; text-align: left; color: {_MENU_TEXT}; font-size: 11px; border-radius: 0px; min-height: 28px; }} QPushButton:hover {{ background: {_MENU_HOVER_BG}; color: {_MENU_HOVER_TEXT}; }} QPushButton:checked {{ background: rgba(125,211,252,0.08); color: {_MENU_HOVER_TEXT}; }} QPushButton:checked:hover {{ background: {_MENU_HOVER_BG}; }}'''
-_SEP_STYLE = 'border-top: 1px solid rgba(255,255,255,0.08); margin: 4px 8px;'
+from palworld_aio.ui.chrome import icons as app_icons
+from palworld_aio.ui.chrome.components import make_button
 
 class _GroupHeader(QWidget):
     def __init__(self, name, idx):
         super().__init__()
         self._idx = idx
-        self.setObjectName('menuPopupButton')
+        self.setObjectName('popupGroupHeader')
+        self.setAccessibleName(name)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setCursor(Qt.PointingHandCursor)
         self.setMinimumWidth(180)
         self.setMinimumHeight(36)
@@ -32,37 +25,16 @@ class _GroupHeader(QWidget):
         self.text_label.setFont(QFont(constants.FONT_FAMILY, 11))
         layout.addWidget(self.text_label)
         layout.addStretch()
-        self.chevron_label = QLabel('▶')
-        self.chevron_label.setFont(QFont(constants.FONT_FAMILY, 11))
+        self.chevron_label = QLabel()
+        self.chevron_label.setPixmap(
+            app_icons.get_pixmap('chevron_right', size=12,
+                                  role='text_secondary'))
         layout.addWidget(self.chevron_label)
         self._update_theme()
 
     def _update_theme(self):
-        self.setStyleSheet(f'''
-            QWidget#menuPopupButton {{
-                background: transparent;
-                border: none;
-                border-radius: 6px;
-            }}
-            QWidget#menuPopupButton[hovered="true"] {{
-                background: {_MENU_HOVER_BG};
-            }}
-            QWidget#menuPopupButton[active="true"] {{
-                background: {_MENU_ACTIVE_BG};
-                border-left: 3px solid {_MENU_ACTIVE_BORDER};
-            }}
-            QLabel {{
-                color: {_MENU_TEXT};
-                background: transparent;
-                border: none;
-            }}
-            QWidget#menuPopupButton[hovered="true"] QLabel {{
-                color: {_MENU_HOVER_TEXT};
-            }}
-            QWidget#menuPopupButton[active="true"] QLabel {{
-                color: {_MENU_HOVER_TEXT};
-            }}
-        ''')
+        self.style().unpolish(self)
+        self.style().polish(self)
 
     def set_active(self, active):
         self.setProperty('active', active)
@@ -74,50 +46,19 @@ class _GroupHeader(QWidget):
         self.style().unpolish(self)
         self.style().polish(self)
 
-_SUBMENU_STYLE = f'''
-QMenu {{
-    background: {_MENU_BG};
-    border: 1px solid {_MENU_BORDER};
-    border-radius: 10px;
-    padding: 6px;
-    color: {_MENU_TEXT};
-    font-size: 11px;
-}}
-QMenu::item {{
-    padding: 8px 12px;
-    min-height: 28px;
-    border-radius: 4px;
-    color: {_MENU_TEXT};
-}}
-QMenu::item:selected {{
-    background: {_MENU_HOVER_BG};
-    color: {_MENU_HOVER_TEXT};
-}}
-QMenu::item:checked {{
-    background: rgba(125,211,252,0.08);
-    color: {_MENU_HOVER_TEXT};
-}}
-QMenu::separator {{
-    height: 1px;
-    background: rgba(255,255,255,0.08);
-    margin: 4px 8px;
-}}
-QMenu::icon {{
-    padding-left: 4px;
-}}
-'''
-
 class ScrollableContextMenu(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._result = None
         self._loop = None
+        self.setObjectName('popupSurface')
+        self.setAccessibleName('Context actions')
         self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(6, 6, 6, 6)
         self.container = QFrame(self)
-        self.container.setStyleSheet(f'QFrame {{ background: {_MENU_BG}; border: 1px solid {_MENU_BORDER}; border-radius: 10px; }}')
+        self.container.setObjectName('popupSurface')
         _shadow = QGraphicsDropShadowEffect(self.container)
         _shadow.setBlurRadius(20)
         _shadow.setOffset(3, 3)
@@ -134,7 +75,7 @@ class ScrollableContextMenu(QWidget):
         self.scroll_area.setMaximumHeight(160)
         self.scroll_area.setObjectName('contextMenuScroll')
         self.content_widget = QWidget()
-        self.content_widget.setStyleSheet('background: transparent;')
+        self.content_widget.setObjectName('popupContent')
         self.layout = QVBoxLayout(self.content_widget)
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
@@ -177,7 +118,7 @@ class ScrollableContextMenu(QWidget):
             return
         hdr, items = self._groups[idx]
         qmenu = QMenu(self)
-        qmenu.setStyleSheet(_SUBMENU_STYLE)
+        qmenu.setObjectName('appContextMenu')
         qmenu.installEventFilter(self)
         for key, text, checkable, checked in items:
             if key == '---':
@@ -230,25 +171,26 @@ class ScrollableContextMenu(QWidget):
         if over_header is None and not over_sub:
             self._hide_sub()
 
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.Wheel and obj is self._sub_popup:
+    def eventFilter(self, a0, a1):
+        if a1.type() == QEvent.Wheel and a0 is self._sub_popup:
             if self.scroll_area and self.scroll_area.isVisible():
-                self.scroll_area.wheelEvent(event)
+                self.scroll_area.wheelEvent(a1)
                 return True
-        return super().eventFilter(obj, event)
+        return super().eventFilter(a0, a1)
 
     def add_item(self, key, text, checkable=False, checked=False):
         if self._in_group:
             self._group_items.append((key, text, checkable, checked))
             return
-        btn = QPushButton(text)
+        btn = make_button(text, 'tertiary')
+        btn.setObjectName('popupMenuItem')
+        btn.setAccessibleName(text)
         btn.setFlat(True)
         btn.setCursor(Qt.PointingHandCursor)
-        btn.setFocusPolicy(Qt.NoFocus)
+        btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         btn.setCheckable(checkable)
         btn.setChecked(checked)
         btn.setMinimumHeight(34)
-        btn.setStyleSheet(_ITEM_STYLE)
         btn.clicked.connect(lambda: self._select(key))
         self.layout.addWidget(btn)
         return btn
@@ -258,32 +200,30 @@ class ScrollableContextMenu(QWidget):
             self._group_items.append(('---', '', False, False))
             return
         sep = QFrame()
+        sep.setObjectName('popupSeparator')
         sep.setFrameShape(QFrame.HLine)
         sep.setFixedHeight(1)
-        sep.setStyleSheet(_SEP_STYLE)
         self.layout.addWidget(sep)
 
     def add_label(self, text):
         lbl = QLabel(text)
-        lbl.setStyleSheet(f'color: {_MENU_TEXT}; font-size: 10px; font-weight: 600; padding: 4px 12px 2px 12px; background: transparent; border: none;')
+        lbl.setObjectName('popupMenuLabel')
         self.layout.addWidget(lbl)
 
     def add_action(self, action):
-        btn = QPushButton(action.text())
+        btn = make_button(action.text(), 'tertiary')
+        btn.setObjectName('popupMenuItem')
+        btn.setAccessibleName(action.text())
         btn.setFlat(True)
         btn.setCursor(Qt.PointingHandCursor)
-        btn.setFocusPolicy(Qt.NoFocus)
+        btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         btn.setMinimumHeight(34)
-        btn.setStyleSheet(_ITEM_STYLE)
         btn.clicked.connect(action.trigger)
         self.layout.addWidget(btn)
         return btn
 
     def addSeparator(self):
         self.add_sep()
-
-    def exec(self, pos):
-        return self.exec(pos)
 
     def _select(self, key):
         self._result = key
@@ -303,9 +243,16 @@ class ScrollableContextMenu(QWidget):
         loop.exec()
         return self._result
 
-    def closeEvent(self, event):
+    def closeEvent(self, a0):
         self._cursor_timer.stop()
         self._hide_sub()
         if self._loop and self._loop.isRunning():
             self._loop.quit()
-        super().closeEvent(event)
+        super().closeEvent(a0)
+
+    def keyPressEvent(self, a0):
+        if a0.key() == Qt.Key.Key_Escape:
+            self.close()
+            a0.accept()
+            return
+        super().keyPressEvent(a0)

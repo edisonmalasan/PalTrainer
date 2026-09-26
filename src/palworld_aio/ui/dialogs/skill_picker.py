@@ -10,7 +10,6 @@ from palworld_aio.editor.pal_editor import _get_cached_pixmap, _get_element_pixm
 from palworld_aio.editor.pal_editor import data as _pedata
 import palworld_aio.managers.data_manager as dm
 from palworld_aio.ui.chrome import tokens as ui_tokens
-from palworld_aio.ui.chrome import tokens as ui_tokens
 from resource_resolver import resource_path
 from palsav import json_tools
 
@@ -203,13 +202,22 @@ class SkillPicker(QWidget):
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
         self.setObjectName('skillPicker')
+        self.setAccessibleName(t('ui.skill_picker.name', default='Skill picker'))
+        self.setAccessibleDescription(t(
+            'ui.skill_picker.description',
+            default='Search and choose a skill, or clear the current skill.'))
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(2)
         self._search = QLineEdit()
-        self._search.setPlaceholderText('Search...')
+        self._search.setPlaceholderText(t(
+            'ui.skill_picker.search', default='Search skills…'))
+        self._search.setAccessibleName(t(
+            'ui.skill_picker.search_name', default='Search skills'))
         layout.addWidget(self._search)
         self._list = QListWidget()
+        self._list.setAccessibleName(t(
+            'ui.skill_picker.results', default='Skill results'))
         self._list.setMaximumHeight(100)
         self._list.setMinimumWidth(220)
         layout.addWidget(self._list)
@@ -218,6 +226,14 @@ class SkillPicker(QWidget):
         self._search.textChanged.connect(self._on_search)
         self._search.returnPressed.connect(self._on_select)
         self._list.itemClicked.connect(self._on_select)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            self._result = None
+            self.hide()
+            event.accept()
+            return
+        super().keyPressEvent(event)
     def _on_search(self, text):
         for i in range(self._list.count()):
             item = self._list.item(i)

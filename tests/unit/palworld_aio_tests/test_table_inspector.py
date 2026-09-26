@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
+import types
 
 import pytest
 
@@ -20,6 +21,9 @@ from tests.dynamic_importer import import_from
 components = import_from('palworld_aio.ui.chrome.components')
 search_panel_mod = import_from('palworld_aio.widgets.search_panel')
 main_window_mod = import_from('palworld_aio.ui.main_window')
+bases_page_mod = import_from('palworld_aio.ui.pages.bases_page')
+guilds_page_mod = import_from('palworld_aio.ui.pages.guilds_page')
+guild_manager_mod = import_from('palworld_aio.managers.guild_manager')
 tools_tab_mod = import_from('palworld_aio.ui.tabs.tools_tab')  # noqa: F401 (pairing)
 
 _app = None
@@ -137,37 +141,27 @@ def test_bases_inspector_populates_on_selection(window, app, monkeypatch):
     window._setup_bases_tab()
     base_id = 'B7D8465740F80E0E7AC081991A033220'
     guild_id = '707E7DCC8C7B7D4C9A2E0B1A3F4D5E60'
-    window.bases_panel.add_item(
-        ['B7D84657…', '707E7DCC…', 'Unnamed Guild', 1],
-        tooltips={0: base_id, 1: guild_id})
-    window.bases_panel.tree.setCurrentItem(window.bases_panel.tree.topLevelItem(0))
-    item = window.bases_panel.get_selected_item()
-    assert item is not None
-
     class _Ctx:
         def set_base(self, v):
-            context_calls.append(('base', v))
+            context_calls.append(('base', v.identifier))
         def set_guild(self, v):
-            context_calls.append(('guild', v))
+            context_calls.append(('guild', v.identifier))
     context_calls = []
-    import types
-    window.app_bar = types.SimpleNamespace(context=_Ctx())
-
-    class _FakeDataManger:
-        @staticmethod
-        def get_bases():
-            return [{'id': base_id, 'guild_id': guild_id,
-                     'guild_name': 'Unnamed Guild'}]
-    monkeypatch.setattr(main_window_mod, 'get_bases',
-                        _FakeDataManger.get_bases)
-    window._on_base_selected(['B7D84657…', '707E7DCC…', 'Unnamed Guild', '1'])
+    window.workspace_context = _Ctx()
+    record = bases_page_mod.BaseRow(
+        base_id, 'Base 1', guild_id, 'Unnamed Guild', 1,
+        'X 10, Y 20')
+    window.bases_page.set_bases((record,))
+    window.bases_panel.tree.setCurrentItem(
+        window.bases_panel.tree.topLevelItem(0))
     inspector = window._bases_inspector
     assert inspector._title.text() == 'Base 1'
-    assert inspector._rows[0][1].text() == 'Unnamed Guild'
-    assert inspector._rows[2][1].value() == base_id
-    assert inspector._rows[3][1].value() == guild_id
+    assert inspector._rows[1][1].text() == 'Unnamed Guild'
+    assert inspector._rows[4][1].value() == base_id
+    assert inspector._rows[5][1].value() == guild_id
     assert not inspector._empty.isVisibleTo(inspector)
-    assert context_calls[0] == ('base', 'B7D84657…')
+    window._on_base_record_selected(record)
+    assert context_calls == [('guild', guild_id), ('base', base_id)]
 
 
 def test_bases_inspector_clears_when_refreshed(window, app):
@@ -177,6 +171,33 @@ def test_bases_inspector_clears_when_refreshed(window, app):
     window._refresh_bases()  # no save loaded -> empty table + empty inspector
     assert inspector._empty.isVisibleTo(inspector)
     assert not inspector._grid_host.isVisibleTo(inspector)
+
+
+def test_bases_refresh_builds_human_names_and_location_metadata(
+        window, app, monkeypatch):
+    window._setup_bases_tab()
+    monkeypatch.setattr(main_window_mod.constants, 'loaded_level_json', {'loaded': True})
+    data_manager = import_from('palworld_aio.managers.data_manager')
+    monkeypatch.setattr(main_window_mod, 'get_bases', lambda: [
+        {'id': 'b1', 'guild_id': 'g1', 'guild_name': 'Builders'},
+        {'id': 'b2', 'guild_id': 'g1', 'guild_name': 'Builders'},
+        {'id': 'b3', 'guild_id': 'g2', 'guild_name': 'Explorers'},
+    ])
+    monkeypatch.setattr(
+        data_manager, 'get_base_coords',
+        lambda base_id: (10.4, -20.6) if base_id == 'b1' else (None, None))
+    monkeypatch.setattr(
+        main_window_mod.save_manager, 'get_guild_level_by_id',
+        lambda guild_id: 12 if guild_id == 'g1' else 7)
+
+    window._refresh_bases()
+
+    records = window.bases_page._records
+    assert records['b1'].name == 'Base 1'
+    assert records['b2'].name == 'Base 2'
+    assert records['b3'].name == 'Base 1'
+    assert records['b1'].location == 'X 10, Y -21'
+    assert records['b1'].guild_level == 12
 
 
 # --------------------------------------------- 4.4 labeled result count
@@ -222,14 +243,14 @@ def test_count_label_updates_live(app):
 
 def test_bases_id_columns_copyable_and_mono(window, app):
     window._setup_bases_tab()
-    assert window.bases_panel._copyable_columns == {0, 1}
-    assert window.bases_panel._mono_columns == {0, 1}
+    assert window.bases_panel._copyable_columns == {5}
+    assert window.bases_panel._mono_columns == {5, 6, 7}
     base_id = 'B7D8465740F80E0E7AC081991A033220'
-    window.bases_panel.add_item(['B7D84657…', '707E7DCC…', 'g', 1],
-                                tooltips={0: base_id, 1: 'G' * 32})
+    window.bases_page.set_bases((bases_page_mod.BaseRow(
+        base_id, 'Base 1', 'G' * 32, 'g', 1),))
     window.bases_panel.tree.setCurrentItem(window.bases_panel.tree.topLevelItem(0))
     item = window.bases_panel.get_selected_item()
-    assert item.data(0, search_panel_mod.GUID_ROLE) == base_id
+    assert item.data(5, search_panel_mod.GUID_ROLE) == base_id
 
 
 def test_copyable_tree_ctrl_c_copies_full_guid(window, app):
@@ -238,8 +259,8 @@ def test_copyable_tree_ctrl_c_copies_full_guid(window, app):
     from PyQt6.QtWidgets import QApplication
     window._setup_bases_tab()
     base_id = 'B7D8465740F80E0E7AC081991A033220'
-    window.bases_panel.add_item(['B7D84657…', 'x', 'g', 1],
-                                tooltips={0: base_id})
+    window.bases_page.set_bases((bases_page_mod.BaseRow(
+        base_id, 'Base 1', '', 'g', 1),))
     window.bases_panel.tree.setCurrentItem(window.bases_panel.get_selected_item())
     event = QKeyEvent(QKeyEvent.Type.KeyPress, _Qt.Key.Key_C,
                       _Qt.KeyboardModifier.ControlModifier)
@@ -252,10 +273,17 @@ def test_copyable_tree_ctrl_c_copies_full_guid(window, app):
 def test_open_in_base_inventory_routes_and_targets_guild(window, app):
     window._setup_bases_tab()
     guild_id = '707E7DCC8C7B7D4C9A2E0B1A3F4D5E60'
-    window.bases_panel.add_item(['B7D84657…', '707E7DCC…', 'g', 1],
-                                tooltips={0: 'B' * 32, 1: guild_id})
-    window.bases_panel.tree.setCurrentItem(window.bases_panel.tree.topLevelItem(0))
     nav_calls, guild_calls = [], []
+
+    class _Context:
+        def set_base(self, _value):
+            pass
+        def set_guild(self, _value):
+            pass
+    window.workspace_context = _Context()
+    window.bases_page.set_bases((bases_page_mod.BaseRow(
+        'B' * 32, 'Base 1', guild_id, 'g', 1),))
+    window.bases_panel.tree.setCurrentItem(window.bases_panel.tree.topLevelItem(0))
 
     class _Tab:
         def select_guild(self, gid):
@@ -335,12 +363,12 @@ def test_players_inspector_populates_on_selection(pwindow, app):
                                  'Guild A', '707E7DCC…', '5'])
     inspector = pwindow._players_inspector
     assert inspector._title.text() == 'Tester'
-    assert inspector._rows[0][1].text() == '2h'
-    assert inspector._rows[1][1].text() == '30'
+    assert inspector._rows[0][1].text() == '30'
+    assert inspector._rows[1][1].text() == '2h'
     assert inspector._rows[2][1].text() == '12'
     assert inspector._rows[3][1].text() == 'Guild A'
-    assert inspector._rows[4][1].value() == uid
-    assert inspector._rows[5][1].value() == '707E7DCC…'  # no tooltip -> display
+    assert inspector._rows[5][1].value() == uid
+    assert inspector._rows[6][1].value() == '707E7DCC…'  # no tooltip -> display
     assert not inspector._empty.isVisibleTo(inspector)
 
 
@@ -351,20 +379,15 @@ def test_players_inspector_clears_when_refreshed(pwindow, app):
     assert not pwindow._players_inspector._grid_host.isVisibleTo(pwindow._players_inspector)
 
 
-def test_bulk_footer_inside_table_column_below_panel(pwindow, app):
-    """ui-tables delta: bulk bar renders in the footer zone directly below
-    the table card, inside the table column."""
+def test_bulk_footer_below_shared_entity_browser(pwindow, app):
+    """The contextual bulk bar follows the complete shared browser."""
     bulk = pwindow._players_bulk_frame
-    assert bulk.parent() is not None
-    table_column = bulk.parentWidget()
-    panel_parent = pwindow.players_panel.parentWidget()
-    assert table_column is panel_parent  # same column widget
-    column_layout = table_column.layout()
-    idx_panel = column_layout.indexOf(pwindow.players_panel)
+    players_page = pwindow.players_page
+    assert bulk.parentWidget() is players_page
+    column_layout = players_page.layout()
+    idx_panel = column_layout.indexOf(players_page.entity_browser)
     idx_bulk = column_layout.indexOf(bulk)
-    assert idx_bulk == idx_panel + 1  # directly below the table card
-    # and the table column is a sibling of the inspector inside the page body
-    assert table_column.parentWidget() is not table_column.window() or True
+    assert idx_bulk == idx_panel + 1
 
 
 def test_bulk_buttons_exist_with_same_handlers(pwindow, app):
@@ -379,19 +402,21 @@ def test_bulk_buttons_exist_with_same_handlers(pwindow, app):
         assert btn is not None
         assert hasattr(pwindow, handler)
         assert callable(getattr(pwindow, handler))
-    assert pwindow.bulk_label.objectName() == 'bulkActionLabel'
+    assert pwindow.bulk_label.objectName() == 'bulkHintLabel'
 
 
 def test_players_uid_guild_columns_copyable_and_mono(pwindow, app):
-    assert pwindow.players_panel._copyable_columns == {4, 6}
-    assert pwindow.players_panel._mono_columns == {4, 6}
+    assert pwindow.players_panel._copyable_columns == {6, 7}
+    assert pwindow.players_panel._mono_columns == {6, 7}
+    assert pwindow.players_panel.tree.isColumnHidden(6)
+    assert pwindow.players_panel.tree.isColumnHidden(7)
 
 
-def test_players_table_height_capped(pwindow, app):
-    pwindow._refresh_players()  # no save -> 0 rows; cap applies a floor
-    maximum = pwindow.players_panel.maximumHeight()
-    assert 0 < maximum <= pwindow._players_table_cap + 300
-    # shared helper used for both pages
+def test_players_table_fills_shared_browser_workspace(pwindow, app):
+    pwindow._refresh_players()
+    assert pwindow.players_panel.maximumHeight() == 16777215
+    assert pwindow.players_page.layout().stretch(0) == 1
+    # The legacy cap helper remains for World pages not yet migrated.
     assert main_window_mod.MainWindow._cap_search_table_height is not None
     assert hasattr(main_window_mod.MainWindow, '_cap_bases_table_height')
 
@@ -426,29 +451,29 @@ def test_guilds_layout_has_inspector_column(gwindow):
                       components.InspectorSideColumn)
     assert gwindow._guilds_inspector_column.width() == 340
     assert gwindow._guilds_inspector._empty.isVisibleTo(gwindow._guilds_inspector)
-    assert 'Select a guild' in gwindow._guilds_inspector._empty.text()
+    assert 'Click a guild row' in gwindow._guilds_inspector._empty.text()
+    assert gwindow.guild_members_panel.isHidden()
 
 
-def test_guilds_inspector_populates_on_selection(gwindow, app):
-    import types
+def test_guilds_inspector_populates_on_selection(gwindow, app, monkeypatch):
     guild_id = '707E7DCC8C7B7D4C9A2E0B1A3F4D5E60'
 
     class _Ctx:
         def set_guild(self, v):
             pass
-    gwindow.app_bar = types.SimpleNamespace(context=_Ctx())
-    gwindow.get_guild_members = lambda gid: []
-    gwindow.guilds_panel.add_item(
-        ['Guild A', '707E7DCC…', 5, 12],
-        tooltips={1: guild_id})
+    gwindow.workspace_context = _Ctx()
+    monkeypatch.setattr(main_window_mod, 'get_guild_members', lambda gid: [])
+    gwindow.guilds_page.set_guilds((
+        guilds_page_mod.GuildRow(guild_id, 'Guild A', 5, 12, 2),
+    ))
     gwindow.guilds_panel.tree.setCurrentItem(
         gwindow.guilds_panel.tree.topLevelItem(0))
-    gwindow._on_guild_selected(['Guild A', '707E7DCC…', '5', '12'])
     inspector = gwindow._guilds_inspector
     assert inspector._title.text() == 'Guild A'
     assert inspector._rows[0][1].text() == '5'
     assert inspector._rows[1][1].text() == '12'
-    assert inspector._rows[2][1].value() == guild_id
+    assert inspector._rows[2][1].text() == '2'
+    assert inspector._rows[3][1].value() == guild_id
     assert not inspector._empty.isVisibleTo(inspector)
 
 
@@ -462,36 +487,129 @@ def test_guilds_inspector_clears_when_refreshed(gwindow, app):
 def test_members_empty_state_uses_row_level_wording(gwindow, app, monkeypatch):
     """ui-pages delta: no-selection copy describes the row interaction and
     never implies no global selection was made."""
-    empty = gwindow._members_empty_state
-    # construction default in _setup_guilds_tab
+    empty = gwindow._guilds_inspector._empty
     assert 'Click a guild row' in empty.text()
-    assert 'Select a guild to view its members' not in empty.text()
-    # refresh path agrees with the construction default (save "loaded")
-    monkeypatch.setattr(main_window_mod.constants, 'loaded_level_json',
-                        object(), raising=False)
-    get_guilds_original = main_window_mod.get_guilds
     monkeypatch.setattr(main_window_mod, 'get_guilds', lambda: [])
+    monkeypatch.setattr(main_window_mod, 'get_bases', lambda: [])
     gwindow._refresh_guilds()
     assert 'Click a guild row' in empty.text()
-    assert empty._hint_label is not None
-    assert 'clicked guild' in empty._hint_label.text()
+    assert gwindow.guild_members_panel.isHidden()
 
 
 def test_guilds_id_columns_copyable_and_mono(gwindow, app):
-    assert gwindow.guilds_panel._copyable_columns == {1}
-    assert gwindow.guilds_panel._mono_columns == {1}
-    assert gwindow.guild_members_panel._copyable_columns == {4}
-    assert gwindow.guild_members_panel._mono_columns == {4}
+    assert gwindow.guilds_panel._copyable_columns == {4}
+    assert gwindow.guilds_panel._mono_columns == {4, 5}
+    assert gwindow.guild_members_panel._copyable_columns == {5}
+    assert gwindow.guild_members_panel._mono_columns == {5}
 
 
-def test_guilds_table_capped_members_splitter_untouched(gwindow, app):
-    gwindow._refresh_guilds()  # no save -> 0 rows; cap applies a floor
-    maximum = gwindow.guilds_panel.maximumHeight()
-    assert 0 < maximum <= gwindow._guilds_table_cap + 300
-    # members pane keeps its splitter behavior (no cap applied)
-    assert gwindow.guild_members_panel.maximumHeight() == 16777215
-    splitter = gwindow.guilds_panel.parentWidget()
-    assert splitter is gwindow.guild_members_panel.parentWidget()
+def test_guild_members_browser_is_nested_in_inspector(gwindow, app):
+    assert gwindow.guild_members_panel.parentWidget() is gwindow._guilds_inspector
+    assert gwindow.guild_members_panel in gwindow._guilds_inspector._content_widgets
+
+
+def test_guilds_refresh_adds_base_counts(gwindow, app, monkeypatch):
+    monkeypatch.setattr(main_window_mod.constants, 'loaded_level_json', {'loaded': True})
+    monkeypatch.setattr(main_window_mod, 'get_guilds', lambda: [{
+        'id': 'GUILD-1', 'name': 'Guild A', 'level': 8, 'member_count': 2,
+    }])
+    monkeypatch.setattr(main_window_mod, 'get_bases', lambda: [
+        {'guild_id': 'GUILD-1'}, {'guild_id': 'GUILD-1'},
+    ])
+    gwindow._refresh_guilds()
+    record = gwindow.guilds_page._guilds['GUILD-1']
+    assert record.name == 'Guild A'
+    assert record.base_count == 2
+    assert gwindow.guilds_panel.tree.topLevelItem(0).text(0) == 'Guild A'
+
+
+def test_guild_and_member_selection_propagate_identifiers(
+        gwindow, app, monkeypatch):
+    updates = {}
+
+    class _Context:
+        def set_guild(self, selection):
+            updates['guild'] = selection
+
+        def set_player(self, selection):
+            updates['player'] = selection
+
+    gwindow.workspace_context = _Context()
+    monkeypatch.setattr(main_window_mod, 'get_guild_members', lambda gid: [{
+        'uid': 'PLAYER-1', 'name': 'Ada', 'role_label': 'Guild Master',
+        'level': 55, 'pals': 40, 'lastseen': '2h ago', 'is_leader': True,
+        'role': 1, 'last_sort': 7200,
+    }])
+    guild = guilds_page_mod.GuildRow('GUILD-1', 'Guild A', 8, 1, 2)
+    gwindow.guilds_page.set_guilds((guild,))
+    gwindow.guilds_panel.tree.topLevelItem(0).setSelected(True)
+    gwindow._on_guild_record_selected(guild)
+    assert updates['guild'].identifier == 'GUILD-1'
+    assert gwindow.guild_members_panel.tree.topLevelItemCount() == 1
+    gwindow.guild_members_panel.tree.setCurrentItem(
+        gwindow.guild_members_panel.tree.topLevelItem(0))
+    gwindow._on_guild_member_record_selected(
+        gwindow.guilds_page._members['PLAYER-1'])
+    assert updates['player'].identifier == 'PLAYER-1'
+
+
+def test_guild_role_mutation_uses_selected_guild_and_refreshes_members(
+        gwindow, app, monkeypatch):
+    calls = []
+    class _Context:
+        def set_guild(self, _selection):
+            pass
+
+    gwindow.workspace_context = _Context()
+    monkeypatch.setattr(main_window_mod, 'get_guild_members', lambda gid: [])
+    guild = guilds_page_mod.GuildRow('GUILD-1', 'Guild A', 8, 1, 0)
+    gwindow.guilds_page.set_guilds((guild,))
+    gwindow.guilds_panel.tree.setCurrentItem(
+        gwindow.guilds_panel.tree.topLevelItem(0))
+    monkeypatch.setattr(
+        guild_manager_mod, 'set_member_role',
+        lambda gid, uid, role: calls.append((gid, uid, role)))
+    gwindow.refresh_all = lambda: None
+    gwindow._show_info = lambda *args: None
+
+    gwindow._set_guild_member_role('GUILD-1', 'PLAYER-1', 2)
+    assert calls == [('GUILD-1', 'PLAYER-1', 2)]
+    assert gwindow.guild_members_panel.tree.topLevelItemCount() == 0
+
+
+def test_guild_related_links_navigate_with_precise_guild_filter(gwindow, app):
+    updates = []
+    routes = []
+    player_filters = []
+    base_filters = []
+
+    class _Context:
+        def set_guild(self, selection):
+            updates.append(selection)
+
+    class _Search:
+        def __init__(self, target):
+            self._target = target
+
+        def setText(self, value):
+            self._target.append(value)
+
+    gwindow.workspace_context = _Context()
+    gwindow._activate_nav = routes.append
+    gwindow.players_page = types.SimpleNamespace(
+        browser=types.SimpleNamespace(search_input=_Search(player_filters)))
+    gwindow.bases_page = types.SimpleNamespace(
+        browser=types.SimpleNamespace(search_input=_Search(base_filters)))
+    guild = guilds_page_mod.GuildRow('GUILD-1', 'Guild A', 8, 1, 2)
+
+    gwindow._open_guild_players(guild)
+    gwindow._open_guild_bases(guild)
+    assert routes == ['players', 'bases']
+    assert player_filters == ['GUILD-1']
+    assert base_filters == ['GUILD-1']
+    assert [selection.identifier for selection in updates] == [
+        'GUILD-1', 'GUILD-1',
+    ]
 
 
 # ------------------------------------------ Task 7: Exclusions add affordance
