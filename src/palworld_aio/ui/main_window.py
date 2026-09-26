@@ -792,6 +792,9 @@ class MainWindow(QMainWindow):
         self._add_exclusion(excl_type, value)
     def _setup_menus(self):
         menu_actions = {'file': [(t('menu.file.load_save') if t else 'Load Save', self._load_save), (t('menu.file.load_xgp_save') if t else 'Load GamePass Save', self._load_xgp_save), (t('menu.file.load_backup') if t else 'Load from Backup', self._load_backup_save), (t('menu.file.load_gps') if t else 'Load Global Pal Storage', self._load_gps), (t('menu.file.load_worldoption') if t else 'Load WorldOption', self._load_worldoption), (t('menu.file.save_changes') if t else 'Save Changes', self._save_changes), (t('menu.file.rename_world') if t else 'Rename World', self._rename_world), (t('aio.menu.open_data_folder') if t else 'Open Data Folder', self._open_data_folder)], 'functions': [(t('deletion.menu.submenu.delete') if t else 'Delete', [(t('deletion.menu.delete_empty_guilds') if t else 'Delete Empty Guilds', self._delete_empty_guilds), (t('deletion.menu.delete_inactive_bases') if t else 'Delete Inactive Bases', self._delete_inactive_bases), (t('deletion.menu.delete_duplicate_players') if t else 'Delete Duplicate Players', self._delete_duplicate_players), (t('deletion.menu.delete_inactive_players') if t else 'Delete Inactive Players', self._delete_inactive_players), (t('deletion.menu.delete_unreferenced') if t else 'Delete Unreferenced Data', self._delete_unreferenced), (t('deletion.menu.delete_non_base_map_objs') if t else 'Delete Non-Base Map Objects', self._delete_non_base_map_objs), (t('deletion.menu.delete_all_skins') if t else 'Delete All Skins', self._delete_all_skins), (t('deletion.menu.delete_invalid_items') if t else 'Delete Invalid Items', self._remove_invalid_items), (t('deletion.menu.delete_invalid_structures') if t else 'Delete Invalid Structures', self._remove_invalid_structures), (t('deletion.menu.delete_imported_pals') if t else 'Delete Imported Pals', self._delete_imported_pals), (t('deletion.menu.delete_invalid_pals') if t else 'Delete Invalid Pals', self._remove_invalid_pals), (t('deletion.menu.delete_invalid_passives') if t else 'Delete Invalid Passives', self._remove_invalid_passives)]), (t('deletion.menu.submenu.fix') if t else 'Fix', [(t('deletion.menu.fix_structures') if t else 'Fix All Structures', self._repair_structures), (t('deletion.menu.fix_items') if t else 'Fix All Items', self._repair_items), (t('deletion.menu.fix_all_pals') if t else 'Fix All Pals', self._fix_all_pals), (t('deletion.menu.fix_illegal_pals') if t else 'Fix Illegal Pals', self._fix_illegal_pals), (t('deletion.menu.fix_illegal_players') if t else 'Fix Illegal Players', self._fix_illegal_players), (t('deletion.menu.fix_invalid_active_skills') if t else 'Fix Invalid Active Skills', self._fix_invalid_active_skills), (t('deletion.menu.fix_timestamps') if t else 'Fix All Negative Timestamps', self._fix_all_timestamps), (t('deletion.menu.fix_overfilled_inventories') if t else 'Fix Container Sizes', self._trim_overfilled_inventories), (t('deletion.menu.fix_all_guilds') if t else 'Fix All Guilds', self._rebuild_all_guilds)]), (t('deletion.menu.submenu.reset') if t else 'Reset', [(t('deletion.menu.reset_missions') if t else 'Reset Missions', self._reset_missions), (t('deletion.menu.reset_anti_air') if t else 'Reset Anti-Air Turrets', self._reset_anti_air), (t('deletion.menu.reset_oilrig') if t else 'Reset Oil Rigs', self._reset_oilrig), (t('deletion.menu.reset_invader') if t else 'Reset Invaders', self._reset_invader), (t('deletion.menu.reset_supply') if t else 'Reset Supply', self._reset_supply), (t('deletion.menu.reset_dungeons') if t else 'Reset Dungeons', self._reset_dungeons), (t('deletion.menu.reset_lock_gimmick') if t else 'Reset Mini Game Towers', self._reset_lock_gimmick)]), (t('deletion.menu.submenu.misc') if t else 'Misc', [(t('deletion.menu.unlock_private_chests') if t else 'Unlock Private Chests', self._unlock_private_chests), (t('deletion.menu.max_all_pals') if t else 'Max All Pals', self._max_all_pals), (t('deletion.menu.paldefender') if t else 'PalDefender Commands', self._open_paldefender),         (t('base.export_all') if t else 'Export All Bases', self._export_all_bases), (t('modify_container_slots') if t else 'Modify Container Slots', self._modify_container_slots), (t('deletion.menu.modify_all_player_slots') if t else 'Modify All Player Slots', self._modify_all_player_slots), (t('deletion.menu.modify_all_guild_chest_slots') if t else 'Modify All Guild Chest Slots', self._modify_all_guild_chest_slots), (t('gamedays.menu') if t else 'Edit Game Days', self._edit_game_days)])], 'configs': [(t('loading.mode.submenu') if t else 'Loading Screen Configs', [(t('loading.mode.show') if t else 'Show Loading Screen', partial(self._set_loading_screen_mode, 'overlay')), (t('loading.mode.hide') if t else 'Hide Loading Screen', partial(self._set_loading_screen_mode, 'header'))]), (t('pal_name_settings.title') if t else 'Pal Name Settings', self._open_pal_name_settings)], 'maps': [(t('deletion.menu.show_map') if t else 'Show Map', self._show_map), (t('deletion.menu.generate_map') if t else 'Generate Map', self._generate_map)], 'exclusions': [(t('deletion.menu.save_exclusions') if t else 'Save Exclusions', self._save_exclusions)], 'languages': [(get_native_lang_name(code), partial(self._change_language, code), {'en_US': '🇺🇸', 'zh_CN': '🇨🇳', 'ru_RU': '🇷🇺', 'fr_FR': '🇫🇷', 'es_ES': '🇪🇸', 'de_DE': '🇩🇪', 'ja_JP': '🇯🇵', 'ko_KR': '🇰🇷', 'pt_BR': '🇧🇷', 'pt_PT': '🇵🇹'}[code]) for code in ['en_US', 'zh_CN', 'ru_RU', 'fr_FR', 'es_ES', 'de_DE', 'ja_JP', 'ko_KR', 'pt_BR', 'pt_PT']]}
+        menu_actions['file'].insert(6, (
+            t('menu.file.reload_from_disk', default='Reload from Disk'),
+            self._reload_from_disk))
         self._set_menu_actions(menu_actions)
     def _open_data_folder(self):
         from resource_resolver import get_user_config_dir
@@ -1456,11 +1459,10 @@ class MainWindow(QMainWindow):
                   default='Full-save restore is not available for a loaded Game Pass container.'))
             return
         if constants.dirty:
-            self._show_warning(
-                t('inventory.unsaved.title', default='Unsaved Changes'),
-                t('ui.backups.unsaved_changes',
-                  default='Save or discard pending changes before restoring a backup.'))
-            return
+            if not self._confirm_replace_pending_changes(
+                    t('ui.backups.confirm_title',
+                      default='Restore this backup?')):
+                return
         if not self._confirm_backup_restore(backup):
             return
 
@@ -2845,6 +2847,28 @@ class MainWindow(QMainWindow):
             save_manager.save_finished.disconnect(on_success)
             save_manager.save_failed.disconnect(on_failure)
         return bool(completed['success'])
+
+    def _confirm_replace_pending_changes(self, target: str) -> bool:
+        self._sync_dirty_from_runtime()
+        if not constants.dirty and not self.pending_journal.changes:
+            return True
+        summary = self.pending_journal.summary
+        msg = QMessageBox(self)
+        msg.setWindowTitle(t('error.unsaved_title', default='Unsaved Changes'))
+        msg.setText(t(
+            'ui.pending.replace_summary',
+            default='Continuing with {target} will replace {count} pending changes. Save the current save first?',
+            target=target, count=summary.count))
+        save_btn = msg.addButton(t('button.save', default='Save'), QMessageBox.AcceptRole)
+        discard_btn = msg.addButton(
+            t('button.dont_save', default="Don't Save"), QMessageBox.DestructiveRole)
+        cancel_btn = msg.addButton(t('button.cancel', default='Cancel'), QMessageBox.RejectRole)
+        msg.setIcon(QMessageBox.Warning)
+        msg.setDefaultButton(cancel_btn)
+        msg.exec()
+        if msg.clickedButton() == save_btn:
+            return self._save_before_close()
+        return msg.clickedButton() == discard_btn
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if hasattr(self, '_drop_overlay'):
@@ -2879,6 +2903,9 @@ class MainWindow(QMainWindow):
             if urls:
                 file_path = urls[0].toLocalFile()
                 if file_path.lower().endswith('.sav'):
+                    if not self._confirm_replace_pending_changes(file_path):
+                        event.ignore()
+                        return
                     save_manager.load_save(path=file_path, parent=self)
                     event.acceptProposedAction()
                     return
@@ -2989,7 +3016,12 @@ class MainWindow(QMainWindow):
         menu.add_action(self._create_action(t('deletion.ctx.remove_exclusion'), lambda v=val: self._remove_exclusion(excl_type, v)))
         menu.exec(panel.tree.viewport().mapToGlobal(pos))
     def _load_save(self):
-        save_manager.load_save(parent=self)
+        from common import get_preferred_save_path
+        level_path, _selected = QFileDialog.getOpenFileName(
+            self, 'Select Level.sav', get_preferred_save_path(),
+            'SAV Files(*.sav)')
+        if level_path and self._confirm_replace_pending_changes(level_path):
+            save_manager.load_save(path=level_path, parent=self)
     def _load_save_folder(self):
         from common import get_preferred_save_path
         folder = QFileDialog.getExistingDirectory(
@@ -3008,7 +3040,8 @@ class MainWindow(QMainWindow):
                     'Choose a save folder containing Level.sav and a Players folder.')),
             )
             return
-        save_manager.load_save(path=level_path, parent=self)
+        if self._confirm_replace_pending_changes(level_path):
+            save_manager.load_save(path=level_path, parent=self)
     def _load_recent_save(self, path):
         from pathlib import Path
         candidate = Path(path)
@@ -3016,7 +3049,29 @@ class MainWindow(QMainWindow):
         if not level_path.is_file() or not (level_path.parent / 'Players').is_dir():
             self._show_no_save_overview()
             return
-        save_manager.load_save(path=str(level_path), parent=self)
+        if self._confirm_replace_pending_changes(str(level_path)):
+            save_manager.load_save(path=str(level_path), parent=self)
+
+    def _reload_from_disk(self) -> None:
+        if not constants.current_save_path or not constants.loaded_level_json:
+            return
+        if not self._confirm_replace_pending_changes(t(
+                'menu.file.reload_from_disk', default='Reload from Disk')):
+            return
+        try:
+            save_manager.reload_current_save()
+            self._suppress_dirty_refresh = True
+            try:
+                self.refresh_all()
+            finally:
+                self._suppress_dirty_refresh = False
+            self._refresh_global_search_index()
+            constants.dirty = False
+            self._set_dirty(False)
+            self._populate_loaded_overview()
+        except Exception as error:
+            self._show_error(t('ui.backups.reload_failed_title',
+                               default='Reload failed'), str(error))
     def _locate_recent_save(self, save_id):
         from common import get_preferred_save_path
         level_path, _selected = QFileDialog.getOpenFileName(
@@ -3081,7 +3136,8 @@ class MainWindow(QMainWindow):
         if not pick:
             return
         cpath, save_id, _ = pick
-        save_manager.load_xgp_save(cpath, save_id, parent=self)
+        if self._confirm_replace_pending_changes(str(cpath)):
+            save_manager.load_xgp_save(cpath, save_id, parent=self)
     def _load_backup_save(self):
         from PyQt6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QHBoxLayout
         from resource_resolver import get_data_base
@@ -3137,7 +3193,8 @@ class MainWindow(QMainWindow):
         name = items[idx][0]
         backup_path = os.path.join(backup_dir, name)
         level_path = os.path.join(backup_path, 'Level.sav')
-        save_manager.load_save(level_path, parent=self)
+        if self._confirm_replace_pending_changes(level_path):
+            save_manager.load_save(level_path, parent=self)
     def _restart_program(self):
         import sys
         python = sys.executable

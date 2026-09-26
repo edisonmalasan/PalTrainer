@@ -110,14 +110,17 @@ def test_load_and_save_entry_points_delegate_to_save_manager(monkeypatch):
         save_changes=lambda *args, **kwargs: calls.append(('save', args, kwargs)),
     )
     monkeypatch.setattr(main_window_mod, 'save_manager', manager)
+    monkeypatch.setattr(main_window_mod, 'QFileDialog', SimpleNamespace(
+        getOpenFileName=lambda *_args: ('C:/fixture/Level.sav', '')))
     monkeypatch.setattr(constants, 'loaded_level_json', {'loaded': True})
     window = main_window_mod.MainWindow.__new__(main_window_mod.MainWindow)
+    window._confirm_replace_pending_changes = lambda target: True
 
     window._load_save()
     window._save_changes()
 
     assert calls == [
-        ('load', (), {'parent': window}),
+        ('load', (), {'path': 'C:/fixture/Level.sav', 'parent': window}),
         ('save', (), {'parent': window}),
     ]
 

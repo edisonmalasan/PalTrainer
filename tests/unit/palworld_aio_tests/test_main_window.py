@@ -273,6 +273,256 @@ assert errors == [('Save failed', 'preflight error')]
     assert result.returncode == 0, result.stderr
 
 
+def test_recent_save_replacement_requires_save_discard_or_cancel():
+    result = _run_isolated(r"""
+import os
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+from PyQt6.QtCore import QCoreApplication, QObject, pyqtSignal
+import palworld_aio.ui.main_window as module
+from palworld_aio import constants
+from palworld_aio.ui.main_window import MainWindow
+from palworld_aio.ui.pending_changes import PendingChangeJournal
+from palworld_aio.ui.workspace_context import SaveIdentity, WorkspaceContext
+
+app = QCoreApplication.instance() or QCoreApplication([])
+context = WorkspaceContext()
+context.finish_load(SaveIdentity('old', 'Old world', 'C:/old/Level.sav'))
+journal = PendingChangeJournal()
+journal.changed.connect(context.set_pending_changes)
+journal.record('Edited inventory')
+constants.dirty = True
+
+class Manager(QObject):
+    save_finished = pyqtSignal(float)
+    save_failed = pyqtSignal(str)
+    outcome = 'cancel'
+    def __init__(self):
+        super().__init__()
+        self.loads = []
+    def save_changes(self, parent=None):
+        if self.outcome == 'cancel':
+            return False
+        if self.outcome == 'failure':
+            self.save_failed.emit('disk error')
+        else:
+            self.save_finished.emit(0.1)
+        return True
+    def load_save(self, path=None, parent=None):
+        self.loads.append(path)
+
+manager = Manager()
+module.save_manager = manager
+class Message:
+    choice = 'cancel'
+    def __init__(self, parent):
+        self.buttons = {}
+    def setWindowTitle(self, value):
+        pass
+    def setText(self, value):
+        assert '1 pending changes' in value
+        assert 'Level.sav' in value
+    def addButton(self, label, role):
+        button = object()
+        self.buttons[{0: 'save', 1: 'discard', 2: 'cancel'}[role]] = button
+        return button
+    def setIcon(self, value):
+        pass
+    def setDefaultButton(self, value):
+        pass
+    def exec(self):
+        pass
+    def clickedButton(self):
+        return self.buttons[Message.choice]
+Message.AcceptRole = 0
+Message.DestructiveRole = 1
+Message.RejectRole = 2
+Message.Warning = 3
+module.QMessageBox = Message
+
+window = SimpleNamespace(
+    workspace_context=context, pending_journal=journal,
+    _sync_dirty_from_runtime=lambda: None,
+    _save_before_close=lambda: MainWindow._save_before_close(window),
+    _confirm_replace_pending_changes=lambda target:
+        MainWindow._confirm_replace_pending_changes(window, target),
+)
+with TemporaryDirectory() as temp:
+    folder = Path(temp)
+    (folder / 'Players').mkdir()
+    (folder / 'Level.sav').touch()
+    for choice, outcome, should_load in [
+        ('cancel', 'cancel', False),
+        ('save', 'cancel', False),
+        ('save', 'failure', False),
+        ('discard', 'cancel', True),
+        ('save', 'success', True),
+    ]:
+        Message.choice = choice
+        manager.outcome = outcome
+        before = len(manager.loads)
+        MainWindow._load_recent_save(window, str(folder))
+        assert len(manager.loads) == before + int(should_load)
+        assert len(journal.changes) == 1
+    assert all(path == str(folder / 'Level.sav') for path in manager.loads)
+constants.dirty = False
+""")
+    assert result.returncode == 0, result.stderr
+
+
+def test_file_folder_and_drop_loads_respect_pending_guard():
+    result = _run_isolated(r"""
+import os
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+import palworld_aio.ui.main_window as module
+from palworld_aio.ui.main_window import MainWindow
+
+loads = []
+module.save_manager = SimpleNamespace(
+    load_save=lambda path=None, parent=None: loads.append(path))
+class Picker:
+    chosen = ''
+    @staticmethod
+    def getOpenFileName(*args):
+        return Picker.chosen, ''
+    @staticmethod
+    def getExistingDirectory(*args):
+        return str(Path(Picker.chosen).parent)
+module.QFileDialog = Picker
+decision = {'allow': False}
+window = SimpleNamespace(
+    _confirm_replace_pending_changes=lambda target: decision['allow'],
+    _show_warning=lambda *args: None,
+    _drop_overlay=SimpleNamespace(setVisible=lambda value: None),
+)
+
+class Event:
+    def __init__(self, path):
+        self.path = path
+        self.accepted = False
+        self.ignored = False
+    def mimeData(self):
+        return SimpleNamespace(
+            hasUrls=lambda: True,
+            urls=lambda: [SimpleNamespace(toLocalFile=lambda: self.path)])
+    def acceptProposedAction(self):
+        self.accepted = True
+    def ignore(self):
+        self.ignored = True
+
+with TemporaryDirectory() as temp:
+    folder = Path(temp)
+    (folder / 'Players').mkdir()
+    level = folder / 'Level.sav'
+    level.touch()
+    Picker.chosen = str(level)
+    MainWindow._load_save(window)
+    MainWindow._load_save_folder(window)
+    event = Event(str(level))
+    MainWindow.dropEvent(window, event)
+    assert event.ignored and not event.accepted
+    assert loads == []
+
+    decision['allow'] = True
+    MainWindow._load_save(window)
+    MainWindow._load_save_folder(window)
+    event = Event(str(level))
+    MainWindow.dropEvent(window, event)
+    assert event.accepted
+    assert loads == [str(level)] * 3
+""")
+    assert result.returncode == 0, result.stderr
+
+
+def test_reload_from_disk_keeps_pending_changes_on_cancel_or_failure():
+    result = _run_isolated(r"""
+from types import SimpleNamespace
+import palworld_aio.ui.main_window as module
+from palworld_aio import constants
+from palworld_aio.ui.main_window import MainWindow
+from palworld_aio.ui.pending_changes import PendingChangeJournal
+
+old_path = constants.current_save_path
+old_doc = constants.loaded_level_json
+constants.current_save_path = 'C:/old'
+constants.loaded_level_json = {'loaded': True}
+constants.dirty = True
+journal = PendingChangeJournal()
+journal.record('Changed inventory')
+state = {'allow': False, 'fail': False, 'reloads': 0, 'refreshes': 0}
+errors = []
+def reload():
+    state['reloads'] += 1
+    if state['fail']:
+        raise RuntimeError('parse error')
+module.save_manager = SimpleNamespace(reload_current_save=reload)
+window = SimpleNamespace(
+    _confirm_replace_pending_changes=lambda target: state['allow'],
+    refresh_all=lambda: state.__setitem__('refreshes', state['refreshes'] + 1),
+    _refresh_global_search_index=lambda: None,
+    _set_dirty=lambda dirty: journal.clear() if not dirty else None,
+    _populate_loaded_overview=lambda: None,
+    _show_error=lambda title, detail: errors.append((title, detail)),
+)
+try:
+    MainWindow._reload_from_disk(window)
+    assert state['reloads'] == 0 and journal.summary.count == 1
+    state['allow'] = True
+    state['fail'] = True
+    MainWindow._reload_from_disk(window)
+    assert state['reloads'] == 1 and journal.summary.count == 1
+    assert constants.dirty
+    assert errors == [('Reload failed', 'parse error')]
+    state['fail'] = False
+    MainWindow._reload_from_disk(window)
+    assert state['reloads'] == 2 and state['refreshes'] == 1
+    assert journal.summary.count == 0 and not constants.dirty
+finally:
+    constants.current_save_path = old_path
+    constants.loaded_level_json = old_doc
+    constants.dirty = False
+""")
+    assert result.returncode == 0, result.stderr
+
+
+def test_backup_restore_never_starts_after_pending_guard_cancel():
+    result = _run_isolated(r"""
+from types import SimpleNamespace
+from palworld_aio import constants
+from palworld_aio.ui.main_window import MainWindow
+
+old_path = constants.current_save_path
+old_doc = constants.loaded_level_json
+old_xgp = constants.xgp_loaded
+old_dirty = constants.dirty
+constants.current_save_path = 'C:/old'
+constants.loaded_level_json = {'loaded': True}
+constants.xgp_loaded = False
+constants.dirty = True
+decisions = []
+window = SimpleNamespace(
+    _confirm_replace_pending_changes=lambda target:
+        decisions.append(target) or False,
+    _confirm_backup_restore=lambda backup:
+        (_ for _ in ()).throw(AssertionError('restore must not start')),
+)
+try:
+    MainWindow._restore_backup_record(window, SimpleNamespace())
+    assert decisions == ['Restore this backup?']
+finally:
+    constants.current_save_path = old_path
+    constants.loaded_level_json = old_doc
+    constants.xgp_loaded = old_xgp
+    constants.dirty = old_dirty
+""")
+    assert result.returncode == 0, result.stderr
+
+
 def test_leaf_ui_import_does_not_create_editor_import_cycle():
     result = _run_isolated("""
 from palworld_aio.editor.pal_editor.widgets import SkillSlotFrame

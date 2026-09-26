@@ -151,6 +151,33 @@ def test_save_start_result_and_failure_signal_keep_close_guard_decidable(
         constants.xgp_loaded = old_xgp
 
 
+def test_external_change_cancellation_does_not_write_loaded_save(
+    monkeypatch, tmp_path,
+):
+    manager = save_manager_module.SaveManager()
+    old_path = constants.current_save_path
+    old_document = constants.loaded_level_json
+    old_xgp = constants.xgp_loaded
+    writes = []
+    monkeypatch.setattr(save_manager_module, 'is_loading_active', lambda: False)
+    monkeypatch.setattr(manager, 'is_save_stale', lambda: True)
+    monkeypatch.setattr(save_manager_module, 'show_question',
+                        lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(save_manager_module.save_session, 'save',
+                        lambda: writes.append('written'))
+    try:
+        constants.current_save_path = str(tmp_path)
+        constants.loaded_level_json = {'loaded': True}
+        constants.xgp_loaded = False
+        assert manager.save_changes() is False
+        assert writes == []
+        assert constants.loaded_level_json == {'loaded': True}
+    finally:
+        constants.current_save_path = old_path
+        constants.loaded_level_json = old_document
+        constants.xgp_loaded = old_xgp
+
+
 def test_player_manager_info_preserves_legacy_display_contract():
     old_document = constants.loaded_level_json
     old_player_levels = constants.player_levels
