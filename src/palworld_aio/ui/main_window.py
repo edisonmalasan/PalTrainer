@@ -874,6 +874,7 @@ class MainWindow(QMainWindow):
         save_manager.load_finished.connect(self._on_load_finished)
         save_manager.save_started.connect(self.shell_state.begin_save)
         save_manager.save_started.connect(self._on_shell_saving)
+        save_manager.backup_created.connect(self._on_pre_save_backup_created)
         save_manager.save_finished.connect(self._on_save_finished)
         save_manager.save_failed.connect(self._on_save_failed)
         self._dirty_sync_timer = QTimer(self)
@@ -1496,7 +1497,27 @@ class MainWindow(QMainWindow):
                 ActivityKind, ActivityStatus,
             )
             if isinstance(result, Exception):
-                detail = str(result)
+                from palworld_aio.application.backup_catalog import BackupRestoreError
+                if isinstance(result, BackupRestoreError):
+                    original_changed = result.original_changed
+                    safety_path = result.safety_backup_path
+                else:
+                    original_changed = (False if isinstance(
+                        result, (ValueError, FileNotFoundError)) else None)
+                    safety_path = None
+                if safety_path is not None:
+                    self._on_pre_save_backup_created(str(safety_path))
+                if original_changed is False:
+                    impact = t('ui.save.failure_unchanged',
+                               default='The original save was not changed by this attempt.')
+                else:
+                    impact = t('ui.save.failure_unknown',
+                               default='The original save may have changed; verify it before retrying.')
+                recovery = (t('ui.save.failure_backup', path=str(safety_path),
+                              default='Recovery backup: {path}')
+                            if safety_path else t('ui.save.failure_no_backup',
+                                                  default='No new recovery backup was created.'))
+                detail = f'{impact}\n{recovery}\n{result}'
                 page.set_result(False, t(
                     'ui.backups.restore_failed',
                     default='Restore failed. {detail}', detail=detail))
@@ -1506,6 +1527,7 @@ class MainWindow(QMainWindow):
                       default='Backup restore failed'),
                     status=ActivityStatus.FAILED, detail=detail)
                 return
+            self._on_pre_save_backup_created(str(result.safety_backup_path))
             try:
                 save_manager.reload_current_save()
                 self._suppress_dirty_refresh = True
@@ -1522,6 +1544,9 @@ class MainWindow(QMainWindow):
                     'ui.backups.reload_failed',
                     default='The files were restored, but the save could not be reloaded: {detail}',
                     detail=str(error))
+                detail += '\n' + t(
+                    'ui.save.failure_backup', path=str(result.safety_backup_path),
+                    default='Recovery backup: {path}')
                 page.set_result(False, detail)
                 self._record_activity(
                     ActivityKind.FAILURE,
@@ -1780,11 +1805,14 @@ class MainWindow(QMainWindow):
                 )
             backup = None
             if success:
+                load_backup_created = bool(
+                    not constants.xgp_loaded and
+                    save_manager.last_load_backup_created)
                 backup = BackupState(
-                    count=0 if constants.xgp_loaded else 1,
-                    latest_label=(None if constants.xgp_loaded else t(
+                    count=int(load_backup_created),
+                    latest_label=(None if not load_backup_created else t(
                         'ui.overview.backup.created', default='Automatic backup created')),
-                    recommended=bool(constants.xgp_loaded),
+                    recommended=not load_backup_created,
                 )
             workspace_context.finish_load(identity, success=success, backup=backup)
             if success:
@@ -1883,19 +1911,58 @@ class MainWindow(QMainWindow):
         msg_box.setText(t('Changes saved successfully.'))
         msg_box.addButton(t('button.ok'), QMessageBox.AcceptRole)
         msg_box.exec()
+    def _on_pre_save_backup_created(self, path: str) -> None:
+        from palworld_aio.ui.operation_journal import ActivityKind
+        from palworld_aio.ui.workspace_context import BackupState
+        context = self.__dict__.get('workspace_context')
+        if context is not None:
+            previous = context.snapshot.backup
+            context.set_backup_state(BackupState(
+                count=previous.count + 1,
+                latest_id=path,
+                latest_label=t('ui.save.backup_created',
+                               default='Recovery backup created'),
+                recommended=False,
+            ))
+        self._record_activity(
+            ActivityKind.BACKUP,
+            t('ui.activity.backup_created', default='Backup created'),
+            detail=path,
+        )
+        if 'backups_page' in self.__dict__:
+            self._refresh_backups()
     def _on_save_failed(self, _detail):
         self.shell_state.finish_save(False)
         workspace_context = self.__dict__.get('workspace_context')
         if workspace_context is not None:
             workspace_context.finish_save(False)
         from palworld_aio.ui.operation_journal import ActivityKind, ActivityStatus
+        report = save_manager.last_save_failure
+        if report is None or report.original_changed is None:
+            impact = t('ui.save.failure_unknown',
+                       default='The original save may have changed; verify it before retrying.')
+        elif report.original_changed:
+            impact = t('ui.save.failure_changed',
+                       default='The original save changed before this failure.')
+        else:
+            impact = t('ui.save.failure_unchanged',
+                       default='The original save was not changed by this attempt.')
+        recovery = (t('ui.save.failure_backup', path=report.backup_path,
+                      default='Recovery backup: {path}')
+                    if report is not None and report.backup_path else
+                    t('ui.save.failure_no_backup',
+                      default='No new recovery backup was created.'))
+        message = f'{impact}\n{recovery}\n' + t(
+            'ui.save.failure_retry',
+            default='Keep the loaded changes, check the save and recovery paths, then retry or restore from the recovery copy.')
         self._record_activity(
             ActivityKind.FAILURE,
             t('ui.activity.save_failed', default='Save failed'),
             status=ActivityStatus.FAILED,
-            detail=t('ui.activity.save_failed_detail',
-                     default='Changes remain in memory. Check Diagnostics before retrying.'),
+            detail=message,
         )
+        self._show_error(t('ui.activity.save_failed', default='Save failed'),
+                         message)
     _TAB_REFRESH = {
         0: None,
         1: '_refresh_base_inventory',
@@ -2276,7 +2343,8 @@ class MainWindow(QMainWindow):
                     self._show_info(t('player_item.no_action') if t else 'No Action Taken', t('player_item.could_not_add') if t else 'Could not add items to any players.')
             if hasattr(self, 'refresh_all'):
                 self.refresh_all()
-        run_with_loading(on_finished, task)
+        run_with_loading(on_finished,
+                         lambda: MainWindow._with_operation_backup(task))
     def _on_bulk_add_all_effigies(self, player_uids):
         def task():
             from palworld_aio.managers.player_manager import max_all_abilities
@@ -2290,7 +2358,8 @@ class MainWindow(QMainWindow):
             self._show_info(t('inventory.max_all_abilities_done', default='Abilities maxed.'), t('inventory.max_all_abilities_done', default='Abilities maxed to maximum rank.'))
             if hasattr(self, 'refresh_all'):
                 self.refresh_all()
-        run_with_loading(on_finished, task)
+        run_with_loading(on_finished,
+                         lambda: MainWindow._with_operation_backup(task))
     def _on_bulk_edit_abilities(self, player_uids, ability_values):
         def task():
             from palworld_aio.managers.player_manager import set_ability_values
@@ -2304,7 +2373,8 @@ class MainWindow(QMainWindow):
             self._show_info(t('inventory.edit_abilities_done', default='Abilities updated.'), t('inventory.edit_abilities_done', default='Ability values applied.'))
             if hasattr(self, 'refresh_all'):
                 self.refresh_all()
-        run_with_loading(on_finished, task)
+        run_with_loading(on_finished,
+                         lambda: MainWindow._with_operation_backup(task))
     def _on_bulk_add_all_key_items(self, player_uids):
         from palworld_aio.inventory.inventory_manager import ItemData, PlayerInventory, FOOD_POUCH_ITEMS, ACCESSORY_UNLOCK_ITEMS, WEAPON_UNLOCK_ITEMS, ASSET_TO_RELIC_TYPE
         from resource_resolver import resource_path
@@ -2409,7 +2479,8 @@ class MainWindow(QMainWindow):
                 self._show_info(t('player_item.add_complete') if t else 'Bulk Add Complete', f'Added {total_missing} key items to {players_affected} player(s).')
             if hasattr(self, 'refresh_all'):
                 self.refresh_all()
-        run_with_loading(on_finished, task)
+        run_with_loading(on_finished,
+                         lambda: MainWindow._with_operation_backup(task))
     def _on_bulk_unlock_all_map(self, player_uids):
         def task():
             import json, os
@@ -2454,7 +2525,8 @@ class MainWindow(QMainWindow):
             return players_affected
         def on_finished(players_affected):
             self._show_info(t('player_item.add_complete') if t else 'Unlock Complete', t('inventory.unlock_all_map_bulk_success.msg', count=players_affected, default=f'Unlocked fast travel for {players_affected} player(s).'))
-        run_with_loading(on_finished, task)
+        run_with_loading(on_finished,
+                         lambda: MainWindow._with_operation_backup(task))
     def _on_bulk_modify_slots(self, player_uids, new_count):
         def task():
             from palworld_aio.inventory.inventory_manager import PlayerInventory
@@ -2543,7 +2615,8 @@ class MainWindow(QMainWindow):
                     self._show_info(t('player_pal.no_action') if t else 'No Action Taken', t('player_pal.no_pals_had_skill') if t else 'No pals had the selected skills.')
             if changed_world and hasattr(self, 'refresh_all'):
                 self.refresh_all()
-        run_with_loading(on_finished, task)
+        run_with_loading(on_finished,
+                         lambda: MainWindow._with_operation_backup(task))
     def _on_player_selected(self, data):
         if data:
             workspace_context = self.__dict__.get('workspace_context')
@@ -2899,7 +2972,8 @@ class MainWindow(QMainWindow):
         save_manager.save_finished.connect(on_success)
         save_manager.save_failed.connect(on_failure)
         try:
-            started = save_manager.save_changes(parent=self)
+            started = save_manager.save_changes(
+                parent=self, backup_mode=MainWindow._backup_mode_for_save(self))
             if started and not completed['done']:
                 loop.exec()
         except Exception as error:
@@ -3262,6 +3336,16 @@ class MainWindow(QMainWindow):
         import sys
         python = sys.executable
         os.execl(python, python, *sys.argv)
+    def _backup_mode_for_save(self) -> str:
+        context = self.__dict__.get('workspace_context')
+        journal = self.__dict__.get('pending_journal')
+        high_risk = bool(constants.files_to_delete or (
+            journal is not None and journal.summary.has_high_risk))
+        backup = context.snapshot.backup if context is not None else None
+        return ('automatic' if high_risk else
+                'offer' if backup is None or backup.recommended
+                or backup.count == 0 else 'none')
+
     def _save_changes(self):
         if not constants.loaded_level_json:
             self._show_warning(t('error.title'), t('guild.rebuild.no_save'))
@@ -3275,7 +3359,8 @@ class MainWindow(QMainWindow):
                 t('ui.save.read_only_message',
                   default='This save is read only. Choose a writable copy before saving.'))
             return
-        save_manager.save_changes(parent=self)
+        return save_manager.save_changes(
+            parent=self, backup_mode=MainWindow._backup_mode_for_save(self))
     def _rename_world(self):
         from ..utils import sav_to_gvasfile, gvasfile_to_sav
         if not constants.current_save_path:
@@ -3588,7 +3673,8 @@ class MainWindow(QMainWindow):
         ):
             return
         def task():
-            return delete_all_skins(self)
+            return MainWindow._with_operation_backup(
+                lambda: delete_all_skins(self))
         def on_finished(removed):
             if removed and level_fields:
                 self.record_pending_change('Remove world skin fields',
@@ -3621,6 +3707,17 @@ class MainWindow(QMainWindow):
                 self.refresh_all()
             self._show_info(t('Done'), t('deletion.chests_unlocked', count=unlocked))
         run_with_loading(on_finished, task)
+    @staticmethod
+    def _with_operation_backup(operation):
+        backup_path = save_manager.create_operation_backup()
+        try:
+            return operation()
+        except Exception as error:
+            raise RuntimeError(t(
+                'ui.save.immediate_failure', path=backup_path,
+                default='The original save may have changed. Recovery backup: {path}'
+            )) from error
+
     def _run_loaded_save_repair(
         self,
         *,
@@ -3633,6 +3730,7 @@ class MainWindow(QMainWindow):
         confirm_text='',
         affected_count=None,
         pending_count=None,
+        immediate_write=False,
     ):
         """Review and run a loaded-save repair with a durable recovery result."""
         if not constants.loaded_level_json:
@@ -3645,6 +3743,11 @@ class MainWindow(QMainWindow):
             affected = t('ui.safety.repair_records', scope=affected,
                          count=affected_count,
                          default='{scope} ({count} records)')
+        if immediate_write:
+            unguarded_operation = operation
+
+            def operation():
+                return MainWindow._with_operation_backup(unguarded_operation)
         dialog = RepairWorkflowDialog(
             loaded_save_repair_spec(
                 title,
@@ -3652,6 +3755,9 @@ class MainWindow(QMainWindow):
                 review,
                 risk=risk,
                 confirm_text=confirm_text,
+                backup=(t('ui.save.immediate_backup',
+                          default='A full recovery backup is created before any files are changed.')
+                        if immediate_write else ''),
             ),
             operation,
             result_message,
@@ -3747,6 +3853,7 @@ class MainWindow(QMainWindow):
                 files=result['fixed_files'], world=result['level_removed'],
                 default='{files} player files fixed; {world} Level items removed.'),
             pending_count=lambda result: result['level_removed'],
+            immediate_write=True,
         )
     def _remove_invalid_structures(self):
         return self._run_loaded_save_repair(
@@ -3813,6 +3920,7 @@ class MainWindow(QMainWindow):
                 'palclean.summary', removed=result['level_removed'] + result['dps_removed']),
             pending_count=lambda result: result['level_removed'],
             confirm_text=t('repair.workflow.remove', default='Remove invalid data'),
+            immediate_write=True,
         )
     def _delete_imported_pals(self):
         if not constants.loaded_level_json:
@@ -3832,7 +3940,8 @@ class MainWindow(QMainWindow):
         if not reply:
             return
         def task():
-            return delete_imported_pals(self)
+            return MainWindow._with_operation_backup(
+                lambda: delete_imported_pals(self))
         def on_finished(removed):
             if removed > 0:
                 constants.invalidate_container_lookup()
@@ -3864,6 +3973,7 @@ class MainWindow(QMainWindow):
                 'deletion.invalid_passives_removed',
                 count=sum(result.values())),
             pending_count=lambda result: result['level_removed'],
+            immediate_write=True,
         )
     def _fix_all_pals(self):
         world_count, dps_count = count_pals_for_fix_all()
@@ -3880,6 +3990,7 @@ class MainWindow(QMainWindow):
                 'func_manager.fix_all_pals.success',
                 count=result['level_fixed'] + result['dps_fixed']),
             pending_count=lambda result: result['level_fixed'],
+            immediate_write=True,
         )
     def _max_all_pals(self):
         if not constants.loaded_level_json:
@@ -3902,7 +4013,8 @@ class MainWindow(QMainWindow):
             PalFrame._cheat_mode = False
             return
         def task():
-            return max_all_pals(self)
+            return MainWindow._with_operation_backup(
+                lambda: max_all_pals(self))
         def on_finished(count):
             PalFrame._cheat_mode = False
             self._show_info(t('func_manager.max_all_pals.title') if t else 'Max All Pals', t('func_manager.max_all_pals.success', count=count) if t else f'Maxed {count} pals.')
@@ -3929,9 +4041,10 @@ class MainWindow(QMainWindow):
             dlg = FixIllegalPalDialog(scan_data, self)
             def start_fix(selected_uids):
                 def fix_task():
-                    return fix_illegal_pals_in_save(
-                        self, selected_uids=selected_uids,
-                        result_details=True)
+                    return MainWindow._with_operation_backup(
+                        lambda: fix_illegal_pals_in_save(
+                            self, selected_uids=selected_uids,
+                            result_details=True))
                 def on_fix_done(result):
                     fixed = result['level_fixed'] + result['dps_fixed']
                     if result['level_fixed']:
@@ -3997,6 +4110,7 @@ class MainWindow(QMainWindow):
             operation=lambda: fix_missions(self),
             result_message=lambda result: t('missions.summary', **result),
             pending_count=lambda _result: 0,
+            immediate_write=True,
         )
     def _reset_anti_air(self):
         return self._run_loaded_save_repair(
@@ -4427,7 +4541,13 @@ class MainWindow(QMainWindow):
               default='Update 1 player file to unlock its viewing cage? The file is written immediately and this has no pending Undo.'),
         ):
             return
-        if unlock_viewing_cage_for_player(uid, self):
+        try:
+            unlocked = MainWindow._with_operation_backup(
+                lambda: unlock_viewing_cage_for_player(uid, self))
+        except Exception as error:
+            self._show_error(t('error.title', default='Error'), str(error))
+            return
+        if unlocked:
             self._show_info(t('Done'), t('player.viewing_cage.unlocked'))
         else:
             self._show_warning(t('Error'), t('player.viewing_cage.failed'))
@@ -4519,8 +4639,8 @@ class MainWindow(QMainWindow):
             backup=t(
                 'repair.workflow.loaded_backup',
                 default=(
-                    'Recovery: a full backup was created when this save was loaded. '
-                    'Imports remain in memory until Save Changes.')),
+                    'Imports remain in memory until Save Changes. A recovery '
+                    'backup is created before saving high-risk changes.')),
             risk=t(
                 'transfer.base.import_risk',
                 default='Imported bases add structures, containers, and ownership links to the loaded save.'),
@@ -4845,8 +4965,8 @@ class MainWindow(QMainWindow):
             backup=t(
                 'repair.workflow.loaded_backup',
                 default=(
-                    'Recovery: a full backup was created when this save was loaded. '
-                    'The clone remains in memory until Save Changes.')),
+                    'The clone remains in memory until Save Changes. A recovery '
+                    'backup is created before saving high-risk changes.')),
             risk=t(
                 'transfer.base.clone_risk',
                 default='Cloning adds a complete base and remapped identifiers to the loaded save.'),

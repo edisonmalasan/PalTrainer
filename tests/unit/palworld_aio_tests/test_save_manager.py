@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from tests.dynamic_importer import import_from
+from pathlib import Path
 import common
+import pytest
 
 constants = import_from('palworld_aio.constants')
 save_manager_module = import_from('palworld_aio.managers.save_manager')
@@ -107,9 +109,11 @@ def test_load_backup_preference_controls_the_existing_safety_snapshot(
         constants.automatic_backup_on_load = False
         manager.load_save(str(level_path))
         assert backups == []
+        assert manager.last_load_backup_created is False
         constants.automatic_backup_on_load = True
         manager.load_save(str(level_path))
         assert backups == ['AllinOneTools']
+        assert manager.last_load_backup_created is True
     finally:
         constants.automatic_backup_on_load = previous
 
@@ -176,6 +180,149 @@ def test_external_change_cancellation_does_not_write_loaded_save(
         constants.current_save_path = old_path
         constants.loaded_level_json = old_document
         constants.xgp_loaded = old_xgp
+
+
+def test_automatic_backup_precedes_save_write(monkeypatch, tmp_path):
+    catalog = import_from('palworld_aio.application.backup_catalog')
+    manager = save_manager_module.SaveManager()
+    current = tmp_path / 'current'
+    (current / 'Players').mkdir(parents=True)
+    level = current / 'Level.sav'
+    level.write_bytes(b'original')
+    (current / 'Players' / 'player.sav').write_bytes(b'player')
+    previous = (constants.current_save_path, constants.loaded_level_json,
+                constants.xgp_loaded)
+    created = []
+    manager.backup_created.connect(created.append)
+    monkeypatch.setattr(catalog, 'default_backups_root',
+                        lambda: tmp_path / 'backups')
+    monkeypatch.setattr(save_manager_module, 'is_loading_active', lambda: False)
+    monkeypatch.setattr(manager, 'is_save_stale', lambda: False)
+    monkeypatch.setattr(save_manager_module, 'run_with_loading',
+                        lambda callback, task, **_kwargs: callback(task()))
+    monkeypatch.setattr(save_manager_module.save_session, 'save',
+                        lambda: level.write_bytes(b'updated'))
+    try:
+        constants.current_save_path = str(current)
+        constants.loaded_level_json = {'loaded': True}
+        constants.xgp_loaded = False
+        assert manager.save_changes(backup_mode='automatic')
+        assert level.read_bytes() == b'updated'
+        assert len(created) == 1
+        snapshot = Path(created[0])
+        assert (snapshot / 'Level.sav').read_bytes() == b'original'
+        assert (snapshot / 'Players' / 'player.sav').read_bytes() == b'player'
+        assert manager.last_save_failure is None
+    finally:
+        (constants.current_save_path, constants.loaded_level_json,
+         constants.xgp_loaded) = previous
+
+
+def test_failed_automatic_backup_aborts_before_write(monkeypatch, tmp_path):
+    manager = save_manager_module.SaveManager()
+    previous = (constants.current_save_path, constants.loaded_level_json,
+                constants.xgp_loaded)
+    writes = []
+    failures = []
+    manager.save_failed.connect(failures.append)
+    monkeypatch.setattr(save_manager_module, 'is_loading_active', lambda: False)
+    monkeypatch.setattr(manager, 'is_save_stale', lambda: False)
+    monkeypatch.setattr(manager, '_create_pre_save_backup',
+                        lambda: (_ for _ in ()).throw(OSError('no space')))
+    monkeypatch.setattr(save_manager_module.save_session, 'save',
+                        lambda: writes.append('written'))
+
+    def run_task(_callback, task, **_kwargs):
+        try:
+            task()
+        except Exception:
+            pass
+
+    monkeypatch.setattr(save_manager_module, 'run_with_loading', run_task)
+    try:
+        constants.current_save_path = str(tmp_path)
+        constants.loaded_level_json = {'loaded': True}
+        constants.xgp_loaded = False
+        assert manager.save_changes(backup_mode='automatic')
+        assert writes == []
+        assert len(failures) == 1 and 'no space' in failures[0]
+        assert manager.last_save_failure.original_changed is False
+        assert manager.last_save_failure.backup_path is None
+    finally:
+        (constants.current_save_path, constants.loaded_level_json,
+         constants.xgp_loaded) = previous
+
+
+def test_game_pass_pre_save_backup_copies_original_container(
+        monkeypatch, tmp_path):
+    catalog = import_from('palworld_aio.application.backup_catalog')
+    manager = save_manager_module.SaveManager()
+    container = tmp_path / 'world.container'
+    container.write_bytes(b'original-container')
+    previous = (constants.xgp_loaded, constants.xgp_container_path)
+    monkeypatch.setattr(catalog, 'default_backups_root',
+                        lambda: tmp_path / 'backups')
+    try:
+        constants.xgp_loaded = True
+        constants.xgp_container_path = str(container)
+        backup = Path(manager._create_pre_save_backup())
+        assert backup.read_bytes() == b'original-container'
+        assert backup != container
+    finally:
+        constants.xgp_loaded, constants.xgp_container_path = previous
+
+
+def test_game_pass_failed_backup_removes_partial_copy(monkeypatch, tmp_path):
+    catalog = import_from('palworld_aio.application.backup_catalog')
+    manager = save_manager_module.SaveManager()
+    container = tmp_path / 'container.sav'
+    container.write_bytes(b'original-container')
+    previous = (constants.xgp_loaded, constants.xgp_container_path)
+    monkeypatch.setattr(catalog, 'default_backups_root',
+                        lambda: tmp_path / 'backups')
+
+    def partial_copy(_source, destination):
+        Path(destination).write_bytes(b'partial')
+        raise OSError('copy failed')
+
+    monkeypatch.setattr('palworld_aio.managers.save_manager.shutil.copy2',
+                        partial_copy)
+    try:
+        constants.xgp_loaded = True
+        constants.xgp_container_path = str(container)
+        with pytest.raises(OSError, match='copy failed'):
+            manager._create_pre_save_backup()
+        assert container.read_bytes() == b'original-container'
+        assert not list((tmp_path / 'backups').rglob('GamePassContainer_backup_*'))
+    finally:
+        constants.xgp_loaded, constants.xgp_container_path = previous
+
+
+def test_declined_offered_backup_still_saves(monkeypatch, tmp_path):
+    manager = save_manager_module.SaveManager()
+    previous = (constants.current_save_path, constants.loaded_level_json,
+                constants.xgp_loaded)
+    writes = []
+    monkeypatch.setattr(save_manager_module, 'is_loading_active', lambda: False)
+    monkeypatch.setattr(manager, 'is_save_stale', lambda: False)
+    monkeypatch.setattr(save_manager_module, 'show_question',
+                        lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(manager, '_create_pre_save_backup',
+                        lambda: (_ for _ in ()).throw(AssertionError('backup created')))
+    monkeypatch.setattr(save_manager_module.save_session, 'save',
+                        lambda: writes.append('saved'))
+    monkeypatch.setattr(save_manager_module, 'run_with_loading',
+                        lambda callback, task, **_kwargs: callback(task()))
+    try:
+        constants.current_save_path = str(tmp_path)
+        constants.loaded_level_json = {'loaded': True}
+        constants.xgp_loaded = False
+        assert manager.save_changes(backup_mode='offer')
+        assert writes == ['saved']
+        assert manager.last_backup_path is None
+    finally:
+        (constants.current_save_path, constants.loaded_level_json,
+         constants.xgp_loaded) = previous
 
 
 def test_player_manager_info_preserves_legacy_display_contract():

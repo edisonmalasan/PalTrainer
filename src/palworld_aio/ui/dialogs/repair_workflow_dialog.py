@@ -139,6 +139,7 @@ def loaded_save_repair_spec(
     *,
     risk: str = '',
     confirm_text: str = '',
+    backup: str = '',
 ) -> RepairWorkflowSpec:
     """Build the standard recovery contract for in-memory save repairs."""
 
@@ -148,11 +149,11 @@ def loaded_save_repair_spec(
         review=review,
         risk=risk,
         confirm_text=confirm_text,
-        backup=t(
+        backup=backup or t(
             'repair.workflow.loaded_backup',
             default=(
-                'Recovery: a full backup was created when this save was loaded. '
-                'This repair stays in memory until you choose Save Changes.'),
+                'Level changes stay in memory until Save Changes. A recovery '
+                'backup is created before saving high-risk changes.'),
         ),
     )
 

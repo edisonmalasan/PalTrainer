@@ -35,9 +35,13 @@ class RestoreResult:
 class BackupRestoreError(RuntimeError):
     """Restore failure that preserves the path to the safety snapshot."""
 
-    def __init__(self, message: str, safety_backup_path: Path) -> None:
+    def __init__(
+        self, message: str, safety_backup_path: Path | None,
+        *, original_changed: bool | None,
+    ) -> None:
         super().__init__(message)
         self.safety_backup_path = safety_backup_path
+        self.original_changed = original_changed
 
 
 def default_backups_root() -> Path:
@@ -138,7 +142,11 @@ def create_backup_snapshot(
     destination_root.mkdir(parents=True, exist_ok=True)
     timestamp = (now or datetime.now()).strftime('%Y%m%d_%H%M%S_%f')
     destination = destination_root / f'{_BACKUP_PREFIX}{timestamp}'
-    _copy_snapshot(source, destination)
+    try:
+        _copy_snapshot(source, destination)
+    except Exception:
+        shutil.rmtree(destination, ignore_errors=True)
+        raise
     return destination
 
 
@@ -185,14 +193,34 @@ def restore_backup(
         raise ValueError('backup and current save must be different folders')
     report = progress or (lambda _message: None)
     report('Creating safety backup')
-    safety = create_backup_snapshot(target, safety_root)
+    try:
+        safety = create_backup_snapshot(target, safety_root)
+    except Exception as error:
+        raise BackupRestoreError(
+            f'The current save could not be backed up: {error}', None,
+            original_changed=False,
+        ) from error
     report('Preparing restore')
-    stage = _stage_snapshot(source, target.parent)
+    try:
+        stage = _stage_snapshot(source, target.parent)
+    except Exception as error:
+        raise BackupRestoreError(
+            f'The restore could not be prepared: {error}', safety,
+            original_changed=False,
+        ) from error
     try:
         report('Restoring files')
         _install_staged_snapshot(stage, target)
     except Exception as restore_error:
-        rollback_stage = _stage_snapshot(safety, target.parent)
+        try:
+            rollback_stage = _stage_snapshot(safety, target.parent)
+        except Exception as rollback_error:
+            raise BackupRestoreError(
+                'The restore failed and rollback could not be prepared. '
+                f'Your safety backup is available at {safety}. '
+                f'Rollback error: {rollback_error}',
+                safety, original_changed=None,
+            ) from restore_error
         try:
             _install_staged_snapshot(rollback_stage, target)
         except Exception as rollback_error:
@@ -201,6 +229,7 @@ def restore_backup(
                 f'Your safety backup is available at {safety}. '
                 f'Rollback error: {rollback_error}',
                 safety,
+                original_changed=None,
             ) from restore_error
         finally:
             shutil.rmtree(rollback_stage, ignore_errors=True)
@@ -208,6 +237,7 @@ def restore_backup(
             'The backup could not be restored. The original save was '
             f'recovered from the safety backup at {safety}.',
             safety,
+            original_changed=False,
         ) from restore_error
     finally:
         shutil.rmtree(stage, ignore_errors=True)
