@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 import pytest
 from tests.dynamic_importer import import_from
 
@@ -91,6 +92,28 @@ def test_focus_and_motion_contracts():
         tokens.motion_duration('unknown')
 
 
+def test_readable_dark_text_and_focus_contrast():
+    palette = tokens.resolve('dark')
+
+    def luminance(color: str) -> float:
+        channels = [int(color[index:index + 2], 16) / 255
+                    for index in (1, 3, 5)]
+        linear = [channel / 12.92 if channel <= 0.04045
+                  else ((channel + 0.055) / 1.055) ** 2.4
+                  for channel in channels]
+        return sum(channel * weight for channel, weight in zip(
+            linear, (0.2126, 0.7152, 0.0722)))
+
+    def ratio(foreground: str, background: str) -> float:
+        first, second = sorted((luminance(foreground), luminance(background)))
+        return (second + 0.05) / (first + 0.05)
+
+    for surface in ('canvas', 'surface', 'surface_raised', 'surface_input'):
+        for role in ('text', 'text_secondary'):
+            assert ratio(palette[role], palette[surface]) >= 4.5, (surface, role)
+        assert ratio(palette['focus_ring'], palette[surface]) >= 3.0, surface
+
+
 def test_generated_theme_rejects_retired_shell_colors():
     qss = qss_builder.build_qss('dark').lower()
     for legacy in tokens.RETIRED_COLORS:
@@ -107,6 +130,26 @@ def test_build_qss_contains_core_selectors():
     for selector in ('QPushButton', 'QLineEdit', 'QTreeWidget', 'QMenu',
                      'QToolTip', 'QScrollBar', 'QTabBar', 'QHeaderView::section'):
         assert selector in qss, f'missing {selector}'
+
+
+def test_pal_trait_controls_keep_distinct_selected_states():
+    qss = qss_builder.build_qss('dark')
+    palette = tokens.resolve('dark')
+    for role in ('danger', 'warning', 'special', 'info'):
+        selector = f'QPushButton[class="palTrait"][traitRole="{role}"]:checked'
+        assert selector in qss
+        rule = qss.split(selector, 1)[1].split('}', 1)[0]
+        assert palette[f'{role}_bg'] in rule
+        assert palette[role] in rule
+    assert 'QPushButton[class="palTrait"]:focus' in qss
+    assert 'QPushButton[class="palMini"]:disabled' in qss
+
+
+def test_deployed_theme_matches_builder_without_legacy_extras():
+    themes = Path(__file__).resolve().parents[3] / 'resources' / 'ui' / 'themes'
+    deployed = (themes / 'darkmode.qss').read_text(encoding='utf-8-sig')
+    assert deployed.endswith(qss_builder.build_qss('dark'))
+    assert not (themes / 'legacy-dark.qss').exists()
 
 
 def test_build_qss_no_unknown_theme():

@@ -116,14 +116,14 @@ def test_save_chip_shell_state_mapping(app):
 # Status strip streaming
 # ---------------------------------------------------------------------------
 
-def test_status_bar_stream_routes_to_status_strip(app):
+def test_status_stream_keeps_raw_output_off_feedback(app):
     from PyQt6.QtWidgets import QStatusBar
     StatusBarStream = main_window_mod.StatusBarStream
     bar = QStatusBar()
     stream = StatusBarStream(bar)
     stream.write('waiting for input')
     stream._drain_pending()
-    assert bar.currentMessage() == 'waiting for input'
+    assert bar.currentMessage() in ('Ready', 'status.ready')
 
 
 def test_status_bar_stream_detaches_and_reattaches(app):
@@ -156,4 +156,4 @@ def test_status_bar_stream_detaches_and_reattaches(app):
     assert not stream.detached and seen[-1] is False
     stream.write('back in strip')
     stream._drain_pending()
-    assert bar.currentMessage() == 'back in strip'
+    assert bar.currentMessage() in ('Ready', 'status.ready')

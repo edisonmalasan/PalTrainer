@@ -80,3 +80,4 @@ def test_failed_result_is_not_emitted_as_completed(app, monkeypatch):
     assert not dialog.succeeded
     assert completed == []
     assert dialog.workflow_review.result_label.property('resultState') == 'error'
+    assert dialog.workflow_review.progress.property('resultState') == 'error'

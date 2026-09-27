@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 import pytest
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QPushButton
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
@@ -42,6 +42,19 @@ def test_state_primary_action_emits(app):
     seen = []
     view.actionTriggered.connect(lambda: seen.append(True))
     view.action_button.click()
+    assert seen == [True]
+
+
+def test_legacy_empty_state_adapter_uses_shared_action_style(app):
+    view = import_from('palworld_aio.widgets.empty_state').EmptyState(
+        'No items', 'Add one to begin', action_text='Add Item')
+    button = view.findChild(QPushButton)
+    assert button is not None
+    assert button.property('controlRole') == 'primary'
+    assert button.styleSheet() == ''
+    seen = []
+    view.action_clicked.connect(lambda: seen.append(True))
+    button.click()
     assert seen == [True]
 
 

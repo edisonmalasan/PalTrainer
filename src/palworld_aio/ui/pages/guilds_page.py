@@ -277,6 +277,7 @@ class GuildsPage(QWidget):
         selected = self.selected_guild()
         if selected is not None:
             self.inspector.show_details(*self._detail_for_guild(selected))
+            self._update_compact_summary()
 
     def _record_for_values(self, values: list[str]) -> GuildRow | None:
         return self._guilds.get(str(values[5])) if len(values) > 5 else None
@@ -295,11 +296,20 @@ class GuildsPage(QWidget):
         })
 
     def _on_guild_values(self, values: list[str]) -> None:
+        self._update_compact_summary()
         guild = self._record_for_values(values)
         if guild is not None:
             self.clear_members()
             self._set_selection_actions(True)
             self.guildSelected.emit(guild)
+
+    def _update_compact_summary(self) -> None:
+        # The first three values are already in the guild table. In the
+        # drawer, keep the full copyable ID and make room for member rows.
+        for label, value in self.inspector._rows[:3]:
+            visible = not self._compact and bool(value.text())
+            label.setVisible(visible)
+            value.setVisible(visible)
 
     def _set_selection_actions(self, enabled: bool) -> None:
         self.players_button.setEnabled(enabled)
@@ -320,8 +330,8 @@ class GuildsPage(QWidget):
         if compact != self._compact:
             self._compact = compact
             self.entity_browser.set_compact(compact)
-            if compact:
-                self.entity_browser.inspector_host.setMaximumHeight(390)
+            if self.selected_guild() is not None:
+                self._update_compact_summary()
             if compact and self.selected_guild() is not None:
                 self.entity_browser.open_inspector()
         super().resizeEvent(a0)

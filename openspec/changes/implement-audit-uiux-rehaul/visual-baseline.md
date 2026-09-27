@@ -59,3 +59,132 @@ copy, reachable footers, distinct failure/success color plus text labels, no
 blank or overlapping regions, and readable System pages at the minimum window.
 All data and paths shown in the images are synthetic, and generated PNGs remain
 outside the repository.
+
+## Phase 9 semantic-state and motion review
+
+On 2026-09-27, the ten Phase 8 synthetic states were rendered again at their
+declared sizes and inspected. The transfer failure capture exposed dim review
+field labels and an amber completed progress bar that implied success while its
+text said "Operation failed." The shared review now uses readable secondary
+text for field names, a red completed failure bar, and an explicit failure
+label; the repaired capture was inspected at 740×540. The success result keeps
+its distinct teal state and explicit text. No real save was read or operation
+executed by the renderer.
+
+The dark palette's primary and secondary text meet a 4.5:1 contrast target
+against canvas, surface, raised, and input backgrounds; focus rings meet 3:1
+on those surfaces. Disabled text is intentionally exempt from the active-text
+target. The smallest type token is 11 px, and workflow labels now use the
+readable secondary role. Reduced-motion preference now removes console/tool
+dialog fades, animated map travel, pulsing map markers, and decorative map
+effects while retaining the final zoom, selection glow, operation result, and
+calibration marker. Token, workflow, and reduced-motion tests cover these
+contracts.
+
+## Phase 9 responsive and interaction measurements
+
+The offscreen workspace contract was exercised at 1450×800, 1200×750, and
+1024×700 on Windows. At 1024 pixels the sidebar collapses to icons and the
+inspector uses a drawer; at 1200 pixels the sidebar remains expanded while the
+inspector is a drawer; at 1450 pixels both use their wide layout. The
+responsive collapse does not overwrite the user's persisted sidebar choice.
+Screenshots of the 1024×700 Settings and Tool Center states were inspected
+after the change, with visible headings, actions, scrollbars, and no footer
+overlap. The existing map bounds and splitter-persistence tests remain part of
+the focused verification set.
+
+A user-provided 1450×800 About capture exposed a separate responsive failure:
+the seven optional global header actions were squeezed into the 1210 px page
+header and their labels clipped. The header now measures the expanded title,
+save state, pending state, and action widths before deciding whether to show
+the actions or their overflow menu. The 1450×800 shell render with the full
+global action set was inspected after the fix: Save Changes, save context,
+pending state, and More actions fit on one row, while all seven optional
+commands remain in the overflow menu. A width-specific regression test covers
+that real action count.
+
+The final world-render pass also caught a one-frame breadcrumb remnant and a
+temporarily narrow brand label after responsive layout changes. Retired chips
+now hide immediately when routes replace them, and the world capture waits
+for Qt to activate the resized layout. The re-rendered 1450×800 Player
+Inventory and Base Inventory and 1024×700 Map images show the full brand,
+clean breadcrumbs, populated editor controls, and map explorer without a
+blank or hybrid shell.
+
+The user performed the required foreground keyboard smoke pass on 2026-09-27
+and reported that all steps passed: visible Tab focus through About, Ctrl+K
+route selection, Escape focus restoration, Shift+F10 on a selected Map explorer
+row after loading the dummy save, and readable Save/More actions at about
+1024×700. The desktop control bridge exposed no native app target, so this
+manual observation is explicitly user-reported; the route, dialog, context
+menu, and size contracts are independently covered by automated tests.
+
+An offscreen synthetic benchmark on 2026-09-27 used 72 route navigations,
+30 inspector openings, 30 searches over 250 rows, 30 empty inventory tab
+switches, and 30 empty Palbox page changes. Median / p95 times on this host:
+
+| Interaction | Median | p95 | Audit target |
+|---|---:|---:|---|
+| Sidebar route navigation | 5.72 ms | 7.99 ms | Effectively instant |
+| Inspector open/close | 0.18 ms | 0.29 ms | Under 100 ms |
+| Search over 250 synthetic rows | 3.00 ms | 4.08 ms | Under 100 ms |
+| Empty inventory tab switch | 0.21 ms | 0.81 ms | Under 150 ms where possible |
+| Empty Palbox page change | 14.55 ms | 18.75 ms | Smooth |
+
+The user's disposable save was copied into a unique temporary folder before
+the populated measurements; the original dummy remained read-only. Its one
+player and 218 Palbox entries loaded successfully. A first inventory load took
+556 ms, initial Pal editor population took 137 ms, and 15 populated Palbox
+page changes measured 13.99 ms median / 107.12 ms p95. Twenty-four inventory
+tab switches measured 5.99 ms median / 34.86 ms p95 after lazy loading, with
+one 4.1 s first-use outlier. A separate first/warm pass located that cost in
+Technology: 3156.63 ms first use, 42.96 ms warm; Missions took 400.94 ms
+first use and 26.26 ms warm. The first-use Technology exception is the
+creation and styling of the complete technology widget grid on the GUI thread;
+Qt widgets must be built there, and the existing page builds it once on demand.
+The warm interaction budget is met. Virtualizing this one-time editor grid is
+a separate behavior and architecture change, so the measured first-use delay
+is retained as an explicit exception to the 150 ms target.
+
+The same temporary copy completed a `SaveManager` automatic-backup save in
+914 ms with the normal worker wrapper replaced by a synchronous test adapter
+to measure total work. The default application path uses its loading worker
+and progress surface. The saved file parsed afterward, a recovery snapshot
+was present in the temporary folder, and its SHA-256 remained unchanged. This
+profiles one representative larger operation without modifying the original
+dummy save.
+
+## Phase 10 manual release smoke
+
+On 2026-09-27 the user reported that every remaining foreground smoke step
+passed using the isolated disposable save copy in the system temporary folder:
+no-save onboarding, open/drop, navigation and Back, selected player/base/Pal
+links, one edit through Review and Save, Backups restore, tool progress or
+failure presentation, and the 1024×700 layout. The user separately confirmed
+opening at least one page in each Workspace, World, Editors, Tools, Reference,
+and System sidebar group. The earlier keyboard-only
+pass also passed. This is user-reported manual evidence because the desktop
+control bridge returned no native app target even while the user showed the
+running PalTrainer window; automated route, workflow, and size tests provide
+independent coverage. The original dummy save was not used for destructive
+testing by the agent.
+
+An agent-run offscreen render of the selected Pal from that copy was inspected
+at 1450×800 and 1024×700 after the final control-style migration. The Palbox
+count was initially clipped at the minimum width. It now selects a compact
+representation that fits the measured label width while retaining the full
+localized count in the tooltip; a focused layout test covers the minimum
+width. Trait controls, Pal cards, selected state, inspector sections, and
+destructive toolbar tier remained visible in both renders.
+
+The final offscreen matrix covered 5 shell baseline states, 10 Phase 8
+states, and 18 World states at 1450×800 and 1024×700 where applicable.
+It used synthetic data and was inspected against the audit's readable,
+single-shell, and no-clipped-action principles. The pass caught two World
+layout defects: unactivated loading/error state widgets covered the entity
+search row, and the compact Guilds inspector left no visible guild row.
+Both were corrected and rerendered. The compact Guilds drawer now shows the
+full guild ID and member rows; its three repeated metrics remain visible in
+the guild table. The final renders showed no blank, overlapping, or clipped
+primary controls. Focused lifecycle and 1024×700 row-visibility tests cover
+both corrections.

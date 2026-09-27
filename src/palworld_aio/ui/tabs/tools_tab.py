@@ -358,11 +358,9 @@ class ToolsTab(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-        root.addWidget(create_page_ribbon(t('tools_tab') if t else 'Start', (t('sidebar.section.inspect') if t else 'Load & Inspect').upper(), self))
         canvas = QWidget()
         canvas.setObjectName('startCanvas')
         body = QVBoxLayout(canvas)
@@ -785,7 +783,7 @@ class ToolsTab(QWidget):
             dialog.installEventFilter(dialog._restore_filter)
         dialog.show()
         self.fade_animation = QPropertyAnimation(dialog, b'windowOpacity')
-        self.fade_animation.setDuration(400)
+        self.fade_animation.setDuration(0 if constants.reduced_motion else 400)
         self.fade_animation.setStartValue(0.0)
         self.fade_animation.setEndValue(1.0)
         self.fade_animation.setEasingCurve(QEasingCurve.OutCubic)

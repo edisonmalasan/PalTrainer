@@ -30,11 +30,6 @@ COLS = 6
 ROWS = 5
 PAGE_SIZE = COLS * ROWS
 
-def _hex_to_rgb(hex_color):
-    h = hex_color.lstrip('#')
-    return f'{int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)}'
-
-
 class GpsEditorDialog(FramelessDialog):
     def __init__(self, parent=None):
         super().__init__('gps_editor.title', parent)
@@ -78,40 +73,32 @@ class GpsEditorDialog(FramelessDialog):
 
         self.restore_all_btn = QPushButton(t('edit_pals.restore_all'))
         self.restore_all_btn.setFixedHeight(24)
-        self.restore_all_btn.setStyleSheet(
-            'QPushButton { background: rgba(45,212,191,0.12); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; }'
-            'QPushButton:hover { background: rgba(45,212,191,0.25); color: #FFFFFF; }'
-        )
+        self.restore_all_btn.setProperty('class', 'warning')
+        self.restore_all_btn.setProperty('controlRole', 'warning')
         self.restore_all_btn.setCursor(Qt.PointingHandCursor)
         self.restore_all_btn.clicked.connect(self._restore_all)
         header.addWidget(self.restore_all_btn)
 
         self.max_all_btn = QPushButton(t('edit_pals.max_all'))
         self.max_all_btn.setFixedHeight(24)
-        self.max_all_btn.setStyleSheet(
-            'QPushButton { background: rgba(192,132,252,0.12); color: #C084FC; border: 1px solid rgba(192,132,252,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; }'
-            'QPushButton:hover { background: rgba(192,132,252,0.25); border-color: rgba(192,132,252,0.5); color: #FFFFFF; }'
-        )
+        self.max_all_btn.setProperty('class', 'warning')
+        self.max_all_btn.setProperty('controlRole', 'warning')
         self.max_all_btn.setCursor(Qt.PointingHandCursor)
         self.max_all_btn.clicked.connect(self._max_all)
         header.addWidget(self.max_all_btn)
 
         self.max_buff_all_btn = QPushButton(t('edit_pals.max_buff_all'))
         self.max_buff_all_btn.setFixedHeight(24)
-        self.max_buff_all_btn.setStyleSheet(
-            'QPushButton { background: rgba(249,115,22,0.12); color: #FB923C; border: 1px solid rgba(249,115,22,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; }'
-            'QPushButton:hover { background: rgba(249,115,22,0.25); border-color: rgba(249,115,22,0.5); color: #FFFFFF; }'
-        )
+        self.max_buff_all_btn.setProperty('class', 'warning')
+        self.max_buff_all_btn.setProperty('controlRole', 'warning')
         self.max_buff_all_btn.setCursor(Qt.PointingHandCursor)
         self.max_buff_all_btn.clicked.connect(self._max_buff_all)
         header.addWidget(self.max_buff_all_btn)
 
         self.all_skills_all_btn = QPushButton(t('edit_pals.all_skills_all'))
         self.all_skills_all_btn.setFixedHeight(24)
-        self.all_skills_all_btn.setStyleSheet(
-            'QPushButton { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; }'
-            'QPushButton:hover { background: rgba(245,158,11,0.25); border-color: rgba(245,158,11,0.5); color: #FFFFFF; }'
-        )
+        self.all_skills_all_btn.setProperty('class', 'warning')
+        self.all_skills_all_btn.setProperty('controlRole', 'warning')
         self.all_skills_all_btn.setCursor(Qt.PointingHandCursor)
         self.all_skills_all_btn.setToolTip(t('edit_pals.all_skills_all_hint'))
         self.all_skills_all_btn.clicked.connect(self._all_skills_all)
@@ -119,10 +106,8 @@ class GpsEditorDialog(FramelessDialog):
 
         self.sort_btn = QPushButton(t('edit_pals.sort_btn'))
         self.sort_btn.setFixedHeight(24)
-        self.sort_btn.setStyleSheet(
-            'QPushButton { background: rgba(166,159,148,0.12); color: #A69F94; border: 1px solid rgba(166,159,148,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; }'
-            'QPushButton:hover { background: rgba(166,159,148,0.25); border-color: rgba(166,159,148,0.5); color: #FFFFFF; }'
-        )
+        self.sort_btn.setProperty('class', 'secondary')
+        self.sort_btn.setProperty('controlRole', 'secondary')
         self.sort_btn.setCursor(Qt.PointingHandCursor)
         self.sort_btn.setToolTip(t('edit_pals.sort_hint'))
         self.sort_btn.clicked.connect(self._on_sort_clicked)
@@ -130,10 +115,8 @@ class GpsEditorDialog(FramelessDialog):
 
         self.select_all_btn = QPushButton(t('pal_editor.select_all_btn'))
         self.select_all_btn.setFixedHeight(24)
-        self.select_all_btn.setStyleSheet(
-            'QPushButton { background: rgba(245,158,11,0.12); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; }'
-            'QPushButton:hover { background: rgba(245,158,11,0.25); border-color: rgba(245,158,11,0.5); color: #FFFFFF; }'
-        )
+        self.select_all_btn.setProperty('class', 'secondary')
+        self.select_all_btn.setProperty('controlRole', 'secondary')
         self.select_all_btn.setCursor(Qt.PointingHandCursor)
         self.select_all_btn.setToolTip(t('pal_editor.select_all_hint'))
         self.select_all_btn.clicked.connect(self._on_select_all)
@@ -141,44 +124,43 @@ class GpsEditorDialog(FramelessDialog):
 
         self.multi_toolbar = QFrame()
         self.multi_toolbar.setObjectName('multiToolbar')
-        self.multi_toolbar.setStyleSheet('QFrame#multiToolbar { background: transparent; border: none; }')
         self.multi_toolbar.setVisible(False)
         mt_layout = QHBoxLayout(self.multi_toolbar)
         mt_layout.setContentsMargins(0, 0, 0, 0)
         mt_layout.setSpacing(4)
         self.multi_count_label = QLabel()
         self.multi_count_label.setStyleSheet('font-size: 11px; font-weight: 700; color: #F59E0B; background: transparent; border: none; padding: 0 4px;')
-        def _mt_btn(obj_name, label_key, handler, color):
+        def _mt_btn(obj_name, label_key, handler):
             btn = QPushButton(t(label_key))
             btn.setObjectName(obj_name)
             btn.setFixedHeight(22)
             btn.setCursor(Qt.PointingHandCursor)
-            c = color
-            btn.setStyleSheet(f'QPushButton {{ background: rgba({_hex_to_rgb(c)},0.12); color: #{c}; border: 1px solid rgba({_hex_to_rgb(c)},0.25); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; }} QPushButton:hover {{ background: rgba({_hex_to_rgb(c)},0.25); color: #FFFFFF; }}')
+            role = 'destructive' if obj_name == 'multi_delete_btn' else 'secondary'
+            btn.setProperty('class', role)
+            btn.setProperty('controlRole', role)
             btn.clicked.connect(handler)
             mt_layout.addWidget(btn)
-        _mt_btn('multi_max_btn', 'pal_editor.bulk_max_btn', self._on_bulk_max_selected, 'C084FC')
-        _mt_btn('multi_buff_btn', 'pal_editor.bulk_max_buff_btn', self._on_bulk_max_buff_selected, 'F97316')
-        _mt_btn('multi_skills_btn', 'pal_editor.bulk_skills_btn', self._on_bulk_all_skills_selected, 'F59E0B')
-        _mt_btn('multi_heal_btn', 'pal_editor.bulk_heal_btn', self._on_bulk_heal_selected, '2DD4BF')
-        _mt_btn('multi_rename_btn', 'pal_editor.bulk_rename_btn', self._on_bulk_rename_selected, 'E8B44C')
-        _mt_btn('multi_delete_btn', 'pal_editor.bulk_delete_btn', self._on_bulk_delete_selected, 'F87171')
-        _mt_btn('multi_add_btn', 'edit_pals.add_new_pal', self._on_bulk_add_selected, 'F59E0B')
+        _mt_btn('multi_max_btn', 'pal_editor.bulk_max_btn', self._on_bulk_max_selected)
+        _mt_btn('multi_buff_btn', 'pal_editor.bulk_max_buff_btn', self._on_bulk_max_buff_selected)
+        _mt_btn('multi_skills_btn', 'pal_editor.bulk_skills_btn', self._on_bulk_all_skills_selected)
+        _mt_btn('multi_heal_btn', 'pal_editor.bulk_heal_btn', self._on_bulk_heal_selected)
+        _mt_btn('multi_rename_btn', 'pal_editor.bulk_rename_btn', self._on_bulk_rename_selected)
+        _mt_btn('multi_delete_btn', 'pal_editor.bulk_delete_btn', self._on_bulk_delete_selected)
+        _mt_btn('multi_add_btn', 'edit_pals.add_new_pal', self._on_bulk_add_selected)
         deselect_btn = QPushButton(t('pal_editor.bulk_deselect_btn'))
         deselect_btn.setObjectName('multi_deselect_btn')
         deselect_btn.setFixedHeight(22)
         deselect_btn.setCursor(Qt.PointingHandCursor)
-        deselect_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #9CA3AF; border: 1px solid rgba(236,231,224,0.10); border-radius: 4px; padding: 2px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(236,231,224,0.10); color: #FFFFFF; }')
+        deselect_btn.setProperty('class', 'secondary')
+        deselect_btn.setProperty('controlRole', 'secondary')
         deselect_btn.clicked.connect(self._clear_multi_selection)
         mt_layout.addWidget(deselect_btn)
         header.addWidget(self.multi_toolbar)
 
         self.save_btn = QPushButton(t('menu.file.save_gps') if t else 'Save GPS')
         self.save_btn.setFixedHeight(24)
-        self.save_btn.setStyleSheet(
-            'QPushButton { background: rgba(45,212,191,0.12); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.25); border-radius: 5px; padding: 4px 10px; font-weight: 600; font-size: 10px; }'
-            'QPushButton:hover { background: rgba(45,212,191,0.25); color: #FFFFFF; }'
-        )
+        self.save_btn.setProperty('class', 'primary')
+        self.save_btn.setProperty('controlRole', 'primary')
         self.save_btn.setCursor(Qt.PointingHandCursor)
         self.save_btn.clicked.connect(lambda: self._save(force=True))
         header.addWidget(self.save_btn)
@@ -761,11 +743,13 @@ class GpsEditorDialog(FramelessDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         cancel_btn = QPushButton(t('pal_editor.bulk_rename_cancel'))
-        cancel_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #9CA3AF; border: 1px solid rgba(236,231,224,0.10); border-radius: 4px; padding: 6px 16px; font-size: 12px; font-weight: 600; } QPushButton:hover { background: rgba(236,231,224,0.10); color: #FFFFFF; }')
+        cancel_btn.setProperty('class', 'secondary')
+        cancel_btn.setProperty('controlRole', 'secondary')
         cancel_btn.clicked.connect(dlg.reject)
         btn_row.addWidget(cancel_btn)
         apply_btn = QPushButton(t('pal_editor.bulk_rename_apply'))
-        apply_btn.setStyleSheet('QPushButton { background: rgba(232,180,76,0.15); color: #E8B44C; border: 1px solid rgba(232,180,76,0.3); border-radius: 4px; padding: 6px 20px; font-size: 12px; font-weight: 700; } QPushButton:hover { background: rgba(232,180,76,0.25); color: #FFFFFF; }')
+        apply_btn.setProperty('class', 'primary')
+        apply_btn.setProperty('controlRole', 'primary')
         btn_row.addWidget(apply_btn)
         il.addLayout(btn_row)
         dlg.content_layout.addWidget(inner)

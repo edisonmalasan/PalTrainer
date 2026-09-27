@@ -196,6 +196,7 @@ def test_bulk_workflow_review_tracks_context_risk_progress_and_result(app):
     assert review.progress.maximum() == 3
     assert review.progress.value() == 2
     assert review.result_label.property('resultState') == 'success'
+    assert review.progress.property('resultState') == 'success'
 
 
 def test_base_dialog_scaffold(app):

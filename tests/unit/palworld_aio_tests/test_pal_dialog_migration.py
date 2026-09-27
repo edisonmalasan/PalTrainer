@@ -178,3 +178,34 @@ def test_large_pal_dialogs_fit_the_supported_minimum_workspace():
     assert 'setMinimumSize(740, 750)' not in source
     assert 'setMinimumSize(1200, 800)' not in editor_source
     assert 'setMinimumSize(980, 640)' in editor_source
+    assert 'QPushButton {' not in editor_source
+
+
+def test_pal_dialog_action_buttons_use_shared_roles():
+    path = (PROJECT_ROOT / 'src' / 'palworld_aio' / 'editor'
+            / 'pal_editor' / 'create_dialogs.py')
+    source = path.read_text(encoding='utf-8-sig')
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'setStyleSheet'
+                and node.args):
+            style_source = ast.get_source_segment(source, node.args[0]) or ''
+            assert 'QPushButton' not in style_source
+    assert "'destructive' if mode == 'delete' else 'primary'" in source
+
+
+def test_gps_bulk_actions_use_shared_roles():
+    path = (PROJECT_ROOT / 'src' / 'palworld_aio' / 'editor'
+            / 'gps_editor.py')
+    source = path.read_text(encoding='utf-8-sig')
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'setStyleSheet'
+                and node.args):
+            style_source = ast.get_source_segment(source, node.args[0]) or ''
+            assert 'QPushButton' not in style_source
+    assert "'destructive' if obj_name == 'multi_delete_btn'" in source

@@ -139,6 +139,7 @@ class BreadcrumbBar(QFrame):
             item = self._layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                widget.hide()
                 widget.deleteLater()
         self._items = list(items)
         self._buttons.clear()
@@ -314,6 +315,7 @@ class WorkspaceHeader(QFrame):
             self.overflow_menu.addAction(overflow_action)
             self._optional_buttons[action_id] = button
             self._overflow_actions[action_id] = overflow_action
+        self._refresh_compact_for_width(self.width())
         self._apply_compact()
         return button
 
@@ -331,6 +333,37 @@ class WorkspaceHeader(QFrame):
             button.setVisible(not self._compact)
         self.overflow_button.setVisible(self._compact and bool(self._optional_buttons))
 
+    def _expanded_width_needed(self) -> int:
+        identity_width = max(
+            170,
+            self.title_label.sizeHint().width(),
+            self.description_label.sizeHint().width(),
+        )
+        buttons = [
+            self._actions.itemAt(index).widget()
+            for index in range(self._actions.count())
+        ]
+        action_width = sum(
+            button.sizeHint().width() for button in buttons if button is not None
+        )
+        action_width += max(0, len(buttons) - 1) * SPACING['xs']
+        save_text_width = max(
+            self.save_context.fontMetrics().horizontalAdvance(self.save_context._title),
+            self.save_context.fontMetrics().horizontalAdvance(self.save_context._detail),
+        ) + 60
+        return (
+            identity_width
+            + max(self.save_context.sizeHint().width(), save_text_width)
+            + self.pending_changes.sizeHint().width()
+            + action_width
+            + 3 * SPACING['md']
+        )
+
+    def _refresh_compact_for_width(self, width: int) -> None:
+        self.set_compact(
+            width <= self.COMPACT_WIDTH or width < self._expanded_width_needed()
+        )
+
     def resizeEvent(self, a0) -> None:
-        self.set_compact(a0.size().width() <= self.COMPACT_WIDTH)
+        self._refresh_compact_for_width(a0.size().width())
         super().resizeEvent(a0)

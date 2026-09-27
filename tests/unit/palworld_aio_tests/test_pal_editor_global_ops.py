@@ -237,3 +237,5 @@ def test_inventoried_inline_bulk_flows_expose_review_progress_and_results():
     assert source.count('BulkWorkflowReview(') == 3
     assert source.count('workflow_review.set_progress') >= 6
     assert source.count('workflow_review.set_result') == 3
+    assert 'QPushButton {' not in source
+    assert source.count("setProperty('controlRole', 'primary')") == 3

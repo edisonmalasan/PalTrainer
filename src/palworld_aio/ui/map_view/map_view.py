@@ -3,6 +3,7 @@ from PyQt6.QtCore import Qt, QPointF, QPoint, QSize, pyqtSignal, QTimer
 from PyQt6.QtGui import QPainter
 from i18n import t
 import palworld_coord
+from palworld_aio import constants
 from .map_markers import BaseMarker, PlayerMarker
 from .map_items import ExclusionZoneItem, PolygonExclusionZoneItem, ZonePreviewItem, PolygonPreviewItem
 class MapGraphicsView(QGraphicsView):
@@ -90,6 +91,17 @@ class MapGraphicsView(QGraphicsView):
     def animate_to_coords(self, x, y, zoom_level=None):
         if zoom_level is None:
             zoom_level = self.config['zoom']['double_click_target']
+        if constants.reduced_motion:
+            zoom_level = max(self.min_zoom, min(zoom_level, self.max_zoom))
+            self.zoom_timer.stop()
+            self.is_animating = False
+            self.resetTransform()
+            self.scale(self.base_scale * zoom_level, self.base_scale * zoom_level)
+            self.current_zoom = zoom_level
+            self.centerOn(self._clamp_center_to_bounds(QPointF(x, y)))
+            self.zoom_label.setText((t('zoom') if t else 'Zoom') + f': {int(zoom_level * 100)}%')
+            self.zoom_changed.emit(zoom_level)
+            return
         self.target_zoom = zoom_level
         self.target_center = QPointF(x, y)
         self.resetTransform()
@@ -308,6 +320,16 @@ class MapGraphicsView(QGraphicsView):
         if zoom_level is None:
             zoom_level = self.config['zoom']['double_click_target']
         zoom_level = max(self.min_zoom, min(zoom_level, self.max_zoom))
+        if constants.reduced_motion:
+            self.zoom_timer.stop()
+            self.is_animating = False
+            self.scale(zoom_level / self.current_zoom, zoom_level / self.current_zoom)
+            self.current_zoom = zoom_level
+            self.centerOn(self._clamp_center_to_bounds(
+                QPointF(marker.center_x, marker.center_y)))
+            self.zoom_label.setText((t('zoom') if t else 'Zoom') + f': {int(zoom_level * 100)}%')
+            self.zoom_changed.emit(zoom_level)
+            return
         view_center = self.mapToScene(self.viewport().rect().center())
         self.start_center = QPointF(view_center.x(), view_center.y())
         target_pos = QPointF(marker.center_x, marker.center_y)

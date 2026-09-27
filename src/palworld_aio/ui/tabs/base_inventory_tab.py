@@ -1187,6 +1187,17 @@ class ContainerListWidget(QTreeWidget):
         self.itemClicked.connect(self._on_item_clicked)
         self._display_name_counts = {}
         self._filter_text = ''
+    def keyPressEvent(self, event):
+        if (event.key() == Qt.Key.Key_Menu
+                or (event.key() == Qt.Key.Key_F10
+                    and event.modifiers() & Qt.KeyboardModifier.ShiftModifier)):
+            item = self.currentItem()
+            if item is not None:
+                self.customContextMenuRequested.emit(
+                    self.visualItemRect(item).center())
+            event.accept()
+            return
+        super().keyPressEvent(event)
     def clear(self):
         super().clear()
         self.setHeaderHidden(True)
@@ -1983,32 +1994,32 @@ class BasePalsContentWidget(QFrame):
         page_row.setSpacing(6)
         self.restore_all_btn = QPushButton(t('base_inventory.restore_all'))
         self.restore_all_btn.setFixedHeight(22)
-        self.restore_all_btn.setStyleSheet('QPushButton { background: rgba(45,212,191,0.12); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.25); border-radius: 4px; padding: 3px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(45,212,191,0.25); border-color: rgba(45,212,191,0.5); color: #FFFFFF; }')
+        self.restore_all_btn.setProperty('class', 'warning')
         self.restore_all_btn.setCursor(Qt.PointingHandCursor)
         self.restore_all_btn.clicked.connect(self._restore_all_pals)
         page_row.addWidget(self.restore_all_btn)
         self.max_all_btn = QPushButton(t('base_inventory.max_all'))
         self.max_all_btn.setFixedHeight(22)
-        self.max_all_btn.setStyleSheet('QPushButton { background: rgba(192,132,252,0.12); color: #C084FC; border: 1px solid rgba(192,132,252,0.25); border-radius: 4px; padding: 3px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(192,132,252,0.25); border-color: rgba(192,132,252,0.5); color: #FFFFFF; }')
+        self.max_all_btn.setProperty('class', 'warning')
         self.max_all_btn.setCursor(Qt.PointingHandCursor)
         self.max_all_btn.clicked.connect(self._max_all_pals)
         page_row.addWidget(self.max_all_btn)
         self.max_buff_all_btn = QPushButton(t('edit_pals.max_buff_all'))
         self.max_buff_all_btn.setFixedHeight(22)
-        self.max_buff_all_btn.setStyleSheet('QPushButton { background: rgba(249,115,22,0.12); color: #FB923C; border: 1px solid rgba(249,115,22,0.25); border-radius: 4px; padding: 3px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(249,115,22,0.25); border-color: rgba(249,115,22,0.5); color: #FFFFFF; }')
+        self.max_buff_all_btn.setProperty('class', 'warning')
         self.max_buff_all_btn.setCursor(Qt.PointingHandCursor)
         self.max_buff_all_btn.setToolTip(t('edit_pals.tooltip.max_buff'))
         self.max_buff_all_btn.clicked.connect(self._max_buff_all_pals)
         page_row.addWidget(self.max_buff_all_btn)
         self.bulk_clone_btn = QPushButton(t('edit_pals.bulk_clone') if t else 'Bulk Clone')
         self.bulk_clone_btn.setFixedHeight(22)
-        self.bulk_clone_btn.setStyleSheet('QPushButton { background: rgba(147,183,221,0.12); color: #93B7DD; border: 1px solid rgba(147,183,221,0.25); border-radius: 4px; padding: 3px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(147,183,221,0.25); border-color: rgba(147,183,221,0.5); color: #FFFFFF; }')
+        self.bulk_clone_btn.setProperty('class', 'secondary')
         self.bulk_clone_btn.setCursor(Qt.PointingHandCursor)
         self.bulk_clone_btn.clicked.connect(self._open_bulk_clone)
         page_row.addWidget(self.bulk_clone_btn)
         self.bulk_delete_btn = QPushButton(t('edit_pals.bulk_delete') if t else 'Bulk Delete')
         self.bulk_delete_btn.setFixedHeight(22)
-        self.bulk_delete_btn.setStyleSheet('QPushButton { background: rgba(248,113,113,0.12); color: #F87171; border: 1px solid rgba(248,113,113,0.25); border-radius: 4px; padding: 3px 8px; font-weight: 600; font-size: 10px; } QPushButton:hover { background: rgba(248,113,113,0.25); border-color: rgba(248,113,113,0.5); color: #FFFFFF; }')
+        self.bulk_delete_btn.setProperty('class', 'destructive')
         self.bulk_delete_btn.setCursor(Qt.PointingHandCursor)
         self.bulk_delete_btn.clicked.connect(self._open_bulk_delete)
         page_row.addWidget(self.bulk_delete_btn)
@@ -2016,7 +2027,7 @@ class BasePalsContentWidget(QFrame):
         self.prev_page_btn.setIcon(
             app_icons.get_qicon('chevron_left', role='accent'))
         self.prev_page_btn.setFixedSize(28, 24)
-        self.prev_page_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.08); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(245,158,11,0.18); color: #FFFFFF; } QPushButton:disabled { background: rgba(100,100,100,0.1); color: #666; border-color: rgba(255,255,255,0.05); }')
+        self.prev_page_btn.setProperty('class', 'icon')
         self.prev_page_btn.clicked.connect(self._prev_page)
         page_row.addWidget(self.prev_page_btn)
         self.page_label = QLabel('Page 1/1')
@@ -2026,7 +2037,7 @@ class BasePalsContentWidget(QFrame):
         self.next_page_btn.setIcon(
             app_icons.get_qicon('chevron_right', role='accent'))
         self.next_page_btn.setFixedSize(28, 24)
-        self.next_page_btn.setStyleSheet('QPushButton { background: rgba(245,158,11,0.08); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; font-weight: 600; font-size: 12px; } QPushButton:hover { background: rgba(245,158,11,0.18); color: #FFFFFF; } QPushButton:disabled { background: rgba(100,100,100,0.1); color: #666; border-color: rgba(255,255,255,0.05); }')
+        self.next_page_btn.setProperty('class', 'icon')
         self.next_page_btn.clicked.connect(self._next_page)
         page_row.addWidget(self.next_page_btn)
         page_row.addStretch()
@@ -2618,11 +2629,11 @@ class BasePalsContentWidget(QFrame):
             btn_row = QHBoxLayout()
             btn_row.addStretch()
             cancel_btn = QPushButton(t('edit_pals.bulk_sync_cancel'))
-            cancel_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #A69F94; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 6px 16px; font-size: 12px; font-weight: 600; } QPushButton:hover { background: rgba(255,255,255,0.1); color: #FFFFFF; }')
+            cancel_btn.setProperty('class', 'secondary')
             cancel_btn.clicked.connect(dlg.reject)
             btn_row.addWidget(cancel_btn)
             apply_btn = QPushButton(t('edit_pals.bulk_rename_apply'))
-            apply_btn.setStyleSheet('QPushButton { background: rgba(45,212,191,0.15); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.3); border-radius: 4px; padding: 6px 20px; font-size: 12px; font-weight: 700; } QPushButton:hover { background: rgba(45,212,191,0.25); color: #FFFFFF; }')
+            apply_btn.setProperty('class', 'primary')
             btn_row.addWidget(apply_btn)
             il.addLayout(btn_row)
             dlg.content_layout.addWidget(inner)
@@ -2715,11 +2726,11 @@ class BasePalsContentWidget(QFrame):
             btn_row = QHBoxLayout()
             btn_row.addStretch()
             cancel_btn = QPushButton(t('edit_pals.bulk_sync_cancel'))
-            cancel_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #A69F94; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 6px 16px; font-size: 12px; font-weight: 600; } QPushButton:hover { background: rgba(255,255,255,0.1); color: #FFFFFF; }')
+            cancel_btn.setProperty('class', 'secondary')
             cancel_btn.clicked.connect(dlg.reject)
             btn_row.addWidget(cancel_btn)
             apply_btn = QPushButton(t('edit_pals.bulk_sync_apply'))
-            apply_btn.setStyleSheet('QPushButton { background: rgba(45,212,191,0.15); color: #2DD4BF; border: 1px solid rgba(45,212,191,0.3); border-radius: 4px; padding: 6px 20px; font-size: 12px; font-weight: 700; } QPushButton:hover { background: rgba(45,212,191,0.25); color: #FFFFFF; }')
+            apply_btn.setProperty('class', 'primary')
             btn_row.addWidget(apply_btn)
             il.addLayout(btn_row)
             dlg.content_layout.addWidget(inner)
@@ -3186,15 +3197,10 @@ class BaseInventoryTab(QWidget):
         self._update_container_stats()
         self._update_container_navigation_summary()
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon, set_content_margins
+        from palworld_aio.ui.chrome.components import set_content_margins
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        # uiux-audit-remediation 8.1: the page edits containers, so its zone
-        # caption reads EDITING (matches its Edit-tier nav position), not
-        # WORLD DATA.
-        ribbon = create_page_ribbon(t('base_inventory.title', default='Base Inventory'), (t('sidebar.section.editing') if t else 'Editing').upper(), self)
-        layout.addWidget(ribbon)
         # top-nav-shell 4.4: guild/base selectors + view switch in a standard
         # toolbar row below the page header. uiux-audit-remediation 8.2
         # (design D10): the two control kinds get distinct treatments —
@@ -3862,7 +3868,7 @@ class BaseInventoryTab(QWidget):
     def _show_guild_popup(self):
         popup = QWidget()
         popup.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
-        popup.setStyleSheet('QWidget { background: rgba(27,25,23,0.98); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; }')
+        popup.setObjectName('pickerPopup')
         layout = QVBoxLayout(popup)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(2)
@@ -3871,7 +3877,7 @@ class BaseInventoryTab(QWidget):
         search.setStyleSheet(PICKER_SEARCH_STYLE)
         layout.addWidget(search)
         list_widget = QListWidget()
-        list_widget.setStyleSheet('QListWidget { background: transparent; color: #ECE7E0; border: none; font-size: 12px; } QListWidget::item { padding: 3px 8px; border-radius: 3px; } QListWidget::item:hover { background: rgba(245,158,11,0.2); } QListWidget::item:selected { background: rgba(245,158,11,0.35); }')
+        list_widget.setObjectName('pickerList')
         list_widget.setMaximumHeight(300)
         layout.addWidget(list_widget)
         clear_item = QListWidgetItem(t('common.clear') if t else '-- clear --')
@@ -3935,7 +3941,7 @@ class BaseInventoryTab(QWidget):
             return
         popup = QWidget()
         popup.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
-        popup.setStyleSheet('QWidget { background: rgba(27,25,23,0.98); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; }')
+        popup.setObjectName('pickerPopup')
         layout = QVBoxLayout(popup)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(2)
@@ -3944,7 +3950,7 @@ class BaseInventoryTab(QWidget):
         search.setStyleSheet(PICKER_SEARCH_STYLE)
         layout.addWidget(search)
         list_widget = QListWidget()
-        list_widget.setStyleSheet('QListWidget { background: transparent; color: #ECE7E0; border: none; font-size: 12px; } QListWidget::item { padding: 3px 8px; border-radius: 3px; } QListWidget::item:hover { background: rgba(245,158,11,0.2); } QListWidget::item:selected { background: rgba(245,158,11,0.35); }')
+        list_widget.setObjectName('pickerList')
         list_widget.setMaximumHeight(300)
         layout.addWidget(list_widget)
         clear_item = QListWidgetItem(t('common.clear') if t else '-- clear --')
@@ -4798,8 +4804,7 @@ class BaseInventoryTab(QWidget):
                 self.clear_item_button.setVisible(False)
             elapsed = time.time() - start_time
             if elapsed > 0.5:
-                if hasattr(self._main_window, 'status_bar'):
-                    self._main_window.status_bar.showMessage(f'Item filter completed in {elapsed:.2f}s', 3000)
+                print(f'Item filter completed in {elapsed:.2f}s')
         run_with_loading(on_finished, task)
     def _reset_filters(self):
         self._item_locations = None
@@ -5018,8 +5023,9 @@ class BaseInventoryTab(QWidget):
                         context=self._current_base_name or self._current_guild_name,
                     )
                 self._suppress_next_auto_save_journal = False
-                if hasattr(self._main_window, 'status_bar'):
-                    self._main_window.status_bar.showMessage(t('base_inventory.auto_save_success') if t else 'Auto-saved changes', 2000)
+                feedback = getattr(self._main_window, '_show_status_feedback', None)
+                if callable(feedback):
+                    feedback(t('base_inventory.auto_save_success') if t else 'Auto-saved changes', level='success')
             else:
                 self._suppress_next_auto_save_journal = False
                 self._show_warning(t('base_inventory.auto_save_failed') if t else 'Auto-save failed - changes not saved')
@@ -5215,8 +5221,7 @@ class BaseInventoryTab(QWidget):
                 self._guilds_data = guilds_data
                 if self._guilds_data:
                     self._on_guild_changed(self._guilds_data[0]['id'])
-                    if hasattr(self._main_window, 'status_bar'):
-                        self._main_window.status_bar.showMessage(f'Found {structure_asset} in {len(self._guilds_data)} guild(s)', 3000)
+                    self._show_info(f'Found {structure_asset} in {len(self._guilds_data)} guild(s)')
             else:
                 if not silent:
                     self._show_info(t('base_inventory.no_structures') if t else f'No guilds found with this structure')

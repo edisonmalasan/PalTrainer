@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QPushButton, QFrame, QVBoxLayout, QListWidget, QListWidgetItem
+from PyQt6.QtWidgets import QWidget, QPushButton, QFrame, QVBoxLayout, QListWidget, QListWidgetItem, QAbstractItemView
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QEvent
-from PyQt6.QtGui import QColor
+from palworld_aio.ui.chrome.localization import tr
 class StyledCombo(QWidget):
     currentIndexChanged = pyqtSignal(int)
     def __init__(self, parent=None):
@@ -10,13 +10,15 @@ class StyledCombo(QWidget):
         self._enabled = True
         self._max_visible_items = 12
         self._setup_ui()
-        self._update_styles()
     def _setup_ui(self):
         self._button = QPushButton()
+        self._button.setObjectName('styledComboButton')
+        self._button.setAccessibleName(tr('ui.combo.select', 'Choose an option'))
         self._button.setFixedHeight(24)
         self._button.setCursor(Qt.PointingHandCursor)
         self._button.clicked.connect(self._toggle_popup)
         self._popup = QFrame(self, Qt.Popup)
+        self._popup.setObjectName('styledComboPopup')
         self._popup.setFixedWidth(300)
         self._popup.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
         self._popup.setAttribute(Qt.WA_TranslucentBackground)
@@ -25,29 +27,42 @@ class StyledCombo(QWidget):
         popup_layout.setContentsMargins(0, 0, 0, 0)
         popup_layout.setSpacing(0)
         self._list = QListWidget()
+        self._list.setObjectName('styledComboList')
+        self._list.setAccessibleName(tr('ui.combo.options', 'Options'))
         self._list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self._list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._list.itemClicked.connect(self._on_item_clicked)
-        self._list.setFocusPolicy(Qt.NoFocus)
+        self._list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         popup_layout.addWidget(self._list)
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         main_layout.addWidget(self._button)
+        self._button.installEventFilter(self)
         self._popup.installEventFilter(self)
+        self._list.installEventFilter(self)
     def eventFilter(self, obj, event):
+        if obj == self._list and event.type() == QEvent.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                item = self._list.currentItem()
+                if item is not None:
+                    self._on_item_clicked(item)
+                return True
+            if event.key() == Qt.Key.Key_Escape:
+                self._hide_popup()
+                return True
+        if obj == self._button and event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Down:
+                self._show_popup()
+                return True
         if obj == self._popup:
-            if event.type() == QEvent.MouseButtonPress:
+            if event.type() == QEvent.Type.MouseButtonPress:
                 pos = self.mapFromGlobal(event.globalPosition().toPoint())
                 if not self._popup.geometry().contains(pos):
                     self._hide_popup()
                     return True
         return super().eventFilter(obj, event)
-    def _update_styles(self):
-        self._button.setStyleSheet('\n            QPushButton {\n                background-color: rgba(30, 35, 45, 0.8);\n                border: 1px solid rgba(255, 255, 255, 0.2);\n                border-radius: 4px;\n                padding: 4px 8px;\n                color: #e0e0e0;\n                text-align: left;\n            }\n            QPushButton::menu-indicator {\n                width: 0px;\n                subcontrol-position: right center;\n                subcontrol-origin: padding;\n            }\n            QPushButton:hover {\n                border-color: rgba(74, 144, 226, 0.5);\n            }\n            QPushButton:disabled {\n                background-color: rgba(40, 45, 55, 0.6);\n                color: #888888;\n                border-color: rgba(255, 255, 255, 0.1);\n            }\n        ')
-        self._popup.setStyleSheet('\n            QFrame {\n                background-color: transparent;\n            }\n        ')
-        self._list.setStyleSheet('\n            QListWidget {\n                background-color: rgba(18, 20, 24, 0.98);\n                border: 1px solid rgba(125, 211, 252, 0.3);\n                border-radius: 6px;\n                padding: 4px;\n                color: #e2e8f0;\n            }\n            QListWidget::item {\n                padding: 6px 12px;\n                border-radius: 3px;\n                height: 28px;\n            }\n            QListWidget::item:selected {\n                background-color: rgba(125, 211, 252, 0.15);\n                color: #7DD3FC;\n            }\n            QListWidget::item:hover {\n                background-color: rgba(125, 211, 252, 0.08);\n            }\n            QListWidget::item:disabled {\n                color: #666666;\n                background-color: transparent;\n            }\n        ')
     def setMaxVisibleItems(self, count):
         self._max_visible_items = count
         self._update_popup_height()
@@ -71,11 +86,13 @@ class StyledCombo(QWidget):
         self._list.setFocus()
     def _hide_popup(self):
         self._popup.hide()
+        self._button.setFocus(Qt.FocusReason.PopupFocusReason)
     def _on_item_clicked(self, item):
         index = self._list.row(item)
         if item.flags() & Qt.ItemIsEnabled:
             self._current_index = index
             self._button.setText(item.text())
+            self._button.setAccessibleName(item.text())
             self._hide_popup()
             self.currentIndexChanged.emit(index)
     def addItem(self, text, userData=None):
@@ -102,6 +119,7 @@ class StyledCombo(QWidget):
             self._current_index = index
             self._items[index]['text']
             self._button.setText(self._items[index]['text'])
+            self._button.setAccessibleName(self._items[index]['text'])
             self._list.setCurrentRow(index)
             return True
         return False
@@ -138,6 +156,8 @@ class StyledCombo(QWidget):
             item = self._list.item(index)
             if item:
                 item.setText(text)
+            if index == self._current_index:
+                self._button.setText(text)
+                self._button.setAccessibleName(text)
     def model(self):
         return self._list.model()
-from PyQt6.QtWidgets import QAbstractItemView

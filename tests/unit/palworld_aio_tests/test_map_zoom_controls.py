@@ -70,6 +70,34 @@ def test_zoom_by_step_clamps_at_bounds(tab):
     assert view.current_zoom == view.max_zoom
 
 
+def test_reduced_motion_centers_marker_without_zoom_animation(tab, monkeypatch):
+    constants = import_from('palworld_aio.constants')
+    monkeypatch.setattr(constants, 'reduced_motion', True)
+    view = tab.view
+    view.zoom_timer.stop()
+    view.resetTransform()
+    view.current_zoom = 1.0
+    marker = type('Marker', (), {'center_x': 200.0, 'center_y': 200.0})()
+
+    view.animate_to_marker(marker, zoom_level=2.0)
+
+    assert view.current_zoom == 2.0
+    assert not view.is_animating
+    assert not view.zoom_timer.isActive()
+    assert view.zoom_label.text() == 'Zoom: 200%'
+
+    view.animate_to_coords(250.0, 250.0, zoom_level=1.5)
+    assert view.current_zoom == 1.5
+    assert not view.zoom_timer.isActive()
+    assert view.zoom_label.text() == 'Zoom: 150%'
+
+    effects = import_from('palworld_aio.ui.map_view.map_effects')
+    calibration = effects.CalibrationEffect(10, 10)
+    swap = effects.SwapSourceEffect(20, 20)
+    assert not calibration._timer.isActive()
+    assert not swap._timer.isActive()
+
+
 def test_zoom_buttons_exist_with_accessible_names(tab):
     view = tab.view
     assert view.zoom_in_btn.objectName() == 'mapZoomBtn'

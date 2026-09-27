@@ -5,6 +5,7 @@ import os
 import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtTest import QSignalSpy, QTest
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
@@ -123,6 +124,8 @@ def test_collection_lifecycle_states_distinguish_empty_search_loading_and_error(
     frame.resize(760, 520)
     frame.show()
     app.processEvents()
+    assert frame.loading_state.isHidden()
+    assert frame.error_state.isHidden()
 
     actions = []
     frame.stateActionRequested.connect(actions.append)
@@ -138,6 +141,8 @@ def test_collection_lifecycle_states_distinguish_empty_search_loading_and_error(
     assert actions[-1] == 'retry'
 
     frame.set_collection_state('ready')
+    assert frame.loading_state.isHidden()
+    assert frame.error_state.isHidden()
     assert not frame.empty_state.isHidden()
     frame.browser.add_item(['Ada'])
     frame.browser.search_input.setText('missing')
@@ -145,3 +150,30 @@ def test_collection_lifecycle_states_distinguish_empty_search_loading_and_error(
     frame.no_result_state.action_button.click()
     assert frame.browser.search_input.text() == ''
     assert frame.browser.count_label.text() == '1 result'
+
+
+def test_search_panel_context_actions_have_keyboard_entry(app):
+    panel = _panel()
+    panel.show()
+    app.processEvents()
+    panel.tree.setCurrentItem(panel.tree.topLevelItem(0))
+    observed = QSignalSpy(panel.tree.customContextMenuRequested)
+    panel.tree.setFocus()
+    QTest.keyClick(panel.tree, Qt.Key.Key_Menu)
+    QTest.keyClick(panel.tree, Qt.Key.Key_F10, Qt.KeyboardModifier.ShiftModifier)
+    app.processEvents()
+    assert len(observed) == 2
+
+
+def test_generic_tree_context_actions_have_keyboard_entry(app):
+    tree_mod = import_from('palworld_aio.widgets.tree_widgets')
+    tree = tree_mod.SortableTreeWidget(['Name'])
+    tree.add_item(['Synthetic row'])
+    tree.setCurrentItem(tree.topLevelItem(0))
+    observed = QSignalSpy(tree.context_menu_requested)
+    tree.show()
+    tree.setFocus()
+    QTest.keyClick(tree, Qt.Key.Key_Menu)
+    app.processEvents()
+    assert len(observed) == 1
+    tree.close()

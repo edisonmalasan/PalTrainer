@@ -49,7 +49,6 @@ def app():
 # ------------------------------------------------- 2.1 status message policy
 
 PRESENT = main_window_mod._present_status
-RAW = main_window_mod._STATUS_SHOW_RAW
 DEMOTE = main_window_mod._STATUS_DEMOTE
 
 
@@ -63,8 +62,8 @@ DEMOTE = main_window_mod._STATUS_DEMOTE
     ('Level.sav loaded', ('status.loaded', 'Save loaded successfully')),
     ('Save completed', ('status.saved', 'Save completed')),
     ('Failed to load save', ('status.load_failed', 'Failed to load save')),
-    ('conversion finished: 3 files written', RAW),
-    ('', RAW),
+    ('conversion finished: 3 files written', DEMOTE),
+    ('', DEMOTE),
 ])
 def test_present_status_policy(payload, expected):
     assert PRESENT(payload) == expected
@@ -97,12 +96,27 @@ def test_decompression_stats_replaced_by_ready(app):
     assert stream.status_bar.currentMessage() == 'Ready'
 
 
-def test_raw_payloads_still_reach_strip_verbatim(app):
+def test_raw_payloads_stay_in_diagnostics_stream(app):
     from PyQt6.QtWidgets import QStatusBar
     stream = main_window_mod.StatusBarStream(QStatusBar())
+    observed = []
+    stream.text_written.connect(observed.append)
     stream.write('conversion finished: 3 files written')
     stream._drain_pending()
-    assert stream.status_bar.currentMessage() == 'conversion finished: 3 files written'
+    assert stream.status_bar.currentMessage() == 'Ready'
+    assert observed == ['conversion finished: 3 files written']
+
+
+def test_only_known_human_summaries_reach_notifications(app):
+    from PyQt6.QtWidgets import QStatusBar
+    stream = main_window_mod.StatusBarStream(QStatusBar())
+    summaries = []
+    stream.summary_written.connect(summaries.append)
+    stream.write('HTTP Error 404: Not Found')
+    stream.write('Decompression successful, decompressed size: 26,429 bytes')
+    stream.write('Save completed')
+    stream._drain_pending()
+    assert summaries == ['Save completed']
 
 
 # ------------------------------------------------- 2.2 warning tri-state

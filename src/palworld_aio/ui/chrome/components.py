@@ -600,6 +600,8 @@ class BulkWorkflowReview(QFrame):
         self.result_label.setText(message)
         self.result_label.setProperty('resultState', 'success' if success else 'error')
         self.result_label.setVisible(bool(message))
+        self.progress.setProperty('resultState', 'success' if success else 'error')
+        _polish(self.progress)
         _polish(self.result_label)
 
 
@@ -719,16 +721,13 @@ class BaseDialog(QDialog):
 
     def done(self, a0: int) -> None:
         super().done(a0)
-        self._restore_focus()
         QTimer.singleShot(0, self._restore_focus)
 
     def accept(self) -> None:
         super().accept()
-        self._restore_focus()
 
     def reject(self) -> None:
         super().reject()
-        self._restore_focus()
 
     def keyPressEvent(self, a0: QKeyEvent | None) -> None:
         if a0 is not None and a0.key() == Qt.Key.Key_Escape:
@@ -752,6 +751,7 @@ class BaseDialog(QDialog):
         try:
             if not self._invoker.isVisible() or not self._invoker.isEnabled():
                 return
+            self._invoker.window().activateWindow()
             self._focus_restored = True
             self._invoker.setFocus(Qt.FocusReason.OtherFocusReason)
             self.focusRestored.emit(self._invoker)
@@ -1130,39 +1130,6 @@ def confirm(
     btn.setFocus()
     result = dialog.exec()
     return result == QDialog.DialogCode.Accepted
-
-
-def create_page_ribbon(title: str, zone: str = '', parent=None) -> QFrame:
-    """Page ribbon (plan 020 section 4.4): per-page title header.
-
-    Returns a QFrame with a horizontal layout: display title, zone label,
-    stretch, and an action slot the caller can extend. Window controls live
-    in the app bar (shell v3), so the ribbon spans the full canvas width.
-    """
-    ribbon = QFrame(parent)
-    ribbon.setObjectName('pageRibbon')
-    lay = QHBoxLayout(ribbon)
-    lay.setContentsMargins(SPACING['xl'], SPACING['md'], SPACING['lg'], SPACING['md'])
-    lay.setSpacing(SPACING['sm'])
-    title_lbl = QLabel(title, ribbon)
-    title_lbl.setObjectName('ribbonTitle')
-    lay.addWidget(title_lbl)
-    if zone:
-        zone_lbl = QLabel(zone, ribbon)
-        zone_lbl.setObjectName('ribbonZone')
-        lay.addWidget(zone_lbl)
-    lay.addStretch(1)
-    ribbon._ribbon_actions_slot = lay
-    return ribbon
-
-
-def ribbon_actions_slot(ribbon: QFrame) -> QHBoxLayout:
-    """Public accessor for a page ribbon's trailing action slot.
-
-    Wraps the private ``_ribbon_actions_slot`` so screens never reach into
-    ribbon internals directly (ui-modernization Phase 0).
-    """
-    return ribbon._ribbon_actions_slot
 
 
 def set_content_margins(target, top: int = 0, bottom: int = 0,

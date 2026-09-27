@@ -103,15 +103,28 @@ def test_only_dedicated_drag_region_starts_shell_drag(app):
     assert drags == [True]
 
 
-@pytest.mark.parametrize('width,mode', [(1024, 'drawer'), (1450, 'side')])
-def test_inspector_switches_between_drawer_and_side_host(app, width, mode):
+@pytest.mark.parametrize('width,height,mode,sidebar_collapsed', [
+    (1024, 700, 'drawer', True),
+    (1200, 750, 'drawer', False),
+    (1450, 800, 'side', False),
+])
+def test_inspector_switches_between_drawer_and_side_host(
+    app, width, height, mode, sidebar_collapsed,
+):
     shell = shell_mod.WorkspaceShell(_loaded_context())
     inspector = QLabel('Entity details')
     shell.set_inspector(inspector, title='Player details')
-    shell.resize(width, 700)
+    shell.resize(width, height)
     shell.show()
     app.processEvents()
     assert shell.property('inspectorMode') == mode
+    assert shell.sidebar.collapsed is sidebar_collapsed
+    assert shell.page_host.width() > 0
+    assert shell.header.width() > 0
+    capture = shell.grab().toImage()
+    assert capture.width() == width
+    assert capture.height() == height
+    assert capture.pixelColor(20, 20) != capture.pixelColor(width - 20, 20)
     if mode == 'drawer':
         assert shell.inspector_side.isHidden()
         shell.open_inspector(shell.sidebar.route_buttons['players'])
@@ -121,6 +134,32 @@ def test_inspector_switches_between_drawer_and_side_host(app, width, mode):
     else:
         assert shell.inspector_side.isVisibleTo(shell)
         assert inspector.parent() is shell.inspector_side
+
+
+def test_responsive_sidebar_collapse_preserves_user_preference(app):
+    shell = shell_mod.WorkspaceShell(_loaded_context())
+    shell.sidebar.set_collapsed(False)
+    shell.resize(1450, 800)
+    shell.show()
+    app.processEvents()
+    assert not shell.sidebar.collapsed
+
+    shell.resize(1024, 700)
+    app.processEvents()
+    assert shell.sidebar.collapsed
+    assert shell.sidebar.export_settings()['collapsed'] is False
+
+    shell.resize(1450, 800)
+    app.processEvents()
+    assert not shell.sidebar.collapsed
+
+    shell.sidebar.set_collapsed(True)
+    shell.resize(1024, 700)
+    app.processEvents()
+    shell.resize(1450, 800)
+    app.processEvents()
+    assert shell.sidebar.collapsed
+    assert shell.sidebar.export_settings()['collapsed'] is True
 
 
 def test_title_bar_history_buttons_track_router(app):

@@ -16,7 +16,6 @@ from palworld_aio.ui.chrome.components import (
     MessageDialog as QMessageBox,
     make_button,
 )
-from palworld_aio.ui.chrome import tokens as ui_tokens
 from palworld_aio.ui.chrome.styles import wrap_tooltip_text
 from palworld_aio.editor.edit_pals import _clean_desc_for_tooltip
 from palworld_aio.widgets.toggle_check import ToggleCheckBtn
@@ -76,7 +75,6 @@ class PlayerItemActionDialog(BaseDialog):
         self._load_players()
         self.item_tabs.currentChanged.connect(self._on_tab_changed)
     def _setup_ui(self):
-        pal = ui_tokens.resolve()
         layout = self.content_layout
         self.workflow_review = BulkWorkflowReview(
             source=t('ui.bulk.select_source', default='Select an item or ability'),
@@ -130,40 +128,22 @@ class PlayerItemActionDialog(BaseDialog):
         add_all_frame = QFrame()
         add_all_layout = QHBoxLayout(add_all_frame)
         add_all_layout.setContentsMargins(0, 0, 0, 0)
-        self.add_all_effigies_btn = QPushButton(t('inventory.max_all_abilities', default='Max All Abilities'))
-        self.add_all_effigies_btn.setStyleSheet(
-            f'QPushButton {{ background: {pal["warning_bg"]}; color: {pal["warning"]}; '
-            f'border: 1px solid {pal["warning_border"]}; border-radius: 6px; '
-            'padding: 4px 8px; font-weight: 600; font-size: 11px; }} '
-            f'QPushButton:hover {{ background: {pal["warning_border"]}; color: {pal["text"]}; }}')
-        self.add_all_effigies_btn.setCursor(Qt.PointingHandCursor)
+        self.add_all_effigies_btn = make_button(
+            t('inventory.max_all_abilities', default='Max All Abilities'), 'warning')
         self.add_all_effigies_btn.clicked.connect(lambda: self._on_add_all_clicked(True))
         add_all_layout.addWidget(self.add_all_effigies_btn)
-        self.add_all_key_items_btn = QPushButton(t('inventory.add_all_key_items', default='Add All Key Items'))
-        self.add_all_key_items_btn.setStyleSheet(
-            f'QPushButton {{ background: {pal["special_bg"]}; color: {pal["special"]}; '
-            f'border: 1px solid {pal["special_border"]}; border-radius: 6px; '
-            'padding: 4px 8px; font-weight: 600; font-size: 11px; }} '
-            f'QPushButton:hover {{ background: {pal["special_border"]}; color: {pal["text"]}; }}')
-        self.add_all_key_items_btn.setCursor(Qt.PointingHandCursor)
+        self.add_all_key_items_btn = make_button(
+            t('inventory.add_all_key_items', default='Add All Key Items'), 'secondary')
         self.add_all_key_items_btn.clicked.connect(lambda: self._on_add_all_clicked(False))
         add_all_layout.addWidget(self.add_all_key_items_btn)
-        self.unlock_all_map_btn = QPushButton(t('inventory.unlock_all_map', default='Unlock All Map + Fast Travel'))
-        self.unlock_all_map_btn.setStyleSheet(
-            f'QPushButton {{ background: {pal["success_bg"]}; color: {pal["success"]}; '
-            f'border: 1px solid {pal["success_border"]}; border-radius: 6px; '
-            'padding: 4px 8px; font-weight: 600; font-size: 11px; }} '
-            f'QPushButton:hover {{ background: {pal["success_border"]}; color: {pal["text"]}; }}')
-        self.unlock_all_map_btn.setCursor(Qt.PointingHandCursor)
+        self.unlock_all_map_btn = make_button(
+            t('inventory.unlock_all_map', default='Unlock All Map + Fast Travel'),
+            'warning')
         self.unlock_all_map_btn.clicked.connect(lambda: self._on_unlock_all_map_clicked())
         add_all_layout.addWidget(self.unlock_all_map_btn)
-        self.modify_slots_btn = QPushButton(t('player_item.modify_slots_btn') if t else 'Modify Slots')
-        self.modify_slots_btn.setStyleSheet(
-            f'QPushButton {{ background: {pal["info_bg"]}; color: {pal["info"]}; '
-            f'border: 1px solid {pal["info_border"]}; border-radius: 6px; '
-            'padding: 4px 8px; font-weight: 600; font-size: 11px; }} '
-            f'QPushButton:hover {{ background: {pal["info_border"]}; color: {pal["text"]}; }}')
-        self.modify_slots_btn.setCursor(Qt.PointingHandCursor)
+        self.modify_slots_btn = make_button(
+            t('player_item.modify_slots_btn') if t else 'Modify Slots',
+            'secondary')
         self.modify_slots_btn.clicked.connect(self._on_modify_slots_clicked)
         add_all_layout.addWidget(self.modify_slots_btn)
         add_all_layout.addStretch()
@@ -567,7 +547,6 @@ class PlayerItemActionDialog(BaseDialog):
             self.player_list.addItem(item)
             self.player_list.setItemWidget(item, checkbox)
     def _make_abilities_tab(self):
-        pal = ui_tokens.resolve()
         from palworld_aio.managers.player_manager import RELIC_TO_STATUS_NAME, RELIC_CUMULATIVE_MAX
         from palworld_aio.inventory.inventory_manager import ASSET_TO_RELIC_TYPE, RELIC_TYPE_TO_EFFIGY, ItemData
         tab = QWidget()
@@ -662,13 +641,9 @@ class PlayerItemActionDialog(BaseDialog):
         columns.addWidget(right, 1)
         layout.addLayout(columns)
         apply_row = QHBoxLayout()
-        self.ability_apply_btn = QPushButton(t('inventory.edit_abilities_apply', default='Apply Ability Changes'))
-        self.ability_apply_btn.setStyleSheet(
-            f'QPushButton {{ background: {pal["success_bg"]}; color: {pal["success"]}; '
-            f'border: 1px solid {pal["success_border"]}; border-radius: 6px; '
-            'padding: 6px 16px; font-weight: 600; font-size: 12px; }} '
-            f'QPushButton:hover {{ background: {pal["success_border"]}; color: {pal["text"]}; }}')
-        self.ability_apply_btn.setCursor(Qt.PointingHandCursor)
+        self.ability_apply_btn = make_button(
+            t('inventory.edit_abilities_apply', default='Apply Ability Changes'),
+            'primary')
         self.ability_apply_btn.clicked.connect(self._on_apply_abilities)
         apply_row.addWidget(self.ability_apply_btn)
         apply_row.addStretch()

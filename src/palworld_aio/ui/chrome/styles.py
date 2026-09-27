@@ -54,13 +54,9 @@ class ThemeManager:
     def load_qss_content(cls):
         if cls._darkmode_content is None:
             qss_path = _os.path.join(str(GUI_DIR), 'darkmode.qss')
-            extras_path = _os.path.join(str(GUI_DIR), 'legacy-dark.qss')
             try:
                 from palworld_aio.ui.chrome.qss_builder import build_qss
-                generated = build_qss(cls.theme())
-                with open(extras_path, 'r', encoding='utf-8') as f:
-                    extras = f.read()
-                cls._darkmode_content = generated + '\n\n' + extras
+                cls._darkmode_content = build_qss(cls.theme())
             except (FileNotFoundError, ImportError, KeyError):
                 try:
                     with open(qss_path, 'r', encoding='utf-8') as f:
@@ -70,8 +66,7 @@ class ThemeManager:
         return cls._darkmode_content
     @classmethod
     def apply_global(cls):
-        # Assemble current generated rules with transitional legacy extras;
-        # fall back to the deployed generated file in constrained builds.
+        # Fall back to the deployed generated file in constrained builds.
         qss = cls.load_qss_content()
         if not qss:
             return cls._apply_fallback_global()

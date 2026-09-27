@@ -65,7 +65,6 @@ TREE_ROW_HEIGHT = 28
 # Body UI font: Inter (bundled) with Segoe UI kept as fallback. Legacy
 # `QFont(FONT_FAMILY, ...)` call sites resolve to the bundled body family.
 FONT_FAMILY = 'Inter 28pt'
-FONT_FAMILY_NERD = 'Hack Nerd Font'
 FONT_FAMILY_MONO = 'Consolas'
 FONT_SIZE = 10
 FONT_SIZE_BOLD = 10

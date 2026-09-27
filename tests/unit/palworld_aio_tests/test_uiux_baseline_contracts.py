@@ -121,7 +121,7 @@ def test_load_and_save_entry_points_delegate_to_save_manager(monkeypatch):
 
     assert calls == [
         ('load', (), {'path': 'C:/fixture/Level.sav', 'parent': window}),
-        ('save', (), {'parent': window}),
+        ('save', (), {'parent': window, 'backup_mode': 'offer'}),
     ]
 
 

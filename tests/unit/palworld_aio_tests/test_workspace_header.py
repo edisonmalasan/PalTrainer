@@ -55,6 +55,15 @@ def test_breadcrumb_context_emits_stable_identifier(app):
     assert bar._buttons['player:1'].accessibleName() == 'Player: Hathaway'
 
 
+def test_breadcrumb_replacement_hides_retired_chips_immediately(app):
+    bar = header_mod.BreadcrumbBar()
+    bar.set_items([header_mod.ContextItem('tools', 'Tools')])
+    old = bar._buttons['tools']
+    bar.set_items([header_mod.ContextItem('about', 'About')])
+    assert old.isHidden()
+    assert bar._buttons['about'].text() == 'About'
+
+
 def test_pending_changes_never_hides_state(app):
     pending = header_mod.PendingChangesButton()
     assert pending.count == 0
@@ -107,6 +116,9 @@ def test_default_and_minimum_width_keep_priority_actions_reachable(app):
     assert header.title_label.text() == 'Players'
     assert header.save_context.isVisibleTo(header)
     assert header.pending_changes.isVisibleTo(header)
+    assert header.context_bar.width() >= header.width() - 2 * host_layout.contentsMargins().left()
+    for chip in header.context_bar._buttons.values():
+        assert chip.geometry().right() <= header.context_bar.width()
 
 
 def test_workspace_action_ids_are_unique(app):
@@ -114,3 +126,25 @@ def test_workspace_action_ids_are_unique(app):
     header.add_action('run', 'Run')
     with pytest.raises(ValueError):
         header.add_action('run', 'Run again')
+
+
+def test_many_actions_overflow_before_header_text_clips(app):
+    host = QWidget()
+    layout = QVBoxLayout(host)
+    header = header_mod.WorkspaceHeader('About', 'View PalTrainer version, credits, and project information.')
+    layout.addWidget(header)
+    header.add_action('save', 'Save Changes', primary=True, icon='save')
+    for index in range(10):
+        header.add_action(f'action-{index}', f'Action {index} details')
+    host.resize(1210, 180)
+    host.show()
+    app.processEvents()
+
+    assert header.compact
+    assert header.overflow_button.isVisibleTo(header)
+    assert all(not button.isVisibleTo(header) for button in header._optional_buttons.values())
+    assert len(header.overflow_menu.actions()) == 10
+    primary = header._actions.itemAt(0).widget()
+    assert primary.width() >= primary.sizeHint().width()
+    assert header.save_context.width() >= header.save_context.sizeHint().width()
+    assert header.pending_changes.width() >= header.pending_changes.sizeHint().width()

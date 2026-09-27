@@ -826,11 +826,7 @@ class PartySlotWidget(QFrame):
             pred_badge.setFixedSize(14, 14)
             pred_badge.setAlignment(Qt.AlignCenter)
             pred_badge.setStyleSheet('background: transparent; border: none; font-size: 11px; font-weight: bold; color: #F87171;')
-            try:
-                import nerdfont as _nf
-                pred_badge.setText('P')
-            except Exception:
-                pred_badge.setText('P')
+            pred_badge.setText('P')
             pred_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
             pred_badge.move(badge_x - 14, badge_y)
             pred_badge.show()

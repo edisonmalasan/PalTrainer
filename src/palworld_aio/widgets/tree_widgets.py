@@ -31,6 +31,17 @@ class SortableTreeWidget(QTreeWidget):
             self.setCurrentItem(item)
             global_pos = self.viewport().mapToGlobal(pos)
             self.context_menu_requested.emit(item, global_pos)
+    def keyPressEvent(self, event):
+        if (event.key() == Qt.Key.Key_Menu
+                or (event.key() == Qt.Key.Key_F10
+                    and event.modifiers() & Qt.KeyboardModifier.ShiftModifier)):
+            item = self.currentItem()
+            if item is not None:
+                self.customContextMenuRequested.emit(
+                    self.visualItemRect(item).center())
+            event.accept()
+            return
+        super().keyPressEvent(event)
     def add_item(self, values, data=None):
         item = QTreeWidgetItem([str(v) for v in values])
         if data:

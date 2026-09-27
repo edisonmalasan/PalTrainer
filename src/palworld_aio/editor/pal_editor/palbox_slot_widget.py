@@ -535,11 +535,7 @@ class PalboxSlotWidget(QFrame):
             pred_badge.setFixedSize(14, 14)
             pred_badge.setAlignment(Qt.AlignCenter)
             pred_badge.setStyleSheet('background: transparent; border: none; font-size: 11px; font-weight: bold; color: #F87171;')
-            try:
-                import nerdfont as _nf
-                pred_badge.setText('P')
-            except Exception:
-                pred_badge.setText('P')
+            pred_badge.setText('P')
             pred_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
             pred_badge._slot_child_kind = 'predator'
             pred_badge.show()
@@ -741,11 +737,7 @@ class _PalSlotDelegate(QStyledItemDelegate):
             is_predator_badge = index.data(Qt.UserRole + 3)
 
             if is_predator_badge:
-                try:
-                    import nerdfont as _nf2
-                    paw = 'P'
-                except Exception:
-                    paw = 'P'
+                paw = 'P'
                 painter.save()
                 painter.setRenderHint(QPainter.TextAntialiasing)
                 painter.setPen(QColor('#EF4444'))

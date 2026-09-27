@@ -3,6 +3,7 @@ import qt_compat
 from PyQt6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem
 from PyQt6.QtCore import Qt, QRectF, QPointF
 from PyQt6.QtGui import QPixmap, QColor, QRadialGradient, QPainter, QPen, QBrush
+from palworld_aio import constants
 class BaseMarker(QGraphicsPixmapItem):
     def __init__(self, base_data, x, y, base_icon_pixmap, config):
         super().__init__()
@@ -101,6 +102,10 @@ class BaseMarker(QGraphicsPixmapItem):
     def start_glow(self):
         self.glow_alpha = 180
     def update_glow(self):
+        if constants.reduced_motion:
+            self.glow_alpha = 180 if self.isSelected() else 0
+            self.update()
+            return
         glow_config = self.config['glow']
         alpha_min = glow_config['selected_alpha_min']
         alpha_max = glow_config['selected_alpha_max']
@@ -194,6 +199,10 @@ class PlayerMarker(QGraphicsPixmapItem):
     def start_glow(self):
         self.glow_alpha = 180
     def update_glow(self):
+        if constants.reduced_motion:
+            self.glow_alpha = 180 if self.isSelected() else 0
+            self.update()
+            return
         alpha_min = 80
         alpha_max = 180
         speed = 8

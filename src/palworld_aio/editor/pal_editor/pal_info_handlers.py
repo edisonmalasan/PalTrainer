@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import QApplication, QDialog, QFrame, QGridLayout, QHBoxLay
 from PyQt6.QtCore import Qt, QEvent, QPoint, QTimer
 from PyQt6.QtGui import QPixmap
 from i18n import t
-import nerdfont as nf
 from loading_manager import show_information, show_warning, show_question
 from palworld_aio import constants
 from resource_resolver import resource_path
@@ -523,7 +522,7 @@ class PalInfoHandlerMixin:
         il.addWidget(list_lbl)
         list_widget = QListWidget()
         list_widget.setMouseTracking(True)
-        list_widget.setStyleSheet(f'QListWidget {{ background: rgba(10,14,20,0.95); border: 1px solid {_P["info_border"]}; border-radius: 4px; color: {_P["text"]}; font-size: 10px; }} QListWidget::item {{ padding: 6px 8px; }} QListWidget::item:hover {{ background: {_P["info_bg"]}; }} QListWidget::item:selected {{ background: {_P["info_bg"]}; color: {_P["info"]}; }}')
+        list_widget.setObjectName('dataList')
         for name in sorted(loadouts.keys()):
             item = QListWidgetItem(name)
             item.setData(Qt.UserRole, name)
@@ -579,17 +578,17 @@ class PalInfoHandlerMixin:
         btn_row = QHBoxLayout()
         btn_row.setSpacing(4)
         save_btn = QPushButton(t('edit_pals.loadouts_save'))
-        save_btn.setStyleSheet(f'QPushButton {{ background: {_P["success_bg"]}; color: {_P["success"]}; border: 1px solid {_P["success_border"]}; border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; }} QPushButton:hover {{ background: rgba(16,185,129,0.22); color: #FFFFFF; }}')
+        save_btn.setProperty('class', 'primary')
         btn_row.addWidget(save_btn)
         load_btn = QPushButton(t('edit_pals.loadouts_apply'))
-        load_btn.setStyleSheet(f'QPushButton {{ background: {_P["info_bg"]}; color: {_P["info"]}; border: 1px solid {_P["info_border"]}; border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; }} QPushButton:hover {{ background: {_P["info_border"]}; color: #FFFFFF; }}')
+        load_btn.setProperty('class', 'secondary')
         btn_row.addWidget(load_btn)
         delete_btn = QPushButton(t('edit_pals.loadouts_delete_btn'))
-        delete_btn.setStyleSheet(f'QPushButton {{ background: {_P["danger_bg"]}; color: {_P["danger"]}; border: 1px solid {_P["danger_border"]}; border-radius: 4px; padding: 6px 14px; font-size: 10px; font-weight: 600; }} QPushButton:hover {{ background: rgba(251,113,133,0.22); color: #FFFFFF; }}')
+        delete_btn.setProperty('class', 'destructive')
         btn_row.addWidget(delete_btn)
         btn_row.addStretch()
         close_btn = QPushButton(t('edit_pals.loadouts_close'))
-        close_btn.setStyleSheet(f'QPushButton {{ background: {_P["info_bg"]}; color: {_P["info"]}; border: 1px solid {_P["info_border"]}; border-radius: 4px; padding: 6px 20px; font-size: 10px; font-weight: 600; }} QPushButton:hover {{ background: {_P["info_border"]}; color: #FFFFFF; }}')
+        close_btn.setProperty('class', 'secondary')
         btn_row.addWidget(close_btn)
         il.addLayout(btn_row)
         def _do_save():

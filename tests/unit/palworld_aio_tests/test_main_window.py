@@ -634,6 +634,7 @@ from PyQt6.QtWidgets import QApplication
 import palworld_aio.ui.main_window as main_window
 from palworld_aio.ui.chrome.app_bar import AppBar
 from palworld_aio.ui.chrome.nav_strip import NavStrip
+from PyQt6.QtWidgets import QStatusBar
 from palworld_aio.ui.chrome.workspace_shell import WorkspaceShell
 from palworld_aio.ui.pages.overview_page import OverviewPage
 from palworld_aio.ui.pages.activity_page import ActivityPage
@@ -695,6 +696,7 @@ assert 'app_bar' not in window.__dict__
 assert 'nav_strip' not in window.__dict__
 assert window.findChild(AppBar) is None
 assert window.findChild(NavStrip) is None
+assert window.findChild(QStatusBar) is None
 assert window.minimumWidth() == 1024
 assert window.minimumHeight() == 700
 assert window.workspace_shell.router.current_route_id == 'overview'
@@ -771,8 +773,7 @@ assert window.workspace_shell.page_host.currentWidget() is window.exclusions_pag
 window._activate_nav('docs')
 assert window.workspace_shell.router.current_route_id == 'docs'
 assert window.stacked_widget.currentIndex() == 10
-assert all(ribbon.isHidden() for ribbon in window.findChildren(
-    main_window.QFrame, 'pageRibbon'))
+assert not window.findChildren(main_window.QFrame, 'pageRibbon')
 assert len(window._page_shortcuts) == 12
 assert {shortcut.key().toString() for shortcut in window._command_shortcuts} == {
     'Ctrl+K', 'Ctrl+P',
@@ -2074,3 +2075,101 @@ def test_immediate_operation_failure_names_recovery_copy(monkeypatch):
     with pytest.raises(RuntimeError, match='C:/recovery/snapshot'):
         main_window.MainWindow._with_operation_backup(
             lambda: (_ for _ in ()).throw(OSError('write failed')))
+
+
+def test_every_route_is_named_and_keyboard_reachable():
+    result = _run_isolated(r"""
+import os
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+from PyQt6.QtCore import Qt
+from PyQt6.QtTest import QTest
+from PyQt6.QtWidgets import QApplication, QAbstractButton, QLineEdit
+import palworld_aio.ui.main_window as main_window
+from palworld_aio.ui.chrome.components import BaseDialog
+from palworld_aio.ui.routes import ROUTES
+from palworld_aio.ui.workspace_context import SaveIdentity, SavePlatform
+
+app = QApplication.instance() or QApplication([])
+main_window.load_exclusions = lambda: None
+main_window.MainWindow._check_update = lambda self: None
+main_window.MainWindow._save_user_settings = lambda self: None
+main_window.MainWindow._load_user_settings = lambda self: setattr(self, 'user_settings', {
+    'language': 'en_US', 'show_icons': True, 'boot_preference': 'menu',
+    'console_detached': False, 'console_window_geometry': None,
+    'loading_screen_mode': 'header', 'tray_expanded': False,
+})
+window = main_window.MainWindow()
+window.show()
+app.processEvents()
+sidebar = window.workspace_shell.sidebar
+for route in ROUTES:
+    button = sidebar.route_buttons[route.route_id]
+    sidebar.scroll_area.ensureWidgetVisible(button)
+    button.setFocus()
+    app.processEvents()
+    assert button.hasFocus(), route.route_id
+    assert button.accessibleName().strip(), route.route_id
+    assert button.toolTip().strip(), route.route_id
+    QTest.keyClick(button, Qt.Key.Key_Space)
+    app.processEvents()
+    assert window.workspace_shell.router.current_route_id == route.route_id
+    assert sidebar.active_route == route.route_id
+    assert button.isChecked()
+
+window.workspace_context.finish_load(SaveIdentity(
+    'fixture', 'Fixture World', 'C:/Fixture', SavePlatform.STEAM))
+for route in ROUTES:
+    window._activate_nav(route.route_id)
+    app.processEvents()
+    page = window.workspace_shell.page_host.currentWidget()
+    for control in page.findChildren(QAbstractButton):
+        if not control.isVisibleTo(page) or not control.isEnabled():
+            continue
+        assert (control.accessibleName().strip() or control.text().strip()
+                or control.toolTip().strip()), (route.route_id, control.objectName())
+    for control in page.findChildren(QLineEdit):
+        if not control.isVisibleTo(page) or not control.isEnabled():
+            continue
+        assert (control.accessibleName().strip() or control.placeholderText().strip()
+                or control.toolTip().strip()), (route.route_id, control.objectName())
+
+for width, height, sidebar_collapsed, inspector_mode in (
+    (1450, 800, False, 'side'),
+    (1200, 750, False, 'drawer'),
+    (1024, 700, True, 'drawer'),
+):
+    window.resize(width, height)
+    app.processEvents()
+    assert window.workspace_shell.sidebar.collapsed is sidebar_collapsed
+    assert window.workspace_shell.property('inspectorMode') == inspector_mode
+    for route in ROUTES:
+        window._activate_nav(route.route_id)
+        app.processEvents()
+        page = window.workspace_shell.page_host.currentWidget()
+        assert page.isVisibleTo(window), (width, route.route_id)
+        assert page.width() > 0 and page.height() > 0, (width, route.route_id)
+        assert window.workspace_shell.header.title_label.text() == route.label
+        assert window.workspace_shell.header.save_context.isVisibleTo(window)
+
+invoker = sidebar.route_buttons['overview']
+sidebar.scroll_area.ensureWidgetVisible(invoker)
+invoker.setFocus()
+app.processEvents()
+assert invoker.hasFocus()
+dialog = BaseDialog('Keyboard review', window)
+dialog.add_confirm_button('Apply')
+dialog.show()
+app.processEvents()
+assert QApplication.focusWidget().window() is dialog
+for _ in range(6):
+    focused = QApplication.focusWidget()
+    assert focused is not None and focused.window() is dialog
+    QTest.keyClick(focused, Qt.Key.Key_Tab)
+    app.processEvents()
+QTest.keyClick(dialog, Qt.Key.Key_Escape)
+app.processEvents()
+assert not dialog.isVisible()
+assert invoker.hasFocus()
+window.close()
+""")
+    assert result.returncode == 0, (result.stdout, result.stderr)
