@@ -9,12 +9,12 @@
 
 ## Implementation Checkpoint
 
-- **OpenSpec change:** `implement-audit-uiux-rehaul`
-- **Status:** Complete — Phases 1–10 of `implement-audit-uiux-rehaul` are delivered; spec sync and archive follow the merged implementation PR.
+- **OpenSpec change:** [2026-09-27-implement-audit-uiux-rehaul](openspec/changes/archive/2026-09-27-implement-audit-uiux-rehaul/proposal.md)
+- **Status:** Complete and archived — Phases 1–10 are delivered, and all nine delta specifications are synced to the main spec set.
 - **Last completed task:** 10.7 — All 97 audit acceptance criteria and Phase 1–7 migration groups have evidence in `acceptance-evidence.md`. The final live style scan found no direct generic control styling, and inactive `AppBar`/`NavStrip` modules are absent from the live shell. The 33-state final visual matrix found two World layout defects; both were fixed and rerendered. The user reported that release and keyboard smoke passed on an isolated copy of the dummy save, including every sidebar group.
 - **Verification:** `uv run --locked pytest -c tests/pytest.ini`: 1128 passed, 20 deselected. Focused final World lifecycle/layout tests: 12 passed. `uv run --locked python -m compileall -q src tests`, localization/resource tests within the full suite, strict OpenSpec validation, and `git diff --check` passed. `uv run --locked pyright src` did **not** pass: 481 errors and 2 warnings, matching the earlier baseline; JSON diagnostic comparison found none on changed source lines. The original dummy save was not modified. Save/load/automatic-backup/reparse/hash and render evidence is in `visual-baseline.md`.
 - **Deliberate deviations:** Native `QFileDialog` remains the operating-system file/folder picker boundary; replacing it would reduce platform accessibility and was not required by the shared in-app scaffold. Slot Injector remains a dedicated complex `QDialog` workspace owned and verified by task 8.3 rather than being forced into the simple-dialog scaffold. Global Pal Storage retains the historical `FramelessDialog` import name only as a source-compatible alias to the shared `PalEditorDialog`/`BaseDialog` implementation. The pre-change Base Inventory had no item-move handler or enabled drag/drop contract to preserve; no new save mutation was invented. Fix Host Save's former browse-time write remains removed because cancellation must not mutate `Level.sav`. The running-game warning is omitted because built-in process enumeration has no verified Palworld executable identity across supported launch paths; the existing stale-file warning and save backup policy remain the supported protection. The first-use Technology grid took 3.16 seconds on the isolated fixture, while warm use took 43 ms; this one-time cost is documented in `visual-baseline.md`. Repository-wide Pyright type debt remains at 481 errors and 2 warnings, with no diagnostics on changed source lines. Neither exception is represented as a passing check.
-- **Next task:** None in this change. Merge Apply, then sync the approved delta specs and archive through their separate PR stages.
+- **Next task:** None in this change.
 
 ---
 
