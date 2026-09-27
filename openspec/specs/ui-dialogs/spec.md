@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the consolidation of PalTrainer's many dialogs onto one dialog scaffold with consistent headers, footers, and selection presentation, migrated incrementally one dialog at a time while monolith internals stay explicitly deferred.
+Defines consistent dialog layout, focus, keyboard, selection, and destructive-action behavior, and when a complex workflow belongs in a drawer or dedicated workspace.
 
 ## Requirements
 
@@ -24,11 +24,16 @@ The system SHALL express selection/checked states in migrated dialogs via theme-
 - **WHEN** the user selects and deselects items in a migrated picker dialog
 - **THEN** selected items are visually distinct from unselected ones and both states use the token palette with no residual cyan/blue selection chrome
 
-### Requirement: Incremental migration with deferred monoliths
+### Requirement: Every dialog uses the shared scaffold and focus contract
+Every dialog SHALL use a consistent header, optional explanation, content region, divider, and footer; secondary action SHALL precede the primary action, destructive confirmation SHALL be isolated and explicitly styled, Escape SHALL safely dismiss, focus SHALL be trapped while modal, and focus SHALL return to the invoking control.
 
-The system SHALL allow dialogs to migrate one at a time in the order guild-assign first, then player-item, player-pal, player-technology, fix-illegal, tab-guide, and GPS editor last, and the large tab internals (player inventory ~4125 lines, base inventory ~4169 lines, map ~2639 lines, wiki ~1506 lines) SHALL remain behaviorally unchanged by this change beyond their outer page frames.
+#### Scenario: Legacy editor dialog is opened
+- **WHEN** any existing picker, editor, repair, transfer, assignment, or confirmation dialog opens
+- **THEN** it uses the shared layout, minimum rather than rigid sizing, theme tokens, accessible names, and predictable keyboard behavior
 
-#### Scenario: Partial migration is shippable
+### Requirement: Complex workflows use drawers or workspaces instead of oversized modals
+The system SHALL present quick contextual details in an inspector or drawer and multi-step, data-dense workflows in a dedicated workspace. A complex workflow SHALL expose source, target, review, progress, result, and recovery state without nested or screen-filling legacy dialogs.
 
-- **WHEN** only the guild-assign dialog has migrated and all other dialogs are untouched
-- **THEN** the application builds, all dialogs still open and complete their existing operations (assign, fix, pick, edit), and no unmigrated dialog regresses because the scaffold exists
+#### Scenario: Character or guild transfer is configured
+- **WHEN** a user starts a complex transfer or assignment workflow
+- **THEN** the UI provides clear source and target context, review before mutation, visible progress, and a result state in a drawer or workspace appropriate to its complexity

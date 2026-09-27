@@ -2,43 +2,46 @@
 
 ## Purpose
 
-Defines the observable behavior of PalTrainer's top two-tier application shell: the app bar and nav strip chrome around the full-bleed page canvas, per-page headers, the restored status strip, and application of the dark Deck-Ops theme from one token source.
+Defines the observable behavior of PalTrainer's sidebar workspace shell, including its page header, save and entity context, separate window controls, responsive regions, and consistent application theme.
 
 ## Requirements
 
-### Requirement: Typography uses bundled real weights
-
-The system SHALL render all primary UI typography (navigation, labels, headings, buttons, tables, dialogs, technical metadata) from the bundled Hanken Grotesk and Inter families using real bundled weights (Regular/Medium/SemiBold) rather than synthetic bold, and SHALL NOT reference the Hack Nerd Font family anywhere in the interface.
-
-#### Scenario: No synthetic bold on primary text
-
-- **WHEN** the application renders headings, navigation labels, or emphasized text
-- **THEN** the rendered glyphs use bundled weight files, and no bundled font references target the Hack Nerd Font family
-
 ### Requirement: Page header presents title, zone, and actions without overlay collision
+The system SHALL render each workspace with a consistent header containing page identity and description, current save and entity context, and page/global actions. Context SHALL remain understandable when the sidebar is collapsed, and page content SHALL never collide with window controls or participate in window dragging.
 
-The system SHALL render each page's header row with a display title, a zone caption, and an action slot, such that header content never requires a reserved window-controls gutter (window controls live in the app bar), and page drag behavior only applies to the app bar, never to page content.
+#### Scenario: Header remains usable at supported sizes
+- **WHEN** the main window is shown at its 1024 by 700 minimum or maximized
+- **THEN** the page title, save context, selected-entity context, pending-change state, and primary actions remain visible or available through an explicit overflow without clipping under window controls
 
 #### Scenario: Ribbon stays clear of window controls
-
-- **WHEN** the main window is shown at minimum size (1200x750) or maximized
-- **THEN** page header titles, zone captions, and action buttons span the full canvas width with no reserved dead gutter, and no content is clipped under window controls
+- **WHEN** the former ribbon is replaced by the workspace header at minimum size or maximized
+- **THEN** header content spans its available region without a reserved dead gutter and remains clear of the dedicated window-control cluster
 
 #### Scenario: Page content does not drag the window
-
-- **WHEN** the user presses and drags on a page header or any page content
-- **THEN** no window move occurs; dragging is restricted to the app bar
+- **WHEN** the user presses and drags on a workspace header, context bar, inspector, or page content
+- **THEN** no window move occurs; dragging is restricted to a dedicated shell drag region
 
 ### Requirement: Dark Deck-Ops theme applies consistently from one source
-
-The system SHALL render all shell surfaces (app bar, nav strip, page headers, chips, status strip, tooltips, menus, scrollbars, and scroll-area viewports) from the frozen token palette (warm dark surfaces, amber `#F59E0B` accent, teal success) with no residual cyan (`#7DD3FC`) or blue (`#4a90e2`) shell chrome, and theme changes SHALL propagate without per-widget stylesheets overriding the global theme. Every rendered icon SHALL come from the bundled token-colored vector icon set; no glyph-font icon rendering MAY remain in shell surfaces.
+The system SHALL render sidebar, workspace headers, context bars, content surfaces, inspectors, drawers, dialogs, menus, tooltips, scrollbars, inventory grids, and transient states from the centralized token palette. No page or hidden workflow MAY retain an inline legacy theme or glyph-font icon system.
 
 #### Scenario: No parallel shell styling
-
-- **WHEN** the application starts and any page is visited
-- **THEN** app bar, nav strip, page headers, chips, status strip, menus, and tooltips share the same accent/surface treatment, and no shell widget carries an inline color stylesheet that diverges from the token palette
+- **WHEN** the application starts and every reachable page or workflow is visited
+- **THEN** all surfaces share the same tokenized hierarchy and icon system without residual legacy navigation, tables, buttons, dialogs, or light fallback viewports
 
 #### Scenario: Scroll containers never fall back to a light palette
+- **WHEN** any page renders scrollable content
+- **THEN** its viewport and inner containers use the active theme rather than the platform default palette
 
-- **WHEN** any page renders content inside a scroll area (including Breeding results)
-- **THEN** the scroll viewport and inner containers use the dark token palette rather than a default light background
+### Requirement: Workspace shell uses a persistent collapsible sidebar
+The system SHALL compose the desktop around a persistent sidebar, workspace header, context or breadcrumb bar, primary content workspace, and contextual inspector or action drawer. Expanded and collapsed sidebar state SHALL persist, and the sidebar SHALL remain the stable navigation anchor on every page.
+
+#### Scenario: User collapses the sidebar
+- **WHEN** the user collapses the sidebar
+- **THEN** destination icons, active location, tooltips, and save context remain available while labels are hidden and the preference is restored on restart
+
+### Requirement: Native controls and application status remain distinct
+The system SHALL visually and interactively separate minimize, maximize, and close controls from application warnings, help, save state, and page actions.
+
+#### Scenario: Warning is present near window controls
+- **WHEN** an application warning is active
+- **THEN** it appears in the application header or status system and cannot be mistaken for an operating-system window action
