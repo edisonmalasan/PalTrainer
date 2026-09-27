@@ -124,6 +124,8 @@ def test_collection_lifecycle_states_distinguish_empty_search_loading_and_error(
     frame.resize(760, 520)
     frame.show()
     app.processEvents()
+    assert frame.loading_state.isHidden()
+    assert frame.error_state.isHidden()
 
     actions = []
     frame.stateActionRequested.connect(actions.append)
@@ -139,6 +141,8 @@ def test_collection_lifecycle_states_distinguish_empty_search_loading_and_error(
     assert actions[-1] == 'retry'
 
     frame.set_collection_state('ready')
+    assert frame.loading_state.isHidden()
+    assert frame.error_state.isHidden()
     assert not frame.empty_state.isHidden()
     frame.browser.add_item(['Ada'])
     frame.browser.search_input.setText('missing')

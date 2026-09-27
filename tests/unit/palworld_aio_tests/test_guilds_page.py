@@ -131,9 +131,21 @@ def test_router_and_compact_drawer_restore_guild_state(app):
     compact.set_guilds(_guilds())
     compact.browser.tree.setCurrentItem(
         _guild_item(compact, 'GUILD-AAA-111111'))
-    compact.resize(760, 650)
+    compact.set_members('GUILD-AAA-111111', _members())
+    compact.resize(912, 517)
     compact.show()
     app.processEvents()
     assert compact.entity_browser._compact
-    assert compact.entity_browser.inspector_host.maximumHeight() == 390
+    assert compact.entity_browser.inspector_host.maximumHeight() == 310
     assert not compact.entity_browser.inspector_host.isHidden()
+    assert compact.browser.tree.viewport().height() >= (
+        compact.browser.tree.visualItemRect(
+            _guild_item(compact, 'GUILD-AAA-111111')).height())
+    assert compact.members_browser.tree.viewport().height() >= (
+        compact.members_browser.tree.visualItemRect(
+            _member_item(compact, 'PLAYER-AAA-111111')).height())
+    assert compact.inspector._rows[0][0].isHidden()
+    assert not compact.inspector._rows[3][0].isHidden()
+    compact.resize(1200, 650)
+    app.processEvents()
+    assert not compact.inspector._rows[0][0].isHidden()

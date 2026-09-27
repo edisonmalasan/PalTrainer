@@ -100,6 +100,10 @@ class EntityBrowserFrame(QWidget):
                'The current save data could not be read. Try again.'),
             parent=self.browser,
         )
+        # These states are attached to the table only when requested. Hidden
+        # from creation, they cannot cover the search row while the page is ready.
+        self.loading_state.hide()
+        self.error_state.hide()
         self.empty_state.actionTriggered.connect(
             lambda: self.stateActionRequested.emit('empty'))
         self.no_result_state.actionTriggered.connect(
