@@ -17,6 +17,10 @@ PalTrainer is a desktop utility for inspecting, repairing, converting, and editi
 
 Every write operation must create a backup, validate the selected save location, and use an atomic replacement path. Real save files should be copied to a disposable test directory before editing.
 
+## Project status
+
+The UI/UX audit rehaul is complete. Its [archived OpenSpec change](openspec/changes/archive/2026-09-27-implement-audit-uiux-rehaul/proposal.md) contains the implementation plan, audit evidence, and verification record; the current behavior contracts are in [OpenSpec specs](openspec/specs/).
+
 ## Requirements
 
 - Python 3.11 or newer.
@@ -41,7 +45,7 @@ uv run python src/palworld_aio/main.py
 ```bash
 uv run pytest -c tests/pytest.ini
 uv run python -m compileall -q src tests
-uv run pyright
+uv run pyright src
 ```
 
 The test harness includes structural import/resource audits and opt-in save fixtures. Do not place personal saves in the repository; use documented fixture directories and sanitized copies.
