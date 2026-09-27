@@ -6,55 +6,25 @@ Defines the per-page layout, hierarchy, density, and interaction contracts for P
 
 ## Requirements
 
-### Requirement: Tools page presents a single save-hub with one grouped tool system
-
-The Tools page SHALL present a save-hub masthead (save state, save path with reveal affordance, Steam/GamePass load actions, and Players/Guilds/Bases/Pals metric chips that navigate to their pages) followed by exactly one grouped tool list system: tool entries SHALL NOT be repeated in a second quick-action/campaign surface. Tool entries SHALL be organized into labeled groups — Conversion (Convert Save Files, Convert GamePass ↔ Steam, Convert SteamID, Restore Map) and Management (Slot Injector, Character Transfer, Fix Host Save) — with every group containing at least two entries.
-
-#### Scenario: Populated Tools page structure
-
-- **WHEN** the Tools page is shown with a save loaded
-- **THEN** the masthead card shows the loaded state with save path, Steam/GamePass load buttons, and clickable metric chips; below it, exactly two tool groups (Conversion with 4 rows, Management with 3 rows) are present with no duplicate quick-action strip
-
-#### Scenario: Metric chips navigate
-
-- **WHEN** the user clicks the Players, Guilds, Bases, or Pals metric chip on the Tools page
-- **THEN** the application navigates to the corresponding page, preserving the existing navigation behavior
-
-### Requirement: Tool rows are visible actions with icon, title, and description
-
-Each Tools page tool entry SHALL render as an action row with a bundled-set icon tile, the tool title, and its one-line description always visible (not tooltip-only), with pointer cursor and hover feedback signaling clickability.
-
-#### Scenario: Tool row affordance
-
-- **WHEN** the Tools page renders a tool entry
-- **THEN** the row shows an icon from the bundled SVG set, the translated tool title, and a visible one-line description (including descriptions for Restore Map and Convert SteamID), and hovering the row shows hover styling with a pointing-hand cursor
-
-### Requirement: Tools page state-dependent save-hub content
-
-The Tools page save hub SHALL differentiate its no-save and loaded states: in the no-save state the drag-and-drop hint is visible with load guidance; in the loaded state the save path is shown with a reveal-in-explorer affordance and the drag-and-drop hint SHALL NOT be shown.
-
-#### Scenario: Drag hint suppressed when loaded
-
-- **WHEN** the Tools page save hub is in the loaded state
-- **THEN** the drag-and-drop hint label is not visible, and the save path is shown as a clickable affordance that reveals Level.sav in the file explorer
-
 ### Requirement: Plain section labels without dev jargon
 
 Content-page section labels SHALL present user-facing wording (translated where the page is translated); internal operation codenames (e.g. "OPS.SAVE_LEDGER", "OPS.FIELD REPORT", "OPS.CAMPAIGN") SHALL NOT appear as visible UI text on modernized pages.
 
 #### Scenario: Tools section labels read as UI copy
 
-- **WHEN** the Tools page renders its section labels
+- **WHEN** Tool Center renders its section labels
 - **THEN** no label shows an internal codename pattern such as "OPS.*" and each label reads as user-facing copy consistent with the en_US locale
 
 ### Requirement: Page content uses available width without dead regions
+Modernized pages SHALL size their content regions to use the available workspace at supported window sizes without reserved dead columns. Populated content SHALL not leave a dominant empty band, while maps and data-heavy editors SHALL prioritize their primary workspace rather than dashboard-card decoration.
 
-Modernized pages SHALL size their content regions to use the available canvas width at supported window sizes (1200px minimum) without reserved dead columns; page-level empty regions SHALL NOT dominate the populated page (populated content occupies the upper canvas such that no entirely empty full-width band taller than the content itself sits between content and the page bottom edge at default window size).
+#### Scenario: Populated Tool Center fills the workspace
+- **WHEN** the Tool Center is shown at the default desktop size
+- **THEN** categorized tool cards use a responsive layout, search and filters remain visible, and no empty region dominates the populated content
 
 #### Scenario: Populated Tools page fills the canvas
-
-- **WHEN** the Tools page is shown populated at default window size
-- **THEN** the tool-group columns split the available width into balanced groups and no single-column dead band taller than the tool rows sits below the content
+- **WHEN** the Tool Center replaces the former populated Tools page at the default desktop size
+- **THEN** tool discovery uses the available workspace without a reserved dead column or an empty band taller than the categorized tool content
 
 ### Requirement: Platform assets use correct bundled artwork
 
@@ -62,7 +32,7 @@ Platform-specific UI (Steam and GamePass load buttons and any platform badges) S
 
 #### Scenario: Steam and GamePass buttons render bundled artwork
 
-- **WHEN** the Tools page save hub renders the Steam and GamePass load buttons
+- **WHEN** Overview renders its Steam and GamePass load buttons
 - **THEN** both buttons show artwork from the bundled steam/gamepass SVG assets through the icon factory with token-appropriate colors, and no text renders in a Nerd Font family
 
 ### Requirement: Base Inventory page uses human-readable selection labels
@@ -151,7 +121,7 @@ All painter-drawn decorations in the Pal Editor (passive-skill overlay animation
 
 ### Requirement: Map overlay chrome is token-styled and browser columns stay readable
 
-The Map page overlay toolbar SHALL style its toggle buttons through the shared theme builder with an accent-based active state (no cyan, no hardcoded inline color stylesheets), the page ribbon zone caption SHALL match the page's navigation zone (World), and the map browser sidebar SHALL size its tree columns so no column header label truncates at the minimum window width.
+The Map page overlay toolbar SHALL style its toggle buttons through the shared theme builder with an accent-based active state (no cyan, no hardcoded inline color stylesheets), the workspace header SHALL identify the page's World zone, and the map browser sidebar SHALL size its tree columns so no column header label truncates at the minimum window width.
 
 #### Scenario: Active map toggle
 
@@ -196,9 +166,69 @@ The Breeding page SHALL present exactly one "Select a Pal" call-to-action while 
 - **WHEN** the Docs page renders lists, filters, sorts, badges, and detail cards
 - **THEN** no cyan-family hardcoded color values remain in the wiki styling
 
+### Requirement: Overview explains the loaded save and next actions
+The system SHALL use Overview as the default workspace after loading a save and SHALL summarize save identity, platform, modification time, backup/safety state, unsaved state, key entity counts, recent activity, and direct quick actions. With no save, it SHALL instead present focused open/drop guidance, recent saves, and utilities that genuinely require no loaded save.
 
+#### Scenario: Save loads successfully
+- **WHEN** a save finishes loading
+- **THEN** Overview answers what is loaded, whether it is safe, what it contains, whether it has pending changes, and which primary workflows can be opened next
 
+### Requirement: Tool Center declares purpose, prerequisites, and risk
+The system SHALL group all conversion, repair, recovery, transfer, injection, restore, and additional utilities by purpose. Each tool SHALL show a title, concise explanation, prerequisite state, risk level where relevant, and visible launch or prerequisite action, and SHALL report operation progress and result.
 
+#### Scenario: Tool requires a loaded save
+- **WHEN** a user views a tool whose declared requirements are not met
+- **THEN** the card explains the missing requirement and offers a relevant action instead of appearing mysteriously disabled
 
+### Requirement: World pages share entity browser and inspector behavior
+Players, Bases, Guilds, and Exclusions SHALL prioritize names and meaningful metadata, use common search/filter/sort/table behavior, open structured detail inspectors, expose direct links to related entities and editors, and show bulk actions only when selection makes them applicable. Exclusions SHALL provide a persistent Add Exclusion action in addition to context-menu entry points.
 
+#### Scenario: Player is selected
+- **WHEN** the user selects a player row
+- **THEN** the inspector shows structured identity, guild, activity, platform, technical details on demand, and direct Inventory, Pal Editor, and Guild actions
 
+#### Scenario: Empty exclusions list
+- **WHEN** a loaded save has no exclusions of the selected type
+- **THEN** the page explains the empty state and offers Add Exclusion without requiring right-click discovery
+
+### Requirement: Map is a first-class explorer workspace
+The Map page SHALL devote the majority of the workspace to the map, provide a structured explorer and contextual inspector, offer understandable layers and filters, consolidate zoom and coordinate controls, and keep selected markers linked to their World entities. Controls SHALL be labeled or have tooltips and accessible names.
+
+#### Scenario: User selects a map marker
+- **WHEN** the user selects a player, base, or other supported marker
+- **THEN** structured details and relevant entity actions appear without obscuring the primary map workspace
+
+### Requirement: Inventory editors share context and grid primitives
+Player Inventory and Base Inventory SHALL show explicit player or guild/base/container context, distinguish context selectors from inventory-category tabs, share inventory slot, quantity, rarity, selection, hover, preview, menu, search, filter, sort, and keyboard behavior, and provide meaningful empty/loading/unknown-structure states. Base containers SHALL be grouped with storage before dropped-item debris.
+
+#### Scenario: User opens Base Inventory with one valid guild and base
+- **WHEN** exactly one valid guild and base exist
+- **THEN** the editor selects them automatically, exposes change-context controls, and presents available storage containers before debris containers
+
+### Requirement: Pal Editor separates sources, collection, and details
+The Pal Editor SHALL clearly separate player/source context, party and Palbox collection, and the selected-Pal inspector; support efficient box navigation at large counts; distinguish editable values from computed statistics; use consistent Pal presentation; and separate safe, bulk, and destructive actions. Bulk actions SHALL appear only with applicable selection and destructive flows SHALL provide affected counts and preview.
+
+#### Scenario: User selects multiple Pals
+- **WHEN** multi-selection becomes active
+- **THEN** a contextual bulk action surface shows the selection count, applicable operations, preview where supported, and a clearly isolated destructive action
+
+### Requirement: JSON Editor supports understandable tree and raw workflows
+The JSON Editor SHALL provide a persistent clickable path breadcrumb, explicit search and match navigation, readable Key/Value/Type tree presentation, clear import/export/refresh actions, validation for edited content, and a raw JSON mode when safe editing support is available.
+
+#### Scenario: User navigates a nested JSON value
+- **WHEN** a nested row is selected
+- **THEN** its full path is visible, ancestor segments are navigable, and editable content is validated before application
+
+### Requirement: Reference and system workspaces use the same product model
+Items, Pals, Skills, Technologies, breeding, world/internal data, Activity, Backups, Settings, About, and Diagnostics SHALL use the same shell, search, cards/tables, inspectors, states, and linking conventions as save-editing pages.
+
+#### Scenario: User opens a referenced item
+- **WHEN** an inventory item links to its reference record
+- **THEN** the Reference workspace opens that item with related context and navigation history preserved
+
+### Requirement: Every existing and future screen adopts the shared workspace system
+No existing, hidden, experimental, save-gated, context-menu-only, or currently inaccessible screen SHALL retain legacy navigation, dialog, table, button, spacing, or state styling. New screens SHALL declare navigation placement, prerequisites, context, risk, loading, empty, error, and result behavior using the shared system.
+
+#### Scenario: Previously inaccessible tool becomes available
+- **WHEN** an underlying loading bug is resolved and the tool can open
+- **THEN** it appears within the Tool Center and renders entirely with the new shell and shared components
