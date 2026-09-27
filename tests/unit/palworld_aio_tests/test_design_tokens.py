@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 import pytest
 from tests.dynamic_importer import import_from
 
@@ -129,6 +130,26 @@ def test_build_qss_contains_core_selectors():
     for selector in ('QPushButton', 'QLineEdit', 'QTreeWidget', 'QMenu',
                      'QToolTip', 'QScrollBar', 'QTabBar', 'QHeaderView::section'):
         assert selector in qss, f'missing {selector}'
+
+
+def test_pal_trait_controls_keep_distinct_selected_states():
+    qss = qss_builder.build_qss('dark')
+    palette = tokens.resolve('dark')
+    for role in ('danger', 'warning', 'special', 'info'):
+        selector = f'QPushButton[class="palTrait"][traitRole="{role}"]:checked'
+        assert selector in qss
+        rule = qss.split(selector, 1)[1].split('}', 1)[0]
+        assert palette[f'{role}_bg'] in rule
+        assert palette[role] in rule
+    assert 'QPushButton[class="palTrait"]:focus' in qss
+    assert 'QPushButton[class="palMini"]:disabled' in qss
+
+
+def test_deployed_theme_matches_builder_without_legacy_extras():
+    themes = Path(__file__).resolve().parents[3] / 'resources' / 'ui' / 'themes'
+    deployed = (themes / 'darkmode.qss').read_text(encoding='utf-8-sig')
+    assert deployed.endswith(qss_builder.build_qss('dark'))
+    assert not (themes / 'legacy-dark.qss').exists()
 
 
 def test_build_qss_no_unknown_theme():

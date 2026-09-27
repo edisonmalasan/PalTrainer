@@ -177,7 +177,7 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         self.next_box_btn.clicked.connect(self._next_box)
         self.box_label = QLabel(t('pal_editor.box', n=1) if t else 'Box 1')
         self.box_label.setObjectName('boxHeader')
-        self.box_label.setFixedWidth(110)
+        self.box_label.setMinimumWidth(110)
         self.box_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         mode_bar.addWidget(self.box_label)
         # uiux-audit-remediation 7.5 (Phase 3.3): compact jump-to-box selector
@@ -384,11 +384,16 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         self.workspace_splitter.setSizes([900, 360])
         root.addWidget(self.workspace_splitter, 1)
         self._responsive_mode = ''
+        self._compact_box_label = False
         self._apply_responsive_layout()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._apply_responsive_layout()
+        compact = self.width() < 1200
+        if compact != self._compact_box_label:
+            self._compact_box_label = compact
+            self._update_box_label()
 
     def _apply_responsive_layout(self):
         if not hasattr(self, 'workspace_splitter'):
@@ -540,18 +545,32 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         if self._palbox_mode == 'dps':
             total = (self.dps_total_slots + 29) // 30 if self.dps_total_slots else 1
             count = len(self.dps_pals)
-            self.box_label.setText(t('pal_editor.dps_count', n=self.current_box_index, m=total, count=count) if t else f'DPS {self.current_box_index}/{total} ({count})')
+            full_label = t('pal_editor.dps_count', n=self.current_box_index, m=total, count=count) if t else f'DPS {self.current_box_index}/{total} ({count})'
         else:
             count = len(self.palbox_pal_dict)
             total = self._get_max_box()
-            self.box_label.setText(
-                t(
-                    'pal_editor.box_count',
-                    n=self.current_box_index,
-                    m=total,
-                    count=count,
-                ) if t else
-                f'Box {self.current_box_index} of {total} ({count})')
+            full_label = t(
+                'pal_editor.box_count',
+                n=self.current_box_index,
+                m=total,
+                count=count,
+            ) if t else f'Box {self.current_box_index} of {total} ({count})'
+        self.box_label.setToolTip(full_label)
+        if self._compact_box_label:
+            variants = (
+                f'{self.current_box_index}/{total} ({count})',
+                f'{self.current_box_index}/{total}·{count}',
+                f'{self.current_box_index}/{total}',
+            )
+            available = max(0, self.box_label.width() - 4)
+            label = next(
+                (value for value in variants
+                 if self.box_label.fontMetrics().horizontalAdvance(value) <= available),
+                variants[-1],
+            )
+        else:
+            label = full_label
+        self.box_label.setText(label)
         self._sync_box_jump_spin()
     def _goto_box(self, idx):
         """Shared navigation core for prev/next and the jump control
@@ -2315,17 +2334,18 @@ class PalEditorWidget(QWidget, BulkOperationMixin):
         il.addWidget(lbl)
         rename_edit = QLineEdit()
         rename_edit.setPlaceholderText(t('pal_editor.bulk_rename_placeholder'))
-        rename_edit.setStyleSheet('QLineEdit { background: rgba(0,0,0,0.4); color: #ECE7E0; border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 8px 10px; font-size: 12px; } QLineEdit:focus { border-color: #F59E0B; }')
         rename_edit.setFocus()
         il.addWidget(rename_edit)
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         cancel_btn = QPushButton(t('pal_editor.bulk_rename_cancel'))
-        cancel_btn.setStyleSheet('QPushButton { background: rgba(255,255,255,0.05); color: #A69F94; border: 1px solid rgba(236,231,224,0.10); border-radius: 4px; padding: 6px 16px; font-size: 12px; font-weight: 600; } QPushButton:hover { background: rgba(236,231,224,0.10); color: #FFFFFF; }')
+        cancel_btn.setProperty('class', 'secondary')
+        cancel_btn.setProperty('controlRole', 'secondary')
         cancel_btn.clicked.connect(dlg.reject)
         btn_row.addWidget(cancel_btn)
         apply_btn = QPushButton(t('pal_editor.bulk_rename_apply'))
-        apply_btn.setStyleSheet('QPushButton { background: rgba(232,180,76,0.15); color: #E8B44C; border: 1px solid rgba(232,180,76,0.3); border-radius: 4px; padding: 6px 20px; font-size: 12px; font-weight: 700; } QPushButton:hover { background: rgba(232,180,76,0.25); color: #FFFFFF; }')
+        apply_btn.setProperty('class', 'primary')
+        apply_btn.setProperty('controlRole', 'primary')
         btn_row.addWidget(apply_btn)
         il.addLayout(btn_row)
         dlg.content_layout.addWidget(inner)

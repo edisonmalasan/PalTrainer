@@ -1,9 +1,7 @@
 """QSS builder: generates the application stylesheet from design tokens.
 
-Global element rules live here (single source of truth). objectName/property
-rules that belong to specific screens are kept in the transitional
-``resources/ui/themes/legacy-dark.qss`` extras file until those screens migrate;
-``scripts/scrs/build_theme.py`` assembles the deployed artifact.
+Global and screen-specific rules live here. ``scripts/scrs/build_theme.py``
+assembles the deployed stylesheet from these token-driven rules.
 
 Rules of the road:
 - No raw hex/rgba literals in widgets; widgets set properties, this builder
@@ -177,6 +175,17 @@ QPushButton#styledComboButton {{
 QPushButton#styledComboButton:hover {{ border-color: {p['border_strong']}; }}
 QPushButton#styledComboButton:focus {{ border-color: {p['accent_border_strong']}; }}
 QPushButton#styledComboButton:disabled {{ color: {p['text_disabled']}; }}
+QPushButton#toggleCheckButton {{
+    background: {p['surface']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px;
+    padding: 0;
+}}
+QPushButton#toggleCheckButton:checked {{
+    background: {p['accent_bg_strong']};
+    border-color: {p['accent_border_strong']};
+}}
+QPushButton#toggleCheckButton:focus {{ border-color: {p['focus_ring']}; }}
 QFrame#styledComboPopup {{ background: transparent; }}
 QListWidget#styledComboList {{
     background: {p['surface_raised']};
@@ -366,6 +375,39 @@ QPushButton[class="chip"]:focus, QPushButton[class="filter"]:focus, QPushButton[
 QPushButton[class="chip"]:disabled, QPushButton[class="filter"]:disabled, QPushButton[class="tab"]:disabled {{ background: {p['surface']}; color: {p['text_disabled']}; border-color: {p['border']}; }}
 
 /* ---- selection views ---- */
+QPushButton[class="palTrait"] {{ background: transparent; border: 1px solid {p['border']}; border-radius: {RADIUS['sm']}px; padding: 0; }}
+QPushButton[class="palTrait"]:hover {{ background: {p['surface_hover']}; }}
+QPushButton[class="palTrait"]:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QPushButton[class="palTrait"]:disabled {{ background: transparent; border-color: {p['border']}; color: {p['text_disabled']}; }}
+QPushButton[class="palTrait"][traitRole="danger"]:checked {{ background: {p['danger_bg']}; border-color: {p['danger']}; color: {p['danger']}; }}
+QPushButton[class="palTrait"][traitRole="warning"]:checked {{ background: {p['warning_bg']}; border-color: {p['warning']}; color: {p['warning']}; }}
+QPushButton[class="palTrait"][traitRole="special"]:checked {{ background: {p['special_bg']}; border-color: {p['special']}; color: {p['special']}; }}
+QPushButton[class="palTrait"][traitRole="info"]:checked {{ background: {p['info_bg']}; border-color: {p['info']}; color: {p['info']}; }}
+QPushButton[class="palTrait"][traitRole="success"] {{ color: {p['success']}; }}
+QPushButton[class="palTrait"][traitRole="warning"] {{ color: {p['warning']}; }}
+QPushButton[class="palMini"] {{ background: {p['info_bg']}; color: {p['info']}; border: 1px solid {p['info_border']}; border-radius: {RADIUS['sm']}px; padding: 0; }}
+QPushButton[class="palMini"]:hover {{ background: {p['info_border']}; }}
+QPushButton[class="palMini"]:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QPushButton[class="palMini"]:disabled {{ background: transparent; color: {p['text_disabled']}; border-color: {p['border']}; }}
+QPushButton[class="palMini"][traitRole="warning"] {{ background: {p['warning_bg']}; color: {p['warning']}; border-color: {p['warning_border']}; }}
+QPushButton[class="palMini"][traitRole="warning"]:hover {{ background: {p['warning_border']}; }}
+QPushButton[class="palOverlayButton"] {{ background: transparent; border: none; padding: 0; }}
+QPushButton[class="palOverlayButton"]:hover {{ background: transparent; }}
+QPushButton[class="palOverlayButton"]:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QPushButton[class="palCopy"] {{ background: transparent; color: {p['text_secondary']}; border: none; padding: 0; }}
+QPushButton[class="palCopy"]:hover {{ color: {p['info']}; }}
+QPushButton[class="palCopy"]:focus {{ border: {FOCUS['width']}px solid {p['focus_ring']}; }}
+QLabel#boxHeader {{ color: {p['text_secondary']}; font-size: {TYPE['caption'][0]}px; }}
+QWidget#pickerPopup {{ background: {p['surface_raised']}; border: 1px solid {p['accent_border']}; border-radius: {RADIUS['md']}px; }}
+QListWidget#pickerList {{ background: transparent; border: none; }}
+QListWidget#pickerList::item {{ padding: 3px 8px; }}
+QListWidget#pickerList::item:hover {{ background: {p['surface_hover']}; }}
+QListWidget#pickerList::item:selected {{ background: {p['accent_bg_strong']}; color: {p['text']}; }}
+QListWidget#dataList {{ background: {p['surface_input']}; border: 1px solid {p['border']}; }}
+QTreeWidget#baseTree, QTreeWidget#playerTree {{ border: none; background: transparent; }}
+QTreeWidget#baseTree::item, QTreeWidget#playerTree::item {{ padding: 2px 4px; }}
+QScrollArea#subPopupScroll, QScrollArea#contextMenuScroll {{ background: transparent; border: none; border-radius: 0; }}
+QSplitter#collapsibleSplitter::handle:horizontal {{ background: {p['border']}; width: 16px; }}
 QTreeWidget, QTreeView, QListWidget, QTableWidget, QTableView, QListView {{
     background: transparent;
     color: {p['text']};

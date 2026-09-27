@@ -2,8 +2,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QStackedWidget
 from palworld_aio.ui.tabs.docs.wiki_tab import WikiTab
 
 class DocsTab(QWidget):
-    """Reference shelf (plan 015-r02, top-nav-shell 4.5): ribbon + reader
-    stack. The single-item sub-tab bar is dropped."""
+    """Reference reader hosted by the workspace shell."""
 
     def __init__(self, parent=None):
         super().__init__(parent)

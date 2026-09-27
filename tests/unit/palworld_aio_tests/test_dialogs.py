@@ -27,6 +27,27 @@ MIGRATION_INVENTORY = (
 _app = None
 
 
+def test_live_ui_has_no_inline_generic_control_themes():
+    root = PROJECT_ROOT / 'src' / 'palworld_aio'
+    generic_selectors = (
+        'QPushButton', 'QTreeWidget', 'QTableWidget', 'QDialog', 'QListWidget',
+    )
+    offenders = []
+    for path in root.rglob('*.py'):
+        source = path.read_text(encoding='utf-8-sig')
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if (not isinstance(node, ast.Call)
+                    or not isinstance(node.func, ast.Attribute)
+                    or node.func.attr != 'setStyleSheet'
+                    or not node.args):
+                continue
+            style_source = ast.get_source_segment(source, node.args[0]) or ''
+            if any(selector in style_source for selector in generic_selectors):
+                offenders.append((path.relative_to(root), node.lineno))
+    assert not offenders
+
+
 @pytest.fixture(scope='module')
 def app():
     global _app

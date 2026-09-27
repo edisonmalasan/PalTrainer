@@ -358,10 +358,7 @@ class PalInfoDisplayMixin:
             else:
                 self.info_fav_btn.setIcon(QIcon())
                 self.info_fav_btn.setText('★' * fav_idx_val if fav_idx_val else '★')
-            if fav_idx_val >= 1 and fav_idx_val <= 3:
-                self.info_fav_btn.setStyleSheet(f'QPushButton {{ background: {_P["warning_bg"]}; border: 1px solid {_P["warning"]}; border-radius: 4px; }} QPushButton:hover {{ background: rgba(251,191,36,0.25); }}')
-            else:
-                self.info_fav_btn.setStyleSheet('QPushButton { background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; } QPushButton:hover { background: rgba(255,255,255,0.08); }')
+            self.info_fav_btn.setChecked(1 <= fav_idx_val <= 3)
             soul_total = sum((int(x) for x in (rank_hp_val, rank_atk_val, rank_def_val, rank_craft_val) if str(x).isdigit()))
             self.stat_plus_lbl.setText(f'+{soul_total}')
             bp = _icons._get_ui_icon_pixmap('buildup', 14)

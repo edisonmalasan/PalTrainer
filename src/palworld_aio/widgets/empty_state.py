@@ -1,9 +1,10 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QSizePolicy
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy
 from PyQt6.QtCore import Qt, pyqtSignal
 from palworld_aio import constants
 from palworld_aio.ui.chrome import icons as app_icons
+from palworld_aio.ui.chrome.components import make_button
 class EmptyState(QWidget):
-    """Shared empty-state surface: glyph, title, hint, optional action.
+    """Shared empty-state surface: vector icon, title, hint, optional action.
 
     Replaces the per-tab placeholder-label duplicates and gives panels without
     any empty indication (Missions, Technology) a consistent one.
@@ -44,16 +45,7 @@ class EmptyState(QWidget):
             )
             layout.addWidget(hint_label)
         if action_text:
-            action_btn = QPushButton(action_text)
-            action_btn.setCursor(Qt.PointingHandCursor)
-            action_btn.setFixedHeight(constants.CONTROL_H_MD)
-            action_btn.setStyleSheet(
-                f'QPushButton {{ background: {constants.ACCENT_BG}; color: {constants.ACCENT}; '
-                f'border: 1px solid {constants.ACCENT_BORDER}; border-radius: {constants.RADIUS_MD}px; '
-                'padding: 4px 16px; font-weight: 600; font-size: '
-                f'{constants.FONT_SIZE_PX_BODY}px; }} '
-                f'QPushButton:hover {{ background: {constants.ACCENT_BG_STRONG}; color: {constants.EMPHASIS}; }}'
-            )
+            action_btn = make_button(action_text, 'primary', parent=self)
             action_btn.clicked.connect(self.action_clicked.emit)
             btn_row = QVBoxLayout()
             btn_row.setAlignment(Qt.AlignCenter)

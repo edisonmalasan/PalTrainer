@@ -742,7 +742,7 @@ class PalCardWidget(QFrame):
 
         lock_btn.setFixedSize(24, 24)
 
-        lock_btn.setStyleSheet('QPushButton { background: transparent; border: none; font-size: 14px; color: rgba(255,255,255,0.3); } QPushButton:hover { color: #FFFFFF; }')
+        lock_btn.setProperty('class', 'icon')
 
         lock_btn.setCheckable(True)
 
@@ -761,5 +761,4 @@ class PalCardWidget(QFrame):
         else:
 
             self.setStyleSheet(slot_full('QFrame#palCardNew'))
-
 

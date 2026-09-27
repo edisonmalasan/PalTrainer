@@ -54,6 +54,25 @@ def test_jump_spin_exists_with_tooltip(editor):
     assert editor.box_jump_spin.accessibleName() == 'Jump to box'
 
 
+def test_box_count_stays_readable_at_minimum_width(app):
+    qss = import_from('palworld_aio.ui.chrome.qss_builder').build_qss('dark')
+    compact_editor = widget_mod.PalEditorWidget(None)
+    compact_editor.setStyleSheet(qss)
+    compact_editor.resize(1024, 700)
+    compact_editor.show()
+    app.processEvents()
+    compact_editor.total_slots = 960
+    compact_editor.palbox_pal_dict = {i: object() for i in range(218)}
+    compact_editor._update_box_label()
+
+    assert compact_editor.box_label.text() in ('1/32 (218)', '1/32·218', '1/32')
+    assert compact_editor.box_label.toolTip() == 'Box 1 of 32 (218 Pals)'
+    assert compact_editor.box_label.fontMetrics().horizontalAdvance(
+        compact_editor.box_label.text()) <= compact_editor.box_label.width()
+    compact_editor.close()
+    compact_editor.deleteLater()
+
+
 def test_jump_spin_styled_via_qss_not_inline(editor):
     qss_mod = import_from('palworld_aio.ui.chrome.qss_builder')
     built = qss_mod.build_qss('dark')
