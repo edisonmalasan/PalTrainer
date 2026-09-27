@@ -213,3 +213,11 @@ def test_generic_context_tree_uses_shared_table_styling():
     assert "setObjectName('dataTree')" in source
     assert "tr('ui.table.accessible'" in source
     assert 'setStyleSheet(' not in source
+
+
+def test_paldefender_tree_uses_shared_data_table_style():
+    source = (
+        PROJECT_ROOT / 'src' / 'palworld_aio' / 'editor' / 'dialogs.py'
+    ).read_text(encoding='utf-8-sig')
+    assert "self.tree.setObjectName('dataTree')" in source
+    assert 'self.tree.setStyleSheet(' not in source

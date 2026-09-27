@@ -139,6 +139,7 @@ class BreadcrumbBar(QFrame):
             item = self._layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                widget.hide()
                 widget.deleteLater()
         self._items = list(items)
         self._buttons.clear()

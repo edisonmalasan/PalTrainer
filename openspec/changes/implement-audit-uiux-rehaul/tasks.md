@@ -94,11 +94,11 @@
 - [x] 9.3 Protect open-file, open-folder, recent-save, global-drop, reload-from-disk, and external-change flows from replacing pending work; verify save-and-open, discard, and cancel branches with temporary fixture paths.
 - [x] 9.4 Add operation-aware automatic/offer backup policy and failure reporting that states whether the original save changed and where recovery exists; verify safe write, failed write, and restore scenarios without committing real saves.
 - [x] 9.5 Assess Palworld process detection reliability using existing platform capabilities, implement the running-game warning only if dependable, otherwise record the audit-approved deviation; verify either behavior or documented omission.
-- [ ] 9.6 Complete keyboard traversal, focus visibility, accessible names, tooltips, context-menu alternatives, dialog focus trapping/restoration, and command navigation across every route; run automated accessibility contract tests and a manual keyboard smoke pass.
-- [ ] 9.7 Verify semantic states remain distinguishable without color, text contrast meets the chosen target, technical text remains readable, and reduced-motion mode preserves feedback; record results in the visual QA artifacts.
-- [ ] 9.8 Complete responsive behavior at 1450x800, 1200x750, and 1024x700: sidebar collapse, inspector drawers, toolbar overflow, readable headers, map bounds, and persisted splitter state; run layout-contract and offscreen render tests at all sizes.
-- [ ] 9.9 Profile sidebar navigation, inspector opening, search, inventory switching, Palbox navigation, and large operations against the audit budgets; remove avoidable GUI-thread work or record measured exceptions with rationale.
-- [ ] 9.10 Remove the persistent bottom status-strip presentation, route concise feedback to state/notifications/Activity and raw output to Diagnostics, and verify no raw HTTP/traceback/byte statistics appear in user-facing surfaces.
+- [x] 9.6 Complete keyboard traversal, focus visibility, accessible names, tooltips, context-menu alternatives, dialog focus trapping/restoration, and command navigation across every route; run automated accessibility contract tests and a manual keyboard smoke pass.
+- [x] 9.7 Verify semantic states remain distinguishable without color, text contrast meets the chosen target, technical text remains readable, and reduced-motion mode preserves feedback; record results in the visual QA artifacts.
+- [x] 9.8 Complete responsive behavior at 1450x800, 1200x750, and 1024x700: sidebar collapse, inspector drawers, toolbar overflow, readable headers, map bounds, and persisted splitter state; run layout-contract and offscreen render tests at all sizes.
+- [x] 9.9 Profile sidebar navigation, inspector opening, search, inventory switching, Palbox navigation, and large operations against the audit budgets; remove avoidable GUI-thread work or record measured exceptions with rationale.
+- [x] 9.10 Remove the persistent bottom status-strip presentation, route concise feedback to state/notifications/Activity and raw output to Diagnostics, and verify no raw HTTP/traceback/byte statistics appear in user-facing surfaces.
 - [ ] 9.11 Run the full accessibility, state, safety, responsive, performance, i18n, resource-integrity, and visual-harness checks and update the audit checkpoint.
 
 ## 10. Audit Closure and Release Verification

@@ -166,6 +166,34 @@ QComboBox QAbstractItemView::item {{
     border-radius: {RADIUS['sm']}px;
     min-height: {HEIGHT['compact']}px;
 }}
+QPushButton#styledComboButton {{
+    background: {p['surface_input']};
+    color: {p['text']};
+    border: 1px solid {p['border']};
+    border-radius: {RADIUS['sm']}px;
+    padding: 4px 8px;
+    text-align: left;
+}}
+QPushButton#styledComboButton:hover {{ border-color: {p['border_strong']}; }}
+QPushButton#styledComboButton:focus {{ border-color: {p['accent_border_strong']}; }}
+QPushButton#styledComboButton:disabled {{ color: {p['text_disabled']}; }}
+QFrame#styledComboPopup {{ background: transparent; }}
+QListWidget#styledComboList {{
+    background: {p['surface_raised']};
+    color: {p['text']};
+    border: 1px solid {p['border_strong']};
+    border-radius: {RADIUS['md']}px;
+    padding: {SPACING['xs']}px;
+    outline: none;
+}}
+QListWidget#styledComboList::item {{
+    padding: 4px 10px;
+    border-radius: {RADIUS['sm']}px;
+    min-height: {HEIGHT['compact']}px;
+}}
+QListWidget#styledComboList::item:selected {{ background: {p['accent_bg_strong']}; color: {p['text']}; }}
+QListWidget#styledComboList::item:hover {{ background: {p['surface_hover']}; }}
+QListWidget#styledComboList::item:disabled {{ color: {p['text_disabled']}; }}
 QSpinBox::up-button, QSpinBox::down-button {{
     background: {p['surface_raised']};
     border: none;

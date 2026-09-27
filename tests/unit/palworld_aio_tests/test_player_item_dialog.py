@@ -48,6 +48,20 @@ def test_item_and_ability_bulk_flow_exposes_review_and_backup(dialog):
     assert dialog.workflow_review.review_value.text()
 
 
+def test_item_actions_use_shared_button_roles(dialog):
+    expected = {
+        dialog.add_all_effigies_btn: 'warning',
+        dialog.add_all_key_items_btn: 'secondary',
+        dialog.unlock_all_map_btn: 'warning',
+        dialog.modify_slots_btn: 'secondary',
+        dialog.ability_apply_btn: 'primary',
+    }
+    for button, role in expected.items():
+        assert button.property('controlRole') == role
+        assert button.styleSheet() == ''
+        assert button.accessibleName() == button.text()
+
+
 def test_add_item_keeps_existing_signal_contract_and_reports_result(
         dialog, monkeypatch):
     from PyQt6.QtWidgets import QMessageBox

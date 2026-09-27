@@ -103,6 +103,22 @@ pending state, and More actions fit on one row, while all seven optional
 commands remain in the overflow menu. A width-specific regression test covers
 that real action count.
 
+The final world-render pass also caught a one-frame breadcrumb remnant and a
+temporarily narrow brand label after responsive layout changes. Retired chips
+now hide immediately when routes replace them, and the world capture waits
+for Qt to activate the resized layout. The re-rendered 1450×800 Player
+Inventory and Base Inventory and 1024×700 Map images show the full brand,
+clean breadcrumbs, populated editor controls, and map explorer without a
+blank or hybrid shell.
+
+The user performed the required foreground keyboard smoke pass on 2026-09-27
+and reported that all steps passed: visible Tab focus through About, Ctrl+K
+route selection, Escape focus restoration, Shift+F10 on a selected Map explorer
+row after loading the dummy save, and readable Save/More actions at about
+1024×700. The desktop control bridge exposed no native app target, so this
+manual observation is explicitly user-reported; the route, dialog, context
+menu, and size contracts are independently covered by automated tests.
+
 An offscreen synthetic benchmark on 2026-09-27 used 72 route navigations,
 30 inspector openings, 30 searches over 250 rows, 30 empty inventory tab
 switches, and 30 empty Palbox page changes. Median / p95 times on this host:

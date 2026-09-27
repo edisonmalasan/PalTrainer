@@ -55,6 +55,15 @@ def test_breadcrumb_context_emits_stable_identifier(app):
     assert bar._buttons['player:1'].accessibleName() == 'Player: Hathaway'
 
 
+def test_breadcrumb_replacement_hides_retired_chips_immediately(app):
+    bar = header_mod.BreadcrumbBar()
+    bar.set_items([header_mod.ContextItem('tools', 'Tools')])
+    old = bar._buttons['tools']
+    bar.set_items([header_mod.ContextItem('about', 'About')])
+    assert old.isHidden()
+    assert bar._buttons['about'].text() == 'About'
+
+
 def test_pending_changes_never_hides_state(app):
     pending = header_mod.PendingChangesButton()
     assert pending.count == 0

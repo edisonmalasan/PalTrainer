@@ -29,6 +29,8 @@ def _capture(app, widget, path: Path, width: int, height: int) -> dict[str, int 
     widget.resize(width, height)
     widget.show()
     app.processEvents()
+    widget.layout().activate()
+    app.processEvents()
     pixmap = widget.grab()
     if pixmap.isNull() or not pixmap.save(str(path), 'PNG'):
         raise RuntimeError(f'Could not render {path.name}')
