@@ -2,6 +2,33 @@
 
 Every criterion is listed below with its closest automated or visual evidence. Test filenames refer to `tests/unit/palworld_aio_tests/` unless otherwise stated; render scripts live under `scripts/scrs/`. Generated images and the copied dummy save remain outside the repository. **Open** rows need Phase 10 work before this ledger can close.
 
+## Phase 1–7 migration cross-check
+
+The route, dialog, popup, context-menu, and stylesheet entries are individually owned in `migration-inventory.md`. The ranges below cover every completed Phase 1–7 task; the named suites and render artifacts were inspected against those entries. Final release checks remain in tasks 10.3–10.6.
+
+| Tasks | Implemented surface and evidence |
+|---|---|
+| 1.1–1.4 | `AUDIT.md` checkpoint, `migration-inventory.md`, `test_main_window.py` characterization, `render_uiux_baseline.py` no-save/loaded/dialog/1024×700 baseline. |
+| 2.1–2.3 | `test_design_tokens.py`, `test_font_registry.py`, `test_icon_factory.py`, `test_components.py`; bundled fonts/icons and shared control roles. |
+| 2.4–2.6 | `test_workspace_header.py`, `test_entity_browser.py`, `test_table_inspector.py`, `test_state_views.py`; default/minimum world renders. |
+| 2.7–2.9 | `test_content_cards.py`, `test_pal_editor_tab.py`, `test_dialogs.py`, `test_localization.py`; shared slot, Pal, dialog, and localized resources. |
+| 3.1–3.3 | `test_routes.py`, `test_workspace_context.py`, `test_router.py`; route/context/history contracts. |
+| 3.4–3.6 | `test_sidebar.py`, `test_workspace_shell.py`, `test_main_window.py`; live shell traversal at default/minimum sizes. |
+| 3.7–3.10 | `test_command_palette.py`, `test_global_search.py`, `test_workspace_settings.py`, `test_localization.py`; Phase 3 render/checkpoint evidence. |
+| 4.1–4.2 | `test_overview_page.py`, `test_main_window.py`; loaded and no-save Overview renders. |
+| 4.3–4.4 | `test_tool_registry.py`, `test_tool_center_page.py`, `test_tools_tab.py`; requirement-aware launcher parity. |
+| 4.5–4.7 | `test_operation_journal.py`, `test_activity_page.py`, `test_backups_page.py`, `test_backup_catalog.py`; Phase 4 renders and checkpoint. |
+| 5.1–5.3 | `test_players_page.py`, `test_bases_page.py`, `test_guilds_page.py`, `test_entity_browser.py`; world workspace matrix. |
+| 5.4–5.6 | `test_guild_assign_dialog.py`, `test_exclusions_page.py`, `test_map_workspace.py`, `test_map_zoom_controls.py`; source/review and map renders. |
+| 5.7–5.8 | `test_state_views.py`, `test_router.py`, `render_world_workspaces.py`; no-save/selected/minimum-size matrix. |
+| 6.1–6.3 | `test_inventory_chip.py`, `test_content_cards.py`, `test_inventory_tab.py`; populated disposable-save Player Inventory render. |
+| 6.4–6.6 | `test_base_inventory_chips.py`, `test_content_cards.py`; Base Inventory default/minimum renders. |
+| 6.7–6.9 | `test_state_views.py`, `test_dialogs.py`, `test_base_inventory_chips.py`; inventory state/dialog and checkpoint evidence. |
+| 7.1–7.4 | `test_pal_editor_tab.py`, `test_pal_editor_box_jump.py`, `test_pal_editor_toolbar.py`; 218-Pal disposable-save renders at 1450×800 and 1024×700. |
+| 7.5–7.6 | `test_pal_editor_global_ops.py`, `test_pal_dialog_migration.py`, `test_player_item_dialog.py`, `test_player_pal_dialog.py`; bulk affected-count and dialog contracts. |
+| 7.7–7.8 | `test_json_editor_breadcrumb.py`, `test_main_window.py`; structured JSON navigation and validated raw-mode boundary. |
+| 7.9–7.10 | `test_wiki_tab.py`, `test_breeding_hint.py`, `test_routes.py`, `test_localization.py`; Reference matrix and checkpoint evidence. |
+
 ## Application Shell
 
 | Criterion | Evidence | Status |
@@ -175,14 +202,13 @@ Every criterion is listed below with its closest automated or visual evidence. T
 | Currently broken Tool-tab screens use the new system when accessible. | test_tool_registry.py; test_tools_tab.py | Provisional: final smoke pending |
 | No legacy tabs remain. | test_main_window.py; test_dialogs.py | Provisional: final smoke pending |
 | No legacy dialogs remain. | test_dialogs.py; AUDIT Slot Injector deviation | Provisional: final smoke pending |
-| No legacy table styling remains. | test_dialogs.py; generic-style search (open) | Open: task 10.2 |
-| No legacy button styling remains. | test_player_item_dialog.py; generic-style search (open) | Open: task 10.2 |
+| No legacy table styling remains. | test_dialogs.py generic-control scan; tokenized `baseTree`/`playerTree` rules; regenerated `darkmode.qss` | Verified in task 10.2 |
+| No legacy button styling remains. | test_dialogs.py generic-control scan; test_design_tokens.py; selected-Pal default/minimum renders | Verified in task 10.2 |
 | No legacy navigation remains. | test_main_window.py; AppBar/NavStrip structural search | Provisional: final smoke pending |
 
 
 ## Evidence still required
 
-- Complete the live generic table and button style audit (task 10.2).
 - Complete the release smoke and final visual matrix (tasks 10.5–10.6).
 - Re-run the full suite and type check after the last implementation edit (tasks 10.3–10.4).
 

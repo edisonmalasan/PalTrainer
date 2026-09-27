@@ -103,8 +103,8 @@
 
 ## 10. Audit Closure and Release Verification
 
-- [ ] 10.1 Cross-check every Phase 1–7 migration item and all acceptance criteria in `AUDIT.md` against implemented behavior, linking each criterion to tests or visual evidence and recording deliberate deviations without silently narrowing scope.
-- [ ] 10.2 Confirm the route/page/dialog/style inventory contains no live `AppBar`/`NavStrip`, legacy page ribbons, legacy table/button/dialog styling, glyph-font icons, unexplained disabled tools, or unowned screens; verify with structural searches and route traversal.
+- [x] 10.1 Cross-check every Phase 1–7 migration item and all acceptance criteria in `AUDIT.md` against implemented behavior, linking each criterion to tests or visual evidence and recording deliberate deviations without silently narrowing scope.
+- [x] 10.2 Confirm the route/page/dialog/style inventory contains no live `AppBar`/`NavStrip`, legacy page ribbons, legacy table/button/dialog styling, glyph-font icons, unexplained disabled tools, or unowned screens; verify with structural searches and route traversal.
 - [ ] 10.3 Run `uv run pytest -c tests/pytest.ini` and record the exact outcome in both the OpenSpec task status and audit checkpoint.
 - [ ] 10.4 Run `uv run python -m compileall -q src tests` and `uv run pyright src`, resolving failures or recording genuine environment blockers without claiming success.
 - [ ] 10.5 Perform manual smoke passes for no-save onboarding, save load/drop, navigation/history, every page family, entity links, representative edits, review/save/backup/restore, tool progress/failure, keyboard-only use, and minimum-size layout; record evidence and any approved deviations.
