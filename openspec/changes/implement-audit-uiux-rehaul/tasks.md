@@ -99,7 +99,7 @@
 - [x] 9.8 Complete responsive behavior at 1450x800, 1200x750, and 1024x700: sidebar collapse, inspector drawers, toolbar overflow, readable headers, map bounds, and persisted splitter state; run layout-contract and offscreen render tests at all sizes.
 - [x] 9.9 Profile sidebar navigation, inspector opening, search, inventory switching, Palbox navigation, and large operations against the audit budgets; remove avoidable GUI-thread work or record measured exceptions with rationale.
 - [x] 9.10 Remove the persistent bottom status-strip presentation, route concise feedback to state/notifications/Activity and raw output to Diagnostics, and verify no raw HTTP/traceback/byte statistics appear in user-facing surfaces.
-- [ ] 9.11 Run the full accessibility, state, safety, responsive, performance, i18n, resource-integrity, and visual-harness checks and update the audit checkpoint.
+- [x] 9.11 Run the full accessibility, state, safety, responsive, performance, i18n, resource-integrity, and visual-harness checks and update the audit checkpoint.
 
 ## 10. Audit Closure and Release Verification
 
