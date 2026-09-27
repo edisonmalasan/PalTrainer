@@ -37,11 +37,7 @@ from loading_manager import is_loading_active
 from palworld_aio.widgets.player_select_popup import show_player_select_popup
 SINGLETON_TYPE_A = {'EPalItemTypeA::Weapon', 'EPalItemTypeA::MonsterEquipWeapon', 'EPalItemTypeA::Armor', 'EPalItemTypeA::Accessory', 'EPalItemTypeA::Glider', 'EPalItemTypeA::CaptureItemModifier'}
 from palworld_aio import constants
-try:
-    import nerdfont as _nf
-except Exception:
-    _nf = None
-SPHERE_ICON = _nf.icons.get('nf-md-pokeball', '\u2B55') if _nf else '\u2B55'
+SPHERE_ICON = '\u2B55'
 EQUIP_SLOT_FILTERS = {'weapon': {'type_a': ['EPalItemTypeA::Weapon', 'EPalItemTypeA::MonsterEquipWeapon']}, 'head': {'type_a': 'EPalItemTypeA::Armor', 'type_b': 'EPalItemTypeB::ArmorHead'}, 'body': {'type_a': 'EPalItemTypeA::Armor', 'type_b': 'EPalItemTypeB::ArmorBody'}, 'shield': {'type_a': 'EPalItemTypeA::Armor', 'type_b': 'EPalItemTypeB::Shield'}, 'accessory': {'type_a': 'EPalItemTypeA::Accessory'}, 'glider': {'type_a': 'EPalItemTypeA::Glider'}, 'sphere_mod': {'type_a': 'EPalItemTypeA::CaptureItemModifier'}, 'food': {'type_a': 'EPalItemTypeA::Food'}}
 GRID_COLS = 6
 class ItemSlotWidget(InventorySlot):

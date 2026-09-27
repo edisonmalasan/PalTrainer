@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PyQt6.QtGui import QFont
 
 from tests.dynamic_importer import import_from
@@ -37,3 +39,13 @@ def test_generated_qss_never_requests_synthetic_bold():
     qss = qss_builder.build_qss('dark').lower()
     assert 'font-weight: 700' not in qss
     assert 'font-weight: bold' not in qss
+
+
+def test_live_presentation_has_no_glyph_font_imports():
+    source = Path(__file__).parents[3] / 'src' / 'palworld_aio'
+    offenders = [
+        path.relative_to(source)
+        for path in source.rglob('*.py')
+        if 'nerdfont' in path.read_text(encoding='utf-8')
+    ]
+    assert offenders == []

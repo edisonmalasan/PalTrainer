@@ -144,9 +144,9 @@ def test_log_panel_clear_empties_only_panel(app):
     assert panel.entry_count() == 1
     panel.clear()
     assert panel.entry_count() == 0
-    # the underlying stream routing is untouched: strip message + signal
-    # history are independent of the panel's view
-    assert stream.status_bar.currentMessage() == 'conversion finished: 3 files written'
+    # The raw stream remains available to Diagnostics without surfacing in
+    # the compatibility status sink.
+    assert stream.status_bar.currentMessage() == 'Ready'
     assert seen == ['conversion finished: 3 files written']
 
 
@@ -175,6 +175,11 @@ def test_tools_tab_subscribes_to_parent_stream(app):
     stream.write('loading Level.sav')
     stream._drain_pending()
     assert 'loading Level.sav' in tab._activity_log._view.toPlainText()
+
+
+def test_tools_tab_has_no_legacy_page_ribbon(app):
+    tab = tools_mod.ToolsTab()
+    assert not tab.findChildren(tools_mod.QFrame, 'pageRibbon')
 
 
 # ------------------------------------- preserved wiring (hard constraints)

@@ -1,7 +1,7 @@
 """Focused tests for the Base Inventory chip/tab split and container
 grouping (uiux-audit-remediation 8.1-8.4).
 
-Covers: EDITING ribbon caption, selector-chip vs view-tab distinction,
+Covers: absence of the legacy ribbon, selector-chip vs view-tab distinction,
 storage-first container grouping (both load paths), separator presence,
 first-selection landing on storage, and container id reachability.
 Widgets are constructed standalone offscreen with a stubbed manager.
@@ -105,19 +105,8 @@ def tab(app):
 
 # ------------------------------------------------------------ 8.1 caption
 
-def test_ribbon_caption_reads_editing(app):
-    i18n_mod = import_from('i18n')
-    i18n_mod.load_resources('en_US')
-    components_mod = import_from('palworld_aio.ui.chrome.components')
-    create_page_ribbon = components_mod.create_page_ribbon
-    ribbon = create_page_ribbon(
-        'Base Inventory',
-        (i18n_mod.t('sidebar.section.editing') or 'Editing').upper(), None)
-    zone_labels = ribbon.findChildren(__import__('PyQt6.QtWidgets',
-                                             fromlist=['QLabel']).QLabel)
-    texts = [lbl.text() for lbl in zone_labels]
-    assert 'EDITING' in texts
-    assert 'WORLD DATA' not in texts
+def test_base_inventory_uses_workspace_header_without_page_ribbon(tab):
+    assert not tab.findChildren(bi_mod.QFrame, 'pageRibbon')
 
 
 # --------------------------------------------------- 8.2 chips vs tabs
@@ -877,6 +866,25 @@ def test_container_slot_dialog_keeps_value_contract(app):
     assert dialog.objectName() == 'baseDialog'
     assert dialog.styleSheet() == ''
     _dispose_dialogs(app, dialog)
+
+
+def test_container_context_menu_has_keyboard_entry(app):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QSignalSpy, QTest
+    from PyQt6.QtWidgets import QTreeWidgetItem
+
+    tree = bi_mod.ContainerListWidget()
+    tree.addTopLevelItem(QTreeWidgetItem(['Synthetic container']))
+    tree.setCurrentItem(tree.topLevelItem(0))
+    tree.customContextMenuRequested.disconnect(tree._show_context_menu)
+    observed = QSignalSpy(tree.customContextMenuRequested)
+    tree.show()
+    tree.setFocus()
+    QTest.keyClick(tree, Qt.Key.Key_Menu)
+    QTest.keyClick(tree, Qt.Key.Key_F10, Qt.KeyboardModifier.ShiftModifier)
+    app.processEvents()
+    assert len(observed) == 2
+    tree.close()
 
 
 def test_base_picker_and_economy_dialogs_keep_shared_footer_contracts(

@@ -113,6 +113,7 @@ class WorkspaceShell(QFrame):
     closeRequested = pyqtSignal()
 
     COMPACT_INSPECTOR_WIDTH = 1200
+    COMPACT_SIDEBAR_WIDTH = 1100
 
     def __init__(
         self,
@@ -381,6 +382,10 @@ class WorkspaceShell(QFrame):
             self.splitter.setSizes(list(sizes))
 
     def resizeEvent(self, event) -> None:
+        sidebar_compact = event.size().width() <= self.COMPACT_SIDEBAR_WIDTH
+        if sidebar_compact != getattr(self, '_sidebar_compact', False):
+            self._sidebar_compact = sidebar_compact
+            self.sidebar.set_responsive_collapsed(sidebar_compact)
         compact = event.size().width() <= self.COMPACT_INSPECTOR_WIDTH
         if compact != self._inspector_compact:
             self._inspector_compact = compact

@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import QApplication, QDialog, QFrame, QGridLayout, QHBoxLay
 from PyQt6.QtCore import Qt, QEvent, QPoint, QTimer
 from PyQt6.QtGui import QPixmap
 from i18n import t
-import nerdfont as nf
 from loading_manager import show_information, show_warning, show_question
 from palworld_aio import constants
 from resource_resolver import resource_path

@@ -27,6 +27,15 @@ class _CopyableTree(QTreeWidget):
         self._panel = panel
 
     def keyPressEvent(self, event):
+        if (event.key() == Qt.Key.Key_Menu
+                or (event.key() == Qt.Key.Key_F10
+                    and event.modifiers() & Qt.KeyboardModifier.ShiftModifier)):
+            item = self.currentItem()
+            if item is not None:
+                self.customContextMenuRequested.emit(
+                    self.visualItemRect(item).center())
+            event.accept()
+            return
         if event.matches(QKeySequence.StandardKey.Copy):
             copied = False
             for item in self.selectedItems():

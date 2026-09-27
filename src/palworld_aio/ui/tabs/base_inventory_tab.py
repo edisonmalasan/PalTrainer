@@ -1187,6 +1187,17 @@ class ContainerListWidget(QTreeWidget):
         self.itemClicked.connect(self._on_item_clicked)
         self._display_name_counts = {}
         self._filter_text = ''
+    def keyPressEvent(self, event):
+        if (event.key() == Qt.Key.Key_Menu
+                or (event.key() == Qt.Key.Key_F10
+                    and event.modifiers() & Qt.KeyboardModifier.ShiftModifier)):
+            item = self.currentItem()
+            if item is not None:
+                self.customContextMenuRequested.emit(
+                    self.visualItemRect(item).center())
+            event.accept()
+            return
+        super().keyPressEvent(event)
     def clear(self):
         super().clear()
         self.setHeaderHidden(True)
@@ -3186,15 +3197,10 @@ class BaseInventoryTab(QWidget):
         self._update_container_stats()
         self._update_container_navigation_summary()
     def _setup_ui(self):
-        from palworld_aio.ui.chrome.components import create_page_ribbon, set_content_margins
+        from palworld_aio.ui.chrome.components import set_content_margins
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        # uiux-audit-remediation 8.1: the page edits containers, so its zone
-        # caption reads EDITING (matches its Edit-tier nav position), not
-        # WORLD DATA.
-        ribbon = create_page_ribbon(t('base_inventory.title', default='Base Inventory'), (t('sidebar.section.editing') if t else 'Editing').upper(), self)
-        layout.addWidget(ribbon)
         # top-nav-shell 4.4: guild/base selectors + view switch in a standard
         # toolbar row below the page header. uiux-audit-remediation 8.2
         # (design D10): the two control kinds get distinct treatments —
@@ -4798,8 +4804,7 @@ class BaseInventoryTab(QWidget):
                 self.clear_item_button.setVisible(False)
             elapsed = time.time() - start_time
             if elapsed > 0.5:
-                if hasattr(self._main_window, 'status_bar'):
-                    self._main_window.status_bar.showMessage(f'Item filter completed in {elapsed:.2f}s', 3000)
+                print(f'Item filter completed in {elapsed:.2f}s')
         run_with_loading(on_finished, task)
     def _reset_filters(self):
         self._item_locations = None
@@ -5018,8 +5023,9 @@ class BaseInventoryTab(QWidget):
                         context=self._current_base_name or self._current_guild_name,
                     )
                 self._suppress_next_auto_save_journal = False
-                if hasattr(self._main_window, 'status_bar'):
-                    self._main_window.status_bar.showMessage(t('base_inventory.auto_save_success') if t else 'Auto-saved changes', 2000)
+                feedback = getattr(self._main_window, '_show_status_feedback', None)
+                if callable(feedback):
+                    feedback(t('base_inventory.auto_save_success') if t else 'Auto-saved changes', level='success')
             else:
                 self._suppress_next_auto_save_journal = False
                 self._show_warning(t('base_inventory.auto_save_failed') if t else 'Auto-save failed - changes not saved')
@@ -5215,8 +5221,7 @@ class BaseInventoryTab(QWidget):
                 self._guilds_data = guilds_data
                 if self._guilds_data:
                     self._on_guild_changed(self._guilds_data[0]['id'])
-                    if hasattr(self._main_window, 'status_bar'):
-                        self._main_window.status_bar.showMessage(f'Found {structure_asset} in {len(self._guilds_data)} guild(s)', 3000)
+                    self._show_info(f'Found {structure_asset} in {len(self._guilds_data)} guild(s)')
             else:
                 if not silent:
                     self._show_info(t('base_inventory.no_structures') if t else f'No guilds found with this structure')

@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 from PyQt6.QtCore import Qt
-from PyQt6.QtTest import QSignalSpy
-from PyQt6.QtWidgets import QApplication, QWidget
+from PyQt6.QtTest import QSignalSpy, QTest
+from PyQt6.QtWidgets import QApplication, QWidget, QTreeWidgetItem
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
@@ -363,3 +363,18 @@ def test_map_base_transfer_actions_keep_callbacks_behind_shared_review():
         }
         assert callback_names <= calls
         assert '_run_transfer_workflow' in attributes
+
+
+def test_map_explorer_context_action_has_keyboard_entry(tab, app):
+    tree = tab.base_tree
+    tree.addTopLevelItem(QTreeWidgetItem(['Synthetic base']))
+    tree.setCurrentItem(tree.topLevelItem(0))
+    tree.customContextMenuRequested.disconnect(tab._on_tree_context_menu)
+    observed = QSignalSpy(tree.customContextMenuRequested)
+    tree.setFocus()
+    QTest.keyClick(tree, Qt.Key.Key_Menu)
+    app.processEvents()
+    assert len(observed) == 1
+    QTest.keyClick(tree, Qt.Key.Key_F10, Qt.KeyboardModifier.ShiftModifier)
+    app.processEvents()
+    assert len(observed) == 2

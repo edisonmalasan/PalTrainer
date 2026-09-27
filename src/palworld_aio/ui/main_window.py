@@ -86,7 +86,7 @@ class DetachedStatusWindow(QWidget):
         self.setWindowOpacity(0.0)
         self.show()
         self.fade_animation = QPropertyAnimation(self, b'windowOpacity')
-        self.fade_animation.setDuration(400)
+        self.fade_animation.setDuration(0 if constants.reduced_motion else 400)
         self.fade_animation.setStartValue(0.0)
         self.fade_animation.setEndValue(1.0)
         self.fade_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
@@ -161,6 +161,7 @@ class DetachedStatusWindow(QWidget):
         event.accept()
 class StatusBarStream(QObject):
     text_written = pyqtSignal(str)
+    summary_written = pyqtSignal(str)
     detach_state_changed = pyqtSignal(bool)
     def __init__(self, status_bar, parent=None):
         QObject.__init__(self)
@@ -182,16 +183,17 @@ class StatusBarStream(QObject):
             self.detach_window.append_message(text)
         else:
             presented = _present_status(text)
-            if presented is _STATUS_SHOW_RAW:
-                self.status_bar.showMessage(text)
-            elif presented is _STATUS_DEMOTE:
+            if presented is _STATUS_DEMOTE:
                 # demoted to the log/console; keep the last human message,
                 # or leave the neutral ready message instead of stale text
                 if not self.status_bar.currentMessage():
                     self.status_bar.showMessage(t('status.ready') if t else 'Ready')
             else:
                 key, fallback = presented  # type: ignore[misc]
-                self.status_bar.showMessage(t(key) if t else fallback)
+                summary = t(key) if t else fallback
+                self.status_bar.showMessage(summary)
+                if key != 'status.ready':
+                    self.summary_written.emit(summary)
     def write(self, text):
         with self._stream_lock:
             self.stringio.write(text)
@@ -223,7 +225,8 @@ class StatusBarStream(QObject):
             self.detach_window.activateWindow()
             self.detach_window.raise_()
             self.detach_window.fade_animation = QPropertyAnimation(self.detach_window, b'windowOpacity')
-            self.detach_window.fade_animation.setDuration(300)
+            self.detach_window.fade_animation.setDuration(
+                0 if constants.reduced_motion else 300)
             self.detach_window.fade_animation.setStartValue(0.0)
             self.detach_window.fade_animation.setEndValue(1.0)
             self.detach_window.fade_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
@@ -270,15 +273,13 @@ class UpdateChecker(QThread):
         except Exception as e:
             print(f'Update check error: {e}')
             self.update_checked.emit(False, None, None)
-# Status strip presentation policy (uiux-audit-remediation 2.1 / design D3):
-# the strip shows one short human-readable message; raw technical payloads
-# are demoted to the log/console stream (StatusBarStream still routes every
-# payload verbatim when detached). Patterns match the producers:
+# Stream presentation policy: only known short summaries become notifications.
+# Raw technical payloads remain in Diagnostics and the detached console.
+# Patterns match the producers:
 # - decompression stats: palsav compressor logger lines
 # - update-check failures: UpdateChecker.print in run(); they surface through
 #   the app-bar warning affordance (2.2) instead of strip text
 # - exception text / HTTP status codes: traceback blocks and HTTPError reprs
-_STATUS_SHOW_RAW = object()
 _STATUS_DEMOTE = object()
 _STATUS_SUMMARIZERS = (
     (re.compile(r'Decompression successful', re.IGNORECASE), ('status.ready', 'Ready')),
@@ -291,17 +292,16 @@ _STATUS_SUMMARIZERS = (
     (re.compile(r'HTTP Error \d{3}'), _STATUS_DEMOTE),
 )
 def _present_status(text):
-    """Map a streamed payload to its strip presentation (design D3).
+    """Map a streamed payload to a concise notification or Diagnostics.
 
-    Returns _STATUS_DEMOTE (log/console only), (key, fallback) for a human
-    summary, or _STATUS_SHOW_RAW to display the payload unchanged."""
+    Returns _STATUS_DEMOTE (log/console only) or a human summary tuple."""
     stripped = (text or '').strip()
     if not stripped:
-        return _STATUS_SHOW_RAW
+        return _STATUS_DEMOTE
     for pattern, presentation in _STATUS_SUMMARIZERS:
         if pattern.search(stripped):
             return presentation
-    return _STATUS_SHOW_RAW
+    return _STATUS_DEMOTE
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -321,6 +321,7 @@ class MainWindow(QMainWindow):
         self._setup_connections()
         QTimer.singleShot(0, self._check_update)
         self.status_stream = StatusBarStream(self.status_bar, self)
+        self.status_stream.summary_written.connect(self._show_status_feedback)
         self.status_stream.detach_state_changed.connect(self._on_detach_state_changed)
         self.status_stream.text_written.connect(
             self.diagnostics_page.append_console_message)
@@ -370,13 +371,10 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         self._setup_workspace_shell(main_layout)
-        # Status strip (top-nav-shell 1.5): visible host for streamed
-        # load/save/log messages; detachable console behavior unchanged.
+        # Keep the stream's compatibility sink detached from the window.
+        # User feedback lives in the header, notifications, and Activity;
+        # raw output is available through Diagnostics and the detached console.
         self.status_bar = QStatusBar()
-        self.status_bar.setObjectName('statusStrip')
-        self.status_bar.setFixedHeight(24)
-        self.status_bar.setSizeGripEnabled(False)
-        self.setStatusBar(self.status_bar)
         self.setAcceptDrops(True)
         self._drop_overlay = DropOverlay(self)
         self._drop_overlay.setVisible(False)
@@ -630,8 +628,6 @@ class MainWindow(QMainWindow):
             widget = self.stacked_widget.widget(self.stacked_widget.count() - 1)
             self.stacked_widget.removeWidget(widget)
             self.stacked_widget.insertWidget(idx, widget)
-            for ribbon in widget.findChildren(QFrame, 'pageRibbon'):
-                ribbon.hide()
             self._tab_created.add(index)
     def _setup_players_tab(self):
         from palworld_aio.ui.pages.players_page import PlayersPage
@@ -1227,6 +1223,12 @@ class MainWindow(QMainWindow):
             detail=detail, undo=undo,
         )
 
+    def _show_status_feedback(self, message: str, *, level: str = 'info') -> None:
+        from palworld_aio.ui.chrome.components import show_toast
+        shell = self.__dict__.get('workspace_shell')
+        if shell is not None and message.strip():
+            show_toast(message.strip(), level, shell)
+
     def _refresh_stats_all_before(self):
         from palworld_aio.managers.save_manager import save_manager
         stats = save_manager.get_current_stats()
@@ -1697,10 +1699,10 @@ class MainWindow(QMainWindow):
     def _on_update_checked(self, ok, latest, branch):
         try:
             if not ok and latest:
-                tools_version = get_display_version()
                 self._set_update_action_state(True)
-                branch_text = f' ({branch})' if branch else ''
-                self.status_bar.showMessage(f"{(t('update.current') if t else 'Current')}: {tools_version}{branch_text} | {(t('update.latest') if t else 'Latest')}: {latest} - Click version chip to update", 0)
+                self._show_status_feedback(
+                    t('ui.about.update_available', default='Update available'),
+                    level='info')
             else:
                 self._set_update_action_state(False)
             about = self.__dict__.get('about_page')
@@ -1862,7 +1864,7 @@ class MainWindow(QMainWindow):
                 app_bar.context.clear_selection()
                 app_bar.context.setVisible(True)
             self._refresh_stats_all_before()
-            self.status_bar.showMessage(t('status.loaded') if t else 'Save loaded successfully', 5000)
+            self._show_status_feedback(t('status.loaded') if t else 'Save loaded successfully')
         else:
             from palworld_aio.ui.operation_journal import (
                 ActivityKind, ActivityStatus,
@@ -1873,7 +1875,8 @@ class MainWindow(QMainWindow):
                 status=ActivityStatus.FAILED,
                 detail=t('save.load_failed', default='The selected save could not be loaded.'),
             )
-            self.status_bar.showMessage(t('status.load_failed') if t else 'Failed to load save', 5000)
+            self._show_status_feedback(
+                t('status.load_failed') if t else 'Failed to load save', level='danger')
             msg_box = self._create_message_box(QMessageBox.Critical)
             msg_box.setWindowTitle(t('error.title'))
             if constants.xgp_loaded:
@@ -1903,7 +1906,7 @@ class MainWindow(QMainWindow):
                 self.app_bar.save_chip.set_shell_state(ShellState.LOADED)
             except (RuntimeError, AttributeError, ImportError):
                 pass
-        self.status_bar.showMessage(f"{(t('status.saved') if t else 'Save completed')}({duration:.2f}s)", 5000)
+        self._show_status_feedback(t('status.saved') if t else 'Save completed', level='success')
         if constants.xgp_loaded:
             return
         msg_box = self._create_message_box(QMessageBox.Information)

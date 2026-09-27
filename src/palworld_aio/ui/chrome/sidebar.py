@@ -60,6 +60,7 @@ class WorkspaceSidebar(QFrame):
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         self._registry = registry
         self._collapsed = False
+        self._preferred_collapsed = False
         self._expanded_width = LAYOUT['sidebar_expanded']
         self._active_route: str | None = None
         self._buttons: dict[str, QPushButton] = {}
@@ -206,6 +207,13 @@ class WorkspaceSidebar(QFrame):
 
     def set_collapsed(self, collapsed: bool) -> None:
         collapsed = bool(collapsed)
+        self._preferred_collapsed = collapsed
+        self._apply_collapsed(collapsed)
+
+    def set_responsive_collapsed(self, compact: bool) -> None:
+        self._apply_collapsed(True if compact else self._preferred_collapsed)
+
+    def _apply_collapsed(self, collapsed: bool) -> None:
         if collapsed == self._collapsed:
             return
         self._collapsed = collapsed
@@ -239,7 +247,7 @@ class WorkspaceSidebar(QFrame):
 
     def export_settings(self) -> dict[str, object]:
         return {
-            'collapsed': self._collapsed,
+            'collapsed': self._preferred_collapsed,
             'expanded_width': self._expanded_width,
         }
 

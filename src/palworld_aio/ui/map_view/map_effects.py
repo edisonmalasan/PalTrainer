@@ -3,6 +3,7 @@ import random
 from PyQt6.QtWidgets import QGraphicsObject
 from PyQt6.QtCore import Qt, QRectF, QPointF, pyqtProperty, QTimer
 from PyQt6.QtGui import QPainter, QPen, QColor, QRadialGradient
+from palworld_aio import constants
 class EffectItem(QGraphicsObject):
     def __init__(self, x, y, duration=1000):
         super().__init__()
@@ -63,7 +64,8 @@ class CalibrationEffect(QGraphicsObject):
         self._phase = 0.0
         self._timer = QTimer()
         self._timer.timeout.connect(self._tick)
-        self._timer.start(30)
+        if not constants.reduced_motion:
+            self._timer.start(30)
     def _tick(self):
         self._phase = (self._phase + 0.04) % 1.0
         self.update()
@@ -92,7 +94,8 @@ class CoordChangeEffect(QGraphicsObject):
         self._phase = 0.0
         self._timer = QTimer()
         self._timer.timeout.connect(self._tick)
-        self._timer.start(30)
+        if not constants.reduced_motion:
+            self._timer.start(30)
         self._duration = 0
     def _tick(self):
         self._phase = (self._phase + 0.03) % 1.0
@@ -137,7 +140,8 @@ class SwapSourceEffect(QGraphicsObject):
         self._phase = 0.0
         self._timer = QTimer()
         self._timer.timeout.connect(self._tick)
-        self._timer.start(30)
+        if not constants.reduced_motion:
+            self._timer.start(30)
     def _tick(self):
         self._phase = (self._phase + 0.035) % 1.0
         self.update()

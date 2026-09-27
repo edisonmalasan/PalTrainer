@@ -91,6 +91,28 @@ def test_focus_and_motion_contracts():
         tokens.motion_duration('unknown')
 
 
+def test_readable_dark_text_and_focus_contrast():
+    palette = tokens.resolve('dark')
+
+    def luminance(color: str) -> float:
+        channels = [int(color[index:index + 2], 16) / 255
+                    for index in (1, 3, 5)]
+        linear = [channel / 12.92 if channel <= 0.04045
+                  else ((channel + 0.055) / 1.055) ** 2.4
+                  for channel in channels]
+        return sum(channel * weight for channel, weight in zip(
+            linear, (0.2126, 0.7152, 0.0722)))
+
+    def ratio(foreground: str, background: str) -> float:
+        first, second = sorted((luminance(foreground), luminance(background)))
+        return (second + 0.05) / (first + 0.05)
+
+    for surface in ('canvas', 'surface', 'surface_raised', 'surface_input'):
+        for role in ('text', 'text_secondary'):
+            assert ratio(palette[role], palette[surface]) >= 4.5, (surface, role)
+        assert ratio(palette['focus_ring'], palette[surface]) >= 3.0, surface
+
+
 def test_generated_theme_rejects_retired_shell_colors():
     qss = qss_builder.build_qss('dark').lower()
     for legacy in tokens.RETIRED_COLORS:

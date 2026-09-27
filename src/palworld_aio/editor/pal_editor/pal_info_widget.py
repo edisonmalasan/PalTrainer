@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import QApplication, QDialog, QFrame, QGraphicsOpacityEffec
 from PyQt6.QtCore import Qt, QEvent, QObject, QPoint, QSize, QTimer, pyqtSignal
 from PyQt6.QtGui import QFontMetrics, QIcon, QShortcut, QKeySequence, QFont
 from i18n import t
-import nerdfont as nf
 
 from palworld_aio import constants
 from resource_resolver import resource_path

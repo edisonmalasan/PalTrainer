@@ -469,14 +469,6 @@ QToolTip {{
     padding: 5px 10px;
     font-size: {TYPE['secondary'][0]}px;
 }}
-QStatusBar {{
-    background: {p['surface']};
-    color: {p['text_secondary']};
-    border-top: 1px solid {p['border']};
-    font-size: {TYPE['micro'][0]}px;
-}}
-QStatusBar::item {{ border: none; }}
-
 /* ---- shell v3 app bar (top-nav-shell 2.1) ---- */
 QFrame#appBar {{
     background: {p['surface']};
@@ -1315,29 +1307,6 @@ QPushButton#drawerCloseBtn {{
 }}
 QPushButton#drawerCloseBtn:hover {{ background: {p['danger_bg']}; color: {p['danger']}; border-color: {p['danger_border']}; }}
 
-/* ---- page ribbon (plan 020 §4.4) ---- */
-QFrame#pageRibbon {{
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid {p['border']};
-}}
-QLabel#ribbonTitle {{
-    color: {p['text']};
-    font-family: {font_family_qss(FONT_HEADING_STACK)};
-    font-size: {TYPE['display'][0]}px;
-    font-weight: {TYPE['display'][1]};
-}}
-QLabel#ribbonZone {{
-    color: {p['text_disabled']};
-    font-size: {TYPE['micro'][0]}px;
-    letter-spacing: 1px;
-    font-weight: 600;
-}}
-QLabel#ribbonSep {{
-    color: {p['text_disabled']};
-    font-size: {TYPE['micro'][0]}px;
-}}
-
 /* ---- workspace sidebar ---- */
 QWidget#sideBar {{
     background-color: {p['surface_sidebar']};
@@ -1960,7 +1929,7 @@ QFrame#passiveSkillsBox {{
 QLabel#palInspectorSectionTitle {{
     color: {p['text_secondary']};
     font-size: {TYPE['micro'][0]}px;
-    font-weight: 700;
+    font-weight: 600;
     padding: 2px {SPACING['xs']}px;
 }}
 QLabel#palTechnicalLabel {{
@@ -2067,7 +2036,7 @@ QFrame#multiToolbar {{
 QLabel#palMultiCount {{
     color: {p['accent']};
     font-size: {TYPE['micro'][0]}px;
-    font-weight: 700;
+    font-weight: 600;
     padding: 0 {SPACING['xs']}px;
 }}
 QFrame#multiToolbar QPushButton {{
@@ -2084,9 +2053,9 @@ QFrame#bulkWorkflowReview[riskVariant="destructive"] {{
     border-color: {p['danger_border']};
 }}
 QLabel#bulkWorkflowField {{
-    color: {p['text_disabled']};
+    color: {p['text_secondary']};
     font-size: {TYPE['micro'][0]}px;
-    font-weight: 700;
+    font-weight: 600;
     min-width: 56px;
 }}
 QLabel#bulkWorkflowValue {{
@@ -2103,7 +2072,14 @@ QLabel#bulkWorkflowRisk {{
 QLabel#bulkWorkflowBackup {{ color: {p['warning']}; }}
 QLabel#bulkWorkflowResult[resultState="success"] {{ color: {p['success']}; }}
 QLabel#bulkWorkflowResult[resultState="error"] {{ color: {p['danger']}; }}
-QProgressBar#bulkWorkflowProgress {{ min-height: 16px; }}
+QProgressBar#bulkWorkflowProgress {{
+    min-height: 16px;
+    font-weight: 600;
+}}
+QProgressBar#bulkWorkflowProgress[resultState="success"],
+QProgressBar#bulkWorkflowProgress[resultState="error"] {{ color: {p['text_on_accent']}; }}
+QProgressBar#bulkWorkflowProgress[resultState="success"]::chunk {{ background: {p['success']}; }}
+QProgressBar#bulkWorkflowProgress[resultState="error"]::chunk {{ background: {p['danger']}; }}
 QTreeWidget#jsonTree {{
     background: {p['canvas']};
     alternate-background-color: {p['surface']};
@@ -2624,7 +2600,7 @@ QLabel#illegalPalMarkers {{
     border-radius: {RADIUS['sm']}px;
     padding: 1px {SPACING['sm']}px;
     font-size: {TYPE['caption'][0]}px;
-    font-weight: 700;
+    font-weight: 600;
 }}
 QLabel#illegalPlayerName {{
     color: {p['text']};

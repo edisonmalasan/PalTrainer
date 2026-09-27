@@ -236,11 +236,7 @@ class PalIcon(QFrame):
             pred_badge.setAlignment(Qt.AlignCenter)
             pred_badge.move(2, 2)
             pred_badge.setAttribute(Qt.WA_TransparentForMouseEvents)
-            try:
-                import nerdfont as _nf
-                pred_badge.setText('P')
-            except Exception:
-                pred_badge.setText('P')
+            pred_badge.setText('P')
             pred_badge.show()
 
         pal_name = _strip_prefix_label(resolve_name(cid, PalFrame._NAMEMAP) or cid)
@@ -765,6 +761,5 @@ class PalCardWidget(QFrame):
         else:
 
             self.setStyleSheet(slot_full('QFrame#palCardNew'))
-
 
 

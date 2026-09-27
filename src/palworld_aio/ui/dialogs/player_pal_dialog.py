@@ -42,11 +42,7 @@ class PalSlotDelegate(QStyledItemDelegate):
         if has_badge:
             is_predator_badge = index.data(Qt.UserRole + 3)
             if is_predator_badge:
-                try:
-                    import nerdfont as _nf2
-                    paw = _nf2.icons.get('nf-fa-paw', '🐾')
-                except Exception:
-                    paw = '🐾'
+                paw = 'P'
                 painter.save()
                 painter.setRenderHint(QPainter.TextAntialiasing)
                 painter.setPen(QColor('#EF4444'))

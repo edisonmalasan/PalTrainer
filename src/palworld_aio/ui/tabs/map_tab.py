@@ -4,8 +4,8 @@ import logging
 from palsav import json_tools
 from palsav.archive import UUID
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGraphicsScene, QGraphicsPixmapItem, QMenu, QLineEdit, QTreeWidget, QTreeWidgetItem, QSplitter, QLabel, QFileDialog, QCheckBox, QStackedWidget, QDialog, QPushButton, QSizePolicy, QHeaderView, QApplication, QFrame
-from PyQt6.QtCore import Qt, QRectF, QPointF, QPoint, QSize, QTimer, QPropertyAnimation, QEasingCurve, pyqtSignal
-from PyQt6.QtGui import QPixmap, QPen, QBrush, QColor, QPainter, QFont, QIcon
+from PyQt6.QtCore import Qt, QEvent, QRectF, QPointF, QPoint, QSize, QTimer, QPropertyAnimation, QEasingCurve, pyqtSignal
+from PyQt6.QtGui import QPixmap, QPen, QBrush, QColor, QPainter, QFont, QIcon, QKeyEvent
 from i18n import t
 from resource_resolver import resource_path
 from loading_manager import show_information, show_warning, show_critical, show_question, run_with_loading
@@ -511,6 +511,7 @@ class MapTab(QWidget):
         self.base_tree.itemDoubleClicked.connect(self._on_tree_item_double_clicked)
         self.base_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.base_tree.customContextMenuRequested.connect(self._on_tree_context_menu)
+        self.base_tree.installEventFilter(self)
         self.base_tree.setSortingEnabled(True)
         self.base_tree.header().setMouseTracking(True)
         self.base_tree.header().setAttribute(Qt.WA_Hover, True)
@@ -531,6 +532,7 @@ class MapTab(QWidget):
         self.player_tree.itemDoubleClicked.connect(self._on_tree_item_double_clicked)
         self.player_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.player_tree.customContextMenuRequested.connect(self._on_tree_context_menu)
+        self.player_tree.installEventFilter(self)
         self.player_tree.setSortingEnabled(True)
         self.player_tree.header().setMouseTracking(True)
         self.player_tree.header().setAttribute(Qt.WA_Hover, True)
@@ -1708,6 +1710,8 @@ class MapTab(QWidget):
                 self.view.animate_to_marker(marker, zoom_level=zoom_level)
                 break
     def _play_effect(self, effect_class, x, y):
+        if constants.reduced_motion:
+            return
         effect = effect_class(x, y)
         self.scene.addItem(effect)
         self.active_effects.append(effect)
@@ -2048,6 +2052,19 @@ class MapTab(QWidget):
             save_radius = self._get_base_radius(self.selected_base_marker.base_data)
             if save_radius is not None:
                 self.current_radius_ring.update_radius(save_radius)
+    def eventFilter(self, a0, a1):
+        if (a0 in (getattr(self, 'base_tree', None), getattr(self, 'player_tree', None))
+                and isinstance(a1, QKeyEvent)
+                and a1.type() == QEvent.Type.KeyPress
+                and (a1.key() == Qt.Key.Key_Menu
+                     or (a1.key() == Qt.Key.Key_F10
+                         and a1.modifiers() & Qt.KeyboardModifier.ShiftModifier))):
+            item = a0.currentItem()
+            if item is not None:
+                a0.customContextMenuRequested.emit(a0.visualItemRect(item).center())
+            return True
+        return super().eventFilter(a0, a1)
+
     def _on_tree_context_menu(self, pos):
         current_tab = self.map_tab_stack.currentIndex()
         if current_tab == 0:
