@@ -153,3 +153,38 @@ and progress surface. The saved file parsed afterward, a recovery snapshot
 was present in the temporary folder, and its SHA-256 remained unchanged. This
 profiles one representative larger operation without modifying the original
 dummy save.
+
+## Phase 10 manual release smoke
+
+On 2026-09-27 the user reported that every remaining foreground smoke step
+passed using the isolated disposable save copy in the system temporary folder:
+no-save onboarding, open/drop, navigation and Back, selected player/base/Pal
+links, one edit through Review and Save, Backups restore, tool progress or
+failure presentation, and the 1024×700 layout. The user separately confirmed
+opening at least one page in each Workspace, World, Editors, Tools, Reference,
+and System sidebar group. The earlier keyboard-only
+pass also passed. This is user-reported manual evidence because the desktop
+control bridge returned no native app target even while the user showed the
+running PalTrainer window; automated route, workflow, and size tests provide
+independent coverage. The original dummy save was not used for destructive
+testing by the agent.
+
+An agent-run offscreen render of the selected Pal from that copy was inspected
+at 1450×800 and 1024×700 after the final control-style migration. The Palbox
+count was initially clipped at the minimum width. It now selects a compact
+representation that fits the measured label width while retaining the full
+localized count in the tooltip; a focused layout test covers the minimum
+width. Trait controls, Pal cards, selected state, inspector sections, and
+destructive toolbar tier remained visible in both renders.
+
+The final offscreen matrix covered 5 shell baseline states, 10 Phase 8
+states, and 18 World states at 1450×800 and 1024×700 where applicable.
+It used synthetic data and was inspected against the audit's readable,
+single-shell, and no-clipped-action principles. The pass caught two World
+layout defects: unactivated loading/error state widgets covered the entity
+search row, and the compact Guilds inspector left no visible guild row.
+Both were corrected and rerendered. The compact Guilds drawer now shows the
+full guild ID and member rows; its three repeated metrics remain visible in
+the guild table. The final renders showed no blank, overlapping, or clipped
+primary controls. Focused lifecycle and 1024×700 row-visibility tests cover
+both corrections.
